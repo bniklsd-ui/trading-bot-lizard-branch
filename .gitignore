@@ -1,0 +1,124 @@
+# ============================================================
+# Trading Bot — .gitignore
+# Rename this file from "gitignore.txt" to ".gitignore" after placing.
+# ============================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+MANIFEST
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Testing / Coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# --- Type checkers / linters ---
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# --- IDE / Editor ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.project
+.pydevproject
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# --- Secrets & credentials (HARD RULE) ---
+# Credentials live in OS keyring ONLY. These patterns are a safety net.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+credentials.json
+config.local.*
+**/secrets/
+**/credentials/
+
+# --- Runtime / Operational state ---
+# State files are written by the bot, not source-controlled
+ig_state.json
+ig_config.json
+turbo_candidates.json
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# --- Logs ---
+*.log
+logs/
+*.log.*
+
+# --- Local config overrides ---
+config.local.json
+config.local.yml
+*.local.toml
+
+# --- OS junk ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+
+# --- Build artifacts / temp ---
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+
+# --- Project-specific output that shouldn't be committed ---
+# Smoke test logs, debugging snapshots, etc.
+smoke_test_output/
+debug_snapshots/

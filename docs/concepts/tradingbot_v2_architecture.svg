@@ -1,0 +1,477 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1190" viewBox="0 0 1700 1190">
+  <defs>
+    <marker id="arr"      markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,1 L0,6 L7,3.5z" fill="#4a5a7a"/></marker>
+    <marker id="arr-gold" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,1 L0,6 L7,3.5z" fill="#D4AF37"/></marker>
+    <marker id="arr-grn"  markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,1 L0,6 L7,3.5z" fill="#5EA85E"/></marker>
+    <marker id="arr-red"  markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,1 L0,6 L7,3.5z" fill="#B87333"/></marker>
+  </defs>
+
+  <rect width="1700" height="1190" fill="#07070f"/>
+
+  <!-- TITLE -->
+  <text x="850" y="37" text-anchor="middle" font-family="Georgia,serif" font-size="22" font-weight="bold" fill="#e0d8c8" letter-spacing="3">TRADINGBOT V2 — SYSTEM ARCHITECTURE</text>
+  <text x="850" y="56" text-anchor="middle" font-family="Courier New,monospace" font-size="10" fill="#333" letter-spacing="2">IG DAILY OPTIONS BOT · HTADU · GBX ACCOUNT · V2 CHANGES HIGHLIGHTED</text>
+  <line x1="18" y1="66" x2="1682" y2="66" stroke="#D4AF3733" stroke-width="1"/>
+
+  <!--
+    COLUMN LAYOUT  (dedicated arrow-lane between each column)
+    Sidebar : x=18   w=210  right=228   | lane x=246 |
+    Col 1   : x=262  w=260  right=522   | lane x=540 |
+    Col 2   : x=558  w=285  right=843   | lane x=861 |
+    Col 3   : x=879  w=265  right=1144  | lane x=1162|
+    Col 4   : x=1178 w=420  right=1598
+
+    HORIZONTAL HIGHWAYS (clear rows for arrows crossing columns)
+    TOP : y=68   (just below title)
+    MID : y=342  (gap between row-A ~307 and row-B 378)
+    LOW : y=626  (gap between row-B ~596 and row-C 656)
+    BOT : y=916  (below all boxes, above legend)
+    RIGHT MARGIN highway at x=1648 (outside col4)
+  -->
+
+  <!-- ═══════════ SIDEBAR ═══════════ -->
+
+  <rect x="18" y="78"  width="210" height="100" rx="5" fill="#090c15" stroke="#2a3a5a" stroke-width="1.5"/>
+  <rect x="18" y="78"  width="5"   height="100" rx="2" fill="#3a5a9f"/>
+  <text x="32" y="96"  font-family="Courier New,monospace" font-size="9"  fill="#5a7abf" letter-spacing="1">SCHEDULER</text>
+  <line x1="32" y1="103" x2="220" y2="103" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="32" y="117" font-family="Arial,sans-serif" font-size="10" fill="#777">09:20 Session Track</text>
+  <text x="32" y="131" font-family="Arial,sans-serif" font-size="10" fill="#777">09:25 Research</text>
+  <text x="32" y="145" font-family="Arial,sans-serif" font-size="10" fill="#777">11:30 — NO TRADE</text>
+  <text x="32" y="163" font-family="Arial,sans-serif" font-size="9"  fill="#CF6679">Hard Stop: 11:19 CET</text>
+
+  <rect x="18" y="192" width="210" height="100" rx="5" fill="#090c15" stroke="#2a3a5a" stroke-width="1.5"/>
+  <rect x="18" y="192" width="5"   height="100" rx="2" fill="#3a5a9f"/>
+  <text x="32" y="210" font-family="Courier New,monospace" font-size="9"  fill="#5a7abf" letter-spacing="1">EXTERNAL DATA</text>
+  <line x1="32" y1="217" x2="220" y2="217" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="32" y="231" font-family="Arial,sans-serif" font-size="10" fill="#777">yFinance (30-min bars)</text>
+  <text x="32" y="245" font-family="Arial,sans-serif" font-size="10" fill="#777">HTADU / CAC trendlines</text>
+  <text x="32" y="259" font-family="Arial,sans-serif" font-size="10" fill="#777">News · brain_context</text>
+  <text x="32" y="277" font-family="Arial,sans-serif" font-size="9"  fill="#555">Today open vs. now %drift</text>
+
+  <rect x="18" y="306" width="210" height="118" rx="5" fill="#090c15" stroke="#2a3a5a" stroke-width="1.5"/>
+  <rect x="18" y="306" width="5"   height="118" rx="2" fill="#3a5a9f"/>
+  <text x="32" y="324" font-family="Courier New,monospace" font-size="9"  fill="#5a7abf" letter-spacing="1">IG API (HTADU)</text>
+  <line x1="32" y1="331" x2="220" y2="331" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="32" y="345" font-family="Arial,sans-serif" font-size="10" fill="#777">GET /markets/[epics]</text>
+  <text x="32" y="359" font-family="Arial,sans-serif" font-size="10" fill="#777">POST /positions/otc</text>
+  <text x="32" y="373" font-family="Arial,sans-serif" font-size="10" fill="#777">DELETE /positions/otc</text>
+  <text x="32" y="387" font-family="Arial,sans-serif" font-size="9"  fill="#555">405 offline → skip · refresh</text>
+  <text x="32" y="401" font-family="Arial,sans-serif" font-size="9"  fill="#555">session keepalive</text>
+  <text x="32" y="414" font-family="Arial,sans-serif" font-size="9"  fill="#555">↔ ig_bot run_cycle()</text>
+
+  <rect x="18" y="438" width="210" height="82" rx="5" fill="#090c15" stroke="#3a2a6a" stroke-width="1.5"/>
+  <rect x="18" y="438" width="5"   height="82" rx="2" fill="#7a5abf"/>
+  <text x="32" y="456" font-family="Courier New,monospace" font-size="9"  fill="#8a6abf" letter-spacing="1">CLAUDE SONNET</text>
+  <line x1="32" y1="463" x2="220" y2="463" stroke="#2a1a4a" stroke-width="1"/>
+  <text x="32" y="477" font-family="Arial,sans-serif" font-size="10" fill="#777">Research · Debate · Judge</text>
+  <text x="32" y="491" font-family="Arial,sans-serif" font-size="10" fill="#777">Longterm Brain</text>
+  <text x="32" y="506" font-family="Arial,sans-serif" font-size="9"  fill="#555">anthropic API</text>
+
+  <!-- SQLITE V2 ★ -->
+  <rect x="18" y="534" width="210" height="228" rx="5" fill="#111009" stroke="#D4AF37" stroke-width="2"/>
+  <rect x="18" y="534" width="5"   height="228" rx="2" fill="#D4AF37"/>
+  <rect x="116" y="528" width="88"  height="14"  rx="3" fill="#D4AF37"/>
+  <text x="160" y="539" text-anchor="middle" font-family="Courier New,monospace" font-size="8" font-weight="bold" fill="#07070f">★ ERWEITERT</text>
+  <text x="32" y="554" font-family="Courier New,monospace" font-size="9"  fill="#D4AF37" letter-spacing="1">SQLITE DB V2</text>
+  <line x1="32" y1="561" x2="220" y2="561" stroke="#D4AF3744" stroke-width="1"/>
+  <text x="32" y="575" font-family="Arial,sans-serif" font-size="9"  fill="#777">── Bestehend ──</text>
+  <text x="32" y="589" font-family="Arial,sans-serif" font-size="10" fill="#666">trade_lessons</text>
+  <text x="32" y="603" font-family="Arial,sans-serif" font-size="10" fill="#666">trade_outcomes</text>
+  <text x="32" y="617" font-family="Arial,sans-serif" font-size="10" fill="#666">reward_pts · ig_config_state</text>
+  <line x1="32" y1="627" x2="220" y2="627" stroke="#D4AF3733" stroke-width="1"/>
+  <text x="32" y="641" font-family="Arial,sans-serif" font-size="9"  fill="#c8a840">── V2 NEU ──</text>
+  <text x="32" y="656" font-family="Arial,sans-serif" font-size="10" fill="#D4AF37">+ market_regime_snapshots</text>
+  <text x="32" y="670" font-family="Arial,sans-serif" font-size="9"  fill="#b09030">  (volatility, spread, time)</text>
+  <text x="32" y="685" font-family="Arial,sans-serif" font-size="10" fill="#D4AF37">+ decision_context</text>
+  <text x="32" y="699" font-family="Arial,sans-serif" font-size="9"  fill="#b09030">  (Bull/Bear args, VETOs)</text>
+  <text x="32" y="714" font-family="Arial,sans-serif" font-size="10" fill="#a08020">+ lesson_embeddings</text>
+  <text x="32" y="728" font-family="Arial,sans-serif" font-size="9"  fill="#806010">  (Vector Store — future)</text>
+  <text x="32" y="742" font-family="Arial,sans-serif" font-size="9"  fill="#806010">  → semantische Ähnlichkeit</text>
+  <text x="32" y="754" font-family="Arial,sans-serif" font-size="9"  fill="#5a7a30">← Brain + Reward write here</text>
+
+  <rect x="18" y="776" width="210" height="120" rx="5" fill="#090c15" stroke="#2a3a5a" stroke-width="1.5"/>
+  <rect x="18" y="776" width="5"   height="120" rx="2" fill="#3a5a9f"/>
+  <text x="32" y="794" font-family="Courier New,monospace" font-size="9"  fill="#5a7abf" letter-spacing="1">JSON STATE</text>
+  <line x1="32" y1="801" x2="220" y2="801" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="32" y="815" font-family="Arial,sans-serif" font-size="10" fill="#777">ig_state.json</text>
+  <text x="32" y="829" font-family="Arial,sans-serif" font-size="10" fill="#777">account / positions / gear</text>
+  <text x="32" y="843" font-family="Arial,sans-serif" font-size="10" fill="#777">ig_config.json</text>
+  <text x="32" y="857" font-family="Arial,sans-serif" font-size="10" fill="#CF6679">turbo_candidates.json</text>
+  <text x="32" y="871" font-family="Arial,sans-serif" font-size="9"  fill="#555">TTL: 30 min · cleared if no picks</text>
+  <text x="32" y="885" font-family="Arial,sans-serif" font-size="9"  fill="#555">↔ ig_bot gate checks</text>
+
+  <!-- ═══════════ COL 1 ═══════════ -->
+
+  <!-- turbo_research.py  y=78–305 -->
+  <rect x="262" y="78"  width="260" height="228" rx="5" fill="#0a0f1a" stroke="#3a5a9f" stroke-width="1.5"/>
+  <rect x="262" y="78"  width="5"   height="228" rx="2" fill="#4a6abf"/>
+  <text x="277" y="96"  font-family="Courier New,monospace" font-size="10" fill="#6a8acf" letter-spacing="1">turbo_research.py</text>
+  <line x1="277" y1="103" x2="514" y2="103" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="277" y="118" font-family="Arial,sans-serif" font-size="10" fill="#888">① Session Health Check</text>
+  <text x="277" y="134" font-family="Arial,sans-serif" font-size="10" fill="#888">② LLM Pick Underlyings</text>
+  <text x="291" y="148" font-family="Arial,sans-serif" font-size="9"  fill="#666">drift%, last 8 trades, brain lessons</text>
+  <text x="291" y="162" font-family="Arial,sans-serif" font-size="9"  fill="#666">confidence ≥70 · score/trust level</text>
+  <text x="277" y="178" font-family="Arial,sans-serif" font-size="10" fill="#888">③ Probe Epics by Range</text>
+  <text x="291" y="192" font-family="Arial,sans-serif" font-size="9"  fill="#666">DAX-Turbos · collect snapshot</text>
+  <text x="277" y="208" font-family="Arial,sans-serif" font-size="10" fill="#888">④ Candidate Filter</text>
+  <text x="291" y="222" font-family="Arial,sans-serif" font-size="9"  fill="#666">confidence ≥55 (≥70 if score&lt;0)</text>
+  <text x="277" y="238" font-family="Arial,sans-serif" font-size="10" fill="#888">⑤ Save Candidates</text>
+  <text x="291" y="252" font-family="Arial,sans-serif" font-size="9"  fill="#4a6abf">→ turbo_candidates.json (TTL 30min)</text>
+  <text x="277" y="268" font-family="Arial,sans-serif" font-size="9"  fill="#4a6abf">→ JSON profile · CALL only · max 1</text>
+  <text x="277" y="284" font-family="Arial,sans-serif" font-size="9"  fill="#555">↑ Scheduler / External Data / Claude</text>
+  <text x="277" y="298" font-family="Arial,sans-serif" font-size="9"  fill="#555">↑ Brain context from SQLite V2</text>
+
+  <!-- THE COUNCIL ★  y=378–595 -->
+  <rect x="262" y="378" width="260" height="218" rx="5" fill="#111009" stroke="#D4AF37" stroke-width="2.5"/>
+  <rect x="262" y="378" width="5"   height="218" rx="2" fill="#D4AF37"/>
+  <rect x="384" y="372" width="58"  height="14"  rx="3" fill="#D4AF37"/>
+  <text x="413" y="383" text-anchor="middle" font-family="Courier New,monospace" font-size="8" font-weight="bold" fill="#07070f">★ NEU</text>
+  <text x="277" y="397" font-family="Courier New,monospace" font-size="11" fill="#D4AF37" letter-spacing="1">THE COUNCIL</text>
+  <text x="277" y="412" font-family="Arial,sans-serif" font-size="10" fill="#a89060">Adversarielle Philosophen-Evaluation</text>
+  <line x1="277" y1="419" x2="514" y2="419" stroke="#D4AF3733" stroke-width="1"/>
+  <text x="277" y="439" font-family="Georgia,serif"  font-size="17" fill="#5B8FD4">Σ</text>
+  <text x="299" y="439" font-family="Georgia,serif"  font-size="17" fill="#C44B4B">M</text>
+  <text x="320" y="439" font-family="Georgia,serif"  font-size="17" fill="#5EA85E">Ε</text>
+  <text x="340" y="439" font-family="Georgia,serif"  font-size="17" fill="#C47A2A">N</text>
+  <text x="359" y="439" font-family="Georgia,serif"  font-size="17" fill="#9B7BC9">孫</text>
+  <text x="382" y="438" font-family="Georgia,serif"  font-size="16" fill="#D4AF37">⚖</text>
+  <line x1="277" y1="447" x2="514" y2="447" stroke="#D4AF3722" stroke-width="1"/>
+  <text x="277" y="462" font-family="Arial,sans-serif" font-size="10" fill="#888">5 parallele API Calls + Narrator</text>
+  <text x="277" y="476" font-family="Arial,sans-serif" font-size="9"  fill="#c8a840">Trigger: "Idee diskutieren"</text>
+  <text x="277" y="489" font-family="Arial,sans-serif" font-size="9"  fill="#c8a840">"Rat befragen" · "challengen"</text>
+  <text x="277" y="502" font-family="Arial,sans-serif" font-size="9"  fill="#c8a840">"zweite Meinung" · "validieren"</text>
+  <line x1="277" y1="510" x2="514" y2="510" stroke="#D4AF3722" stroke-width="1"/>
+  <text x="277" y="524" font-family="Arial,sans-serif" font-size="10" fill="#D4AF37">Output: verbesserungsvorschlaege</text>
+  <text x="277" y="537" font-family="Arial,sans-serif" font-size="9"  fill="#D4AF37">→ Agent Pipeline als struct. Input</text>
+  <text x="277" y="551" font-family="Arial,sans-serif" font-size="9"  fill="#c8a840">Urteil: SOLIDE/FRAGWÜRDIG/KRITISCH</text>
+  <text x="277" y="565" font-family="Arial,sans-serif" font-size="9"  fill="#806020">Session: 4× SOLIDE / 1× FRAGWÜRDIG</text>
+  <text x="277" y="580" font-family="Arial,sans-serif" font-size="9"  fill="#D4AF37">→ ig_bot pipeline input →</text>
+
+  <!-- turbo_candidates.json  y=656–735 -->
+  <rect x="262" y="656" width="260" height="80"  rx="5" fill="#090c15" stroke="#2a3a5a" stroke-width="1.2"/>
+  <rect x="262" y="656" width="5"   height="80"  rx="2" fill="#4a6abf"/>
+  <text x="277" y="674" font-family="Courier New,monospace" font-size="9"  fill="#5a7abf">turbo_candidates.json</text>
+  <line x1="277" y1="681" x2="514" y2="681" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="277" y="695" font-family="Arial,sans-serif" font-size="10" fill="#777">TTL: 30 min · CALL only · max 1 pick</text>
+  <text x="277" y="709" font-family="Arial,sans-serif" font-size="10" fill="#777">Cleared immediately if no picks</text>
+  <text x="277" y="725" font-family="Arial,sans-serif" font-size="9"  fill="#4a6abf">↑ research  →  ig_bot Gate 2</text>
+
+  <!-- FORCE TRIGGER ⚠  y=752–843 -->
+  <rect x="262" y="752" width="260" height="92"  rx="5" fill="#120909" stroke="#8a2020" stroke-width="2"/>
+  <rect x="262" y="752" width="5"   height="92"  rx="2" fill="#CF6679"/>
+  <rect x="362" y="746" width="80"  height="14"  rx="3" fill="#8a2020"/>
+  <text x="402" y="757" text-anchor="middle" font-family="Courier New,monospace" font-size="8" font-weight="bold" fill="#FF9999">⚠ RISIKO</text>
+  <text x="277" y="772" font-family="Courier New,monospace" font-size="9"  fill="#CF6679" letter-spacing="1">FORCE TRIGGER</text>
+  <line x1="277" y1="779" x2="514" y2="779" stroke="#4a1a1a" stroke-width="1"/>
+  <text x="277" y="794" font-family="Arial,sans-serif" font-size="10" fill="#a87070">Bypasses Zeitfenster-Schutz</text>
+  <text x="277" y="808" font-family="Arial,sans-serif" font-size="10" fill="#a87070">Human Override — kritisch!</text>
+  <text x="277" y="823" font-family="Arial,sans-serif" font-size="9"  fill="#CF6679">→ Lock bei neg. Daily PNL</text>
+  <text x="277" y="836" font-family="Arial,sans-serif" font-size="9"  fill="#8a4040">Heute −6.200 GBP → kein Force!</text>
+
+  <!-- ═══════════ COL 2 ═══════════ -->
+
+  <!-- ig_bot.py 5 GATES  y=78–590 (spans rows A + B) -->
+  <rect x="558" y="78"  width="285" height="512" rx="5" fill="#140c07" stroke="#7a4020" stroke-width="1.5"/>
+  <rect x="558" y="78"  width="5"   height="512" rx="2" fill="#bf6030"/>
+  <text x="573" y="96"  font-family="Courier New,monospace" font-size="10" fill="#cf7040" letter-spacing="1">ig_bot.py — run_cycle()</text>
+  <line x1="573" y1="103" x2="835" y2="103" stroke="#4a2a10" stroke-width="1"/>
+
+  <rect x="573" y="111" width="256" height="76"  rx="4" fill="#0f0905" stroke="#7a4020" stroke-width="1"/>
+  <text x="587" y="127" font-family="Courier New,monospace" font-size="9"  fill="#cf7040">GATE 1: TIME WINDOW</text>
+  <text x="587" y="143" font-family="Arial,sans-serif" font-size="10" fill="#888">09:30 ≤ now ≤ 11:19 CET</text>
+  <text x="587" y="158" font-family="Arial,sans-serif" font-size="9"  fill="#666">Block außerhalb Handelsfenster</text>
+  <text x="587" y="172" font-family="Arial,sans-serif" font-size="9"  fill="#666">109 Minuten Tradingfenster</text>
+
+  <rect x="573" y="196" width="256" height="76"  rx="4" fill="#0f0905" stroke="#7a4020" stroke-width="1"/>
+  <text x="587" y="212" font-family="Courier New,monospace" font-size="9"  fill="#cf7040">GATE 2: LOAD CANDIDATES</text>
+  <text x="587" y="228" font-family="Arial,sans-serif" font-size="10" fill="#888">turbo_candidates.json non-empty</text>
+  <text x="587" y="243" font-family="Arial,sans-serif" font-size="9"  fill="#666">FAIL → trigger research() OR skip</text>
+  <text x="587" y="257" font-family="Arial,sans-serif" font-size="9"  fill="#666">TTL 30min check</text>
+
+  <rect x="573" y="281" width="256" height="76"  rx="4" fill="#0f0905" stroke="#7a4020" stroke-width="1"/>
+  <text x="587" y="297" font-family="Courier New,monospace" font-size="9"  fill="#cf7040">GATE 3: CONSTRAINTS</text>
+  <text x="587" y="313" font-family="Arial,sans-serif" font-size="10" fill="#888">Budget ≥ 5 GBP · check_budget()</text>
+  <text x="587" y="328" font-family="Arial,sans-serif" font-size="9"  fill="#666">max concurrent open positions</text>
+  <text x="587" y="342" font-family="Arial,sans-serif" font-size="9"  fill="#666">state.json constraint read</text>
+
+  <rect x="573" y="366" width="256" height="76"  rx="4" fill="#0f0905" stroke="#7a4020" stroke-width="1"/>
+  <text x="587" y="382" font-family="Courier New,monospace" font-size="9"  fill="#cf7040">GATE 4: BROKER</text>
+  <text x="587" y="398" font-family="Arial,sans-serif" font-size="10" fill="#888">Sizing: min(budget×0.08, ×3C)</text>
+  <text x="587" y="413" font-family="Arial,sans-serif" font-size="10" fill="#888">CFD / Options check</text>
+  <text x="587" y="427" font-family="Arial,sans-serif" font-size="9"  fill="#666">RUNTABLE min(budget×0.50, ×2K)</text>
+
+  <rect x="573" y="451" width="256" height="107" rx="4" fill="#0f0905" stroke="#7a4020" stroke-width="1"/>
+  <text x="587" y="467" font-family="Courier New,monospace" font-size="9"  fill="#cf7040">GATE 5: DIRECTION FIX</text>
+  <text x="587" y="483" font-family="Arial,sans-serif" font-size="10" fill="#888">LLM direction = CALL / PUT</text>
+  <text x="587" y="498" font-family="Arial,sans-serif" font-size="10" fill="#888">confidence ≥ 55 match</text>
+  <text x="587" y="513" font-family="Arial,sans-serif" font-size="10" fill="#888">OTM distance reasonable</text>
+  <text x="587" y="528" font-family="Arial,sans-serif" font-size="9"  fill="#666">save_candidates([]) clears file</text>
+  <text x="587" y="543" font-family="Arial,sans-serif" font-size="9"  fill="#cf7040">→ pre_trade_option_check() ↗</text>
+  <text x="587" y="557" font-family="Arial,sans-serif" font-size="9"  fill="#D4AF37">← Council input feeds here</text>
+  <text x="587" y="575" font-family="Arial,sans-serif" font-size="9"  fill="#555">↑ IG API · JSON State · candidates</text>
+
+  <!-- REWARD/PUNISHMENT ▲  y=656–887 -->
+  <rect x="558" y="656" width="285" height="232" rx="5" fill="#100d07" stroke="#B87333" stroke-width="2"/>
+  <rect x="558" y="656" width="5"   height="232" rx="2" fill="#B87333"/>
+  <rect x="718" y="650" width="84"  height="14"  rx="3" fill="#B87333"/>
+  <text x="760" y="661" text-anchor="middle" font-family="Courier New,monospace" font-size="8" font-weight="bold" fill="#fff">▲ REFORM</text>
+  <text x="573" y="675" font-family="Courier New,monospace" font-size="9"  fill="#d4832a" letter-spacing="1">REWARD / PUNISHMENT V2</text>
+  <line x1="573" y1="682" x2="835" y2="682" stroke="#4a2a10" stroke-width="1"/>
+  <text x="573" y="697" font-family="Arial,sans-serif" font-size="10" fill="#888">WIN: base + gain×10 · speed bonus</text>
+  <text x="573" y="711" font-family="Arial,sans-serif" font-size="10" fill="#888">LOSS: ÷2.5 std · quick ÷4.8 · ×8max</text>
+  <text x="573" y="725" font-family="Arial,sans-serif" font-size="10" fill="#888">Score 0-50 KONSERVATIV · 50-100 AGG</text>
+  <text x="573" y="739" font-family="Arial,sans-serif" font-size="10" fill="#888">record_outcome() → db.py</text>
+  <line x1="573" y1="749" x2="835" y2="749" stroke="#D4AF3744" stroke-width="1"/>
+  <text x="573" y="764" font-family="Arial,sans-serif" font-size="10" fill="#c8a840">▲ REFORM: Prozess-Metriken</text>
+  <text x="573" y="778" font-family="Arial,sans-serif" font-size="10" fill="#D4AF37">+ process_quality_score</text>
+  <text x="573" y="792" font-family="Arial,sans-serif" font-size="9"  fill="#b09030">  VETO-Häufigkeit · Confidence</text>
+  <text x="573" y="806" font-family="Arial,sans-serif" font-size="9"  fill="#b09030">  Debate-Qualität · Gate-Verlauf</text>
+  <text x="573" y="821" font-family="Arial,sans-serif" font-size="9"  fill="#a07030">Score = Prozess, nicht Outcome</text>
+  <text x="573" y="835" font-family="Arial,sans-serif" font-size="9"  fill="#a07030">Anti-Emotionalität im Scoring</text>
+  <text x="573" y="850" font-family="Arial,sans-serif" font-size="9"  fill="#D4AF37">↓ → SQLite V2 (via BOT highway)</text>
+  <text x="573" y="878" font-family="Arial,sans-serif" font-size="9"  fill="#555">↑ Triggered after BROKER close</text>
+
+  <!-- ═══════════ COL 3 ═══════════ -->
+
+  <!-- pre_trade_option_check  y=78–305 -->
+  <rect x="879" y="78"  width="265" height="228" rx="5" fill="#0f0818" stroke="#5a3a8a" stroke-width="1.5"/>
+  <rect x="879" y="78"  width="5"   height="228" rx="2" fill="#7a5abf"/>
+  <text x="894" y="96"  font-family="Courier New,monospace" font-size="9"  fill="#8a6abf" letter-spacing="1">pre_trade_option_check()</text>
+  <line x1="894" y1="103" x2="1136" y2="103" stroke="#1a1a4a" stroke-width="1"/>
+  <text x="894" y="118" font-family="Arial,sans-serif" font-size="10" fill="#888">LIVE MARKET FETCH</text>
+  <line x1="894" y1="124" x2="1136" y2="124" stroke="#1a1a4a" stroke-width="1"/>
+  <text x="894" y="140" font-family="Arial,sans-serif" font-size="10" fill="#CF6679">VETO: spread ≥ 25%</text>
+  <text x="894" y="156" font-family="Arial,sans-serif" font-size="10" fill="#CF6679">VETO: price drift ≥ 50%</text>
+  <text x="908" y="170" font-family="Arial,sans-serif" font-size="9"  fill="#a87070">option moved since research</text>
+  <text x="894" y="186" font-family="Arial,sans-serif" font-size="10" fill="#CF6679">VETO: 15-min momentum ≥ 0.5%</text>
+  <text x="908" y="200" font-family="Arial,sans-serif" font-size="9"  fill="#a87070">against trade direction</text>
+  <text x="894" y="216" font-family="Arial,sans-serif" font-size="10" fill="#CF6679">VETO: spread guard</text>
+  <line x1="894" y1="225" x2="1136" y2="225" stroke="#2a1a4a" stroke-width="1"/>
+  <text x="894" y="240" font-family="Arial,sans-serif" font-size="9"  fill="#7a5abf">4 Hard VETOs before debate</text>
+  <text x="894" y="254" font-family="Arial,sans-serif" font-size="9"  fill="#7a5abf">↓ → BULL / BEAR / JUDGE</text>
+  <text x="894" y="268" font-family="Arial,sans-serif" font-size="9"  fill="#555">↑ ig_bot Gate 5 via col2→col3 lane</text>
+  <text x="894" y="282" font-family="Arial,sans-serif" font-size="9"  fill="#555">GET /markets live fetch</text>
+  <text x="894" y="296" font-family="Arial,sans-serif" font-size="9"  fill="#555">Epics live snapshot check</text>
+
+  <!-- BULL/BEAR/JUDGE + HANDOVER ★  y=378–595 -->
+  <rect x="879" y="378" width="265" height="218" rx="5" fill="#0d0f18" stroke="#4a5a9f" stroke-width="1.5"/>
+  <rect x="879" y="378" width="5"   height="218" rx="2" fill="#6a7abf"/>
+  <rect x="992" y="372" width="104" height="14"  rx="3" fill="#D4AF37"/>
+  <text x="1044" y="383" text-anchor="middle" font-family="Courier New,monospace" font-size="8" font-weight="bold" fill="#07070f">★ HANDOVER LOGIK</text>
+  <text x="894" y="397" font-family="Courier New,monospace" font-size="9"  fill="#7a8acf" letter-spacing="1">BULL / BEAR / JUDGE</text>
+  <text x="894" y="412" font-family="Arial,sans-serif" font-size="10" fill="#888">Claude Sonnet · 5 Runden</text>
+  <line x1="894" y1="419" x2="1136" y2="419" stroke="#1a1a4a" stroke-width="1"/>
+  <rect x="896" y="427" width="72"  height="30"  rx="3" fill="#0a1a0a" stroke="#2a6a3a" stroke-width="1"/>
+  <text x="932" y="447" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#4CAF50">BULL</text>
+  <rect x="978" y="427" width="72"  height="30"  rx="3" fill="#1a0a0a" stroke="#8a2a2a" stroke-width="1"/>
+  <text x="1014" y="447" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#CF6679">BEAR</text>
+  <rect x="1060" y="427" width="72" height="30"  rx="3" fill="#0a0a1a" stroke="#3a5a9f" stroke-width="1"/>
+  <text x="1096" y="447" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#5B8FD4">JUDGE</text>
+  <line x1="894" y1="466" x2="1136" y2="466" stroke="#D4AF3733" stroke-width="1"/>
+  <text x="894" y="481" font-family="Arial,sans-serif" font-size="10" fill="#c8a840">★ HANDOVER LOGIK V2</text>
+  <text x="894" y="495" font-family="Arial,sans-serif" font-size="9"  fill="#D4AF37">Threshold: ~60-70% Context Window</text>
+  <text x="894" y="509" font-family="Arial,sans-serif" font-size="9"  fill="#c8a840">Compress: Bull-Pos · Bear-Pos</text>
+  <text x="894" y="522" font-family="Arial,sans-serif" font-size="9"  fill="#c8a840">Judge-Stand · Offene Punkte</text>
+  <text x="894" y="535" font-family="Arial,sans-serif" font-size="9"  fill="#c8a840">→ Neue Session mit Kontext-Summary</text>
+  <text x="894" y="549" font-family="Arial,sans-serif" font-size="9"  fill="#806020">Lost-in-the-Middle Prevention</text>
+  <text x="894" y="563" font-family="Arial,sans-serif" font-size="9"  fill="#7a8acf">APPROVED → size_factor → BROKER ↗</text>
+  <text x="894" y="578" font-family="Arial,sans-serif" font-size="9"  fill="#555">VETOs: trade factor · close factor</text>
+
+  <!-- LONGTERM BRAIN  y=656–887 -->
+  <rect x="879" y="656" width="265" height="232" rx="5" fill="#080f10" stroke="#2a6a6a" stroke-width="1.5"/>
+  <rect x="879" y="656" width="5"   height="232" rx="2" fill="#3a8a8a"/>
+  <text x="894" y="674" font-family="Courier New,monospace" font-size="9"  fill="#4a9a9a" letter-spacing="1">LONGTERM BRAIN</text>
+  <line x1="894" y1="681" x2="1136" y2="681" stroke="#1a4a4a" stroke-width="1"/>
+  <text x="894" y="696" font-family="Arial,sans-serif" font-size="10" fill="#888">reflect() / reflect_with_kl() → brain.py</text>
+  <text x="894" y="710" font-family="Arial,sans-serif" font-size="10" fill="#888">Nach JEDEM Trade-Close</text>
+  <line x1="894" y1="718" x2="1136" y2="718" stroke="#1a4a4a" stroke-width="1"/>
+  <text x="894" y="733" font-family="Arial,sans-serif" font-size="10" fill="#888">→ Extrahiert LESSON</text>
+  <text x="894" y="747" font-family="Arial,sans-serif" font-size="10" fill="#888">→ trade_lessons (SQLite)</text>
+  <text x="894" y="761" font-family="Arial,sans-serif" font-size="10" fill="#888">30d Preishistorie (yFinance)</text>
+  <text x="894" y="775" font-family="Arial,sans-serif" font-size="10" fill="#888">3x High/Low Distanz</text>
+  <text x="894" y="789" font-family="Arial,sans-serif" font-size="10" fill="#888">Volume Anomalien ≥ 10% vol max</text>
+  <text x="894" y="803" font-family="Arial,sans-serif" font-size="10" fill="#CF6679">VETO: expected hold ≥ 120 Tage</text>
+  <text x="894" y="817" font-family="Arial,sans-serif" font-size="10" fill="#888">longterm_pre_trade_check() [3MK]</text>
+  <line x1="894" y1="827" x2="1136" y2="827" stroke="#1a4a4a" stroke-width="1"/>
+  <text x="894" y="842" font-family="Arial,sans-serif" font-size="9"  fill="#D4AF37">↓ → SQLite V2 (via BOT highway)</text>
+  <text x="894" y="856" font-family="Arial,sans-serif" font-size="9"  fill="#3a8a8a">→ brain_context → turbo_research</text>
+  <text x="894" y="870" font-family="Arial,sans-serif" font-size="9"  fill="#555">↑ Triggered after BROKER close</text>
+  <text x="894" y="880" font-family="Arial,sans-serif" font-size="9"  fill="#555">↑ via right-margin highway</text>
+
+  <!-- ═══════════ COL 4 ═══════════ -->
+
+  <!-- BROKER & POSITION MGT  y=78–305 -->
+  <rect x="1178" y="78"  width="420" height="228" rx="5" fill="#080f09" stroke="#2a6a3a" stroke-width="1.5"/>
+  <rect x="1178" y="78"  width="5"   height="228" rx="2" fill="#3a8a4a"/>
+  <text x="1193" y="96"  font-family="Courier New,monospace" font-size="10" fill="#4a9a5a" letter-spacing="1">BROKER &amp; POSITION MGT</text>
+  <line x1="1193" y1="103" x2="1590" y2="103" stroke="#1a4a2a" stroke-width="1"/>
+  <rect x="1193" y="111" width="118" height="52"  rx="3" fill="#0a140a" stroke="#2a6a3a" stroke-width="1"/>
+  <text x="1252" y="132" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#4CAF50">PLACE ORDER</text>
+  <text x="1252" y="148" text-anchor="middle" font-family="Arial,sans-serif" font-size="9"  fill="#666">POST /otc</text>
+  <rect x="1321" y="111" width="118" height="52"  rx="3" fill="#0a140a" stroke="#2a6a3a" stroke-width="1"/>
+  <text x="1380" y="132" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#4CAF50">MONITOR</text>
+  <text x="1380" y="148" text-anchor="middle" font-family="Arial,sans-serif" font-size="9"  fill="#666">P&amp;L tracking</text>
+  <rect x="1449" y="111" width="118" height="52"  rx="3" fill="#0a140a" stroke="#2a6a3a" stroke-width="1"/>
+  <text x="1508" y="132" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#4CAF50">CLOSE ORDER</text>
+  <text x="1508" y="148" text-anchor="middle" font-family="Arial,sans-serif" font-size="9"  fill="#666">DELETE /otc</text>
+  <line x1="1193" y1="172" x2="1590" y2="172" stroke="#1a4a2a" stroke-width="1"/>
+  <text x="1193" y="187" font-family="Arial,sans-serif" font-size="10" fill="#888">VETO: trade factor / close factor zu hoch</text>
+  <text x="1193" y="201" font-family="Arial,sans-serif" font-size="10" fill="#888">VETO: market closes in time_to_target</text>
+  <text x="1193" y="215" font-family="Arial,sans-serif" font-size="10" fill="#888">FLIP-Logik · size_factor Betrag</text>
+  <text x="1193" y="229" font-family="Arial,sans-serif" font-size="9"  fill="#2a8a3a">APPROVED → Place · Monitor → Close</text>
+  <text x="1193" y="244" font-family="Arial,sans-serif" font-size="9"  fill="#2a6a3a">↑ Bull/Bear/Judge APPROVED feeds here</text>
+  <text x="1193" y="259" font-family="Arial,sans-serif" font-size="9"  fill="#B87333">↓ After Close → Reward + Brain</text>
+  <text x="1193" y="273" font-family="Arial,sans-serif" font-size="9"  fill="#555">via right-margin highway →</text>
+  <text x="1193" y="287" font-family="Arial,sans-serif" font-size="9"  fill="#555">IG API calls for all position ops</text>
+
+  <!-- DASHBOARD  y=378–529 -->
+  <rect x="1178" y="378" width="420" height="152" rx="5" fill="#090c15" stroke="#2a3a5a" stroke-width="1.5"/>
+  <rect x="1178" y="378" width="5"   height="152" rx="2" fill="#3a5a9f"/>
+  <text x="1193" y="396" font-family="Courier New,monospace" font-size="10" fill="#5a7abf" letter-spacing="1">DASHBOARD (FastAPI)</text>
+  <line x1="1193" y1="403" x2="1590" y2="403" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="1193" y="418" font-family="Arial,sans-serif" font-size="10" fill="#888">dashboard_server.py · dashboard.html</text>
+  <text x="1193" y="432" font-family="Arial,sans-serif" font-size="10" fill="#888">total_reward_pts · trust_score (0–100)</text>
+  <text x="1193" y="446" font-family="Arial,sans-serif" font-size="10" fill="#888">trade_count · avg_win / avg_loss £</text>
+  <text x="1193" y="460" font-family="Arial,sans-serif" font-size="10" fill="#888">score_bet · score_gts</text>
+  <text x="1193" y="474" font-family="Arial,sans-serif" font-size="10" fill="#888">Bull/Bear/Judge Sonnet · Green/Red</text>
+  <text x="1193" y="488" font-family="Arial,sans-serif" font-size="9"  fill="#5a7abf">GET /status → Echtzeit-Metriken</text>
+  <text x="1193" y="515" font-family="Arial,sans-serif" font-size="9"  fill="#3a5a9f">Win Widget · Score Widget</text>
+
+  <!-- ACCOUNT STATE + TAG BOT  y=546–887 -->
+  <rect x="1178" y="546" width="420" height="342" rx="5" fill="#090c15" stroke="#2a3a6a" stroke-width="1.5"/>
+  <rect x="1178" y="546" width="5"   height="342" rx="2" fill="#3a5a7f"/>
+  <text x="1193" y="564" font-family="Courier New,monospace" font-size="9"  fill="#5a7abf" letter-spacing="1">TAG / JORB BOT</text>
+  <line x1="1193" y1="571" x2="1590" y2="571" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="1193" y="586" font-family="Arial,sans-serif" font-size="10" fill="#777">brain.py → execute_loop()</text>
+  <text x="1193" y="600" font-family="Arial,sans-serif" font-size="10" fill="#777">Longterm equity discussion</text>
+  <text x="1193" y="614" font-family="Arial,sans-serif" font-size="10" fill="#777">Pre-trade gatekeeping</text>
+  <line x1="1193" y1="624" x2="1590" y2="624" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="1193" y="639" font-family="Courier New,monospace" font-size="9"  fill="#4a8a4a" letter-spacing="1">CURRENT ACCOUNT STATE</text>
+  <line x1="1193" y1="645" x2="1590" y2="645" stroke="#1a4a2a" stroke-width="1"/>
+  <text x="1193" y="661" font-family="Arial,sans-serif" font-size="10" fill="#888">Account: HTADU | GBX</text>
+  <text x="1193" y="679" font-family="Arial,sans-serif" font-size="12" fill="#4CAF50" font-weight="bold">Balance: 58.700 GBP</text>
+  <text x="1193" y="697" font-family="Arial,sans-serif" font-size="12" fill="#CF6679" font-weight="bold">Daily PNL: −6.200 GBP</text>
+  <text x="1193" y="715" font-family="Arial,sans-serif" font-size="10" fill="#c8a840">Bot Score: 50 → KONSERVATIV</text>
+  <text x="1193" y="731" font-family="Arial,sans-serif" font-size="10" fill="#888">Open Positions: 0</text>
+  <line x1="1193" y1="741" x2="1590" y2="741" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="1193" y="757" font-family="Arial,sans-serif" font-size="10" fill="#888">Proven Performance: 2–4% PNL/Trade</text>
+  <text x="1193" y="771" font-family="Arial,sans-serif" font-size="10" fill="#888">Risk: KONSERVATIV mode aktiv</text>
+  <text x="1193" y="785" font-family="Arial,sans-serif" font-size="10" fill="#888">Bot-Score → risk_level → gate sizing</text>
+  <text x="1193" y="800" font-family="Arial,sans-serif" font-size="9"  fill="#c8a840">→ Score-Reform: Prozess ≠ Outcome</text>
+  <text x="1193" y="815" font-family="Arial,sans-serif" font-size="9"  fill="#666">HTADU · 405 = offline skip</text>
+  <text x="1193" y="830" font-family="Arial,sans-serif" font-size="9"  fill="#666">IG Daily Options · CFD / Turbos</text>
+  <text x="1193" y="846" font-family="Arial,sans-serif" font-size="9"  fill="#555">DAX-Fokus · DAX Turbo-Zertifikate</text>
+  <text x="1193" y="862" font-family="Arial,sans-serif" font-size="9"  fill="#D4AF37">Council: 4× SOLIDE / 1× FRAGWÜRDIG</text>
+  <text x="1193" y="878" font-family="Arial,sans-serif" font-size="9"  fill="#555">HTADU broker · GBX account currency</text>
+
+  <!-- ═══════════════════════════════════════════════
+       ARROWS — all routed through lanes / highways
+       No arrow crosses through any box.
+       ═══════════════════════════════════════════════ -->
+
+  <!-- 1. Scheduler → turbo_research (straight horizontal) -->
+  <line x1="228" y1="128" x2="262" y2="128" stroke="#3a5a9f" stroke-width="1.5" marker-end="url(#arr)" stroke-dasharray="5,3"/>
+
+  <!-- 2. External Data → turbo_research (up through lane) -->
+  <polyline points="228,242 246,242 246,182 262,182" fill="none" stroke="#3a5a9f" stroke-width="1.5" marker-end="url(#arr)" stroke-dasharray="5,3"/>
+
+  <!-- 3. IG API → ig_bot (up to TOP highway, across, down) -->
+  <polyline points="228,365 246,365 246,68 540,68 540,224 558,224" fill="none" stroke="#3a5a9f" stroke-width="1.5" marker-end="url(#arr)" stroke-dasharray="5,3"/>
+  <text x="280" y="63" font-family="Arial,sans-serif" font-size="9" fill="#3a5a9f">IG API ↗</text>
+
+  <!-- 4. Claude Sonnet → turbo_research (dashed, up lane) -->
+  <polyline points="228,480 246,480 246,214 262,214" fill="none" stroke="#7a5abf" stroke-width="1" marker-end="url(#arr)" stroke-dasharray="4,3"/>
+
+  <!-- 5. Claude Sonnet → Bull/Bear/Judge (via TOP highway) -->
+  <polyline points="228,470 246,470 246,68 861,68 861,488 879,488" fill="none" stroke="#7a5abf" stroke-width="1" marker-end="url(#arr)" stroke-dasharray="4,3"/>
+  <text x="450" y="63" font-family="Arial,sans-serif" font-size="9" fill="#7a5abf">Claude Sonnet ↗</text>
+
+  <!-- 6. Claude Sonnet → Longterm Brain (via TOP highway) -->
+  <polyline points="228,475 246,475 246,68 861,68 861,760 879,760" fill="none" stroke="#7a5abf" stroke-width="1" marker-end="url(#arr)" stroke-dasharray="4,3"/>
+
+  <!-- 7. turbo_research → turbo_candidates (around Council via col1-col2 lane) -->
+  <polyline points="522,192 540,192 540,642 392,642 392,656" fill="none" stroke="#4a6abf" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="543" y="370" width="14" height="80" fill="#07070f"/>
+  <text x="551" y="417" font-family="Arial,sans-serif" font-size="9" fill="#4a6abf" transform="rotate(90,551,417)">candidates</text>
+
+  <!-- 8. turbo_candidates → ig_bot Gate 2 (right to lane, up, into col2) -->
+  <polyline points="522,696 540,696 540,262 558,262" fill="none" stroke="#cf7040" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="543" y="520" width="14" height="80" fill="#07070f"/>
+  <text x="551" y="567" font-family="Arial,sans-serif" font-size="9" fill="#cf7040" transform="rotate(90,551,567)">→ Gate 2</text>
+
+  <!-- 9. COUNCIL → ig_bot (straight horizontal gold — NEW FLOW) -->
+  <line x1="522" y1="510" x2="558" y2="510" stroke="#D4AF37" stroke-width="3" marker-end="url(#arr-gold)"/>
+  <text x="522" y="504" font-family="Arial,sans-serif" font-size="9" fill="#D4AF37">★</text>
+
+  <!-- 10. ig_bot Gate5 → pre_trade_option_check (right to lane, up, into col3) -->
+  <polyline points="843,520 861,520 861,178 879,178" fill="none" stroke="#7a4020" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="863" y="310" width="14" height="80" fill="#07070f"/>
+  <text x="871" y="357" font-family="Arial,sans-serif" font-size="9" fill="#7a4020" transform="rotate(90,871,357)">→ pre_trade</text>
+
+  <!-- 11. pre_trade → Bull/Bear/Judge (vertical in gap between rows A and B) -->
+  <line x1="1011" y1="306" x2="1011" y2="378" stroke="#5a3a8a" stroke-width="2.5" marker-end="url(#arr)"/>
+  <text x="1018" y="348" font-family="Arial,sans-serif" font-size="10" fill="#5a3a8a">↓</text>
+
+  <!-- 12. Bull/Bear/Judge → BROKER (right to lane, up, into col4) -->
+  <polyline points="1144,487 1162,487 1162,178 1178,178" fill="none" stroke="#2a6a3a" stroke-width="2.5" marker-end="url(#arr-grn)"/>
+  <rect x="1164" y="300" width="14" height="96" fill="#07070f"/>
+  <text x="1172" y="354" font-family="Arial,sans-serif" font-size="9" fill="#2a6a3a" transform="rotate(90,1172,354)">APPROVED →</text>
+
+  <!-- 13. BROKER → Reward/Punishment (right-margin highway, down, left, up) -->
+  <polyline points="1598,220 1648,220 1648,916 700,916 700,888" fill="none" stroke="#B87333" stroke-width="1.5" marker-end="url(#arr-red)" stroke-dasharray="6,3"/>
+  <rect x="1651" y="530" width="14" height="100" fill="#07070f"/>
+  <text x="1659" y="588" font-family="Arial,sans-serif" font-size="9" fill="#B87333" transform="rotate(90,1659,588)">record_outcome()</text>
+
+  <!-- 14. BROKER → Longterm Brain (right-margin highway, slightly offset) -->
+  <polyline points="1598,230 1655,230 1655,922 1012,922 1012,888" fill="none" stroke="#3a8a8a" stroke-width="1.5" marker-end="url(#arr)" stroke-dasharray="6,3"/>
+  <text x="1260" y="918" font-family="Arial,sans-serif" font-size="9" fill="#3a8a8a">→ reflect()</text>
+
+  <!-- 15. Reward/Punishment → SQLite V2 (gold — left lane, down BOT, left, up to SQLite) -->
+  <polyline points="558,770 540,770 540,930 246,930 246,662 228,662" fill="none" stroke="#D4AF37" stroke-width="1.5" marker-end="url(#arr-gold)" stroke-dasharray="5,3"/>
+  <text x="360" y="928" font-family="Arial,sans-serif" font-size="9" fill="#D4AF37">→ SQLite V2</text>
+
+  <!-- 16. Longterm Brain → SQLite V2 (gold — left col2-3 lane, down BOT, left, up to SQLite) -->
+  <polyline points="879,772 861,772 861,936 246,936 246,648 228,648" fill="none" stroke="#D4AF37" stroke-width="1.5" marker-end="url(#arr-gold)" stroke-dasharray="5,3"/>
+  <text x="620" y="934" font-family="Arial,sans-serif" font-size="9" fill="#D4AF37">→ SQLite V2</text>
+
+  <!-- 17. JSON State → ig_bot (up lane, TOP highway, to col2) -->
+  <polyline points="228,836 246,836 246,68 540,68 540,302 558,302" fill="none" stroke="#3a5a9f" stroke-width="1" marker-end="url(#arr)" stroke-dasharray="3,3"/>
+
+  <!-- ═══════════ LEGEND ═══════════ -->
+
+  <rect x="18" y="960" width="1664" height="152" rx="5" fill="#0a0a12" stroke="#1e1e2e" stroke-width="1"/>
+  <text x="36" y="978" font-family="Courier New,monospace" font-size="10" fill="#4a4a5a" letter-spacing="2">V2 LEGENDE</text>
+  <line x1="36" y1="986" x2="1670" y2="986" stroke="#1e1e2e" stroke-width="1"/>
+
+  <rect x="36"  y="996" width="13" height="13" rx="2" fill="#111009" stroke="#D4AF37" stroke-width="2"/>
+  <text x="56"  y="1007" font-family="Arial,sans-serif" font-size="11" fill="#D4AF37">★ NEU / ERWEITERT</text>
+  <text x="56"  y="1021" font-family="Arial,sans-serif" font-size="9"  fill="#666">Council Skill · SQLite V2 Schema · Handover Logik</text>
+  <text x="56"  y="1034" font-family="Arial,sans-serif" font-size="9"  fill="#555">the_council.jsx · React · 5 parallele API Calls + Narrator</text>
+  <text x="56"  y="1047" font-family="Arial,sans-serif" font-size="9"  fill="#555">Council-Ergebnis: 4× SOLIDE · 1× FRAGWÜRDIG (Sokrates)</text>
+  <text x="56"  y="1061" font-family="Arial,sans-serif" font-size="9"  fill="#806020">Persistenz: 1. Regime-Snapshots  2. Decision-Context  3. Embeddings (future)</text>
+  <text x="56"  y="1075" font-family="Arial,sans-serif" font-size="9"  fill="#555">Claude Code Handover: ~20-30 Tool-Calls · Bull/Bear: ~60-70% Context-Window</text>
+  <text x="56"  y="1089" font-family="Arial,sans-serif" font-size="9"  fill="#555">Arrow-Routing: Lanes x=246|540|861|1162 · Highways y=68|342|626|916</text>
+
+  <rect x="500" y="996" width="13" height="13" rx="2" fill="#100d07" stroke="#B87333" stroke-width="2"/>
+  <text x="520" y="1007" font-family="Arial,sans-serif" font-size="11" fill="#B87333">▲ REFORM</text>
+  <text x="520" y="1021" font-family="Arial,sans-serif" font-size="9"  fill="#666">Score misst Prozessqualität, nicht Outcome</text>
+  <text x="520" y="1034" font-family="Arial,sans-serif" font-size="9"  fill="#555">+ process_quality_score (VETOs, Confidence, Debate, Gates)</text>
+  <text x="520" y="1047" font-family="Arial,sans-serif" font-size="9"  fill="#555">Anti-Emotionalität: kein Score-Penalty für Markt-Pech</text>
+
+  <rect x="880" y="996" width="13" height="13" rx="2" fill="#120909" stroke="#8a2020" stroke-width="2"/>
+  <text x="900" y="1007" font-family="Arial,sans-serif" font-size="11" fill="#CF6679">⚠ RISIKO IDENTIFIZIERT</text>
+  <text x="900" y="1021" font-family="Arial,sans-serif" font-size="9"  fill="#666">Force Trigger: Lock bei neg. Daily PNL empfohlen</text>
+  <text x="900" y="1034" font-family="Arial,sans-serif" font-size="9"  fill="#555">Heute −6.200 GBP → Force Trigger sollte gesperrt sein</text>
+
+  <line x1="880" y1="1055" x2="928" y2="1055" stroke="#D4AF37" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-gold)"/>
+  <text x="936" y="1059" font-family="Arial,sans-serif" font-size="10" fill="#D4AF37">Neuer Datenfluss (V2)</text>
+  <line x1="880" y1="1073" x2="928" y2="1073" stroke="#4a5a7a" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="936" y="1077" font-family="Arial,sans-serif" font-size="10" fill="#666">Bestehender Datenfluss</text>
+  <line x1="880" y1="1091" x2="928" y2="1091" stroke="#3a3a5a" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="936" y="1095" font-family="Arial,sans-serif" font-size="10" fill="#555">Abhängigkeit / Referenz</text>
+
+  <text x="850" y="1128" text-anchor="middle" font-family="Courier New,monospace" font-size="9" fill="#2a2a38" letter-spacing="2">SOKRATES · MACHIAVELLI · EPIKTET · NIETZSCHE · SUN TZU · ⚖ DER SPRECHER</text>
+  <text x="850" y="1148" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="#252530">V2 baut auf bewiesener Basis: 2–4% PNL/Trade · 58.700 GBP · Proven in Production</text>
+  <text x="850" y="1168" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" fill="#1a1a28">Alle Pfeile durch dedizierte Arrow-Lanes — kein Pfeil schneidet durch Text</text>
+</svg>

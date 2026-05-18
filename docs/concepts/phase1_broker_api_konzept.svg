@@ -1,0 +1,206 @@
+<svg width="100%" viewBox="0 0 680 700" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Phase 1 — Broker Wrapper Architecture</title>
+<desc>Architecture diagram showing the broker_wrapper package structure: consumer layer, core modules, IGAdapter, streaming, and external IG API endpoints, with credentials and envelope schema in the right panel.</desc>
+<defs>
+<marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+<style>
+svg { font-family: ui-monospace,'Cascadia Code','Fira Mono','Courier New',monospace; background: #0D1117; }
+.th { font-size: 13px; font-weight: 600; fill: #E2E8F0; }
+.t  { font-size: 12px; font-weight: 400; fill: #CBD5E1; }
+.ts { font-size: 10.5px; font-weight: 400; fill: #94A3B8; }
+.tm { font-size: 10px; font-weight: 400; fill: #64748B; }
+.accent-green  { fill: #4ADE80; }
+.accent-amber  { fill: #FBBF24; }
+.accent-blue   { fill: #60A5FA; }
+.accent-red    { fill: #F87171; }
+.accent-purple { fill: #A78BFA; }
+.accent-teal   { fill: #2DD4BF; }
+</style>
+</defs>
+
+<rect width="680" height="700" fill="#0D1117"/>
+
+<rect x="0" y="0" width="680" height="46" fill="#161D27"/>
+<line x1="0" y1="46" x2="680" y2="46" stroke="#1E2D45" stroke-width="1"/>
+<text x="16" y="20" class="th" style="font-size:15px;fill:#E2E8F0;">Phase 1 — Broker Wrapper</text>
+<text x="16" y="37" class="ts">ig_adapter · envelope · credentials · filters · streaming · OS keyring</text>
+<rect x="568" y="11" width="98" height="22" rx="3" fill="#052E1A" stroke="#166534" stroke-width="0.8"/>
+<circle cx="582" cy="22" r="3.5" fill="#4ADE80"/>
+<text x="590" y="26.5" class="ts" style="fill:#4ADE80;font-size:10px;">phase 1 done</text>
+
+<line x1="336" y1="52" x2="336" y2="592" stroke="#1E293B" stroke-width="1" stroke-dasharray="4,3"/>
+
+<rect x="8" y="52" width="320" height="52" rx="5" fill="#0A1628" stroke="#1E3A5F" stroke-width="0.8" stroke-dasharray="5,3"/>
+<text x="20" y="68" class="ts" style="fill:#3B6DB7;">consumers</text>
+<text x="88" y="68" class="tm">(phase 2+)</text>
+<rect x="18" y="74" width="88" height="22" rx="3" fill="#0D1E38" stroke="#1E3A5F" stroke-width="0.6"/>
+<text x="62" y="89" class="ts" style="fill:#5A8ACC;text-anchor:middle;">bot_core.py</text>
+<rect x="118" y="74" width="88" height="22" rx="3" fill="#0D1E38" stroke="#1E3A5F" stroke-width="0.6"/>
+<text x="162" y="89" class="ts" style="fill:#5A8ACC;text-anchor:middle;">FastAPI layer</text>
+<rect x="218" y="74" width="88" height="22" rx="3" fill="#0D1E38" stroke="#2A6040" stroke-width="0.6"/>
+<text x="262" y="89" class="ts" style="fill:#4ADE80;text-anchor:middle;">cli.py ✓</text>
+<line x1="168" y1="104" x2="168" y2="115" stroke="#2A4060" stroke-width="1.2" marker-end="url(#arr)"/>
+<text x="174" y="113" class="tm">factory.get_broker("ig")</text>
+
+<rect x="8" y="117" width="320" height="70" rx="5" fill="#081A10" stroke="#166534" stroke-width="0.8"/>
+<text x="20" y="132" class="ts" style="fill:#2D7A50;">broker_wrapper/</text>
+<rect x="18" y="138" width="92" height="22" rx="3" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<rect x="18" y="138" width="2.5" height="22" rx="1" fill="#4ADE80"/>
+<text x="28" y="148" class="ts" style="fill:#86EFAC;font-size:9.5px;">envelope.py</text>
+<text x="28" y="157" class="tm">Envelope</text>
+<rect x="118" y="138" width="92" height="22" rx="3" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<rect x="118" y="138" width="2.5" height="22" rx="1" fill="#4ADE80"/>
+<text x="128" y="148" class="ts" style="fill:#86EFAC;font-size:9.5px;">models.py</text>
+<text x="128" y="157" class="tm">Price · Position</text>
+<rect x="218" y="138" width="100" height="22" rx="3" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<rect x="218" y="138" width="2.5" height="22" rx="1" fill="#4ADE80"/>
+<text x="228" y="148" class="ts" style="fill:#86EFAC;font-size:9.5px;">exceptions.py</text>
+<text x="228" y="157" class="tm">BrokerError tree</text>
+<rect x="18" y="166" width="88" height="15" rx="2" fill="#041A0C" stroke="#0F3B20" stroke-width="0.5"/>
+<text x="62" y="177" class="tm" style="text-anchor:middle;">factory.py</text>
+<rect x="114" y="166" width="88" height="15" rx="2" fill="#041A0C" stroke="#0F3B20" stroke-width="0.5"/>
+<text x="158" y="177" class="tm" style="text-anchor:middle;">filters.py</text>
+<rect x="210" y="166" width="110" height="15" rx="2" fill="#041A0C" stroke="#0F3B20" stroke-width="0.5"/>
+<text x="265" y="177" class="tm" style="text-anchor:middle;">credentials.py</text>
+
+<line x1="90" y1="187" x2="90" y2="198" stroke="#2A3050" stroke-width="1.2" marker-end="url(#arr)"/>
+
+<rect x="8" y="200" width="320" height="52" rx="4" fill="#100C22" stroke="#2D1B69" stroke-width="0.8"/>
+<rect x="8" y="200" width="2.5" height="52" rx="1" fill="#A78BFA"/>
+<text x="20" y="215" class="ts" style="fill:#7C3AED;">adapters/base.py</text>
+<text x="20" y="229" class="t" style="fill:#C4B5FD;font-weight:600;">BrokerAdapter</text>
+<text x="118" y="229" class="ts" style="fill:#7C3AED;">(ABC)</text>
+<text x="20" y="243" class="tm">connect · disconnect · 14 abstract methods → all return Envelope</text>
+
+<line x1="168" y1="252" x2="168" y2="263" stroke="#1A3050" stroke-width="1.2" marker-end="url(#arr)"/>
+
+<rect x="8" y="265" width="320" height="180" rx="4" fill="#07130A" stroke="#1A4025" stroke-width="0.8"/>
+<rect x="8" y="265" width="2.5" height="180" rx="1" fill="#4ADE80"/>
+<rect x="8" y="265" width="320" height="24" rx="4" fill="#0A1E10"/>
+<text x="20" y="281" class="ts" style="fill:#2D7A50;">adapters/ig_adapter.py</text>
+<rect x="272" y="269" width="50" height="16" rx="2" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<circle cx="284" cy="277" r="2.5" fill="#4ADE80"/>
+<text x="290" y="281" class="tm" style="fill:#4ADE80;font-size:9px;">✓ full</text>
+<text x="20" y="303" class="t" style="fill:#86EFAC;font-weight:600;">IGAdapter</text>
+<text x="94" y="303" class="ts" style="fill:#4ADE80;">raw REST · EUR · DAX CFD</text>
+<line x1="20" y1="309" x2="320" y2="309" stroke="#0F3B20" stroke-width="0.5"/>
+<text x="20" y="322" class="tm" style="fill:#64748B;">session</text>
+<text x="65" y="322" class="tm">connect · disconnect · re-login on 401</text>
+<text x="20" y="336" class="tm" style="fill:#64748B;">market</text>
+<text x="65" y="336" class="tm">get_price · get_ohlcv · get_historical_ohlcv</text>
+<text x="65" y="348" class="tm">get_market_info · search_markets</text>
+<text x="20" y="362" class="tm" style="fill:#64748B;">account</text>
+<text x="65" y="362" class="tm">get_account · get_open_positions · get_trade_history</text>
+<text x="20" y="376" class="tm" style="fill:#64748B;">orders</text>
+<text x="65" y="376" class="tm">open_position(MARKET|LIMIT|STOP) · close_position</text>
+<text x="65" y="388" class="tm">modify_position · reconcile_positions</text>
+<line x1="20" y1="394" x2="320" y2="394" stroke="#0F3B20" stroke-width="0.5"/>
+<text x="20" y="406" class="tm">401→re-login · 405→MarketOffline · 429→backoff</text>
+<text x="20" y="418" class="tm">deal_reference idempotency · confirm polling · v1/v2/v3</text>
+<text x="20" y="430" class="tm">orders: MARKET · LIMIT · STOP · stop/limit levels</text>
+<text x="20" y="443" class="tm">spread_pct · calc_position_size in filters.py (Code, not AI)</text>
+
+<line x1="168" y1="445" x2="168" y2="456" stroke="#2A5030" stroke-width="1.2" marker-end="url(#arr)"/>
+
+<rect x="8" y="458" width="320" height="54" rx="4" fill="#160404" stroke="#6B2121" stroke-width="0.8"/>
+<rect x="8" y="458" width="2.5" height="54" rx="1" fill="#F87171"/>
+<text x="20" y="473" class="ts" style="fill:#EF4444;">external · IG Markets REST API</text>
+<text x="20" y="486" class="tm">live:  api.ig.com/gateway/deal</text>
+<text x="20" y="498" class="tm">demo: demo-api.ig.com/gateway/deal</text>
+<text x="20" y="508" class="tm">auth: CST + X-SECURITY-TOKEN headers · 6h sessions</text>
+
+<rect x="344" y="52" width="328" height="158" rx="4" fill="#180F00" stroke="#78350F" stroke-width="0.8"/>
+<rect x="344" y="52" width="2.5" height="158" rx="1" fill="#FBBF24"/>
+<rect x="344" y="52" width="328" height="22" rx="4" fill="#1A1000"/>
+<text x="356" y="67" class="ts" style="fill:#B45309;">credentials.py · OS keyring</text>
+<text x="356" y="83" class="tm">get_credential(name) → keyring.get_password(SERVICE, name)</text>
+<text x="356" y="95" class="tm">store via: python scripts/store_credential.py &lt;name&gt;</text>
+<line x1="356" y1="101" x2="664" y2="101" stroke="#291500" stroke-width="0.5"/>
+<text x="356" y="114" class="tm" style="fill:#D97706;">demo:</text>
+<text x="396" y="114" class="tm">ig_demo_username · ig_demo_password</text>
+<text x="396" y="126" class="tm">ig_demo_api_key · ig_demo_account_id</text>
+<text x="356" y="140" class="tm" style="fill:#D97706;">live:</text>
+<text x="396" y="140" class="tm">ig_username · ig_password</text>
+<text x="396" y="152" class="tm">ig_api_key · ig_account_id</text>
+<text x="356" y="165" class="tm">macOS: Keychain · Linux: gnome-keyring · Win: CredMgr</text>
+<text x="356" y="177" class="tm">fallback_env=True for CI/demo only, never production</text>
+<text x="356" y="189" class="tm">AI reads get_credential() at runtime — no plaintext files</text>
+<text x="356" y="201" class="tm">scripts/store_credential.py uses getpass — input hidden</text>
+
+<rect x="344" y="220" width="328" height="195" rx="4" fill="#041A10" stroke="#065F46" stroke-width="0.8"/>
+<rect x="344" y="220" width="2.5" height="195" rx="1" fill="#2DD4BF"/>
+<rect x="344" y="220" width="328" height="22" rx="4" fill="#042F2E"/>
+<text x="356" y="235" class="ts" style="fill:#0D9488;">envelope.py · standard response shape</text>
+<text x="356" y="252" class="tm" style="fill:#6B7280;">{</text>
+<text x="370" y="265" class="tm" style="fill:#059669;">"ok":</text>
+<text x="400" y="265" class="tm">true | false,</text>
+<text x="370" y="278" class="tm" style="fill:#059669;">"ts":</text>
+<text x="400" y="278" class="tm">"2026-05-14T13:42:11.123Z",</text>
+<text x="370" y="291" class="tm" style="fill:#059669;">"broker":</text>
+<text x="416" y="291" class="tm">"ig",</text>
+<text x="370" y="304" class="tm" style="fill:#059669;">"method":</text>
+<text x="422" y="304" class="tm">"get_price",</text>
+<text x="370" y="317" class="tm" style="fill:#059669;">"data":</text>
+<text x="404" y="317" class="tm">{ ... } | null,</text>
+<text x="370" y="330" class="tm" style="fill:#059669;">"error":</text>
+<text x="413" y="330" class="tm">null | {</text>
+<text x="384" y="343" class="tm" style="fill:#6B7280;">"code": "MARKET_OFFLINE",</text>
+<text x="384" y="356" class="tm" style="fill:#6B7280;">"message": "405 ...",</text>
+<text x="384" y="369" class="tm" style="fill:#6B7280;">"retryable": true</text>
+<text x="370" y="382" class="tm" style="fill:#6B7280;">},</text>
+<text x="370" y="395" class="tm" style="fill:#059669;">"latency_ms":</text>
+<text x="452" y="395" class="tm">127</text>
+<text x="356" y="408" class="tm" style="fill:#6B7280;">}</text>
+
+<rect x="344" y="425" width="328" height="87" rx="4" fill="#0A1020" stroke="#1E3050" stroke-width="0.8"/>
+<rect x="344" y="425" width="2.5" height="87" rx="1" fill="#60A5FA"/>
+<rect x="344" y="425" width="328" height="22" rx="4" fill="#0D1428"/>
+<text x="356" y="440" class="ts" style="fill:#2563EB;">phase 1 decisions locked</text>
+<text x="356" y="456" class="tm">product  → DAX CFD on IG (no commission intraday)</text>
+<text x="356" y="468" class="tm">currency → EUR (IG Europe GmbH)</text>
+<text x="356" y="480" class="tm">api      → raw requests, no trading-ig dependency</text>
+<text x="356" y="492" class="tm">orders   → MARKET · LIMIT · STOP + modify_position</text>
+<text x="356" y="504" class="tm">tradeable → filters.py (Code, not AI) · is_tradeable()</text>
+
+<text x="8" y="534" class="ts" style="fill:#475569;">streaming/</text>
+
+<rect x="8" y="540" width="320" height="64" rx="4" fill="#07130A" stroke="#1A4025" stroke-width="0.8"/>
+<rect x="8" y="540" width="2.5" height="64" rx="1" fill="#4ADE80"/>
+<rect x="272" y="545" width="50" height="16" rx="2" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<circle cx="284" cy="553" r="2.5" fill="#4ADE80"/>
+<text x="290" y="557" class="tm" style="fill:#4ADE80;font-size:9px;">✓ ready</text>
+<text x="20" y="558" class="t" style="fill:#86EFAC;font-weight:600;">PollingStreamClient</text>
+<text x="20" y="572" class="tm">REST polling fallback · configurable interval_s</text>
+<text x="20" y="583" class="tm">thread-safe · PriceTick(epic, bid, ask, ts) callback</text>
+<text x="20" y="594" class="tm">swap to Lightstreamer: 1-line change in factory</text>
+
+<rect x="344" y="540" width="328" height="64" rx="4" fill="#111017" stroke="#2A2040" stroke-width="0.8"/>
+<rect x="344" y="540" width="2.5" height="64" rx="1" fill="#FBBF24"/>
+<rect x="606" y="545" width="60" height="16" rx="2" fill="#1A1000" stroke="#78350F" stroke-width="0.6"/>
+<text x="636" y="557" class="tm" style="fill:#FBBF24;font-size:9px;text-anchor:middle;">⚠ skeleton</text>
+<text x="356" y="558" class="t" style="fill:#A78BFA;font-weight:600;">IGLightstreamerClient</text>
+<text x="356" y="572" class="tm">TLCP protocol · L1:{epic} item subscriptions</text>
+<text x="356" y="583" class="tm">BID · OFFER · UPDATE_TIME fields</text>
+<text x="356" y="594" class="tm">interface fixed → impl next session w/ live account</text>
+
+<line x1="344" y1="618" x2="336" y2="618" stroke="#1E293B" stroke-width="0.5"/>
+<rect x="8" y="614" width="664" height="70" rx="4" fill="#0A0E14" stroke="#1E293B" stroke-width="0.6"/>
+<rect x="8" y="614" width="664" height="20" rx="4" fill="#0D1117"/>
+<text x="20" y="629" class="ts" style="fill:#374151;">legend + test commands</text>
+<rect x="20" y="638" width="3" height="12" rx="1" fill="#4ADE80"/>
+<text x="30" y="648" class="tm">implemented ✓</text>
+<rect x="130" y="638" width="3" height="12" rx="1" fill="#FBBF24"/>
+<text x="140" y="648" class="tm">skeleton ⚠ interface fixed</text>
+<rect x="310" y="638" width="3" height="12" rx="1" fill="#60A5FA"/>
+<text x="320" y="648" class="tm">future phase</text>
+<rect x="420" y="638" width="3" height="12" rx="1" fill="#F87171"/>
+<text x="430" y="648" class="tm">external (IG broker)</text>
+<rect x="20" y="656" width="3" height="12" rx="1" fill="#4ADE80"/>
+<text x="30" y="666" class="tm" style="fill:#4ADE80;">pytest tests/ -v</text>
+<text x="155" y="666" class="tm" style="fill:#374151;">31 tests · no network · </text>
+<text x="310" y="666" class="tm" style="fill:#4ADE80;">python scripts/smoke_test.py --order</text>
+<text x="540" y="666" class="tm" style="fill:#374151;">full lifecycle</text>
+<text x="20" y="678" class="tm">next: phase 2 — SQLite schema + JSON state + rate-limit budget tracking</text>
+</svg>
