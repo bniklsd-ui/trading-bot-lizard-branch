@@ -54,3 +54,25 @@ def get_broker(name: str, config: dict[str, Any] | None = None) -> BrokerAdapter
         f"unknown broker '{name}'. Supported: 'ig', 'ig_demo'. "
         "Add IBKR/Saxo adapters in a future phase."
     )
+
+
+def get_stream(adapter: "IGAdapter") -> "IGLightstreamerClient":
+    """Build an IGLightstreamerClient from an already-connected IGAdapter.
+
+    Args:
+        adapter: IGAdapter on which connect() has already succeeded.
+
+    Raises:
+        RuntimeError: if adapter is not connected.
+    """
+    from broker_wrapper.streaming.ig_lightstreamer import IGLightstreamerClient
+    if not adapter.is_connected():
+        raise RuntimeError(
+            "adapter.connect() must succeed before calling get_stream()"
+        )
+    return IGLightstreamerClient(
+        cst=adapter._cst,
+        security_token=adapter._security_token,
+        account_id=adapter._account_id,
+        lightstreamer_endpoint=adapter.lightstreamer_endpoint,
+    )

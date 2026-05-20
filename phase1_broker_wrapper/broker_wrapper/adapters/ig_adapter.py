@@ -130,6 +130,7 @@ class IGAdapter(BrokerAdapter):
         self._cst: str | None = None
         self._security_token: str | None = None
         self._session_expires_at: datetime | None = None
+        self._lightstreamer_endpoint: str = ""
 
     # ---------- Session ----------
 
@@ -181,6 +182,11 @@ class IGAdapter(BrokerAdapter):
             return False
         return True
 
+    @property
+    def lightstreamer_endpoint(self) -> str:
+        """Lightstreamer push endpoint from POST /session. Empty string before login."""
+        return self._lightstreamer_endpoint
+
     def _login(self) -> None:
         """Acquire CST + X-SECURITY-TOKEN via POST /session (v2)."""
         url = f"{self._base_url}/session"
@@ -212,6 +218,7 @@ class IGAdapter(BrokerAdapter):
 
         # Switch to the configured account if not already current.
         body_meta = resp.json() if resp.content else {}
+        self._lightstreamer_endpoint = body_meta.get("lightstreamerEndpoint", "")
         current = body_meta.get("currentAccountId")
         if current and current != self._account_id:
             self._switch_account(self._account_id)
