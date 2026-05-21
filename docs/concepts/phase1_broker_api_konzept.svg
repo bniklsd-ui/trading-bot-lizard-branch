@@ -177,13 +177,13 @@ svg { font-family: ui-monospace,'Cascadia Code','Fira Mono','Courier New',monosp
 <text x="20" y="594" class="tm">swap to Lightstreamer: 1-line change in factory</text>
 
 <rect x="344" y="540" width="328" height="64" rx="4" fill="#111017" stroke="#2A2040" stroke-width="0.8"/>
-<rect x="344" y="540" width="2.5" height="64" rx="1" fill="#FBBF24"/>
-<rect x="606" y="545" width="60" height="16" rx="2" fill="#1A1000" stroke="#78350F" stroke-width="0.6"/>
-<text x="636" y="557" class="tm" style="fill:#FBBF24;font-size:9px;text-anchor:middle;">⚠ skeleton</text>
+<rect x="344" y="540" width="2.5" height="64" rx="1" fill="#4ADE80"/>
+<rect x="606" y="545" width="60" height="16" rx="2" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<text x="636" y="557" class="tm" style="fill:#4ADE80;font-size:9px;text-anchor:middle;">✓ tested</text>
 <text x="356" y="558" class="t" style="fill:#A78BFA;font-weight:600;">IGLightstreamerClient</text>
-<text x="356" y="572" class="tm">TLCP protocol · L1:{epic} item subscriptions</text>
-<text x="356" y="583" class="tm">BID · OFFER · UPDATE_TIME fields</text>
-<text x="356" y="594" class="tm">interface fixed → impl next session w/ live account</text>
+<text x="356" y="572" class="tm">official Lightstreamer SDK · PRICE:{acct}:{epic}</text>
+<text x="356" y="583" class="tm">BIDPRICE1 · ASKPRICE1 · TIMESTAMP fields</text>
+<text x="356" y="594" class="tm">live-tested vs IG demo (2026-05-21) · PriceTick callback</text>
 
 <line x1="344" y1="618" x2="336" y2="618" stroke="#1E293B" stroke-width="0.5"/>
 <rect x="8" y="614" width="664" height="70" rx="4" fill="#0A0E14" stroke="#1E293B" stroke-width="0.6"/>
@@ -192,7 +192,7 @@ svg { font-family: ui-monospace,'Cascadia Code','Fira Mono','Courier New',monosp
 <rect x="20" y="638" width="3" height="12" rx="1" fill="#4ADE80"/>
 <text x="30" y="648" class="tm">implemented ✓</text>
 <rect x="130" y="638" width="3" height="12" rx="1" fill="#FBBF24"/>
-<text x="140" y="648" class="tm">skeleton ⚠ interface fixed</text>
+<text x="140" y="648" class="tm">credentials · keyring (caution)</text>
 <rect x="310" y="638" width="3" height="12" rx="1" fill="#60A5FA"/>
 <text x="320" y="648" class="tm">future phase</text>
 <rect x="420" y="638" width="3" height="12" rx="1" fill="#F87171"/>
