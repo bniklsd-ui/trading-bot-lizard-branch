@@ -1,6 +1,6 @@
-"""Unit tests for IGLightstreamerClient and related factory/adapter changes.
+"""Unit tests for IGLightstreamerClient (SDK-backed) and factory/adapter changes.
 
-All HTTP is mocked — no network calls.
+The Lightstreamer SDK is mocked — no network calls, no real connection.
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ import pytest
 from broker_wrapper.adapters.ig_adapter import IGAdapter
 from broker_wrapper.streaming.ig_lightstreamer import (
     IGLightstreamerClient,
-    _ensure_scheme,
-    _update_time_to_iso,
+    _PriceListener,
+    _utm_to_iso,
 )
 from broker_wrapper.factory import get_stream
 
@@ -49,15 +49,12 @@ def _client(**kwargs) -> IGLightstreamerClient:
     return IGLightstreamerClient(**defaults)
 
 
-def _mock_response(status: int = 200, text: str = "", headers: dict | None = None) -> MagicMock:
-    m = MagicMock()
-    m.status_code = status
-    m.text = text
-    m.headers = headers or {}
-    m.content = text.encode() if text else b""
-    m.json.return_value = {}
-    m.raise_for_status = MagicMock()
-    return m
+def _fake_update(bid="24615.9", ask="24617.0", ts="1747737000000") -> MagicMock:
+    """Mock SDK ItemUpdate whose getValue() returns the given field values."""
+    values = {"BIDPRICE1": bid, "ASKPRICE1": ask, "TIMESTAMP": ts}
+    u = MagicMock()
+    u.getValue.side_effect = lambda field: values.get(field)
+    return u
 
 
 # ---------- adapter changes --------------------------------------------------
@@ -95,120 +92,153 @@ def test_client_init():
     assert c._endpoint == "https://push.example.com"
     assert c._running is False
     assert c._subscriptions == {}
-    assert c._session_id is None
-    assert c._table_map == {}
+    assert c._subs == {}
+
+
+# ---------- start / stop -----------------------------------------------------
+
+
+def test_start_connects_with_ig_credentials():
+    c = _client()
+    fake_client = MagicMock()
+    with patch(
+        "broker_wrapper.streaming.ig_lightstreamer.LightstreamerClient",
+        return_value=fake_client,
+    ) as ls_ctor:
+        c.start()
+    ls_ctor.assert_called_once_with("https://push.example.com", "DEFAULT")
+    fake_client.connectionDetails.setUser.assert_called_once_with("ACC1")
+    fake_client.connectionDetails.setPassword.assert_called_once_with(
+        "CST-cst-x|XST-tok-y"
+    )
+    fake_client.connect.assert_called_once()
+    assert c.is_running is True
+
+
+def test_start_is_idempotent():
+    c = _client()
+    with patch(
+        "broker_wrapper.streaming.ig_lightstreamer.LightstreamerClient",
+        return_value=MagicMock(),
+    ) as ls_ctor:
+        c.start()
+        c.start()
+    ls_ctor.assert_called_once()
+
+
+def test_stop_disconnects():
+    c = _client()
+    fake_client = MagicMock()
+    with patch(
+        "broker_wrapper.streaming.ig_lightstreamer.LightstreamerClient",
+        return_value=fake_client,
+    ):
+        c.start()
+        c.stop()
+    fake_client.disconnect.assert_called_once()
+    assert c.is_running is False
 
 
 # ---------- subscribe / unsubscribe ------------------------------------------
 
 
-def test_subscribe_unsubscribe_thread_safe():
+def test_subscribe_creates_price_subscription():
     c = _client()
+    fake_client = MagicMock()
+    fake_sub = MagicMock()
     cb = MagicMock()
-    # No active session → no control.txt POST.
-    c.subscribe("IX.D.DAX.IFMM.IP", cb)
-    assert "IX.D.DAX.IFMM.IP" in c._subscriptions
-    c.unsubscribe("IX.D.DAX.IFMM.IP")
-    assert "IX.D.DAX.IFMM.IP" not in c._subscriptions
-    # Idempotent.
-    c.unsubscribe("IX.D.DAX.IFMM.IP")
-
-
-# ---------- _create_ls_session -----------------------------------------------
-
-
-def test_create_session_parses_ok_response():
-    c = _client()
-    session_text = (
-        "OK\n"
-        "SessionId:S-abc123\n"
-        "ControlAddress:ctrl.example.com\n"
-        "KeepaliveMillis:5000\n"
+    with patch(
+        "broker_wrapper.streaming.ig_lightstreamer.LightstreamerClient",
+        return_value=fake_client,
+    ), patch(
+        "broker_wrapper.streaming.ig_lightstreamer.Subscription",
+        return_value=fake_sub,
+    ) as sub_ctor:
+        c.start()
+        c.subscribe("IX.D.DAX.IFMM.IP", cb)
+    sub_ctor.assert_called_once_with(
+        "MERGE", ["PRICE:ACC1:IX.D.DAX.IFMM.IP"],
+        ["BIDPRICE1", "ASKPRICE1", "TIMESTAMP"],
     )
-    with patch.object(c._http, "post", return_value=_mock_response(text=session_text)):
-        c._create_ls_session()
-    assert c._session_id == "S-abc123"
-    assert c._control_address == "https://ctrl.example.com"
+    fake_sub.setDataAdapter.assert_called_once_with("Pricing")
+    fake_sub.addListener.assert_called_once()
+    fake_client.subscribe.assert_called_once_with(fake_sub)
 
 
-def test_create_session_error_raises():
+def test_subscribe_before_start_defers_until_start():
     c = _client()
-    with patch.object(c._http, "post", return_value=_mock_response(text="ERROR\nErrorCode:10\n")):
-        with pytest.raises(RuntimeError, match="create_session failed"):
-            c._create_ls_session()
-
-
-def test_create_session_missing_fields_raises():
-    c = _client()
-    # OK but no SessionId line.
-    with patch.object(c._http, "post", return_value=_mock_response(text="OK\n")):
-        with pytest.raises(RuntimeError, match="missing SessionId"):
-            c._create_ls_session()
-
-
-# ---------- update parsing ---------------------------------------------------
-
-
-def test_handle_update_dispatches_callback():
-    c = _client()
+    fake_client = MagicMock()
+    fake_sub = MagicMock()
     cb = MagicMock()
-    c._table_map["IX.D.DAX.IFMM.IP"] = 1
-    c._subscriptions["IX.D.DAX.IFMM.IP"] = cb
+    with patch(
+        "broker_wrapper.streaming.ig_lightstreamer.LightstreamerClient",
+        return_value=fake_client,
+    ), patch(
+        "broker_wrapper.streaming.ig_lightstreamer.Subscription",
+        return_value=fake_sub,
+    ):
+        c.subscribe("IX.D.DAX.IFMM.IP", cb)   # no client yet → deferred
+        fake_client.subscribe.assert_not_called()
+        c.start()                              # start() subscribes the backlog
+    fake_client.subscribe.assert_called_once_with(fake_sub)
 
-    c._handle_update("U,1,1,24615.9|24617.0|08:30:00.000")
 
+def test_unsubscribe_removes_and_calls_sdk():
+    c = _client()
+    fake_client = MagicMock()
+    cb = MagicMock()
+    with patch(
+        "broker_wrapper.streaming.ig_lightstreamer.LightstreamerClient",
+        return_value=fake_client,
+    ), patch(
+        "broker_wrapper.streaming.ig_lightstreamer.Subscription",
+        return_value=MagicMock(),
+    ):
+        c.start()
+        c.subscribe("EPIC", cb)
+        c.unsubscribe("EPIC")
+    assert "EPIC" not in c._subscriptions
+    assert "EPIC" not in c._subs
+    fake_client.unsubscribe.assert_called_once()
+    # idempotent
+    c.unsubscribe("EPIC")
+
+
+# ---------- _PriceListener ---------------------------------------------------
+
+
+def test_price_listener_dispatches_tick():
+    cb = MagicMock()
+    lis = _PriceListener("IX.D.DAX.IFMM.IP", cb)
+    lis.onItemUpdate(_fake_update(bid="24615.9", ask="24617.0", ts="1747737000000"))
     cb.assert_called_once()
     tick = cb.call_args[0][0]
     assert tick.epic == "IX.D.DAX.IFMM.IP"
     assert tick.bid == pytest.approx(24615.9)
     assert tick.ask == pytest.approx(24617.0)
-    assert "08:30:00.000" in tick.timestamp
+    assert "T" in tick.timestamp and tick.timestamp.endswith("Z")
 
 
-def test_handle_update_field_cache():
-    c = _client()
+def test_price_listener_skips_incomplete_update():
     cb = MagicMock()
-    c._table_map["EPIC"] = 1
-    c._subscriptions["EPIC"] = cb
-
-    c._handle_update("U,1,1,100.0|101.0|09:00:00.000")
-    assert cb.call_count == 1
-
-    # Empty offer and time fields — should reuse cached values.
-    c._handle_update("U,1,1,100.5||")
-    assert cb.call_count == 2
-    tick = cb.call_args[0][0]
-    assert tick.bid == pytest.approx(100.5)
-    assert tick.ask == pytest.approx(101.0)   # from cache
-
-
-def test_handle_update_incomplete_before_cache_no_callback():
-    c = _client()
-    cb = MagicMock()
-    c._table_map["EPIC"] = 1
-    c._subscriptions["EPIC"] = cb
-
-    # Only bid present, ask empty, cache is cold — no callback yet.
-    c._handle_update("U,1,1,100.0||")
+    lis = _PriceListener("EPIC", cb)
+    lis.onItemUpdate(_fake_update(bid="100.0", ask=None, ts="1747737000000"))
     cb.assert_not_called()
 
 
-# ---------- _handle_line dispatching -----------------------------------------
-
-
-def test_probe_ignored():
-    c = _client()
+def test_price_listener_swallows_non_numeric():
     cb = MagicMock()
-    c._table_map["EPIC"] = 1
-    c._subscriptions["EPIC"] = cb
-    c._handle_line("PROBE")
+    lis = _PriceListener("EPIC", cb)
+    lis.onItemUpdate(_fake_update(bid="n/a", ask="101.0"))
     cb.assert_not_called()
 
 
-def test_subok_stores_field_count():
-    c = _client()
-    c._handle_line("SUBOK,1,1,3")
-    assert c._subok_fields[1] == 3
+def test_price_listener_callback_exception_isolated():
+    cb = MagicMock(side_effect=RuntimeError("boom"))
+    lis = _PriceListener("EPIC", cb)
+    # must not raise
+    lis.onItemUpdate(_fake_update())
+    cb.assert_called_once()
 
 
 # ---------- factory ----------------------------------------------------------
@@ -232,20 +262,20 @@ def test_get_stream_returns_client():
 # ---------- helpers ----------------------------------------------------------
 
 
-def test_ensure_scheme_adds_https():
-    assert _ensure_scheme("ctrl.example.com") == "https://ctrl.example.com"
-    assert _ensure_scheme("https://ctrl.example.com") == "https://ctrl.example.com"
-    assert _ensure_scheme("https://ctrl.example.com/") == "https://ctrl.example.com"
-
-
-def test_update_time_to_iso_formats_correctly():
-    ts = _update_time_to_iso("08:30:00.000")
-    assert ts.endswith("T08:30:00.000Z")
+def test_utm_to_iso_formats_correctly():
+    ts = _utm_to_iso("1747737000000")
     assert "T" in ts
+    assert ts.endswith("Z")
+    assert len(ts) == len("2025-01-01T00:00:00.000Z")
 
 
-def test_update_time_to_iso_fallback_on_empty():
-    ts = _update_time_to_iso("")
-    # Should still be a valid-looking ISO string.
+def test_utm_to_iso_fallback_on_empty():
+    ts = _utm_to_iso("")
+    assert "T" in ts
+    assert ts.endswith("Z")
+
+
+def test_utm_to_iso_fallback_on_invalid():
+    ts = _utm_to_iso("not-a-number")
     assert "T" in ts
     assert ts.endswith("Z")

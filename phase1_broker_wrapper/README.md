@@ -1,8 +1,8 @@
 # broker_wrapper — Phase 1
 
-Unified broker abstraction for the trading bot. Pure REST, runs standalone,
-emits standard JSON envelopes consumable by tests, CLI, FastAPI, and the
-bot core.
+Unified broker abstraction for the trading bot. Pure REST + Lightstreamer streaming,
+runs standalone, emits standard JSON envelopes consumable by tests, CLI, FastAPI,
+and the bot core.
 
 ## What it is, what it isn't
 
@@ -10,15 +10,18 @@ bot core.
 - A single Python interface (`BrokerAdapter`) every broker implements.
 - An IG Markets REST adapter (raw `requests`, no third-party trading-ig).
 - A polling stream client as functional fallback.
-- A skeleton Lightstreamer client (next iteration finishes it).
+- A Lightstreamer client (official `lightstreamer-client-lib` SDK, live-tested against IG demo).
 - A deterministic tradeable-filter rules engine (Code, not AI).
 - A CLI for standalone smoke-testing and shell piping.
 - OS-keyring credential management.
+- ✓ REST smoke-tested against IG demo — full lifecycle including order open/close verified.
 
 **Isn't (yet):**
-- Live-tested against a real IG account. Smoke-test first against demo.
 - Backtesting infrastructure. (Phase 3.)
 - The bot itself. This module is a tool, not a strategy.
+
+Lightstreamer streaming is live-tested: CONOK/SUBOK + real DAX ticks confirmed against
+IG demo on 2026-05-21 via `scripts/test_lightstreamer.py`.
 
 ## Install
 
@@ -37,6 +40,8 @@ cannot read them.
 python scripts/store_credential.py --list
 
 # Store each one (input is hidden, prompted via getpass)
+# Note: IG username is the login identifier shown in MyIG → Personal details,
+# which may differ from your email address.
 python scripts/store_credential.py ig_demo_username
 python scripts/store_credential.py ig_demo_password
 python scripts/store_credential.py ig_demo_api_key
@@ -49,17 +54,45 @@ python scripts/store_credential.py --status
 For production keys, repeat with `ig_username`, `ig_password`,
 `ig_api_key`, `ig_account_id`.
 
-## Smoke test
+## REST smoke test
 
 ```bash
-python scripts/smoke_test.py                 # read-only checks against demo
-python scripts/smoke_test.py --order         # also place + close a tiny order
-python scripts/smoke_test.py --epic IX.D.DAX.IFM.IP
+python scripts/smoke_test.py                          # read-only, auto-selects first TRADEABLE INDICES epic
+python scripts/smoke_test.py --order --size 1         # full lifecycle: open + close demo position
+python scripts/smoke_test.py --epic IX.D.DAX.IFMM.IP  # explicit confirmed epic
 ```
 
 The smoke test exercises connect → account → search → market info →
 price → OHLCV → positions → reconcile → disconnect. With `--order`, it
 also opens and closes a demo position.
+
+**Session throttling:** IG blocks rapid successive logins from the same account.
+If you get `service.security.authentication.failure-invalid-client-security-token`
+after a successful run, wait 2–3 minutes before retrying. Not an issue in
+production where the bot holds one persistent session.
+
+## Lightstreamer live test
+
+`scripts/test_lightstreamer.py` validates the streaming connection end-to-end —
+something neither `pytest` (mocked HTTP) nor `smoke_test.py` (REST only) can do.
+
+```bash
+python scripts/test_lightstreamer.py                          # wait for 3 ticks, 30s timeout
+python scripts/test_lightstreamer.py --ticks 5 --timeout 60  # stricter check
+python scripts/test_lightstreamer.py --epic IX.D.DAX.IFMM.IP # explicit epic
+```
+
+What it validates:
+- `lightstreamerEndpoint` is returned by `POST /session` (the Gap 1 fix in `_login()`)
+- IG accepts `CST-...|XST-...` auth format over TLCP
+- TLCP session creates and `CONOK` is received
+- Subscription to `L1:{epic}` returns `SUBOK`
+- `PriceTick` callbacks are delivered via `U,...` stream lines
+- `stop()` cleans up the reader thread
+
+**Must run during market hours** (Mon–Fri 08:00–22:30 CET). Outside hours the
+DAX index is CLOSED and may deliver zero ticks even on a healthy connection.
+Exit code 0 = PASS, 1 = FAIL (see output for debug hints on failure).
 
 ## CLI usage (standalone, JSON output)
 
@@ -67,12 +100,12 @@ Every command prints one Envelope JSON object to stdout.
 
 ```bash
 python -m broker_wrapper.cli --broker ig_demo get-account
-python -m broker_wrapper.cli --broker ig_demo get-price --epic IX.D.DAX.IFM.IP
+python -m broker_wrapper.cli --broker ig_demo get-price --epic IX.D.DAX.IFMM.IP
 python -m broker_wrapper.cli --broker ig_demo search --query DAX
 python -m broker_wrapper.cli --broker ig_demo ohlcv \
-    --epic IX.D.DAX.IFM.IP --resolution MINUTE_5 --count 20
+    --epic IX.D.DAX.IFMM.IP --resolution MINUTE_5 --count 20
 python -m broker_wrapper.cli --broker ig_demo historical \
-    --epic IX.D.DAX.IFM.IP --from 2026-05-01T00:00:00 --to 2026-05-10T00:00:00 \
+    --epic IX.D.DAX.IFMM.IP --from 2026-05-01T00:00:00 --to 2026-05-10T00:00:00 \
     --resolution HOUR
 python -m broker_wrapper.cli --broker ig_demo reconcile --refs bot-abc bot-def
 ```
@@ -81,15 +114,21 @@ python -m broker_wrapper.cli --broker ig_demo reconcile --refs bot-abc bot-def
 
 ```python
 from broker_wrapper import get_broker
+from broker_wrapper.factory import get_stream
 
+# REST
 broker = get_broker("ig_demo")
-env = broker.connect()
-assert env.ok
-
-price = broker.get_price("IX.D.DAX.IFM.IP")
+broker.connect()
+price = broker.get_price("IX.D.DAX.IFMM.IP")
 if price.ok:
     print(price.data["bid"], price.data["ask"])
 
+# Streaming
+stream = get_stream(broker)
+stream.subscribe("IX.D.DAX.IFMM.IP", lambda tick: print(tick.bid, tick.ask))
+stream.start()
+# ... bot runs ...
+stream.stop()
 broker.disconnect()
 ```
 
@@ -137,10 +176,10 @@ returns which references are `present` / `missing` / `unexpected`.
 ## Running tests
 
 ```bash
-pytest tests/ -v
+pytest tests/ -v   # 48 tests: envelope(7) · filters(10) · ig_adapter(14) · lightstreamer(17)
 ```
 
-The unit tests use mocked HTTP — no network, no credentials needed.
+All unit tests use mocked HTTP — no network, no credentials needed.
 
 ## What goes where in this module
 
@@ -151,25 +190,32 @@ broker_wrapper/
 ├── credentials.py         ← OS keyring access
 ├── models.py              ← normalized cross-broker dataclasses
 ├── filters.py             ← deterministic "tradeable?" rules + sizing math
-├── factory.py             ← get_broker("ig" | "ig_demo")
+├── factory.py             ← get_broker("ig"|"ig_demo") · get_stream(adapter)
 ├── cli.py                 ← standalone CLI / JSON pipe
 ├── adapters/
 │   ├── base.py            ← BrokerAdapter ABC
-│   └── ig_adapter.py      ← IG REST implementation
+│   └── ig_adapter.py      ← IG REST implementation + lightstreamer_endpoint property
 └── streaming/
     ├── base.py            ← StreamClient ABC + PollingStreamClient
-    └── ig_lightstreamer.py  ← skeleton, finished next session
+    └── ig_lightstreamer.py  ← official Lightstreamer SDK wrapper · live-tested
+
+scripts/
+├── store_credential.py    ← credential storage (getpass, OS keyring)
+├── smoke_test.py          ← REST end-to-end test (48 steps, order lifecycle)
+└── test_lightstreamer.py  ← Lightstreamer live stream validation (run during market hours)
 ```
 
 ## Open items / known limits
 
-1. **Lightstreamer not finished.** Production streaming pending; polling
-   client works in the meantime.
-2. **Endpoint specifics need live verification.** The IG REST endpoints
-   used here are written from the public API documentation. Each one
-   should be hit against the demo account in the smoke test before
-   trusting it with real money.
-3. **DAX CFD epics** — exact epic strings depend on your IG product
-   subscriptions. Use `search` to discover them rather than hardcoding.
-4. **Trade-history parsing** is best-effort. IG's transaction format
-   varies by deal type; cross-check against a known closed deal.
+1. **Lightstreamer live-tested ✅.** Built on the official `lightstreamer-client-lib`
+   SDK; CONOK/SUBOK + real DAX `PRICE` ticks confirmed against IG demo on 2026-05-21
+   via `python scripts/test_lightstreamer.py`. See `lightstreamer_integration_notes.md`.
+2. **DAX CFD epic confirmed:** `IX.D.DAX.IFMM.IP` — "Deutschland 40-Kassa (1 €)",
+   `min_deal_size: 0.5`, `lot_size: 1.0 €/point`, EUR, spread ~1.8 pts (~0.007%).
+   Use `search_markets()` to discover epics rather than hardcoding in case IG
+   changes their naming.
+3. **Trade-history parsing** is best-effort. IG's transaction format varies by
+   deal type; cross-check against a known closed deal before relying on it.
+4. **IG Europe GmbH live account** required before real-money trading. Current
+   HTADU/GBX is a UK entity account — not correct for German residents post-Brexit.
+   Open a fresh EUR account at ig.com/de.

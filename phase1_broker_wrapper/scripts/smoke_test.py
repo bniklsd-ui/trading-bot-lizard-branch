@@ -69,7 +69,11 @@ def main() -> int:
     epic = args.epic
     if not epic and s_env.ok:
         for r in s_env.data.get("results", []):
-            if "DAX" in (r.get("name") or "") and r.get("epic"):
+            if (
+                r.get("epic")
+                and r.get("type") == "INDICES"
+                and r.get("market_status") == "TRADEABLE"
+            ):
                 epic = r["epic"]
                 break
     if not epic:
@@ -99,7 +103,7 @@ def main() -> int:
             epic, "BUY", args.size, "MARKET", currency="EUR",
         )
         all_ok &= _show(open_env)
-        if open_env.ok and open_env.data.get("deal_id"):
+        if open_env.ok and open_env.data.get("deal_id") and open_env.data.get("status") == "ACCEPTED":
             deal_id = open_env.data["deal_id"]
             print(f"\n[10] close_position {deal_id}")
             all_ok &= _show(broker.close_position(deal_id))

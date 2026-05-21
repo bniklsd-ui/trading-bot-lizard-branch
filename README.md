@@ -1,7 +1,7 @@
 # Trading Bot
 
 A multi-phase, AI-augmented options trading bot for the DAX.
-Primary broker: IG Markets (HTADU account, GBX). Multi-broker abstraction in place.
+Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 
 > **Bauprinzip:** So wenig AI wie möglich, so viel AI wie nötig.
 > Code macht alles was Code kann. AI trifft nur Entscheidungen die genuines
@@ -11,17 +11,17 @@ Primary broker: IG Markets (HTADU account, GBX). Multi-broker abstraction in pla
 
 ## Status
 
-| Phase | Komponente                          | Status                            |
-|-------|------------------------------------|-----------------------------------|
-| 1     | Broker API Wrapper                  | Code vorhanden, **ungetestet**    |
-| 2     | Persistenz (SQLite + JSON)          | Nicht begonnen                    |
-| 3     | External Data (yFinance)            | Nicht begonnen                    |
-| 4     | turbo_research.py + LLM             | Nicht begonnen                    |
-| 5     | ig_bot.py Gates 1–5 + pre_trade     | Nicht begonnen                    |
-| 6     | Bull/Bear/Judge Debate              | Nicht begonnen                    |
-| 7     | Reward/Punishment + Brain           | Nicht begonnen                    |
-| 8     | Scheduler                           | Nicht begonnen                    |
-| 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert) |
+| Phase | Komponente                          | Status                                              |
+|-------|-------------------------------------|-----------------------------------------------------|
+| 1     | Broker API Wrapper                  | ✅ Abgeschlossen (live-verifiziert, Demo)            |
+| 2     | Persistenz (SQLite + JSON)          | Nicht begonnen                                      |
+| 3     | External Data (yFinance)            | Nicht begonnen                                      |
+| 4     | turbo_research.py + LLM             | Nicht begonnen                                      |
+| 5     | ig_bot.py Gates 1–5 + pre_trade     | Nicht begonnen                                      |
+| 6     | Bull/Bear/Judge Debate              | Nicht begonnen                                      |
+| 7     | Reward/Punishment + Brain           | Nicht begonnen                                      |
+| 8     | Scheduler                           | Nicht begonnen                                      |
+| 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert)       |
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)
@@ -72,7 +72,7 @@ python scripts/store_credential.py ig_demo_api_key
 python scripts/store_credential.py ig_demo_account_id
 
 # 5. Smoke test gegen Demo
-python scripts/smoke_test.py
+python scripts/smoke_test.py --epic IX.D.DAX.IFMM.IP
 ```
 
 **Credentials liegen NIE in Dateien.** Nur im OS-Keyring
