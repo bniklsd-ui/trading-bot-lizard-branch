@@ -77,7 +77,19 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 2 — Persistenz (SQLite + JSON State)
+**Active phase:** Phase 2 — Persistenz: ✅ abgeschlossen + live-verifiziert.
+Phase-3-Konzept (External Data) ausstehend (Browser-Konzept-Session leitet den
+Phasenwechsel ein — nicht hier in Claude Code).
+
+**Phase 2 status:** ✅ Abgeschlossen + live-verifiziert (2026-05-22)
+- 59 Unit-Tests grün (gemockt) + live-verifiziert via `phase2_persistence/scripts/live_test.py`
+  (Durability über Prozess-Neustart, Candidates-TTL-Selbstlöschung, Phase-1→Phase-2
+  Integration gegen IG Demo)
+- Code in `phase2_persistence/` · Konzept in `docs/concepts/phase2_persistence_konzept.md`
+- Runtime-Daten in gitignored Root-`data/` (`trading_bot.sqlite` + `state/*.json`),
+  angelegt via `scripts/init_db.py`
+- Erkenntnis (Code = Source of Truth): `get_open_positions().data` ist ein Dict
+  `{"positions": [...]}`, keine blanke Liste — Konzept-Beispiel entsprechend korrigiert
 
 **Phase 1 status:** ✅ Abgeschlossen
 - Live-verifiziert gegen IG Demo · smoke_test PASS inkl. `--order`
@@ -102,14 +114,16 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 │
 ├── docs/
 │   ├── concepts/                           ← Phase-N concept docs
-│   │   └── phase1_broker_api_konzept.md
+│   │   ├── phase1_broker_api_konzept.md
+│   │   └── phase2_persistence_konzept.md
 │   ├── architecture/
 │   │   ├── tradingbot_v2_architecture.svg
 │   │   └── tradingbot_v2_architecture.pdf
 │   └── sessions/                           ← (optional) chat session summaries
 │
+├── data/                                   ← runtime SQLite + JSON state (gitignored)
 ├── phase1_broker_wrapper/                  ← Phase 1 code ✅
-├── phase2_persistence/                     ← (future)
+├── phase2_persistence/                     ← Phase 2 code ✅
 ├── phase3_external_data/                   ← (future)
 └── ...
 ```
