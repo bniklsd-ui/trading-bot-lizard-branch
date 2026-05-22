@@ -598,28 +598,35 @@ Abdeckung die Phase 2 benötigt:
 
 ---
 
-## Session stopped — 2026-05-22
+## Session stopped — 2026-05-22 — ✅ ABGESCHLOSSEN + LIVE-VERIFIZIERT + GEMERGED
 
 ### Completed
 - `phase2_persistence/` vollständig implementiert: `persistence/` Package
   (`timeutil.py`, `schema.py`, `defaults.py`, `migrations.py`, `db.py`,
   `state.py`, `__init__.py`), `migrations/001_initial.sql` (alle 6 Tabellen +
-  Indizes), `scripts/init_db.py`, `tests/` (test_migrations/db/state).
-- **59 Tests grün** (`pytest tests/ -v`), keine Netzwerk-Calls.
+  Indizes), `scripts/init_db.py`, `scripts/live_test.py`, `tests/`
+  (test_migrations/db/state).
+- **59 Unit-Tests grün** (`pytest tests/ -v`), keine Netzwerk-Calls.
+- **Live-verifiziert vom User (2026-05-22)** via `scripts/live_test.py`:
+  Durability über echten Prozess-Neustart, Candidates-TTL-Selbstlöschung, und
+  Phase-1→Phase-2-Integration gegen IG Demo (`get_account` / `get_open_positions`
+  → `StateManager` / `Database`). Alles PASS.
 - `init_db.py` verifiziert: legt `data/trading_bot.sqlite` + `data/state/` an,
   migriert auf Version 1, seedet `ig_config_state`-Defaults; zweiter Lauf =
   sauberer No-Op. `data/` ist per `.gitignore` ausgeschlossen.
-- README + CLAUDE.md für Phase 2 geschrieben; Konzept-Entscheidungen oben
-  dokumentiert.
+- **Konzept↔Code-Korrektur:** `get_open_positions().data` ist ein Dict
+  `{"positions": [...]}`, keine blanke Liste (Integration-Beispiel oben gefixt;
+  Code = Source of Truth).
+- README + CLAUDE.md für Phase 2 geschrieben; in `phase2-testbranch` committet
+  und per `--no-ff` nach `main` gemerged + gepusht.
 
 ### Next
-- Phase-2-Code committen (atomare Commits, kein `data/`).
-- ROADMAP Phase-2-Checkboxen abhaken (erledigt) und root `CLAUDE.md`
-  "Current state" auf Phase 3 umstellen — beim Phasenwechsel (Browser-Konzept-
-  Session) entscheiden.
-- Phase 3 (External Data / yFinance) Konzept vorbereiten.
+- Phase 3 (External Data / yFinance) Konzept in der Browser-Konzept-Session
+  vorbereiten — der Phasenwechsel (Setzen der „Active phase" auf Phase 3) gehört
+  laut Projektregel in die Browser-Session, nicht in Claude Code.
 
 ### Open questions / blockers
-- Keine. Phase 2 ist self-contained und ohne Broker-Verbindung lauffähig.
-- Erinnerung: Live-/Netzwerktests sind Sache des Users — Phase 2 hat ohnehin
-  keinen Netzwerkpfad, `pytest` + `init_db.py` decken alles ab.
+- Keine. Phase 2 ist self-contained, live-verifiziert und auf `main`.
+- Erinnerung: Live-/Netzwerktests sind Sache des Users; `scripts/live_test.py`
+  bündelt sie reproduzierbar (`durability` / `ttl` ohne Netz, `integration` gegen
+  IG Demo aus dem Phase-1-venv).

@@ -1,5 +1,8 @@
 # persistence — Phase 2
 
+> **Status:** ✅ live-verified 2026-05-22 — 59 unit tests + `scripts/live_test.py`
+> (durability, TTL, Phase-1 integration against IG demo). Merged to `main`.
+
 The data layer for the trading bot. **100% deterministic code — no LLM calls.**
 It stores and returns; it does not judge, score, or filter. Two stores, two
 lifetimes:

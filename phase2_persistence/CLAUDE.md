@@ -4,6 +4,8 @@
 Phase 2 of a DAX intraday trading bot. This package is the data/persistence layer.
 Full design and all decisions: see `../docs/concepts/phase2_persistence_konzept.md`.
 
+**Status:** ✅ live-verified 2026-05-22 (pytest + `scripts/live_test.py`), merged to `main`.
+
 ## Stack
 - Python 3.11+ · `sqlite3` + `json` (stdlib) — **no runtime dependencies**
 - `pytest` for tests (mocked/local only, no network)

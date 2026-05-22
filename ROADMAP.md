@@ -45,7 +45,8 @@ against the demo account.
 - [x] Reader/writer abstractions (`db.py`, `state.py`)
 
 **Done when:** All schemas exist, can read/write/migrate. Unit tests cover
-each table's CRUD operations. ✅ 59 unit tests green (2026-05-22).
+each table's CRUD operations. ✅ 59 unit tests green + live-verified via
+`scripts/live_test.py` (durability, TTL, Phase-1 integration) — 2026-05-22.
 
 **Directory:** [`phase2_persistence/`](./phase2_persistence/)
 **Concept:** [`docs/concepts/phase2_persistence_konzept.md`](./docs/concepts/phase2_persistence_konzept.md)
