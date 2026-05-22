@@ -114,6 +114,27 @@ offline (tests, analysis, future backtesting) with no broker connection.
 pytest tests/ -v   # 59 tests: migrations(9) · db(31) · state(19) — no network, temp SQLite/dirs
 ```
 
+## Live / smoke tests
+
+`scripts/live_test.py` covers what mocked unit tests can't: real on-disk
+persistence across a process restart, candidate-TTL self-clearing, and the real
+Phase-1 → Phase-2 dict contract. Exit code 0 = PASS, 1 = FAIL. Writes only to
+gitignored `../data/livetest*` paths.
+
+```bash
+python scripts/live_test.py all                    # durability + ttl (no network)
+python scripts/live_test.py durability --phase write   # true 2-process: step 1
+python scripts/live_test.py durability --phase verify  # true 2-process: step 2
+
+# Phase-1 integration — hits the live IG demo; run from the phase1 venv:
+source ../phase1_broker_wrapper/.venv/bin/activate
+python scripts/live_test.py integration
+```
+
+Note: `get_open_positions().data` is `{"positions": [...]}` (a dict), and a live
+`Position` carries `created_at` (not `open_ts`) with no `session_date` — the
+integration test maps these, which is the glue Phase 5 will own.
+
 ## Conventions
 
 - All timestamps: ISO 8601 UTC, ms precision, `Z` suffix.

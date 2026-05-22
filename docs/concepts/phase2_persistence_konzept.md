@@ -484,13 +484,21 @@ broker = get_broker("ig_demo")
 db = Database("trading_bot.sqlite")
 
 # Nach Order-Close:
-position = broker.get_open_positions().data[0]  # dict aus Envelope
-db.insert_trade({                                # Envelope.data direkt verwertbar
-    "deal_id": position["deal_id"],
-    "epic": position["epic"],
-    ...
+# ACHTUNG (Code = Source of Truth): get_open_positions().data ist ein DICT
+# {"positions": [...]}, KEINE blanke Liste. Live verifiziert am 2026-05-22.
+position = broker.get_open_positions().data["positions"][0]   # dict aus Envelope
+db.insert_trade({
+    **position,                # Position-Felder direkt übernehmen
+    "open_ts": position["created_at"],   # Position hat created_at, nicht open_ts
+    "session_date": "2026-05-22",         # Position liefert kein session_date
 })
 ```
+
+> **Mapping-Hinweis (Phase-5-Glue):** Ein `Position`-Dict aus Phase 1 trägt
+> `created_at` (nicht `open_ts`) und kein `session_date`. `insert_trade()`
+> braucht beide → der Aufrufer mappt `created_at → open_ts` und ergänzt
+> `session_date`. Überzählige Position-Keys (`current_level`, `stop_level`, …)
+> werden vom Spalten-Whitelist in `db.py` ignoriert.
 
 **Warum nicht direkt importieren?**
 Phase-Isolation. Die Persistence-Schicht muss ohne Broker-Verbindung
