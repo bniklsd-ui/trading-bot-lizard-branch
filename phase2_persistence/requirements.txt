@@ -1,0 +1,4 @@
+# Phase 2 has no runtime dependencies — sqlite3 and json are in the stdlib.
+
+# dev / test
+pytest>=7.4.0

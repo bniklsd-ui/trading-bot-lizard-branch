@@ -37,16 +37,18 @@ against the demo account.
 
 **Goal:** Data layer for the rest of the bot. No business logic, just storage.
 
-- [ ] SQLite schema: `trade_lessons`, `trade_outcomes`, `reward_pts`, `ig_config_state`
-- [ ] JSON state files: `ig_state.json`, `ig_config.json`, `turbo_candidates.json`
-- [ ] TTL handling for `turbo_candidates.json` (30 min)
-- [ ] Migrations / schema versioning
-- [ ] Reader/writer abstractions (`db.py`)
+- [x] SQLite schema: `trade_lessons`, `trade_outcomes`, `reward_pts`, `ig_config_state`
+      (+ V2 `market_regime_snapshots`, `decision_context` as empty placeholders)
+- [x] JSON state files: `ig_state.json`, `ig_config.json`, `turbo_candidates.json`
+- [x] TTL handling for `turbo_candidates.json` (30 min)
+- [x] Migrations / schema versioning
+- [x] Reader/writer abstractions (`db.py`, `state.py`)
 
 **Done when:** All schemas exist, can read/write/migrate. Unit tests cover
-each table's CRUD operations.
+each table's CRUD operations. ✅ 59 unit tests green (2026-05-22).
 
-**Directory:** `phase2_persistence/` *(to be created)*
+**Directory:** [`phase2_persistence/`](./phase2_persistence/)
+**Concept:** [`docs/concepts/phase2_persistence_konzept.md`](./docs/concepts/phase2_persistence_konzept.md)
 
 ---
 
