@@ -15,7 +15,7 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 |-------|-------------------------------------|-----------------------------------------------------|
 | 1     | Broker API Wrapper                  | ✅ Abgeschlossen (live-verifiziert, Demo)            |
 | 2     | Persistenz (SQLite + JSON)          | ✅ Abgeschlossen (live-verifiziert, Demo)            |
-| 3     | External Data (yFinance)            | Nicht begonnen                                      |
+| 3     | External Data (yFinance)            | ✅ Abgeschlossen (live-verifiziert, ^GDAXI)          |
 | 4     | turbo_research.py + LLM             | Nicht begonnen                                      |
 | 5     | ig_bot.py Gates 1–5 + pre_trade     | Nicht begonnen                                      |
 | 6     | Bull/Bear/Judge Debate              | Nicht begonnen                                      |

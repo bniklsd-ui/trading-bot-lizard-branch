@@ -77,9 +77,29 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 2 — Persistenz: ✅ abgeschlossen + live-verifiziert.
-Phase-3-Konzept (External Data) ausstehend (Browser-Konzept-Session leitet den
-Phasenwechsel ein — nicht hier in Claude Code).
+**Active phase:** Phase 3 — External Data (yFinance): ✅ abgeschlossen +
+live-verifiziert. Phase-4-Konzept (turbo_research) ausstehend (Browser-Konzept-Session
+leitet den Phasenwechsel ein — nicht hier in Claude Code).
+
+**Phase 3 status:** ✅ Abgeschlossen + live-verifiziert (2026-06-02)
+- 70 Unit-Tests grün (gemockt, `_raw_download` monkeypatched — kein Netzwerk) +
+  live-verifiziert via `phase3_external_data/scripts/live_test.py --clear-cache`
+  → `RESULT: 6/6 passed` gegen reales yFinance `^GDAXI` (Konnektivität, Daily-
+  Indikatoren, Markt-Regime-Verzweigung, Cache-Hit, Rate-Limiter-Abstand,
+  `get_brain_context`-Toleranz). ETF-Volume-Proxy-Pfad via `--volume-proxy EXS1.DE`
+  bestätigt (`volume_available=True`, `volume_source=EXS1.DE`, `today_volume>0`).
+- 100 % Code, **kein LLM-Call** (Bauprinzip). yFinance liefert Rohwerte, Code rechnet
+  Drift/Momentum/Volume-z/HighLow. Einziger Netzwerk-Punkt: `fetcher._raw_download`.
+- Code in `phase3_external_data/` (importiert nichts aus Phase 1/2 — Phasen-Isolation)
+  · Plan/Konzept in `docs/concepts/phase3_external_data_konzept.md`
+- Runtime-Cache in gitignored Root-`data/cache/*.json` (TTL: 1d bis Mitternacht
+  Europe/Berlin · 5m 120 s · 30m 300 s)
+- ⚠ **Phase-5-Flag:** `get_momentum()` ist ~15 min verzögert (yFinance Delayed Quote) —
+  ein **Kontext-Signal**, KEIN harter Momentum-VETO. Der VETO gehört in Phase 5 an
+  Phase-1/IG-Echtzeit-Bars (siehe `phase3_external_data/CLAUDE.md` + Konzept §13).
+- Erkenntnisse (Code = Source of Truth, Konzept entsprechend annotiert): `get_bars`
+  ist `list[PriceBar] | None` (Off-Hours-Disziplin, §11); der Live-Rate-Limiter-Check
+  provisioniert sich einen frischen Temp-Cache statt `--clear-cache` zu brauchen (§17.2)
 
 **Phase 2 status:** ✅ Abgeschlossen + live-verifiziert (2026-05-22)
 - 59 Unit-Tests grün (gemockt) + live-verifiziert via `phase2_persistence/scripts/live_test.py`
@@ -115,7 +135,8 @@ Phasenwechsel ein — nicht hier in Claude Code).
 ├── docs/
 │   ├── concepts/                           ← Phase-N concept docs
 │   │   ├── phase1_broker_api_konzept.md
-│   │   └── phase2_persistence_konzept.md
+│   │   ├── phase2_persistence_konzept.md
+│   │   └── phase3_external_data_konzept.md
 │   ├── architecture/
 │   │   ├── tradingbot_v2_architecture.svg
 │   │   └── tradingbot_v2_architecture.pdf
@@ -124,7 +145,7 @@ Phasenwechsel ein — nicht hier in Claude Code).
 ├── data/                                   ← runtime SQLite + JSON state (gitignored)
 ├── phase1_broker_wrapper/                  ← Phase 1 code ✅
 ├── phase2_persistence/                     ← Phase 2 code ✅
-├── phase3_external_data/                   ← (future)
+├── phase3_external_data/                   ← Phase 3 code ✅
 └── ...
 ```
 

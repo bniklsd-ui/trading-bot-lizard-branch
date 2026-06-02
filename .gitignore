@@ -93,6 +93,10 @@ turbo_candidates.json
 *.db-journal
 *.db-wal
 *.db-shm
+# Phase 3 external-data cache (yFinance OHLCV JSON, written at runtime).
+# Added 2026-06-02: the concept (§2) and phase3 CLAUDE.md assumed data/cache/
+# was already ignored, but no rule covered it — reconciled here.
+data/cache/
 
 # --- Logs ---
 *.log
