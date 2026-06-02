@@ -1,0 +1,10 @@
+# Phase 3 — External Data (yFinance).
+# curl_cffi comes in transitively with yfinance; on some systems it needs
+# a build toolchain (see README install note).
+
+# runtime
+yfinance>=0.2.65,<0.3
+pandas>=2.0.0
+
+# dev / test
+pytest>=7.4.0
