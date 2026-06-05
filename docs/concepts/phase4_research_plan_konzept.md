@@ -200,6 +200,7 @@ phase4_research/
 │   ├── validator.py               # ★ Halluzinations-Schutz (Code)
 │   ├── candidate_filter.py        # ★ deterministisches reales Gate (Code)
 │   ├── models.py                  # Candidate, ResearchContext, ResearchConfig, ValidationResult
+│   ├── timeutil.py                # ★ Step-2-Ergänzung: utc_iso_now()/_utcnow()/parse_iso (wie P3)
 │   └── credentials.py             # dünner Shim → broker_wrapper.credentials.get_credential
 ├── scripts/
 │   ├── wiring.py                  # baut echte P1/P2/P3-Instanzen (sys.path), setzt EXS1.DE-Proxy
@@ -239,6 +240,20 @@ Netzwerk/echtes LLM, atomic commits, kein Subtask „done" ohne grünes `pytest`
 ### 2. `validator.py` + `test_validator.py` ZUERST (Sicherheits-Kern)
 Reine Funktion. **Der wichtigste Test der ganzen Phase.**
 
+> **Angepasst 2026-06-05 (Step 2 gebaut, Code = Source of Truth):** Die 6 **positionalen**
+> Args bleiben exakt wie unten eingefroren. Der Validator **baut** bei PASS aber den
+> **vollen** `Candidate` (Contract oben) — und zwei Contract-Felder (`score_at_pick`,
+> `drift_at_pick`) sind Entscheidungs-Kontextwerte, die in den 6 Args **nicht** vorkommen.
+> Lösung: zwei **keyword-only** Passthrough-Parameter `*, score_at_pick: float,
+> drift_at_pick: float | None` ergänzt (vom Orchestrator aus `context.bot_score` bzw.
+> P3-Drift versorgt; in Tests explizit übergeben). Sie beeinflussen **keine**
+> Validierungs-Entscheidung — reine Persistenz-Durchreichung. `broker` ist im Code via
+> lokalem `typing.Protocol` (`_BrokerLike.get_price`) getypt, **kein** `broker_wrapper`-
+> Import (Phasen-Isolation). `generated_at` wird via neuem `research/timeutil.py`
+> (`utc_iso_now()`, monkeypatchbares `_utcnow()` — wie Phase 3) gestempelt; das Modul war
+> in der Modul-Struktur unten nicht gelistet, ist aber die Phase-1/2/3-Konvention und wird
+> ab Step 5 (Token-Meter-`ts`) mitgenutzt. `test_validator.py`: **18 grün** (≥12 erfüllt).
+
 ```python
 def validate_candidate(
     raw: dict,                       # geparster LLM-Output (oder Structured-Output-Dict)
@@ -247,6 +262,9 @@ def validate_candidate(
     allowed_directions: tuple[str, ...],
     broker: "BrokerAdapter",         # für Live-Spread-Recheck
     max_spread_pct: float,
+    *,                               # ── Step-2-Ergänzung (Passthrough, keine Logik) ──
+    score_at_pick: float,            # → Candidate.score_at_pick (aus context.bot_score)
+    drift_at_pick: float | None,     # → Candidate.drift_at_pick (P3-Drift)
 ) -> ValidationResult: ...
 ```
 
@@ -390,7 +408,9 @@ Flow (alles außer dem einen LLM-Call ist Code):
 4. `system, user, schema = build_prompt(context, threshold, allowed)`.
 5. `raw = llm.ask_candidate(system, user, schema)` — der **einzige** AI-Schritt.
    Bei `LLMResponseError` → Abstain → `save_candidates([])` (kein blinder Trade).
-6. `vr = validate_candidate(raw, context.tradeable_epics, threshold, allowed, broker, max_spread_pct)`.
+6. `vr = validate_candidate(raw, context.tradeable_epics, threshold, allowed, broker,
+   max_spread_pct, score_at_pick=context.bot_score, drift_at_pick=<P3-Drift aus
+   context.brain_context>)` (keyword-only Args, Step-2-Ergänzung — siehe §2-Annotation).
    REJECT oder `abstain` → `save_candidates([])`.
 7. `fv = apply_filter(vr.candidate, context, config)`; `not fv.ok` → `save_candidates([])`.
 8. PASS → `state.save_candidates([candidate.to_dict()])`. Rückgabe der Liste.
