@@ -7,7 +7,7 @@
 
 ## What this project is
 
-A multi-phase, AI-augmented options trading bot for the DAX.
+A multi-phase, AI-augmented CFD trading bot for the DAX.
 Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 
 The bot is structured around a **5-Gate Execution Pipeline** with adversarial

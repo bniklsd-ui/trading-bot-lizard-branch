@@ -1,0 +1,452 @@
+# Phase 4 — Implementierungsplan für Claude Code
+
+> **Status:** Architektur geklärt (8 Entscheidungen unten gelockt), Contracts gegen
+> den echten Repo-Code verifiziert. Dieser Plan ersetzt die ungenauen Stubs im
+> Konzept dort, wo der Code abweicht.
+>
+> **Quelle der Wahrheit bleibt das Repo.** Wo dieser Plan eine Signatur nennt, ist
+> sie aus `ig_adapter.py` / `filters.py` / `credentials.py` verifiziert. Wo der Plan
+> auf Phase-3-Keys verweist (`to_prompt_dict`), ist die **finale** Verifikation gegen
+> `phase3_external_data/.../models.py` ein Pflicht-Schritt (Step 0.5).
+
+---
+
+## 0. Geklärte Architektur-Entscheidungen (gelockt)
+
+| # | Entscheidung | Festlegung |
+|---|---|---|
+| 1 | `direction`-Vokabular | **`"BUY"` / `"SELL"`** — exakt das, was `open_position()` erzwingt. Fließt ohne Mapping in Phase 5. **Kein CALL/PUT irgendwo.** |
+| 2 | Komposition | DI via Konstruktor (gesetzt). `wiring.py`/`live_test.py` lösen echte Instanzen via **`sys.path`-Bootstrap** auf (wie Phase-2-`live_test`). Editable installs / Monorepo erst Phase 5. |
+| 3 | Strukturierte Ausgabe | **Structured Outputs als Primärpfad** (`output_format` json_schema, `epic` als Enum der realen Liste). Manuelles Parse + Fence-Strip nur als Fallback. Validator unabhängig **immer** aktiv. |
+| 4 | Confidence | LLM-Confidence ist **epistemisch schwach** (Forschung: ECE ~0,1, systematisch overconfident, keine Schwelle filtert zuverlässig). Daher: **als Feld speichern, als grober Low-Floor nutzen — NICHT als das Gate.** Reales Gating trägt der deterministische `candidate_filter`. Floor-Semantik im Code als „provisorisch, ersetzt durch Phase-7 outcome-anchored" dokumentiert. |
+| 5 | Epic-Universum | **Hybrid, code-kuratiert.** `epic_allowlist` in der Config, Default `("IX.D.DAX.IFMM.IP",)`, Platz für 1–2 kuratierte DAX-Geschwister. **Kein** `search_markets("DAX")`-Schleppnetz (Halluzinations-Oberfläche + Latenz). Pro Epic via `get_price` + `get_market_info` proben, mit `is_tradeable` filtern. |
+| 6 | Credentials | **Usecase über Politik:** Phase-1-`get_credential` wiederverwenden (gleicher Keyring `SERVICE_NAME="tradingbot"`). Dünner Phase-4-Shim dokumentiert die bewusste Isolations-Ausnahme. Key: `anthropic_api_key`. |
+| 7 | `allowed_directions` | Config-Flag. Default beide. **Long-Bias-Clamp auf `("BUY",)` bei `bot_score < 50` standardmäßig AN.** Clamp arbeitet rein mit BUY/SELL — keine Call-Überbleibsel. |
+| 8 | LLM-Fehlerverhalten | **1× Retry** — aber nur bei **transienten** Fehlern (Netzwerk, 5xx, Timeout, Parse-/Schema-Fail). **Kein** Retry bei (a) validem `abstain` (legitime Antwort), (b) `validator`-REJECT (Inhaltsentscheidung → kein Trade; Reject-Retry = „nach einer handelbaren Antwort shoppen" = Anti-Pattern). Jeder Endfehler → `save_candidates([])` → kein Trade. |
+
+---
+
+## Step 0 — Terminologie-Bereinigung + Contract-Fix (eigener Commit, VOR jeder Logik)
+
+> **Angepasst 2026-06-05 (Step 0 ausgeführt, Code = Source of Truth):**
+> Aufgabe 2 (`turbo_research.py` → `research.py`, `TurboResearch` → `Research`) war ein
+> **No-Op** — es existierte **kein** Phase-4-Stub im Repo (kein `phase4_research/`,
+> keine `turbo_research.py`/`TurboResearch`). Die Benennung wird stattdessen **bei der
+> Datei-Erstellung in den Steps 1–9 erzwungen** (`research/research.py`, Klasse
+> `Research`). Aufgabe 3 (Options-Semantik verbannen) betraf nur noch Doku, da noch
+> kein Candidate-/Schema-Code existierte. Die „Done-when"-`grep`-Treffer in `.py`
+> waren **ausschließlich False-Positives** (`callable`, `compute_*`, `_last_call`,
+> `EpicNotMappedError`, `output`/`input`); der einzige echte `turbo_research`-Treffer
+> war ein Phase-3-Kommentar (`fetcher.py:343`), jetzt auf `research` korrigiert.
+> Zusätzlich trugen zwei **Phase-2-Fixtures** noch das Alt-Vokabular
+> `"direction": "CALL"` (`tests/test_state.py` `CANDIDATE`, `scripts/live_test.py` ×2) —
+> auf das BUY/SELL-Contract (`"BUY"`) umgestellt (opake Roundtrip-Dicts, keine
+> Direction-Wert-Assertion → verhaltensneutral; concept-Aufgabe 3 „CALL/PUT verbannen").
+> Tatsächlich geänderte Dateien: Root-`CLAUDE.md`, `README.md`, `ROADMAP.md`,
+> `phase2_persistence/.../state.py` (nur Kommentar),
+> `phase2_persistence/tests/test_state.py` + `phase2_persistence/scripts/live_test.py`
+> (CALL→BUY), `phase3_external_data/.../fetcher.py` (nur Kommentar).
+
+Der Handover behandelt Step 0 als Kosmetik. Der Code zeigt einen **harten
+Contract-Bruch**: `ig_adapter.open_position()` erzwingt `direction in ("BUY","SELL")`
+und wirft sonst `ValueError`. Das Konzept trägt durchgängig `CALL/PUT` — Options-Erbe
+aus dem Turbo-Bot. Würde Phase 4 `"CALL"` schreiben, crasht Phase 5 beim Order-Call.
+
+**Aufgaben (ein Commit, kein Research-Code):**
+
+1. **`turbo_candidates.json` als Name einfrieren** (Phase-2-Contract, Phase-5 Gate 2
+   erwartet ihn). Kommentar an `CANDIDATES_FILE`: *„legacy name; Inhalt = DAX-CFD-
+   Kandidaten, keine Turbos."* **Nicht** umbenennen.
+2. **`turbo_research.py` → `research.py` umbenennen.** Interner Dateiname, **kein**
+   Contract-Bruch, keine Folgephase zeigt darauf. Jetzt sauber, solange noch nichts
+   verdrahtet ist. Klasse: `TurboResearch` → **`Research`**.
+3. **Options-Semantik aus jedem Candidate-/Schema-Entwurf verbannen:** kein `strike`,
+   `otm_distance`, `issuer`, `expiry`, **kein `CALL`/`PUT`**. `direction` ist BUY/SELL.
+4. **Top-Level-Doku korrigieren:** Root-`CLAUDE.md` „options trading bot" →
+   **„CFD trading bot for the DAX"**; ROADMAP-Phase-4-Filter „OTM distance" →
+   „CFD-Filter (Spread, Drift-Eignung, Score-Coupling)"; Hinweis, dass `turbo_*`
+   Legacy-Benennung ist.
+
+**Done when:** `grep -ri "call\|put\|strike\|otm\|issuer\|turbo_research" --include=*.py`
+liefert keine instrumentenbezogenen Treffer mehr (außer dem bewusst dokumentierten
+`turbo_candidates.json`-Legacy-Namen). Eigener, sauberer Commit.
+
+---
+
+## Step 0.5 — Phase-3-Keys final verifizieren (vor `context_builder.py`)
+
+Der Phase-3-Handover sagt: *„The exact key set is part of the Phase-4 contract — do
+not rename or drop keys."* **Bevor** der Context-Builder gebaut wird:
+
+- `phase3_external_data/.../models.py` öffnen, `BrainContext.to_prompt_dict()` lesen,
+  die **echten** Keys notieren. Erwartet (laut Konzept, gegen Code abzugleichen):
+  `ticker, drift_pct, momentum_15m_pct, momentum_is_realtime (immer False),
+  volume_z_score, volume_available, distance_to_high_pct, distance_to_low_pct,
+  range_30d`.
+- **Jeder Wert kann `None` sein** (Marktzeiten-Guard außerhalb 09:00–17:30 Europe/
+  Berlin; fehlender Volume-Proxy). Context-Builder darf bei `None` **nicht crashen** —
+  er reicht `None` transparent an den Prompt durch.
+- Volume-Proxy `EXS1.DE` via `register_volume_proxy` auf dem Fetcher setzen (in
+  `wiring.py`/Config), sonst ist `volume_z_score` immer `None`.
+
+---
+
+## Verifizierte geerbte Contracts (gegen Repo-Code geprüft)
+
+### Phase 1 — `broker_wrapper`
+- `adapter.connect() -> Envelope` · `is_connected() -> bool` · `get_account() -> Envelope`
+- `adapter.get_price(epic) -> Envelope`; `.data` enthält u.a. `bid, ask, spread,
+  spread_pct, market_status, timestamp`. **`spread_pct` und `market_status` kommen von
+  hier** (nicht aus `search_markets`).
+- `adapter.get_market_info(epic) -> Envelope`; `.data` enthält `min_deal_size, currency,
+  instrument_type, market_status`.
+- `adapter.search_markets(query) -> Envelope`; `.data = {"query":..., "results":[...]}`
+  — Items: `epic, name, type, expiry, market_status, bid, ask` (**kein** `spread_pct`,
+  **kein** `min_size`). → wird in Phase 4 **nicht** als Universums-Quelle genutzt
+  (Entscheidung 5), nur das Allowlist-Proben via `get_price`/`get_market_info`.
+- `adapter.get_ohlcv(epic, resolution, count)` — `resolution` ∈ `VALID_RESOLUTIONS`
+  (`MINUTE`, `MINUTE_5`, …); für Phase 5-VETO, **nicht** Phase 4.
+- `open_position(epic, direction, size, ...)` — **`direction in ("BUY","SELL")` Pflicht.**
+- `broker_wrapper.filters`: `is_tradeable(price, market_info, FilterConfig) -> FilterVerdict`
+  (`.ok`, `.rule`, `.reason`); `calc_spread_pct(bid, ask)`; `calc_position_size(...)`.
+- **Envelope:** `.ok` (bool), `.data` (dict bei ok), `.error` (`{code,message,retryable}`).
+  Phase 4 prüft **immer** `env.ok` vor `env.data`.
+
+### Phase 2 — `persistence`
+- `Database.get_recent_trades(n=8)` · `get_recent_lessons(n=5)` · `get_current_score()`
+  · `get_risk_level()` · `mark_lesson_used(id)`
+- `StateManager.save_candidates(list[dict])` · `load_candidates()` ·
+  `candidates_are_fresh()` · `clear_candidates()` (TTL 30 min, self-clearing).
+
+### Phase 3 — `external_data`
+- `MarketDataFetcher.get_brain_context(epic) -> BrainContext`, dann `.to_prompt_dict()`.
+- Intraday-Werte außerhalb der Marktzeiten `None` → tolerieren.
+
+### Credentials
+- `from broker_wrapper.credentials import get_credential`; `get_credential("anthropic_api_key")`.
+  `SERVICE_NAME="tradingbot"`. Seeding via vorhandenes `scripts/store_credential.py`.
+
+### LLM (recherchiert)
+- Structured Outputs sind GA (Sonnet 4.5/4.6, Opus 4.5+). Modell-Default
+  **`claude-sonnet-4-6`** (Konzept-String `claude-sonnet-4-20250514` ist veraltet),
+  als `ResearchConfig.model` **konfigurierbar, nicht hardcoden**.
+- Structured Outputs garantieren **Schema-Form, nicht Korrektheit** → Validator bleibt
+  Pflicht. `epic` als dynamisches Enum der realen Liste macht Epic-Halluzination auf
+  Decoding-Ebene unmöglich; der Validator prüft trotzdem (Defense-in-Depth + Live-Spread).
+
+---
+
+## Der Candidate-Contract (Phase 4 → Phase 5, einmal definiert = stabil)
+
+`turbo_candidates.json` enthält pro Pick ein Dict dieser Form. **Abstain/Reject →
+leere Liste** (`save_candidates([])`), kein `abstain`-Feld im persistierten Candidate.
+
+```python
+{
+    "epic": str,                    # exakt aus dem bereitgestellten Universum
+    "direction": "BUY" | "SELL",    # Broker-Vokabular, direkt in open_position
+    "llm_confidence": float,        # 0-100, LLM-Selbstbericht — ADVISORY, unkalibriert
+    "reasoning": str,               # 2-3 Sätze, LLM
+    "spread_pct_at_pick": float,    # Code-erfasst beim Validieren (frischer get_price)
+    "drift_at_pick": float | None,  # Code-erfasst, P3-Kontext (~15min verzögert)
+    "score_at_pick": float,         # Bot-Score zum Entscheidungszeitpunkt
+    "threshold_applied": float,     # angewandter Confidence-Floor (55/70)
+    "generated_at": str,            # ISO-8601 UTC
+    "source": "research",           # Provenienz
+}
+```
+
+> Bewusst getrennt: `llm_confidence` (Selbstbericht, schwach) vs. die code-erfassten
+> Hartfakten (`spread_pct_at_pick`, `drift_at_pick`, `score_at_pick`). Phase 7 kann
+> später `llm_confidence` gegen tatsächliche Outcomes korrelieren und prüfen, ob das
+> Modell überhaupt kalibriert war — genau die Daten, die outcome-anchored Confidence braucht.
+
+---
+
+## Modul-Struktur
+
+```
+phase4_research/
+├── README.md
+├── CLAUDE.md                      # inkl. "## Session stopped"-Handover (Pflicht)
+├── requirements.txt               # anthropic SDK (einzige neue Dep)
+├── research/
+│   ├── __init__.py                # exports: Research, ResearchConfig
+│   ├── research.py                # Orchestrator run()  (ex turbo_research.py)
+│   ├── context_builder.py         # ResearchContext aus P1/P2/P3 (Code)
+│   ├── prompt.py                  # (system, user, json_schema) bauen (Code)
+│   ├── llm_client.py              # Anthropic-Wrapper, Structured Outputs + Fallback + 1 Retry
+│   ├── validator.py               # ★ Halluzinations-Schutz (Code)
+│   ├── candidate_filter.py        # ★ deterministisches reales Gate (Code)
+│   ├── models.py                  # Candidate, ResearchContext, ResearchConfig, ValidationResult
+│   └── credentials.py             # dünner Shim → broker_wrapper.credentials.get_credential
+├── scripts/
+│   ├── wiring.py                  # baut echte P1/P2/P3-Instanzen (sys.path), setzt EXS1.DE-Proxy
+│   ├── smoke_test.py              # ein echter LLM-Lauf, DRY (kein save)
+│   └── live_test.py               # voller Zyklus → candidates.json, hart asserted, exit 0
+└── tests/
+    ├── conftest.py                # FakeBroker, FakeDB, FakeFetcher, FakeLLM
+    ├── test_validator.py          # ★ höchste Priorität (≥12)
+    ├── test_context_builder.py    # (≥6)
+    ├── test_prompt.py             # (≥5)
+    ├── test_candidate_filter.py   # (≥6)
+    ├── test_llm_client.py         # (≥6)
+    └── test_research.py           # voller run() (≥5)
+```
+
+Repo-Konventionen (gelten auch hier): `from __future__ import annotations`, Type-Hints +
+Docstrings, eine Datei = eine Verantwortung, eigene typisierte Exceptions, nie still
+schlucken, **Logging → stderr / stdout nur maschinenlesbares JSON**, `pytest` ohne
+Netzwerk/echtes LLM, atomic commits, kein Subtask „done" ohne grünes `pytest`.
+
+---
+
+## Build-Reihenfolge (strikt TDD, jede Stufe grün bevor weiter)
+
+### 1. `models.py` (keine Logik, nur Typen)
+- `Candidate` (Felder = Contract oben), `ResearchContext`, `ResearchConfig`,
+  `ValidationResult`.
+- `ResearchConfig`-Felder mindestens: `model: str = "claude-sonnet-4-6"`,
+  `max_tokens: int = 1024`, `temperature: float = 0.2`, `timeout_s: float = 30.0`,
+  `epic_allowlist: tuple[str, ...] = ("IX.D.DAX.IFMM.IP",)`,
+  `allowed_directions: tuple[str, ...] = ("BUY", "SELL")`,
+  `long_bias_below_score: float = 50.0`, `enable_long_bias_clamp: bool = True`,
+  `max_spread_pct: float = 0.5`, `volume_proxy: str | None = "EXS1.DE"`,
+  `confidence_floor_default: float = 55.0`, `confidence_floor_low_score: float = 70.0`.
+- Eigene Exceptions: `LLMResponseError`, `ResearchAbort` (Session-Health-Fail).
+
+### 2. `validator.py` + `test_validator.py` ZUERST (Sicherheits-Kern)
+Reine Funktion. **Der wichtigste Test der ganzen Phase.**
+
+```python
+def validate_candidate(
+    raw: dict,                       # geparster LLM-Output (oder Structured-Output-Dict)
+    epic_universe: list[dict],       # Code-bereitgestellte reale Epics (mit frischen Daten)
+    threshold: float,                # score-abhängiger Confidence-Floor
+    allowed_directions: tuple[str, ...],
+    broker: "BrokerAdapter",         # für Live-Spread-Recheck
+    max_spread_pct: float,
+) -> ValidationResult: ...
+```
+
+Prüfreihenfolge (jeder Fail → `valid=False` + `rejected_reason`):
+1. `raw["abstain"] is True` → valider „kein Kandidat"-Zustand (`valid=True, candidate=None`).
+2. Pflichtfelder vorhanden (`epic, direction, confidence`)?
+3. **★ `epic` ∈ `{e["epic"] for e in epic_universe}`?** sonst REJECT (Halluzination).
+4. `direction ∈ allowed_directions`? sonst REJECT.
+5. `confidence` numerisch, `0 ≤ c ≤ 100`, `c ≥ threshold`? sonst REJECT (grober Floor).
+6. **★ Live-Spread-Recheck:** frischer `broker.get_price(epic)`; `env.ok` und
+   `spread_pct ≤ max_spread_pct` und `market_status == "TRADEABLE"`? sonst REJECT.
+7. PASS → `Candidate` bauen, `spread_pct_at_pick` aus dem frischen Preis übernehmen.
+
+**`test_validator.py` (≥12), Pflichtfälle:**
+- erfundenes Epic (nicht in Liste) → REJECT
+- `direction="CALL"` (Alt-Müll) bzw. außerhalb allowed → REJECT
+- confidence < threshold → REJECT; confidence = threshold → PASS
+- confidence > 100 / nicht-numerisch → REJECT
+- Epic valide, aber Live-Spread inzwischen zu weit → REJECT
+- Epic valide, aber `market_status != TRADEABLE` → REJECT
+- `get_price`-Envelope `ok=False` → REJECT (kein blinder Trade)
+- fehlende Pflichtfelder → REJECT
+- `abstain=True` → PASS mit `candidate=None`
+- wohlgeformter valider BUY → PASS, `spread_pct_at_pick` gesetzt
+- valider SELL → PASS
+
+### 3. `context_builder.py` + Tests (nach Step 0.5)
+`build_context(broker, db, market_data, config) -> ResearchContext`. Rein deterministisch.
+- **Epic-Probe (Entscheidung 5):** für jedes Epic in `config.epic_allowlist`:
+  `get_price` + `get_market_info`, dann `is_tradeable(price, info, FilterConfig(
+  max_spread_pct=config.max_spread_pct))`. Nur `ok`-Verdikte landen im Universum,
+  als Dicts `{epic, name, spread_pct, market_status, min_deal_size}`.
+- **Phase-2-Kontext:** `get_recent_trades(8)`, `get_recent_lessons(5)`,
+  `get_current_score()`, `get_risk_level()`.
+- **Phase-3-Kontext:** `get_brain_context(epic).to_prompt_dict()` für das Anker-Epic;
+  `None`-Werte transparent durchreichen.
+- Leeres Universum (alle Epics nicht handelbar / Markt zu) → `ResearchContext` mit
+  leerem `tradeable_epics`; der Orchestrator behandelt das als Abstain-Pfad.
+- Tests (≥6): vollständiger Kontext; leere Trades/Lessons; `volume_z_score=None`;
+  alle Intraday `None` (off-hours); ein Epic nicht handelbar → fällt raus; leeres Universum.
+
+### 4. `prompt.py` + Tests
+`build_prompt(context, threshold, allowed_directions) -> tuple[str, str, dict]`
+→ `(system, user, json_schema)`.
+- **System:** Rolle = Research-Analyst eines DAX-Intraday-CFD-Bots; wähle ≤1 Instrument
+  **nur aus der Liste**; **Marktdaten ~15 min verzögert → Stimmungsbild, kein Echtzeit-
+  Signal**; bei Zweifel enthalten.
+- **User (Code-gebaut):** Marktlage (verzögert, mit `None` ehrlich markiert) · letzte 8
+  Trades als Tabelle · aktive Lessons · Bot-Score + Risk-Level + geforderter Floor ·
+  **handelbare Instrumente als Tabelle (epic, name, spread%, min_size)** · Antwortformat.
+- **`json_schema`** für Structured Outputs:
+  ```python
+  {
+    "type": "object",
+    "properties": {
+      "abstain": {"type": "boolean"},
+      "epic": {"type": ["string", "null"], "enum": [*epics, None]},  # dynamisch!
+      "direction": {"type": ["string", "null"], "enum": ["BUY", "SELL", None]},
+      "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+      "reasoning": {"type": "string"},
+    },
+    "required": ["abstain", "reasoning"],
+    "additionalProperties": False,
+  }
+  ```
+- Tests (≥5): alle Sektionen vorhanden; Epic-Liste korrekt eingebettet; `None`-Werte
+  ehrlich gerendert (kein Crash, kein „0"-Fake); Schema-`epic`-Enum = exakt Universum +
+  `null`; `allowed_directions`-Clamp im Schema reflektiert (bei BUY-only nur `["BUY", null]`).
+
+### 5. `llm_client.py` + Tests
+```python
+class LLMClient:
+    def __init__(self, model: str, api_key: str, *, max_tokens: int,
+                 temperature: float, timeout_s: float) -> None: ...
+    def ask_candidate(self, system: str, user: str, json_schema: dict) -> dict:
+        """Einziger LLM-Call-Punkt. Primär Structured Outputs, Fallback manueller
+        Parse. 1 Retry bei transientem Fehler. LLMResponseError sonst."""
+```
+- **Primärpfad:** Anthropic SDK mit `output_format`/json_schema (Beta-Header bei Bedarf,
+  Version aus Doku gegenchecken). Rückgabe = geparstes Dict.
+- **Fallback:** wenn Structured Outputs scheitern → normaler Call, dann Fence-Strip
+  (` ```json ` entfernen) + `json.loads`.
+- **Retry (Entscheidung 8):** **genau 1×**, nur bei Netzwerk/Timeout/5xx/Parse-Fail
+  (kleiner Backoff). **Nicht** bei validem JSON, das `abstain` oder einen REJECT-Pick
+  enthält — das ist eine inhaltliche Antwort, kein Transportfehler.
+- **Ein einziger mockbarer Punkt** (analog `_raw_download` in Phase 3): die rohe
+  SDK-Call-Methode kapseln, damit Tests sie patchen.
+- Tests (≥6, gemockt, **kein Netzwerk**): Structured-Output-Dict sauber zurückgegeben;
+  Backtick-umrandetes JSON im Fallback geparst; Malformed → 1 Retry → dann
+  `LLMResponseError`; transienter Fehler → 1 Retry → Erfolg; valides `abstain` → **kein**
+  Retry; API-Key fehlt → klare Exception.
+
+### 6. `candidate_filter.py` + Tests — DAS REALE GATE
+Hier sitzt die Gating-Last (Entscheidung 4 + 7), nicht bei der LLM-Confidence.
+
+```python
+def confidence_threshold(bot_score: float, config: ResearchConfig) -> float:
+    """Score unter neutral → strengerer Floor. NICHT als Wahrscheinlichkeit lesen —
+    grober Selbstbericht-Floor, ersetzt durch Phase-7 outcome-anchored."""
+    return config.confidence_floor_low_score if bot_score < 50.0 \
+        else config.confidence_floor_default
+
+def resolve_allowed_directions(bot_score: float, config: ResearchConfig) -> tuple[str, ...]:
+    """Long-Bias-Clamp: bot_score < long_bias_below_score → nur ('BUY',)."""
+    if config.enable_long_bias_clamp and bot_score < config.long_bias_below_score:
+        return ("BUY",)
+    return config.allowed_directions
+
+def apply_filter(candidate: Candidate, context: ResearchContext,
+                 config: ResearchConfig) -> FilterVerdict: ...
+```
+- `apply_filter` führt die **deterministischen** Endregeln: Spread ≤ max (aus dem schon
+  geprüften Universum bestätigt), `market_status TRADEABLE`, `direction` im geclampten
+  Set, optionale **weiche Drift-Kohärenz-Sanity** (z.B. SELL bei stark positivem Drift →
+  Verdict mit Warn-`rule`, **nicht** hart ablehnen, da P3-Daten verzögert sind —
+  Entscheidung 4: Bot soll nicht ins „nie sicher"-Extrem kippen).
+- Tests (≥6): Floor 55 bei score≥50; Floor 70 bei score<50; Clamp auf BUY-only bei
+  score<50; Clamp aus → beide erlaubt; SELL bei score<50 → gefiltert; saubere BUY
+  passiert.
+
+### 7. `research.py` Orchestrator + Tests
+```python
+class Research:
+    def __init__(self, broker, db, state, market_data, llm, config): ...  # DI
+    def run(self) -> list[Candidate]: ...
+```
+Flow (alles außer dem einen LLM-Call ist Code):
+1. **Session-Health:** `broker.is_connected()` bzw. `connect()`; `get_account().ok`;
+   `get_price(anchor_epic).ok` + `TRADEABLE`. Fail → `ResearchAbort` → `save_candidates([])`.
+2. `context = build_context(...)`. Leeres Universum → Abstain-Pfad.
+3. `threshold = confidence_threshold(score, config)`;
+   `allowed = resolve_allowed_directions(score, config)`.
+4. `system, user, schema = build_prompt(context, threshold, allowed)`.
+5. `raw = llm.ask_candidate(system, user, schema)` — der **einzige** AI-Schritt.
+   Bei `LLMResponseError` → Abstain → `save_candidates([])` (kein blinder Trade).
+6. `vr = validate_candidate(raw, context.tradeable_epics, threshold, allowed, broker, max_spread_pct)`.
+   REJECT oder `abstain` → `save_candidates([])`.
+7. `fv = apply_filter(vr.candidate, context, config)`; `not fv.ok` → `save_candidates([])`.
+8. PASS → `state.save_candidates([candidate.to_dict()])`. Rückgabe der Liste.
+9. **Logging:** jede REJECT/Abstain-Begründung nach **stderr** (für Brain/Debug);
+   stdout nur das maschinenlesbare Ergebnis-JSON.
+- Tests (≥5, alle Mocks): voller PASS-Flow → 1 Candidate gespeichert; `abstain` →
+  `save_candidates([])`; Validator-REJECT → leer; LLM-Error → leer; Session-Health-Fail
+  → leer, kein LLM-Call.
+
+### 8. `scripts/`
+- `wiring.py`: `sys.path`-Bootstrap, baut **echte** `IGAdapter` (Demo-Creds via Keyring),
+  `Database`, `StateManager`, `MarketDataFetcher` (**`register_volume_proxy("EXS1.DE")`**),
+  `LLMClient` (`get_credential("anthropic_api_key")`). Eine Factory
+  `build_research(config) -> Research`.
+- `smoke_test.py`: ein echter Research-Lauf, **DRY** (StateManager gemockt/`save` no-op),
+  druckt Kontext + LLM-Antwort + Validator-Verdict. Schnell, manuell.
+- `live_test.py`: voller Zyklus gegen IG Demo + echtes LLM → schreibt valide
+  `turbo_candidates.json` **oder** dokumentiert sauber den Abstain-Grund.
+  **Hart asserted**, `exit 0` = PASS. Läuft **nicht** in CI.
+
+### 9. `README.md` + `CLAUDE.md`
+- `CLAUDE.md`: AI-Grenze, Candidate-Contract, die 8 Entscheidungen, **`## Session
+  stopped`-Handover-Block** (Pflicht). Confidence-Floor explizit als „provisorisch,
+  Phase-7 ersetzt" markiert — im Code-Kommentar **nicht** als echtes Confidence-System ausgeben.
+
+---
+
+## Done-Kriterien (Phase-4-Gate)
+- `pytest tests/ -v` grün, **≥40 Tests**, davon `test_validator.py` ≥12.
+- `python scripts/live_test.py` erzeugt valide `turbo_candidates.json` (oder
+  dokumentierten Abstain), `exit 0`.
+- `grep` aus Step 0 zeigt keine Options-/CALL-/PUT-/Turbo-Logik mehr.
+- **Beweis-Test:** eine LLM-Halluzination (erfundenes Epic, übertriebene Confidence,
+  Alt-`CALL`) wird im Validator zuverlässig abgefangen, bevor sie Candidate wird.
+
+## Bewusst NICHT in Phase 4 (Carry-overs)
+- Harter Momentum-VETO → **Phase 5**, aus **IG-Echtzeit-Bars** (`get_ohlcv`), **nicht**
+  aus dem ~15 min verzögerten P3-`get_momentum()`. P3-Momentum bleibt hier reines
+  verzögertes Kontextsignal.
+- Outcome-anchored Confidence (`f(win_rate, expectancy, sample_size)`, N_min=10) →
+  **Phase 7**. Phase 4 speichert `llm_confidence` als Rohdaten dafür.
+
+---
+
+## Session stopped — 2026-06-05
+
+> Handover liegt hier, weil `phase4_research/` noch nicht existiert. Sobald Step 1 das
+> Verzeichnis anlegt, wandert dieser Block nach `phase4_research/CLAUDE.md`.
+
+### Completed — Step 0 (Terminologie-Bereinigung + Contract-Fix)
+- Root-`CLAUDE.md` + `README.md`: „options trading bot" → „CFD trading bot for the DAX";
+  README-Statustabelle Phase-4-Zeile auf `research.py + LLM (turbo_* = legacy)`.
+- `ROADMAP.md` Phase-4-Block: Überschrift/Done-when `turbo_research.py` → `research.py`;
+  Filter „OTM distance" → „CFD-Filter (Spread, Drift-Eignung, Score-Coupling)";
+  Legacy-Hinweis zu `turbo_candidates.json`.
+- `phase2_persistence/.../state.py`: Legacy-Kommentar an `CANDIDATES_FILE` (Datei/Name
+  bewusst **nicht** umbenannt — Phase-2/Phase-5-Contract).
+- `phase3_external_data/.../fetcher.py:343`: Kommentar `turbo_research` → `research`.
+- `phase2_persistence/tests/test_state.py` + `scripts/live_test.py`: Alt-Vokabular
+  `"direction": "CALL"` → `"BUY"` (BUY/SELL-Contract; verhaltensneutral).
+- Step-0-Aufgabe 2 (`turbo_research.py`/`TurboResearch` umbenennen) war **No-Op** —
+  kein Stub existierte; Benennung wird bei Datei-Erstellung erzwungen (Annotation oben).
+- **Verifikation:** Done-when-`grep` über `.py` zeigt nur False-Positives (Verb „call",
+  HTTP `PUT /session`, Erklär-Kommentar); `pytest` Phase 2 = 59 grün, Phase 3 = 70 grün;
+  `py_compile` der geänderten Dateien sauber. **Noch nicht committet** (User triggert Commit).
+
+### Next — Step 0.5, dann Step 1
+- **Step 0.5:** `phase3_external_data/external_data/models.py` `BrainContext.to_prompt_dict()`
+  final lesen, Key-Set festschreiben. **Bereits vorab verifiziert** (Code = Source):
+  `ticker, drift_pct, momentum_15m_pct, momentum_is_realtime, volume_z_score,
+  volume_available, distance_to_high_pct, distance_to_low_pct, range_30d` — jeder Wert
+  kann `None` sein. ⚠ **Abweichung zum Konzept:** `MarketDataFetcher.get_brain_context(epic)`
+  gibt `BrainContext | None` zurück (nicht garantiert non-None) → context_builder muss den
+  `None`-Fall behandeln. Volume-Proxy `EXS1.DE` via `register_volume_proxy` setzen.
+- **Step 1:** `phase4_research/` anlegen + `research/models.py` (nur Typen:
+  `Candidate`, `ResearchContext`, `ResearchConfig`, `ValidationResult` + Exceptions
+  `LLMResponseError`, `ResearchAbort`). Danach Step 2 = `validator.py` (Sicherheits-Kern, ≥12 Tests).
+
+### Token-Zähler (User-Zusatz) — Design steht, Bau in Step 5
+- Phase-4-`token_meter`: liest `usage.input_tokens`/`output_tokens` (+ Cache-Felder) aus
+  jeder Anthropic-Response, **appended** Records `{ts, model, input_tokens, output_tokens,
+  est_cost_eur}` an gitignored `data/state/llm_usage.json`; Pro-Modell-Pricing in
+  `ResearchConfig`. Bleibt komplett in Phase 4. Wird in `llm_client.py` (Step 5) eingehängt.
+
+### Open questions / blockers
+- Keine. `is_tradeable(price, market_info, FilterConfig)` erwartet `Price`/`MarketInfo`-
+  **Objekte** (keine Dicts) — relevant für `context_builder` (Step 3): Envelope-`.data`
+  ggf. in diese Modelle rekonstruieren oder Spread/Status direkt prüfen.

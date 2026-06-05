@@ -99,7 +99,7 @@ def _durability_write(db_path: Path, state_dir: Path) -> None:
     db.close()
 
     StateManager(str(state_dir)).save_candidates(
-        [{"epic": "IX.D.DAX.IFMM.IP", "direction": "CALL", "confidence": 72}]
+        [{"epic": "IX.D.DAX.IFMM.IP", "direction": "BUY", "confidence": 72}]
     )
     print(f"  wrote LIVE-1 (+reward +lesson) and candidates to {db_path}")
 
@@ -151,7 +151,7 @@ def _run_ttl(args, check: _Check) -> None:
 
     print("ttl — candidates expiry self-clear:")
     sm = StateManager(str(args.state_dir))
-    sm.save_candidates([{"epic": "X", "direction": "CALL", "confidence": 60}])
+    sm.save_candidates([{"epic": "X", "direction": "BUY", "confidence": 60}])
     check("file exists after save", sm._candidates_path.exists())
     check("candidates_are_fresh() after save", sm.candidates_are_fresh())
 

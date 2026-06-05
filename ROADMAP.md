@@ -71,7 +71,12 @@ anomaly flags reliably.
 
 ---
 
-## Phase 4 — turbo_research.py + LLM Kandidaten
+## Phase 4 — research.py + LLM Kandidaten
+
+> Legacy-Benennung: das Modul hieß im Konzept-Erbe `turbo_research.py`; es heißt
+> jetzt `research.py` (Klasse `Research`). Die Output-Datei `turbo_candidates.json`
+> behält ihren **Legacy-Namen** (Phase-2/Phase-5-Gate-2-Contract). Es geht um
+> DAX-**CFDs**, keine Optionen/Turbos — kein CALL/PUT/Strike/OTM.
 
 **Goal:** The research phase. LLM picks one candidate per session based on
 code-prepared data. AI's first appearance in the pipeline.
@@ -79,11 +84,11 @@ code-prepared data. AI's first appearance in the pipeline.
 - [ ] Session health check
 - [ ] LLM pick underlyings (with drift, last 8 trades, brain lessons, score)
 - [ ] Probe epics by range (uses broker_wrapper)
-- [ ] Candidate filter (confidence ≥55, OTM distance, spread)
+- [ ] Candidate filter (CFD-Filter: Spread, Drift-Eignung, Score-Coupling; confidence-Floor)
 - [ ] Save to `turbo_candidates.json`
 - [ ] Code-side validation of LLM output (epic exists, spread tradeable)
 
-**Done when:** Running `turbo_research.py` produces a valid `turbo_candidates.json`
+**Done when:** Running `research.py` produces a valid `turbo_candidates.json`
 that passes downstream consumption.
 
 **Directory:** `phase4_research/` *(to be created)*
