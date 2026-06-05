@@ -292,6 +292,21 @@ Prüfreihenfolge (jeder Fail → `valid=False` + `rejected_reason`):
 - valider SELL → PASS
 
 ### 3. `context_builder.py` + Tests (nach Step 0.5)
+
+> **Angepasst 2026-06-05 (Step 3 gebaut, Code = Source of Truth):** Von den zwei in
+> diesem §3 angebotenen Tradeable-Check-Optionen wurde die **zweite** umgesetzt —
+> `spread_pct`/`market_status` (+ `currency`) **direkt aus `env.data` prüfen**, **kein**
+> `Price`/`MarketInfo`-Rebuild + `is_tradeable`-Aufruf. Grund: Phasen-Isolation
+> konsequent wie beim Validator (Step 2) — `context_builder.py` importiert **nichts** aus
+> `broker_wrapper`; Kollaborateure sind via lokale `typing.Protocol` (`_BrokerLike` mit
+> `get_price`+`get_market_info`, `_DBLike`, `_FetcherLike`) getypt. Der EUR-Check
+> (`currency == "EUR"`) spiegelt `FilterConfig.require_currency` + die EUR-Konto-Hard-Rule.
+> Der `EpicNotMappedError`-Guard fängt **per Klassennamen** (`type(exc).__name__ ==
+> "EpicNotMappedError"`) — kein `external_data`-Import (Codebase-Muster wie P3
+> `_is_rate_limit_error`); jede andere Exception propagiert. `build_context` ruft pro Epic
+> `get_price` **und** `get_market_info` (Letzteres liefert `name`/`currency`/
+> `min_deal_size`). `test_context_builder.py`: **13 grün** (≥6 erfüllt).
+
 `build_context(broker, db, market_data, config) -> ResearchContext`. Rein deterministisch.
 - **Epic-Probe (Entscheidung 5):** für jedes Epic in `config.epic_allowlist`:
   `get_price` + `get_market_info`, dann `is_tradeable(price, info, FilterConfig(

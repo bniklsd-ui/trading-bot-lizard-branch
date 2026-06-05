@@ -1,9 +1,10 @@
 """Shared pytest fixtures for the Phase-4 research tests.
 
 No network, no real credentials, no real LLM. This file grows step-by-step:
-Step 2 needs only a ``FakeBroker`` (for the validator's live-spread recheck) and a
-sample ``universe``. ``FakeDB`` / ``FakeFetcher`` / ``FakeLLM`` arrive with their
-own steps (3, 5, 7), mirroring the Phase-3 conftest rhythm.
+Step 2 added a ``FakeBroker`` (for the validator's live-spread recheck) and a
+sample ``universe``. Step 3 extends ``FakeBroker`` with ``get_market_info`` and
+adds ``FakeDB`` / ``FakeFetcher`` (for ``context_builder``). ``FakeLLM`` arrives
+with Step 5, mirroring the Phase-3 conftest rhythm.
 """
 
 from __future__ import annotations
@@ -30,11 +31,17 @@ class _FakeEnv:
 
 
 class FakeBroker:
-    """Configurable broker whose ``get_price`` drives the live recheck.
+    """Configurable broker whose ``get_price`` / ``get_market_info`` drive probes.
 
     Construct with the desired recheck outcome; every ``get_price`` call returns
-    that same env (Step 2 issues exactly one recheck per validation). Defaults to
-    a healthy TRADEABLE quote with a small spread.
+    that same env (the validator issues exactly one recheck per validation; the
+    context builder probes once per allow-listed epic). Defaults to a healthy
+    TRADEABLE EUR quote with a small spread.
+
+    ``get_price`` is the Step-2 surface (validator live recheck). ``get_market_info``
+    is the Step-3 addition (context-builder universe probe): a separate ``info_ok``
+    / ``currency`` / ``min_deal_size`` / ``name`` config so a test can fail the
+    market-info leg independently of the price leg.
     """
 
     def __init__(
@@ -43,11 +50,20 @@ class FakeBroker:
         ok: bool = True,
         spread_pct: float | None = 0.03,
         market_status: str | None = "TRADEABLE",
+        info_ok: bool = True,
+        currency: str | None = "EUR",
+        min_deal_size: float = 0.5,
+        name: str = "Germany 40 Cash (1 EUR)",
     ) -> None:
         self._ok = ok
         self._spread_pct = spread_pct
         self._market_status = market_status
+        self._info_ok = info_ok
+        self._currency = currency
+        self._min_deal_size = min_deal_size
+        self._name = name
         self.calls: list[str] = []
+        self.info_calls: list[str] = []
 
     def get_price(self, epic: str) -> _FakeEnv:
         self.calls.append(epic)
@@ -63,6 +79,24 @@ class FakeBroker:
                 "spread_pct": self._spread_pct,
                 "market_status": self._market_status,
                 "timestamp": "2026-06-05T09:30:00.000Z",
+            },
+        )
+
+    def get_market_info(self, epic: str) -> _FakeEnv:
+        self.info_calls.append(epic)
+        if not self._info_ok:
+            return _FakeEnv(ok=False, data=None)
+        return _FakeEnv(
+            ok=True,
+            data={
+                "epic": epic,
+                "name": self._name,
+                "instrument_type": "INDICES",
+                "currency": self._currency,
+                "expiry": None,
+                "min_deal_size": self._min_deal_size,
+                "lot_size": 1.0,
+                "market_status": self._market_status,
             },
         )
 
@@ -85,6 +119,141 @@ def universe() -> list[dict[str, Any]]:
             "min_deal_size": 0.5,
         }
     ]
+
+
+# --------------------------------------------------------------------------- #
+# Step 3 — context-builder collaborators (Phase-2 DB + Phase-3 fetcher)        #
+# --------------------------------------------------------------------------- #
+
+
+class EpicNotMappedError(Exception):
+    """Local stand-in for Phase-3's ``EpicNotMappedError``.
+
+    The context builder catches the real one **by class name** (phase isolation —
+    it never imports ``external_data``). A test raising this same-named local
+    exception exercises that guard without pulling Phase 3 onto the path.
+    """
+
+
+class FakeDB:
+    """Configurable Phase-2 ``Database`` stand-in for the context reads.
+
+    Each accessor returns its configured value; ``get_recent_trades`` /
+    ``get_recent_lessons`` record the requested ``n`` so a test can assert the
+    8/5 limits.
+    """
+
+    def __init__(
+        self,
+        *,
+        trades: list[dict[str, Any]] | None = None,
+        lessons: list[dict[str, Any]] | None = None,
+        score: float = 55.0,
+        risk_level: str = "AGGRESSIV",
+    ) -> None:
+        self._trades = trades if trades is not None else []
+        self._lessons = lessons if lessons is not None else []
+        self._score = score
+        self._risk_level = risk_level
+        self.trade_n: list[int] = []
+        self.lesson_n: list[int] = []
+
+    def get_recent_trades(self, n: int = 8) -> list[dict[str, Any]]:
+        self.trade_n.append(n)
+        return list(self._trades)
+
+    def get_recent_lessons(self, n: int = 5) -> list[dict[str, Any]]:
+        self.lesson_n.append(n)
+        return list(self._lessons)
+
+    def get_current_score(self) -> float:
+        return self._score
+
+    def get_risk_level(self) -> str:
+        return self._risk_level
+
+
+class _FakeBrainContext:
+    """Wraps a prompt dict so the builder can call ``to_prompt_dict()`` on it."""
+
+    def __init__(self, prompt_dict: dict[str, Any]) -> None:
+        self._prompt_dict = prompt_dict
+
+    def to_prompt_dict(self) -> dict[str, Any]:
+        return dict(self._prompt_dict)
+
+
+class FakeFetcher:
+    """Configurable Phase-3 ``MarketDataFetcher`` stand-in.
+
+    ``get_brain_context`` returns a :class:`_FakeBrainContext` wrapping the
+    configured prompt dict, or ``None`` (``returns_none``), or raises the
+    configured exception (e.g. the local :class:`EpicNotMappedError`).
+    """
+
+    def __init__(
+        self,
+        *,
+        prompt_dict: dict[str, Any] | None = None,
+        returns_none: bool = False,
+        raises: Exception | None = None,
+    ) -> None:
+        self._prompt_dict = prompt_dict
+        self._returns_none = returns_none
+        self._raises = raises
+        self.calls: list[str] = []
+
+    def get_brain_context(self, epic: str) -> Any:
+        self.calls.append(epic)
+        if self._raises is not None:
+            raise self._raises
+        if self._returns_none or self._prompt_dict is None:
+            return None
+        return _FakeBrainContext(self._prompt_dict)
+
+
+def _make_prompt_dict(**overrides: Any) -> dict[str, Any]:
+    """Build a realistic 10-key Phase-3 ``to_prompt_dict()`` (overridable)."""
+    base: dict[str, Any] = {
+        "ticker": DEFAULT_EPIC,
+        "drift_pct": 0.42,
+        "momentum_15m_pct": 0.11,
+        "momentum_is_realtime": False,
+        "volume_z_score": -1.36,
+        "volume_available": True,
+        "distance_to_high_pct": -1.2,
+        "distance_to_low_pct": 3.8,
+        "range_30d": {"low": 17500.0, "high": 18400.0},
+        "generated_at": "2026-06-05T09:30:00.000Z",
+    }
+    base.update(overrides)
+    return base
+
+
+@pytest.fixture
+def db() -> FakeDB:
+    """A healthy default DB (some trades + lessons, neutral-ish score)."""
+    return FakeDB(
+        trades=[
+            {"id": 2, "epic": DEFAULT_EPIC, "direction": "BUY", "profit_loss": 12.5},
+            {"id": 1, "epic": DEFAULT_EPIC, "direction": "SELL", "profit_loss": -4.0},
+        ],
+        lessons=[{"id": 7, "lesson_text": "Trend day; held to target."}],
+        score=55.0,
+        risk_level="AGGRESSIV",
+    )
+
+
+@pytest.fixture
+def prompt_dict() -> dict[str, Any]:
+    """A full 10-key Phase-3 prompt dict (all indicators present)."""
+    return _make_prompt_dict()
+
+
+@pytest.fixture
+def fetcher(prompt_dict: dict[str, Any]) -> FakeFetcher:
+    """A fetcher returning the full brain context."""
+    return FakeFetcher(prompt_dict=prompt_dict)
 
 
 @pytest.fixture

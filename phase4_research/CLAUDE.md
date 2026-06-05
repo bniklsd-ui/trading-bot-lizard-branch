@@ -85,7 +85,7 @@ See `research/models.py` (`Candidate`).
 1. ✅ **scaffold + `models.py`** (types only).
 2. ✅ `validator.py` + `test_validator.py` (safety core, **18 tests** ≥12) +
    `timeutil.py` (ISO stamp source).
-3. ☐ `context_builder.py` (+ tests ≥6) — P1 probe / P2 reads / P3 brain context.
+3. ✅ `context_builder.py` (+ tests, **13** ≥6) — P1 probe / P2 reads / P3 brain context.
 4. ☐ `prompt.py` (+ tests ≥5) — `(system, user, json_schema)`.
 5. ☐ `llm_client.py` (+ tests ≥6) — Anthropic wrapper, Structured Outputs +
    fallback + 1 retry. **Token meter built here** (USD + EUR), **plus**
@@ -167,50 +167,48 @@ totals the log by model/day. Stays entirely in Phase 4.
 - **No concept↔code mismatch** found this step — inherited contracts re-verified
   against the repo code and all matched the concept.
 
-## Session stopped — 2026-06-05 (Step 2)
+## Session stopped — 2026-06-05 (Step 3)
 
-### Completed — Step 2 (the safety core)
-- `research/validator.py` — `validate_candidate(...)`, the hallucination guard.
-  Check order: valid abstain → required fields → **epic ∈ universe** → direction ∈
-  allowed → confidence numeric (bool excluded) / 0-100 / ≥ floor → **fresh
-  live-spread recheck** (`broker.get_price`: `env.ok`, `spread_pct ≤ max`,
-  `market_status == "TRADEABLE"`, missing keys → REJECT not crash) → PASS builds the
-  full `Candidate` with `spread_pct_at_pick` from the **fresh** price. Each fail →
-  `ValidationResult(valid=False, reason)`, logged to stderr. Broker typed via local
-  `typing.Protocol` (**no** `broker_wrapper` import — phase isolation, verified).
-- `research/timeutil.py` — `utc_iso_now()` / `_utcnow()` (monkeypatchable) /
-  `parse_iso()`, duplicated from P1/2/3. Stamps `generated_at`; reused by the Step-5
-  token meter. (New module — concept module-struct annotated.)
-- `tests/conftest.py` — `FakeBroker` (configurable `get_price` env: ok/spread/
-  status toggles, no real `Envelope` import) + `universe` / `good_raw` fixtures.
-  Grows with FakeDB/FakeFetcher/FakeLLM in later steps.
-- `tests/test_validator.py` — **18 passed** (≥12): invented epic, `CALL`, clamp
-  violation, sub-/at-floor confidence, >100, non-numeric, bool, wide spread,
-  non-TRADEABLE, `get_price` ok=False, missing fields (×3 param), abstain, clean
-  BUY (full contract + fresh spread + parseable `generated_at`), SELL, and the
-  **Phase-4-gate proof test** (invented epic + 99 conf + `CALL` → caught at the
-  epic-membership guard, no broker call).
-- **Verification:** `py_compile` clean; `pytest tests/ -v` → 18 passed, no network,
-  `anthropic`/`broker_wrapper` never imported; Phase 3 suite still 70. **Not
-  committed** (operator triggers commits).
-
-### Concept↔code reconciliation (Step 2)
-- The frozen §2 6-arg signature can't populate the full frozen `Candidate`
-  (`score_at_pick`, `drift_at_pick` are decision-context). Added them as
-  **keyword-only** passthrough params (no validation effect). Annotated
-  `docs/concepts/phase4_research_plan_konzept.md` §2 + build-order step-6 call +
-  module-struct (`timeutil.py`), dated 2026-06-05.
-
-### Next — Step 3 (`context_builder.py`)
-- `build_context(broker, db, market_data, config) -> ResearchContext` (concept §3,
-  tests ≥6). Epic-probe per allowlist epic (`get_price` + `get_market_info`, then
-  `is_tradeable` — ⚠ needs `Price`/`MarketInfo` **objects** from `env.data`, or
-  check `spread_pct`/`market_status` off the dict directly). P2 reads
+### Completed — Step 3 (`context_builder.py` — deterministic input side)
+- `research/context_builder.py` — `build_context(broker, db, market_data, config)
+  -> ResearchContext`. 100% code, no AI. Per allow-list epic: `get_price` +
+  `get_market_info`, kept only if `env.ok` **and** `market_status == "TRADEABLE"`
+  **and** `spread_pct ≤ config.max_spread_pct` **and** `currency == "EUR"` → universe
+  dict `{epic, name, spread_pct, market_status, min_deal_size}`. P2 reads
   (`get_recent_trades(8)`/`get_recent_lessons(5)`/`get_current_score`/
-  `get_risk_level`). P3 `get_brain_context(anchor).to_prompt_dict()` (10 keys) in
-  `try/except EpicNotMappedError` + `is None` guard → degrade to `None`. Empty
-  universe → empty `tradeable_epics` (orchestrator treats as abstain). Add
-  `FakeDB`/`FakeFetcher` to conftest.
+  `get_risk_level`). P3 `get_brain_context(anchor).to_prompt_dict()` (10 keys), every
+  `None` passed through verbatim. Empty universe → empty `tradeable_epics` (abstain
+  path for Step 7). Collaborators typed via local `Protocol`s (`_BrokerLike`,
+  `_DBLike`, `_FetcherLike`) — **no** `broker_wrapper`/`external_data`/`persistence`
+  import.
+- `tests/conftest.py` — extended `FakeBroker` with `get_market_info` (separate
+  `info_ok`/`currency`/`min_deal_size`/`name` toggles; `get_price` untouched so the 18
+  validator tests stay green); added `FakeDB`, `FakeFetcher`, `_FakeBrainContext`,
+  local `EpicNotMappedError`, `_make_prompt_dict()` helper + `db`/`prompt_dict`/
+  `fetcher` fixtures.
+- `tests/test_context_builder.py` — **13 passed** (≥6): full context; empty
+  trades/lessons; `volume_z_score=None` pass-through; all-intraday-`None` off-hours;
+  untradeable status / wide spread / non-EUR drop-outs; `get_price` ok=False;
+  `get_market_info` ok=False; `EpicNotMappedError` → `brain_context None`; defensive
+  `None` return; non-guard exception re-raises; two-epic allow-list partial probe.
+- **Verification:** `py_compile` clean; `pytest tests/ -v` → **31 passed** (18 + 13),
+  no network; confirmed `anthropic`/`broker_wrapper`/`external_data`/`persistence`
+  never imported in the unit run. **Not committed** (operator triggers commits).
+
+### Concept↔code reconciliation (Step 3)
+- §3 offered two tradeability-check options; took the **env.data-direct** one (no
+  `Price`/`MarketInfo` rebuild, no `is_tradeable` call) for phase isolation, consistent
+  with the validator. `EpicNotMappedError` caught **by class name**, not imported. Dated
+  note added to `docs/concepts/phase4_research_plan_konzept.md` §3.
+
+### Next — Step 4 (`prompt.py`)
+- `build_prompt(context, threshold, allowed_directions) -> (system, user, json_schema)`
+  (concept §4, tests ≥5). System = DAX intraday CFD research analyst, pick ≤1 **only from
+  the list**, data ~15 min delayed → sentiment not real-time, abstain on doubt. User =
+  code-built tables (market state with honest `None`s, last 8 trades, active lessons,
+  score+risk+floor, tradeable instruments `epic/name/spread%/min_size`). `json_schema`
+  with **dynamic** `epic` enum (`[*epics, None]`) and `direction` enum reflecting the
+  clamp (BUY-only → `["BUY", null]`). Tests ≥5 per §4 bullets.
 
 ### Open questions / blockers
-- None. One step per session — Step 3 next session.
+- None. One step per session — Step 4 next session.
