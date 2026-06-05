@@ -78,16 +78,33 @@ liefert keine instrumentenbezogenen Treffer mehr (außer dem bewusst dokumentier
 Der Phase-3-Handover sagt: *„The exact key set is part of the Phase-4 contract — do
 not rename or drop keys."* **Bevor** der Context-Builder gebaut wird:
 
-- `phase3_external_data/.../models.py` öffnen, `BrainContext.to_prompt_dict()` lesen,
-  die **echten** Keys notieren. Erwartet (laut Konzept, gegen Code abzugleichen):
-  `ticker, drift_pct, momentum_15m_pct, momentum_is_realtime (immer False),
-  volume_z_score, volume_available, distance_to_high_pct, distance_to_low_pct,
-  range_30d`.
-- **Jeder Wert kann `None` sein** (Marktzeiten-Guard außerhalb 09:00–17:30 Europe/
-  Berlin; fehlender Volume-Proxy). Context-Builder darf bei `None` **nicht crashen** —
-  er reicht `None` transparent an den Prompt durch.
-- Volume-Proxy `EXS1.DE` via `register_volume_proxy` auf dem Fetcher setzen (in
-  `wiring.py`/Config), sonst ist `volume_z_score` immer `None`.
+> **✅ Verifiziert gegen Code 2026-06-05** (`phase3_external_data/external_data/models.py:194-205`
+> `to_prompt_dict()`; `fetcher.py:461-494` `get_brain_context`). Code = Source of Truth.
+
+- **Reales Key-Set (10 Keys, exakt diese Reihenfolge):**
+  `ticker, drift_pct, momentum_15m_pct, momentum_is_realtime, volume_z_score,
+  volume_available, distance_to_high_pct, distance_to_low_pct, range_30d,
+  generated_at`.
+  ⚠ **Abweichung 1:** der ursprüngliche Konzept-Erwartungswert nannte **9** Keys und
+  **vergaß `generated_at`** — der Code liefert es mit. Context-Builder/Prompt müssen den
+  Extra-Key tolerieren (als Snapshot-Zeitstempel nutzen oder ignorieren), nicht von einem
+  9-Key-Set ausgehen.
+- **Nullability (bestätigt):** `drift_pct`, `momentum_15m_pct`, `volume_z_score`,
+  `distance_to_high_pct`, `distance_to_low_pct`, `range_30d` können **je `None`** sein
+  (Off-Hours-Guard außerhalb 09:00–17:30 Europe/Berlin; Indikator nicht verfügbar; keine
+  History). `momentum_is_realtime` ist **immer `False`** (delay-ehrlich; auch `False`,
+  wenn Momentum `None` ist). `volume_available` ist `False` bei fehlendem/degradiertem
+  Volume. `range_30d` ist `{"low": float, "high": float}` **oder** `None`. → Prompt rendert
+  `None` ehrlich (kein „0"-Fake), crasht nie darauf.
+- ⚠ **Abweichung 2 — `get_brain_context` gibt praktisch **nie** `None` zurück:** Die
+  Signatur ist `BrainContext | None`, der Body liefert für ein **gemapptes** Epic aber
+  immer einen `BrainContext` (jeder Indikator einzeln per `try/except` → `None`-Feld;
+  History `or []`). Der **echte** Fehlerfall ist **`EpicNotMappedError`** (propagiert),
+  wenn das Epic **nicht** in `TickerMapper._MAP` steht. Das Default-Allowlist-Epic
+  `IX.D.DAX.IFMM.IP` **ist** gemappt (→ `^GDAXI`) — für die Default-Config kein Risiko;
+  Risiko nur, wenn kuratierte Geschwister-Epics ohne Ticker-Mapping ergänzt werden.
+- Volume-Proxy `EXS1.DE` via `register_volume_proxy` auf dem Fetcher/Mapper setzen (in
+  `wiring.py`/Config — **Step 8**), sonst ist `volume_z_score` immer `None`.
 
 ---
 
@@ -118,9 +135,13 @@ not rename or drop keys."* **Bevor** der Context-Builder gebaut wird:
 - `StateManager.save_candidates(list[dict])` · `load_candidates()` ·
   `candidates_are_fresh()` · `clear_candidates()` (TTL 30 min, self-clearing).
 
-### Phase 3 — `external_data`
-- `MarketDataFetcher.get_brain_context(epic) -> BrainContext`, dann `.to_prompt_dict()`.
-- Intraday-Werte außerhalb der Marktzeiten `None` → tolerieren.
+### Phase 3 — `external_data` *(verifiziert 2026-06-05 — siehe Step 0.5)*
+- `MarketDataFetcher.get_brain_context(epic) -> BrainContext | None`, dann
+  `.to_prompt_dict()`. **Praktisch nie `None`** für ein gemapptes Epic; wirft aber
+  `EpicNotMappedError` für ungemappte Epics → Step-3-Guard ist `try/except
+  EpicNotMappedError` (+ defensiver `is None`-Check).
+- `to_prompt_dict()` = **10 Keys** inkl. `generated_at` (Step 0.5). Jeder Indikator-Wert
+  kann `None` sein; Intraday-Werte außerhalb der Marktzeiten `None` → tolerieren.
 
 ### Credentials
 - `from broker_wrapper.credentials import get_credential`; `get_credential("anthropic_api_key")`.
@@ -258,10 +279,18 @@ Prüfreihenfolge (jeder Fail → `valid=False` + `rejected_reason`):
   `get_price` + `get_market_info`, dann `is_tradeable(price, info, FilterConfig(
   max_spread_pct=config.max_spread_pct))`. Nur `ok`-Verdikte landen im Universum,
   als Dicts `{epic, name, spread_pct, market_status, min_deal_size}`.
+  ⚠ **Verifiziert (Step 0):** `is_tradeable(price, market_info, ...)` erwartet
+  `Price`/`MarketInfo`-**Objekte** (`broker_wrapper.models`), **keine** Dicts —
+  `env.data` ist das Dict. Step 3 muss `Price`/`MarketInfo` aus `env.data`
+  rekonstruieren **oder** `spread_pct`/`market_status` direkt aus `env.data` prüfen
+  (Envelope immer zuerst `env.ok` checken).
 - **Phase-2-Kontext:** `get_recent_trades(8)`, `get_recent_lessons(5)`,
   `get_current_score()`, `get_risk_level()`.
 - **Phase-3-Kontext:** `get_brain_context(epic).to_prompt_dict()` für das Anker-Epic;
-  `None`-Werte transparent durchreichen.
+  `None`-Werte transparent durchreichen. ⚠ **Verifiziert (Step 0.5):** in
+  `try/except EpicNotMappedError` kapseln (ungemapptes Epic) + defensiver `is None`-
+  Check; bei Fehler P3-Kontext für dieses Epic auf `None` degradieren, nicht crashen.
+  Key-Set = 10 Keys inkl. `generated_at`.
 - Leeres Universum (alle Epics nicht handelbar / Markt zu) → `ResearchContext` mit
   leerem `tradeable_epics`; der Orchestrator behandelt das als Abstain-Pfad.
 - Tests (≥6): vollständiger Kontext; leere Trades/Lessons; `volume_z_score=None`;
@@ -411,6 +440,17 @@ Flow (alles außer dem einen LLM-Call ist Code):
 > Handover liegt hier, weil `phase4_research/` noch nicht existiert. Sobald Step 1 das
 > Verzeichnis anlegt, wandert dieser Block nach `phase4_research/CLAUDE.md`.
 
+### Completed — Step 0.5 (Phase-3-Key-Contract verifiziert — doc-only)
+- `to_prompt_dict()` final gegen Code gelesen (`models.py:194-205`): **10 Keys** inkl.
+  `generated_at` (Konzept-Erwartung nannte nur 9 → korrigiert). Nullability je Indikator
+  bestätigt; `momentum_is_realtime` immer `False`; `range_30d` dict|None.
+- `get_brain_context` (`fetcher.py:461-494`): Signatur `BrainContext | None`, gibt aber
+  **praktisch nie `None`** zurück (gemapptes Epic → immer Objekt); echter Fehlerfall ist
+  **`EpicNotMappedError`** für ungemappte Epics → Step-3-Guard `try/except` + `is None`.
+- Konzept aktualisiert: Step 0.5, „Verifizierte geerbte Contracts → Phase 3", Step-3-
+  Bullets (inkl. `is_tradeable` braucht `Price`/`MarketInfo`-Objekte). **Kein Code,
+  keine Tests** (reiner Verifikations-/Doku-Schritt). Noch nicht committet.
+
 ### Completed — Step 0 (Terminologie-Bereinigung + Contract-Fix)
 - Root-`CLAUDE.md` + `README.md`: „options trading bot" → „CFD trading bot for the DAX";
   README-Statustabelle Phase-4-Zeile auf `research.py + LLM (turbo_* = legacy)`.
@@ -428,17 +468,13 @@ Flow (alles außer dem einen LLM-Call ist Code):
   HTTP `PUT /session`, Erklär-Kommentar); `pytest` Phase 2 = 59 grün, Phase 3 = 70 grün;
   `py_compile` der geänderten Dateien sauber. **Noch nicht committet** (User triggert Commit).
 
-### Next — Step 0.5, dann Step 1
-- **Step 0.5:** `phase3_external_data/external_data/models.py` `BrainContext.to_prompt_dict()`
-  final lesen, Key-Set festschreiben. **Bereits vorab verifiziert** (Code = Source):
-  `ticker, drift_pct, momentum_15m_pct, momentum_is_realtime, volume_z_score,
-  volume_available, distance_to_high_pct, distance_to_low_pct, range_30d` — jeder Wert
-  kann `None` sein. ⚠ **Abweichung zum Konzept:** `MarketDataFetcher.get_brain_context(epic)`
-  gibt `BrainContext | None` zurück (nicht garantiert non-None) → context_builder muss den
-  `None`-Fall behandeln. Volume-Proxy `EXS1.DE` via `register_volume_proxy` setzen.
-- **Step 1:** `phase4_research/` anlegen + `research/models.py` (nur Typen:
-  `Candidate`, `ResearchContext`, `ResearchConfig`, `ValidationResult` + Exceptions
-  `LLMResponseError`, `ResearchAbort`). Danach Step 2 = `validator.py` (Sicherheits-Kern, ≥12 Tests).
+### Next — Step 1
+- **Step 1:** `phase4_research/` anlegen (`README.md`, `CLAUDE.md`, `requirements.txt`
+  mit `anthropic`, `research/`-Package) + `research/models.py` (nur Typen:
+  `Candidate`, `ResearchContext`, `ResearchConfig` mit Defaults gem. §1,
+  `ValidationResult` + Exceptions `LLMResponseError`, `ResearchAbort`). Danach Step 2 =
+  `validator.py` (Sicherheits-Kern, ≥12 Tests). Step-0.5-Erkenntnisse (10-Key-Set,
+  `EpicNotMappedError`-Guard, `Price`/`MarketInfo`-Objekte) fließen in Step 3 ein.
 
 ### Token-Zähler (User-Zusatz) — Design steht, Bau in Step 5
 - Phase-4-`token_meter`: liest `usage.input_tokens`/`output_tokens` (+ Cache-Felder) aus
@@ -447,6 +483,6 @@ Flow (alles außer dem einen LLM-Call ist Code):
   `ResearchConfig`. Bleibt komplett in Phase 4. Wird in `llm_client.py` (Step 5) eingehängt.
 
 ### Open questions / blockers
-- Keine. `is_tradeable(price, market_info, FilterConfig)` erwartet `Price`/`MarketInfo`-
-  **Objekte** (keine Dicts) — relevant für `context_builder` (Step 3): Envelope-`.data`
-  ggf. in diese Modelle rekonstruieren oder Spread/Status direkt prüfen.
+- Keine. Die Step-0-Erkenntnis (`is_tradeable` braucht `Price`/`MarketInfo`-Objekte) und
+  die Step-0.5-Erkenntnisse (10-Key-Set inkl. `generated_at`; `EpicNotMappedError` statt
+  `None`) sind in Step 0.5 / „Verifizierte geerbte Contracts" / Step 3 eingearbeitet.
