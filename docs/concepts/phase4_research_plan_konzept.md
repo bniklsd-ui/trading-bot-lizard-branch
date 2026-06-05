@@ -330,6 +330,22 @@ Prüfreihenfolge (jeder Fail → `valid=False` + `rejected_reason`):
   alle Intraday `None` (off-hours); ein Epic nicht handelbar → fällt raus; leeres Universum.
 
 ### 4. `prompt.py` + Tests
+
+> **Angepasst 2026-06-05 (Step 4 gebaut, Code = Source of Truth):** Umgesetzt wie
+> spezifiziert; präzisiert: (a) Das `direction`-Schema-Enum wird **dynamisch aus
+> `allowed_directions`** gebaut (`[*allowed_directions, None]`) — der Konzept-Stub zeigte
+> statisch `["BUY","SELL",None]`; der Code reflektiert den Long-Bias-Clamp (BUY-only →
+> `["BUY", None]`), wie der §4-Test-Bullet es ohnehin fordert. (b) `None`-Werte werden über
+> einen einzigen `_fmt()`-Choke-Point als **`"n/a"`** gerendert (nie „0"); Floats mit 2
+> Nachkommastellen. (c) Die Recent-Trades-Tabelle rendert defensiv (`.get()`) die Spalten
+> **`date | direction | epic | pnl | status`** (`date` = `session_date`→`close_ts`→`open_ts`),
+> Lessons als `lesson_text`-Zeilen — passend zu den realen P2-`trade_outcomes`/`trade_lessons`-
+> Spalten. (d) Leeres Universum → `epic`-Enum `[None]` (kein Crash; Orchestrator abstaint
+> ohnehin vorher). (e) Der System-Prompt nennt **CALL/PUT explizit als verboten** (statt sie
+> nur wegzulassen). Reine Funktion, kein I/O/Clock/AI; Kollaborateur-Typ nur `ResearchContext`
+> (kein `broker_wrapper`/`external_data`/`persistence`-Import). `test_prompt.py`: **10 grün**
+> (≥5 erfüllt).
+
 `build_prompt(context, threshold, allowed_directions) -> tuple[str, str, dict]`
 → `(system, user, json_schema)`.
 - **System:** Rolle = Research-Analyst eines DAX-Intraday-CFD-Bots; wähle ≤1 Instrument

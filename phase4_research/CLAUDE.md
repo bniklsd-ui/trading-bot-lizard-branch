@@ -86,7 +86,7 @@ See `research/models.py` (`Candidate`).
 2. ✅ `validator.py` + `test_validator.py` (safety core, **18 tests** ≥12) +
    `timeutil.py` (ISO stamp source).
 3. ✅ `context_builder.py` (+ tests, **13** ≥6) — P1 probe / P2 reads / P3 brain context.
-4. ☐ `prompt.py` (+ tests ≥5) — `(system, user, json_schema)`.
+4. ✅ `prompt.py` (+ tests, **10** ≥5) — `(system, user, json_schema)`.
 5. ☐ `llm_client.py` (+ tests ≥6) — Anthropic wrapper, Structured Outputs +
    fallback + 1 retry. **Token meter built here** (USD + EUR), **plus**
    `scripts/usage_report.py` summary, **plus the `.gitignore` fix** (see below).
@@ -167,7 +167,60 @@ totals the log by model/day. Stays entirely in Phase 4.
 - **No concept↔code mismatch** found this step — inherited contracts re-verified
   against the repo code and all matched the concept.
 
-## Session stopped — 2026-06-05 (Step 3)
+## Session stopped — 2026-06-05 (Step 4)
+
+### Completed — Step 4 (`prompt.py` — deterministic prompt assembly)
+- `research/prompt.py` — `build_prompt(context, threshold, allowed_directions) ->
+  (system, user, json_schema)`. Pure function, no I/O/clock/AI. Static system prompt
+  (DAX intraday CFD analyst, pick ≤1 **only from the list** or abstain, data ~15 min
+  delayed → sentiment not real-time, BUY/SELL only, abstain on doubt). Code-built user
+  message: delayed market snapshot (every `None` → `"n/a"` via one `_fmt()` choke point,
+  never `0`), recent-trades table (`date | direction | epic | pnl | status`), active
+  lessons (`lesson_text`), decision block (score / risk / floor / permitted directions),
+  tradeable-instruments table (`epic | name | spread% | min_size`), answer-format note.
+  `json_schema` with **dynamic** `epic` enum (`[*epics, None]`) and `direction` enum
+  reflecting the clamp (`[*allowed_directions, None]`); `required=["abstain","reasoning"]`,
+  `additionalProperties=False`. Empty universe → `epic` enum `[None]` (no crash).
+- `tests/conftest.py` — added a `research_context` fixture (direct `ResearchContext`
+  construction, so prompt tests don't depend on `build_context`). Existing fixtures
+  untouched.
+- `tests/test_prompt.py` — **10 passed** (≥5): 3-tuple + system constraints; universe in
+  user table **and** schema enum; honest `None` render (off-hours + whole-snapshot-None);
+  schema shape (required/additionalProperties/0-100); BUY-only clamp in enum + instruction
+  blocks; trades+lessons rendered; empty trades/lessons graceful; floor/score in user;
+  empty-universe edge.
+- **Verification:** `py_compile` clean; `pytest tests/ -v` → **41 passed** (31 + 10), no
+  network; confirmed `prompt.py` imports only `research.models` + stdlib (no
+  `anthropic`/`broker_wrapper`/`external_data`/`persistence`). **Committed** to
+  `phase4-research` (no merge to `main`).
+
+### Concept↔code reconciliation (Step 4)
+- §4 `direction`-schema enum made **dynamic** from `allowed_directions` (concept stub
+  showed static `["BUY","SELL",None]`); `None` rendered as `"n/a"`; trade table columns =
+  `date|direction|epic|pnl|status`; system prompt forbids CALL/PUT explicitly. Dated note
+  added to `docs/concepts/phase4_research_plan_konzept.md` §4.
+
+### Next — Step 5 (`llm_client.py` + token meter + `.gitignore` fix)
+- `LLMClient.ask_candidate(system, user, json_schema) -> dict` (concept §5, tests ≥6).
+  Primary path = Anthropic Structured Outputs (`output_format`/json_schema); fallback =
+  plain call + fence-strip + `json.loads`. **Exactly 1 retry** on *transient* faults
+  (network/timeout/5xx/parse-/schema-fail), **no** retry on a valid `abstain` or a
+  content answer. **One mockable raw SDK call site** (the Phase-3 `_raw_download`
+  analogue) — lazy-import `anthropic`; unit tests mock it, no network.
+- **Also in Step 5 (don't forget):** the **token meter** — read `usage.input_tokens`/
+  `output_tokens` (+ cache fields) from each response, append `{ts, model, input_tokens,
+  output_tokens, est_cost_usd, est_cost_eur}` to `data/state/llm_usage.json` (pricing +
+  `usd_to_eur` already in `ResearchConfig`); a `scripts/usage_report.py` summary; **and
+  the `.gitignore` rule** for `data/state/llm_usage.json` (root `.gitignore` covers the
+  other state files but not this one — the same reconciliation Phase 3 did for
+  `data/cache/`). Add `FakeLLM`/raw-call fakes to conftest.
+
+### Open questions / blockers
+- None. One step per session — Step 5 next session.
+
+---
+
+## Step 3 log — 2026-06-05 (superseded by the Step 4 handover above)
 
 ### Completed — Step 3 (`context_builder.py` — deterministic input side)
 - `research/context_builder.py` — `build_context(broker, db, market_data, config)
@@ -201,14 +254,4 @@ totals the log by model/day. Stays entirely in Phase 4.
   with the validator. `EpicNotMappedError` caught **by class name**, not imported. Dated
   note added to `docs/concepts/phase4_research_plan_konzept.md` §3.
 
-### Next — Step 4 (`prompt.py`)
-- `build_prompt(context, threshold, allowed_directions) -> (system, user, json_schema)`
-  (concept §4, tests ≥5). System = DAX intraday CFD research analyst, pick ≤1 **only from
-  the list**, data ~15 min delayed → sentiment not real-time, abstain on doubt. User =
-  code-built tables (market state with honest `None`s, last 8 trades, active lessons,
-  score+risk+floor, tradeable instruments `epic/name/spread%/min_size`). `json_schema`
-  with **dynamic** `epic` enum (`[*epics, None]`) and `direction` enum reflecting the
-  clamp (BUY-only → `["BUY", null]`). Tests ≥5 per §4 bullets.
-
-### Open questions / blockers
-- None. One step per session — Step 4 next session.
+*(Step-3 "Next/Open" trimmed — superseded; see the Step 4 handover above.)*

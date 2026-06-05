@@ -257,6 +257,44 @@ def fetcher(prompt_dict: dict[str, Any]) -> FakeFetcher:
 
 
 @pytest.fixture
+def research_context(
+    universe: list[dict[str, Any]], prompt_dict: dict[str, Any]
+):
+    """A fully-populated ``ResearchContext`` built **directly** (Step 4 prompt tests).
+
+    Constructed without ``build_context`` so the prompt tests don't depend on the
+    Step-3 builder. Imported lazily to keep the module import free of `research`
+    side effects (consistent with the other fakes here being import-light).
+    """
+    from research.models import ResearchContext
+
+    return ResearchContext(
+        tradeable_epics=list(universe),
+        recent_trades=[
+            {
+                "session_date": "2026-06-04",
+                "direction": "BUY",
+                "epic": DEFAULT_EPIC,
+                "profit_loss": 12.5,
+                "status": "CLOSED",
+            },
+            {
+                "session_date": "2026-06-03",
+                "direction": "SELL",
+                "epic": DEFAULT_EPIC,
+                "profit_loss": -4.0,
+                "status": "CLOSED",
+            },
+        ],
+        recent_lessons=[{"lesson_text": "Trend day; held to target."}],
+        bot_score=55.0,
+        risk_level="AGGRESSIV",
+        brain_context=dict(prompt_dict),
+        anchor_epic=DEFAULT_EPIC,
+    )
+
+
+@pytest.fixture
 def good_raw() -> dict[str, Any]:
     """A well-formed, in-universe BUY pick (the happy path)."""
     return {
