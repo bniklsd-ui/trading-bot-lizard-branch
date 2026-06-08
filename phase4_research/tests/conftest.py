@@ -42,6 +42,12 @@ class FakeBroker:
     is the Step-3 addition (context-builder universe probe): a separate ``info_ok``
     / ``currency`` / ``min_deal_size`` / ``name`` config so a test can fail the
     market-info leg independently of the price leg.
+
+    The Step-7 addition is the **session-health** surface (``is_connected`` /
+    ``connect`` / ``get_account``) the orchestrator pre-flight uses, with
+    ``connected`` / ``connect_ok`` / ``account_ok`` toggles (all healthy by
+    default) so a test can fail any one leg independently. ``connect_calls`` /
+    ``account_calls`` record invocations.
     """
 
     def __init__(
@@ -54,6 +60,9 @@ class FakeBroker:
         currency: str | None = "EUR",
         min_deal_size: float = 0.5,
         name: str = "Germany 40 Cash (1 EUR)",
+        connected: bool = True,
+        connect_ok: bool = True,
+        account_ok: bool = True,
     ) -> None:
         self._ok = ok
         self._spread_pct = spread_pct
@@ -62,8 +71,30 @@ class FakeBroker:
         self._currency = currency
         self._min_deal_size = min_deal_size
         self._name = name
+        self._connected = connected
+        self._connect_ok = connect_ok
+        self._account_ok = account_ok
         self.calls: list[str] = []
         self.info_calls: list[str] = []
+        self.connect_calls = 0
+        self.account_calls = 0
+
+    # --- Step-7 session-health surface (orchestrator pre-flight) ---
+    def is_connected(self) -> bool:
+        return self._connected
+
+    def connect(self) -> _FakeEnv:
+        self.connect_calls += 1
+        if self._connect_ok:
+            self._connected = True
+            return _FakeEnv(ok=True, data={"connected": True})
+        return _FakeEnv(ok=False, data=None)
+
+    def get_account(self) -> _FakeEnv:
+        self.account_calls += 1
+        if not self._account_ok:
+            return _FakeEnv(ok=False, data=None)
+        return _FakeEnv(ok=True, data={"balance": 10000.0, "currency": "EUR"})
 
     def get_price(self, epic: str) -> _FakeEnv:
         self.calls.append(epic)
@@ -420,3 +451,41 @@ class FakeLLM:
         if self._raises is not None:
             raise self._raises
         return dict(self._raw)
+
+
+# --------------------------------------------------------------------------- #
+# Step 7 — orchestrator collaborator (Phase-2 StateManager stand-in)           #
+# --------------------------------------------------------------------------- #
+
+
+class FakeState:
+    """Phase-2 ``StateManager`` stand-in — the orchestrator's persistence sink.
+
+    The orchestrator only ever **writes**: exactly one ``save_candidates`` call
+    per cycle (the single pick on PASS, or ``[]`` on any abstain / reject /
+    error). Each saved payload is recorded into ``self.saved`` so a test can
+    assert both the count (always 1) and the content (``[]`` vs the candidate
+    dict). The read/clear methods are no-op stubs for interface completeness.
+    """
+
+    def __init__(self) -> None:
+        self.saved: list[list[dict[str, Any]]] = []
+
+    def save_candidates(self, candidates: list[dict[str, Any]]) -> None:
+        # Store a shallow copy so later mutation can't rewrite history.
+        self.saved.append(list(candidates))
+
+    def load_candidates(self) -> list[dict[str, Any]]:
+        return list(self.saved[-1]) if self.saved else []
+
+    def candidates_are_fresh(self) -> bool:
+        return bool(self.saved and self.saved[-1])
+
+    def clear_candidates(self) -> None:
+        self.saved.append([])
+
+
+@pytest.fixture
+def state() -> FakeState:
+    """A fresh recording ``StateManager`` stand-in."""
+    return FakeState()

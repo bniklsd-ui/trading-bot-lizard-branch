@@ -475,6 +475,32 @@ def apply_filter(candidate: Candidate, context: ResearchContext,
   passiert.
 
 ### 7. `research.py` Orchestrator + Tests
+
+> **Angepasst 2026-06-08 (Step 7 gebaut, Code = Source of Truth):** Umgesetzt wie
+> spezifiziert (reine Komposition der Steps 2–6 + die Fehlerpfad-Disziplin: **jeder**
+> Nicht-PASS-Zweig → genau ein `save_candidates([])`); präzisiert: (a) **Pre-flight-
+> Reihenfolge** (`_preflight`): `is_connected()` → sonst `connect()` (`.ok` Pflicht) →
+> `get_account().ok` → `get_price(anchor).ok` **und** `market_status == "TRADEABLE"`;
+> `anchor_epic = config.epic_allowlist[0]`. Jeder Fail wirft `ResearchAbort`, vom `run()`
+> gefangen → `save_candidates([])`, **kein** LLM-Call. (b) **Validator-Zweig:** sowohl
+> `not vr.valid` (REJECT) **als auch** `vr.candidate is None` (valides Abstain) → leerer
+> Save; der Drift-Passthrough ist `(context.brain_context or {}).get("drift_pct")`
+> (brain_context kann `None` sein). (c) **Filter-Gate** ist nur `fv.ok` — ein **weicher**
+> Drift-Kohärenz-Warn (`ok=True` **mit** `rule`) passiert bewusst und wird **gespeichert**,
+> nicht abgelehnt (Step 6). (d) **`run()` schreibt nicht auf stdout** — es gibt die Liste
+> zurück und loggt Begründungen nach stderr; das maschinenlesbare Ergebnis-JSON ist Sache
+> der Step-8-Skripte (hält `run()` I/O-frei außer über injizierte Kollaborateure).
+> (e) **DI/Phasen-Isolation:** Kollaborateure via lokale `typing.Protocol`s
+> (`_BrokerLike`/`_DBLike`/`_StateLike`/`_FetcherLike`/`_LLMLike`) — **kein** Import aus
+> `anthropic`/`broker_wrapper`/`external_data`/`persistence` (konsistent mit Validator/
+> Context-Builder). (f) **conftest** um die Session-Health-Fläche auf `FakeBroker`
+> (`is_connected`/`connect`/`get_account` + `connected`/`connect_ok`/`account_ok`-Toggles)
+> und einen `FakeState` (aufzeichnender `save_candidates`-Sink) erweitert. `__init__.py`
+> exportiert jetzt `Research` + `ResearchConfig`. `test_research.py`: **8 grün** (≥5
+> erfüllt) — voller PASS, Abstain (LLM *wurde* gefragt), Validator-REJECT (Halluzinations-
+> Epic), LLM-Error, Session-Health-Fail (×2: account + connect → **kein** LLM-Call),
+> leeres Universum (kein LLM-Call), weicher Drift-Warn passiert dennoch.
+
 ```python
 class Research:
     def __init__(self, broker, db, state, market_data, llm, config): ...  # DI

@@ -91,7 +91,9 @@ See `research/models.py` (`Candidate`).
    fallback + 1 retry. **Token meter built** (`token_meter.py`, **6** tests, USD + EUR),
    **plus** `scripts/usage_report.py` summary (**4** tests), **plus the `.gitignore` fix**.
 6. ✅ `candidate_filter.py` (+ tests, **15** ≥6) — the **real** deterministic gate.
-7. ☐ `research.py` orchestrator (+ tests ≥5).
+7. ✅ `research.py` orchestrator (+ tests, **8** ≥5) — composes Steps 2–6, every
+   non-PASS branch → `save_candidates([])`. `__init__.py` now exports
+   `Research`/`ResearchConfig`.
 8. ☐ `scripts/` — `wiring.py`, `smoke_test.py`, `live_test.py` (operator runs the
    live ones; not in CI).
 9. ☐ finalize `README.md` + this file.
@@ -166,7 +168,76 @@ totals the log by model/day. Stays entirely in Phase 4.
 - **No concept↔code mismatch** found this step — inherited contracts re-verified
   against the repo code and all matched the concept.
 
-## Session stopped — 2026-06-08 (Step 6)
+## Session stopped — 2026-06-08 (Step 7)
+
+### Completed — Step 7 (`research.py` orchestrator — the full `run()` cycle)
+- `research/research.py` — `class Research(__init__(broker, db, state, market_data,
+  llm, config))` + `run() -> list[Candidate]`. **Pure composition** of Steps 2–6;
+  imports only `research.*` + stdlib (collaborators via local `typing.Protocol`s
+  `_BrokerLike`/`_DBLike`/`_StateLike`/`_FetcherLike`/`_LLMLike` — **no**
+  `anthropic`/`broker_wrapper`/`external_data`/`persistence` import). Flow:
+  1. `_preflight()` — `is_connected()` → else `connect()` (`.ok` req) →
+     `get_account().ok` → anchor `get_price().ok` **and** `market_status ==
+     TRADEABLE` (`anchor = config.epic_allowlist[0]`). Any fail → `ResearchAbort`,
+     caught → empty save, **no LLM call**.
+  2. `build_context`; empty `tradeable_epics` → empty save, **no LLM call**.
+  3. `confidence_threshold` + `resolve_allowed_directions` (off `context.bot_score`).
+  4. `build_prompt`.
+  5. The **single** `llm.ask_candidate`; `LLMResponseError` → empty save.
+  6. `drift = (context.brain_context or {}).get("drift_pct")`; `validate_candidate(...
+     score_at_pick=context.bot_score, drift_at_pick=drift)`; `not vr.valid`
+     (REJECT) **or** `vr.candidate is None` (abstain) → empty save.
+  7. `apply_filter`; `not fv.ok` → empty save (a soft `drift_coherence_warn` is
+     `ok=True` → **passes**).
+  8. PASS → `state.save_candidates([candidate.to_dict()])`; return `[candidate]`.
+  **Invariant:** exactly one `save_candidates` per cycle; stderr logging only,
+  stdout untouched (result JSON is Step-8's job → `run()` stays I/O-free).
+- `research/__init__.py` — now exports `Research` + `ResearchConfig`.
+- `tests/conftest.py` — `FakeBroker` extended with the session-health surface
+  (`is_connected`/`connect`/`get_account` + `connected`/`connect_ok`/`account_ok`
+  toggles, `connect_calls`/`account_calls` counters); new `FakeState` (recording
+  `save_candidates` sink) + `state` fixture. Existing fakes untouched (defaults
+  healthy → 18 validator / 13 context tests stay green).
+- `tests/test_research.py` — **8 passed** (≥5): full PASS (1 saved, `spread_pct_at
+  _pick` = fresh recheck, `drift_at_pick` passthrough); abstain (empty save, LLM
+  **was** called); validator REJECT (hallucinated epic); LLM-error; session-health
+  fail ×2 (account + connect → empty save, **`llm.calls == []`**); empty universe
+  (no LLM call); soft drift-warn still PASSES + saves.
+- **Concept reconciliation:** dated §7 annotation added to
+  `docs/concepts/phase4_research_plan_konzept.md` (preflight order; both
+  validator-fail sub-branches; `fv.ok`-only gate; stdout discipline; DI Protocols;
+  conftest growth).
+- **Verification:** `pytest tests/ -v` → **84 passed** (76 + 8). `test_validator.py`
+  stays **18** (≥12). `research.py` real imports = `research.*` + stdlib only
+  (grep). `from research import Research, ResearchConfig` resolves. **Not
+  committed** (operator triggers commits).
+
+### Next — Step 8 (`scripts/` — wiring + smoke + live; operator runs the live ones)
+- `scripts/wiring.py`: `sys.path` bootstrap → build **real** `IGAdapter` (Demo
+  creds via keyring), `Database`, `StateManager`, `MarketDataFetcher` (**`register
+  _volume_proxy("EXS1.DE")`** from `config.volume_proxy`), `LLMClient`
+  (`get_credential("anthropic_api_key")` via the new `research/credentials.py`
+  shim → reuses `broker_wrapper.credentials.get_credential`). One factory
+  `build_research(config) -> Research`. Resolve `usage_log_path` to
+  `<repo_root>/data/state/llm_usage.json`.
+- `research/credentials.py`: thin shim documenting the deliberate isolation
+  exception (Decision 6) — `get_credential` re-export from Phase 1.
+- `scripts/smoke_test.py`: one real Research run, **DRY** (`save` no-op), prints
+  context + LLM answer + validator/filter verdicts. Manual.
+- `scripts/live_test.py`: full cycle vs IG Demo + real LLM → writes valid
+  `turbo_candidates.json` **or** documents a clean abstain; **hard-asserted**,
+  `exit 0` = PASS. **Operator runs it** (real network — not in CI).
+- Then Step 9: finalize `README.md` + this file. **Phase-4 gate** is then met
+  (≥40 tests incl. validator ≥12 ✅; the proof-test = hallucinated epic caught by
+  the validator is already green in `test_research.py`).
+
+### Open questions / blockers
+- None. Step 8 is the operator-facing wiring + live test; the live network run is
+  the user's job (per project rule: Claude does code + mocked tests only).
+
+---
+
+## Session stopped — 2026-06-08 (Step 6, superseded by Step 7 above)
 
 ### Completed — Step 6 (`candidate_filter.py` — THE real deterministic gate)
 - `research/candidate_filter.py` — three pure functions (no I/O / clock / AI;
