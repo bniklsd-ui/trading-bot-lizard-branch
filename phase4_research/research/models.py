@@ -209,13 +209,18 @@ class ValidationResult:
 # Per-model Anthropic pricing in USD per **million** tokens, as
 # ``(input_per_Mtok, output_per_Mtok)``.
 #
-# ⚠ PRICING AS OF 2026-06-05 — verify against Anthropic's pricing page before
+# ⚠ PRICING AS OF 2026-06-08 — verify against Anthropic's pricing page before
 # trusting any cost figure. These are estimates used only for the token meter's
 # advisory cost log (Step 5); they never gate a trade. Update here when pricing
 # changes; the meter reads whatever is in the config.
+#
+# corrected 2026-06-08 (Step 5): Opus 4.8 is $5/$25 per 1M (the recent price
+# drop), not the old $15/$75 — fixed below. Sonnet 4.6 ($3/$15) and Haiku 4.5
+# ($1/$5) re-verified and unchanged. The default model is claude-sonnet-4-6, so
+# this row is only exercised when the config names Opus.
 _DEFAULT_PRICING_USD_PER_MTOK: dict[str, tuple[float, float]] = {
     "claude-sonnet-4-6": (3.0, 15.0),
-    "claude-opus-4-8": (15.0, 75.0),
+    "claude-opus-4-8": (5.0, 25.0),
     "claude-haiku-4-5-20251001": (1.0, 5.0),
 }
 

@@ -87,9 +87,9 @@ See `research/models.py` (`Candidate`).
    `timeutil.py` (ISO stamp source).
 3. ✅ `context_builder.py` (+ tests, **13** ≥6) — P1 probe / P2 reads / P3 brain context.
 4. ✅ `prompt.py` (+ tests, **10** ≥5) — `(system, user, json_schema)`.
-5. ☐ `llm_client.py` (+ tests ≥6) — Anthropic wrapper, Structured Outputs +
-   fallback + 1 retry. **Token meter built here** (USD + EUR), **plus**
-   `scripts/usage_report.py` summary, **plus the `.gitignore` fix** (see below).
+5. ✅ `llm_client.py` (+ tests, **10** ≥6) — Anthropic wrapper, Structured Outputs +
+   fallback + 1 retry. **Token meter built** (`token_meter.py`, **6** tests, USD + EUR),
+   **plus** `scripts/usage_report.py` summary (**4** tests), **plus the `.gitignore` fix**.
 6. ☐ `candidate_filter.py` (+ tests ≥6) — the **real** deterministic gate.
 7. ☐ `research.py` orchestrator (+ tests ≥5).
 8. ☐ `scripts/` — `wiring.py`, `smoke_test.py`, `live_test.py` (operator runs the
@@ -108,10 +108,9 @@ est_cost_eur}` to `data/state/llm_usage.json`. Per-model pricing + `usd_to_eur`
 live in `ResearchConfig` (already present in `models.py`). `usage_report.py`
 totals the log by model/day. Stays entirely in Phase 4.
 
-> ⚠ **Step-5 must-do:** `data/state/llm_usage.json` is **not** gitignored yet
-> (root `.gitignore` covers `turbo_candidates.json`, `*.sqlite`, `ig_state.json`,
-> `data/cache/` — but not the usage log). Step 5 adds a `.gitignore` rule for it,
-> the same reconciliation Phase 3 did for `data/cache/`. Don't forget.
+> ✅ **Step-5 done (2026-06-08):** `data/state/llm_usage.json` is now gitignored
+> (root `.gitignore`, dated reconciliation block mirroring the Phase-3 `data/cache/`
+> rule). Verified via `git check-ignore data/state/llm_usage.json`.
 
 ## Conventions
 - `from __future__ import annotations`, type hints + docstrings everywhere.
@@ -167,7 +166,57 @@ totals the log by model/day. Stays entirely in Phase 4.
 - **No concept↔code mismatch** found this step — inherited contracts re-verified
   against the repo code and all matched the concept.
 
-## Session stopped — 2026-06-05 (Step 4)
+## Session stopped — 2026-06-08 (Step 5)
+
+### Completed — Step 5 (`llm_client.py` + token meter + `.gitignore` fix)
+- `research/llm_client.py` — `LLMClient.ask_candidate(system, user, json_schema) -> dict`,
+  **the single AI call site of the whole bot.**
+  - **Billing decision ("which way"):** **Messages API only** — one `client.messages.create`
+    per cycle, billed purely per token. **No** Managed Agents, **no** server-side tools
+    (those add a hosted-agent-loop + per-session-container charge on top of tokens — the
+    "second bill"). All non-AI work is our code → only the one call's tokens bill.
+  - **Structured Outputs** via `output_config={"format":{"type":"json_schema","schema":…}}`
+    (the deprecated top-level `output_format` is **not** used) with the dynamic schema from
+    `prompt.py`. **Fallback:** plain call → fence-strip → `json.loads`.
+  - **Sampling-param drop:** `_supports_sampling()` omits `temperature` for Opus 4.7/4.8
+    (they 400 on it); default `claude-sonnet-4-6` keeps `temperature=0.2`. **Thinking off**
+    by default (configurable via `enable_thinking`). **Caching** intentionally off.
+  - **Retry (Decision 8):** SDK `max_retries=0`; own policy = exactly 1 retry on transient
+    (network/timeout/5xx/429/JSON-parse), **no** retry on a content answer (incl. `abstain`)
+    or 400/auth → `LLMResponseError`. Faults classified **by class name** → unit run never
+    imports `anthropic`. One mockable site: `_raw_call` (lazy SDK import) + pure
+    `_build_create_kwargs`.
+- `research/token_meter.py` — `estimate_cost()` (USD+EUR, incl. cache multipliers, unknown
+  model → 0) + `record()` appending the frozen 6-key record to `data/state/llm_usage.json`
+  (JSON array; `path=None` → no write). `ts` via `timeutil`.
+- `scripts/usage_report.py` (+ `scripts/__init__.py`) — pure `summarize()` by model/day +
+  `format_report()`; runnable standalone.
+- **Reconciliations:** `models.py` Opus-4.8 pricing `(15,75)→(5,25)` (dated note); root
+  `.gitignore` += `data/state/llm_usage.json`; concept §5 dated annotation.
+- `tests/conftest.py` — added `_FakeUsage`/`_FakeMessage`/`make_message`/`FakeRawCall` +
+  `FakeLLM` (for Step 7) + named test exceptions (`BadRequestError`/`AuthenticationError`).
+- **Verification:** `pytest tests/ -v` → **61 passed** (41 + 10 llm_client + 6 token_meter +
+  4 usage_report). Meta-path import-guard confirms the unit run never imports
+  `anthropic`/`broker_wrapper`/`external_data`/`persistence`. `git check-ignore` passes.
+  **Not committed** (operator triggers commits).
+
+### Next — Step 6 (`candidate_filter.py` — THE real deterministic gate)
+- `confidence_threshold(bot_score, config)` (55 ≥50 / 70 <50), `resolve_allowed_directions`
+  (long-bias clamp to `("BUY",)` when `bot_score < long_bias_below_score`), and
+  `apply_filter(candidate, context, config) -> FilterVerdict` (spread ≤ max, TRADEABLE,
+  direction in clamped set, **soft** drift-coherence warn — not a hard reject; concept §6).
+  Tests ≥6 (floor 55/70, clamp on/off, SELL filtered at score<50, clean BUY passes).
+- Then Step 7 orchestrator (`research.py`, uses `FakeLLM` from conftest), Step 8 scripts +
+  `research/credentials.py` shim + **operator live test** (real network — user runs it).
+
+### Open questions / blockers
+- None. Default model stays `claude-sonnet-4-6` (well-prompted); thinking off but
+  configurable (user-confirmed this session). Live `_raw_call` test is the operator's job,
+  lands with Step 8.
+
+---
+
+## Step 4 log — 2026-06-05 (superseded by the Step 5 handover above)
 
 ### Completed — Step 4 (`prompt.py` — deterministic prompt assembly)
 - `research/prompt.py` — `build_prompt(context, threshold, allowed_directions) ->

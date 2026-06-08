@@ -304,3 +304,119 @@ def good_raw() -> dict[str, Any]:
         "confidence": 72.0,
         "reasoning": "Drift positive, spread tight, score neutral.",
     }
+
+
+# --------------------------------------------------------------------------- #
+# Step 5 — LLM-client collaborators (mocked SDK surface; no network, no SDK)   #
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class _FakeUsage:
+    """Duck-typed stand-in for an Anthropic ``usage`` object (token meter)."""
+
+    input_tokens: int = 120
+    output_tokens: int = 40
+    cache_creation_input_tokens: int | None = None
+    cache_read_input_tokens: int | None = None
+
+
+@dataclass
+class _FakeTextBlock:
+    """A single ``type="text"`` content block of an Anthropic ``Message``."""
+
+    text: str
+    type: str = "text"
+
+
+@dataclass
+class _FakeMessage:
+    """Duck-typed Anthropic ``Message`` — only ``content`` + ``usage`` are read."""
+
+    content: list[Any]
+    usage: _FakeUsage = field(default_factory=_FakeUsage)
+
+
+def make_message(payload: dict[str, Any], *, fenced: bool = False,
+                 usage: _FakeUsage | None = None) -> _FakeMessage:
+    """Build a ``_FakeMessage`` whose single text block is ``json.dumps(payload)``.
+
+    With ``fenced=True`` the JSON is wrapped in a ```json … ``` fence (exercises
+    the fallback path's fence-strip).
+    """
+    import json as _json
+
+    body = _json.dumps(payload)
+    if fenced:
+        body = f"```json\n{body}\n```"
+    return _FakeMessage(
+        content=[_FakeTextBlock(text=body)],
+        usage=usage if usage is not None else _FakeUsage(),
+    )
+
+
+def make_text_message(text: str, *, usage: _FakeUsage | None = None) -> _FakeMessage:
+    """Build a ``_FakeMessage`` with arbitrary (possibly non-JSON) text."""
+    return _FakeMessage(
+        content=[_FakeTextBlock(text=text)],
+        usage=usage if usage is not None else _FakeUsage(),
+    )
+
+
+# Test-only exception classes. The client classifies faults BY CLASS NAME
+# (phase-isolation pattern — it never imports ``anthropic``), so these names
+# matter: ``BadRequestError`` → structured-output fallback; an unrecognised name
+# with no transient status → non-transient (no retry).
+class BadRequestError(Exception):
+    """Stand-in for ``anthropic.BadRequestError`` (HTTP 400)."""
+
+    status_code = 400
+
+
+class AuthenticationError(Exception):
+    """Stand-in for ``anthropic.AuthenticationError`` (HTTP 401, non-transient)."""
+
+    status_code = 401
+
+
+class FakeRawCall:
+    """Scripted stand-in for ``LLMClient._raw_call``.
+
+    Construct with a list of *actions*; each call pops the next one and either
+    returns it (a ``_FakeMessage``) or raises it (an ``Exception`` instance).
+    Records every call's ``json_schema`` kwarg so tests can assert the
+    structured-vs-plain path and the call count (retry behaviour).
+    """
+
+    def __init__(self, actions: list[Any]) -> None:
+        self._actions = list(actions)
+        self.calls: list[dict[str, Any]] = []
+
+    def __call__(self, system: str, user: str, *, json_schema: Any) -> Any:
+        self.calls.append({"system": system, "user": user, "json_schema": json_schema})
+        action = self._actions.pop(0)
+        if isinstance(action, BaseException):
+            raise action
+        return action
+
+
+class FakeLLM:
+    """Stand-in implementing ``ask_candidate`` for the Step-7 orchestrator tests.
+
+    Returns a configured raw dict (or raises a configured exception), recording
+    the prompts it was asked with. Not used by the Step-5 client tests (those
+    drive the real ``LLMClient`` via :class:`FakeRawCall`), but lands now per the
+    conftest growth plan so Step 7 can wire it without touching this file.
+    """
+
+    def __init__(self, raw: dict[str, Any] | None = None,
+                 raises: Exception | None = None) -> None:
+        self._raw = raw if raw is not None else {"abstain": True, "reasoning": "n/a"}
+        self._raises = raises
+        self.calls: list[tuple[str, str, dict[str, Any]]] = []
+
+    def ask_candidate(self, system: str, user: str, json_schema: dict[str, Any]) -> dict[str, Any]:
+        self.calls.append((system, user, json_schema))
+        if self._raises is not None:
+            raise self._raises
+        return dict(self._raw)

@@ -374,6 +374,36 @@ Prüfreihenfolge (jeder Fail → `valid=False` + `rejected_reason`):
   `null`; `allowed_directions`-Clamp im Schema reflektiert (bei BUY-only nur `["BUY", null]`).
 
 ### 5. `llm_client.py` + Tests
+
+> **Angepasst 2026-06-08 (Step 5 gebaut, Code = Source of Truth):** Umgesetzt wie
+> spezifiziert; nach Recherche der aktuellen Anthropic-SDK/Billing-Lage präzisiert:
+> (a) **"Welcher Weg"-Frage (Billing) geklärt:** Wir nutzen **ausschließlich die Messages
+> API** (`client.messages.create`, ein `POST /v1/messages` pro Zyklus, rein
+> token-basiert abgerechnet) — **keine** Managed Agents, **keine** Server-side Tools
+> (Code-Execution/Web-Search), die einen gehosteten Agent-Loop + Per-Session-Container
+> **zusätzlich** zu Tokens abrechnen würden ("zweite Rechnung"). Damit bilanziert nur der
+> eine Klassifikations-Call (input+output Tokens) — exakt das, was der Token-Meter loggt
+> (Bauprinzip in Billing-Form).
+> (b) **Structured Outputs:** der Top-Level-Param `output_format` ist API-weit
+> **deprecated** → der Code nutzt **`output_config={"format": {"type":"json_schema",
+> "schema": <dyn. Schema>}}`** (kanonische Form), mit dem dynamischen Schema aus `prompt.py`
+> (kein Pydantic `messages.parse`, da das per-run-Epic-Enum dynamisch ist).
+> (c) **Request-Surface-Änderung:** Opus 4.7/4.8 lehnen `temperature`/`top_p`/`top_k` +
+> `budget_tokens` mit HTTP 400 ab. `_supports_sampling()` lässt `temperature` für
+> Opus-Modelle **weg**; das Default-Modell `claude-sonnet-4-6` akzeptiert es weiterhin
+> (`temperature=0.2`). **Thinking** ist **aus** per Default (deterministisch, schont das
+> kleine `max_tokens`-Budget); `enable_thinking=True` → `thinking={"type":"adaptive"}`.
+> (d) **Caching** bewusst **nicht** aktiv (1 Call / ~30 min > 5-min-TTL; System-Prompt unter
+> der Mindest-Cacheable-Prefix-Größe) — der Meter liest die Cache-Felder trotzdem (bleiben 0).
+> (e) **Retry:** SDK-Auto-Retry aus (`max_retries=0`), Client besitzt die Policy; Fehler werden
+> **per Klassennamen** klassifiziert (`_is_transient`/`_is_bad_request`, Phasen-Isolations-
+> Muster wie P3 `_is_rate_limit_error`) → der Unit-Run importiert **nie** `anthropic`.
+> (f) **Token-Meter** als eigene Datei `research/token_meter.py` (eine Verantwortung) +
+> `scripts/usage_report.py` (Aggregat by model/day). **Daten-Korrektur:** Opus-4.8-Pricing
+> in `models.py` von $15/$75 → **$5/$25** pro 1M (Preissenkung). **`.gitignore`:**
+> `data/state/llm_usage.json` ergänzt (Phase-3-`data/cache/`-Analogon). `test_llm_client.py`
+> **10 grün** + `test_token_meter.py` **6** + `test_usage_report.py` **4** (≥6 erfüllt).
+
 ```python
 class LLMClient:
     def __init__(self, model: str, api_key: str, *, max_tokens: int,

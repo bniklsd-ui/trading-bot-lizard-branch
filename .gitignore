@@ -97,6 +97,12 @@ turbo_candidates.json
 # Added 2026-06-02: the concept (§2) and phase3 CLAUDE.md assumed data/cache/
 # was already ignored, but no rule covered it — reconciled here.
 data/cache/
+# Phase 4 LLM usage / cost log (token-meter records, written at runtime).
+# Added 2026-06-08 (Step 5): the phase4 concept + CLAUDE.md flag this as a
+# Step-5 must-do — the same reconciliation Phase 3 did for data/cache/. Only
+# specific data/state/*.json files are ignored above (ig_state.json,
+# turbo_candidates.json); the usage log wasn't covered, so add it here.
+data/state/llm_usage.json
 
 # --- Logs ---
 *.log
