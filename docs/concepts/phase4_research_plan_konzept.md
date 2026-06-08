@@ -429,6 +429,26 @@ class LLMClient:
 ### 6. `candidate_filter.py` + Tests — DAS REALE GATE
 Hier sitzt die Gating-Last (Entscheidung 4 + 7), nicht bei der LLM-Confidence.
 
+> **Angepasst 2026-06-08 (Step 6 gebaut, Code = Source of Truth):** Umgesetzt wie
+> spezifiziert; präzisiert: (a) Rückgabetyp ist ein **lokal** in `research/models.py`
+> definiertes `FilterVerdict` (`ok / rule / reason / details`) — bewusst die Form des
+> Phase-1-`broker_wrapper.filters.FilterVerdict` gespiegelt, aber **nicht** importiert
+> (Phasen-Isolation, konsistent mit Validator/Context-Builder). (b) Die Floor-Grenze
+> nutzt das **Literal `50.0`** aus dem §6-Stub (Modul-Konstante `_NEUTRAL_SCORE`),
+> bewusst **getrennt** von `config.long_bias_below_score` (der Direction-Clamp-Grenze) —
+> zwei eigenständige Knöpfe, die zufällig denselben Default 50 haben. (c) Die **weiche**
+> Drift-Kohärenz-Sanity verwendet eine dokumentierte Modul-Konstante
+> `_DRIFT_COHERENCE_PCT = 0.5` (% Drift): SELL bei Drift `> +0.5` bzw. BUY bei Drift
+> `< -0.5` → **`FilterVerdict(ok=True, rule="drift_coherence_warn")`** (passiert mit
+> Warnung, **kein** Reject — P3-Drift ist ~15 min verzögert); `drift_pct is None`
+> (Off-Hours) → Check übersprungen. Bewusst grobe, großzügige Konstante (kein getunter
+> Parameter; Phase 5 ersetzt den harten Momentum-VETO durch Echtzeit-Bars). (d)
+> `apply_filter` prüft Spread/`market_status` aus dem **Universums-Eintrag**
+> (`context.tradeable_epics`), nicht aus dem Candidate — bestätigt das schon geprüfte
+> Universum (Defense-in-Depth: Universums-Mitgliedschaft wird trotz Validator erneut
+> geprüft). Reine Funktion, kein I/O/Clock/AI; Importe nur `research.models` + stdlib.
+> `test_candidate_filter.py`: **15 grün** (≥6 erfüllt).
+
 ```python
 def confidence_threshold(bot_score: float, config: ResearchConfig) -> float:
     """Score unter neutral → strengerer Floor. NICHT als Wahrscheinlichkeit lesen —

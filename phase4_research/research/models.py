@@ -203,6 +203,46 @@ class ValidationResult:
 
 
 # ---------------------------------------------------------------------------
+# FilterVerdict — output of the deterministic candidate filter (Step 6)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FilterVerdict:
+    """Result of the deterministic ``candidate_filter`` — the **real** gate.
+
+    Defined **locally** (phase isolation — Phase 4 imports nothing from
+    ``broker_wrapper``) but deliberately mirrors the shape of Phase-1's
+    ``broker_wrapper.filters.FilterVerdict`` (``ok / rule / reason / details``)
+    so the convention reads the same across phases.
+
+    This is where Phase 4 does its real gating (concept Decisions 4 + 7), **not**
+    on the LLM's self-reported confidence (which is advisory only). A candidate
+    must pass this filter before it is persisted as a pick.
+
+    Soft-warn convention: ``ok=True`` **with** a ``rule`` set means "passed, but
+    with a coherence warning" — used for the soft drift-coherence sanity check.
+    Phase-3 data is ~15 min delayed, so a direction that looks incoherent with
+    delayed drift is flagged, **never** hard-rejected (concept §6: the bot must
+    not tip into a "never sure" extreme). A hard fail is ``ok=False`` with the
+    failing ``rule``.
+
+    Attributes:
+        ok: ``True`` if the candidate passes the gate (possibly with a warn
+            ``rule``); ``False`` for a hard rejection.
+        rule: The failing rule on a hard reject, **or** a soft-warn marker when
+            ``ok=True``; ``None`` for a clean pass.
+        reason: Human-readable explanation; ``None`` for a clean pass.
+        details: Optional structured context (e.g. the observed ``drift_pct``).
+    """
+
+    ok: bool
+    rule: str | None = None
+    reason: str | None = None
+    details: dict[str, Any] = field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
 # ResearchConfig — every tunable in one place
 # ---------------------------------------------------------------------------
 

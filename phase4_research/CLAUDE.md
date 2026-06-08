@@ -90,7 +90,7 @@ See `research/models.py` (`Candidate`).
 5. ✅ `llm_client.py` (+ tests, **10** ≥6) — Anthropic wrapper, Structured Outputs +
    fallback + 1 retry. **Token meter built** (`token_meter.py`, **6** tests, USD + EUR),
    **plus** `scripts/usage_report.py` summary (**4** tests), **plus the `.gitignore` fix**.
-6. ☐ `candidate_filter.py` (+ tests ≥6) — the **real** deterministic gate.
+6. ✅ `candidate_filter.py` (+ tests, **15** ≥6) — the **real** deterministic gate.
 7. ☐ `research.py` orchestrator (+ tests ≥5).
 8. ☐ `scripts/` — `wiring.py`, `smoke_test.py`, `live_test.py` (operator runs the
    live ones; not in CI).
@@ -166,7 +166,65 @@ totals the log by model/day. Stays entirely in Phase 4.
 - **No concept↔code mismatch** found this step — inherited contracts re-verified
   against the repo code and all matched the concept.
 
-## Session stopped — 2026-06-08 (Step 5)
+## Session stopped — 2026-06-08 (Step 6)
+
+### Completed — Step 6 (`candidate_filter.py` — THE real deterministic gate)
+- `research/candidate_filter.py` — three pure functions (no I/O / clock / AI;
+  imports only `research.models` + stdlib):
+  - `confidence_threshold(bot_score, config)` — coarse provisional floor
+    (`confidence_floor_low_score` at `bot_score < 50.0` else
+    `confidence_floor_default`). Module const `_NEUTRAL_SCORE = 50.0`, kept
+    **distinct** from `config.long_bias_below_score` (separate knobs, same default).
+  - `resolve_allowed_directions(bot_score, config)` — long-bias clamp to
+    `("BUY",)` when `enable_long_bias_clamp and bot_score < long_bias_below_score`.
+  - `apply_filter(candidate, context, config) -> FilterVerdict` — ordered hard
+    rules off the **universe entry** (`context.tradeable_epics`): in-universe
+    (`epic_not_in_universe`), spread ≤ `max_spread_pct` (`spread_too_wide`),
+    `market_status == TRADEABLE` (`not_tradeable`), direction in clamped set
+    (`direction_not_allowed`); then a **soft** drift-coherence sanity:
+    SELL vs drift `> +_DRIFT_COHERENCE_PCT` (0.5%) or BUY vs drift `< -0.5%` →
+    `FilterVerdict(ok=True, rule="drift_coherence_warn")` (passes WITH warning —
+    P3 drift is ~15 min delayed, never a reject; `drift_pct is None` → skipped).
+- `research/models.py` — added local `FilterVerdict` dataclass (`ok / rule /
+  reason / details`), mirroring `broker_wrapper.filters.FilterVerdict`'s shape but
+  **not** imported (phase isolation). Soft-warn convention documented: `ok=True`
+  with a `rule` set = "passed with a coherence warning".
+- `tests/test_candidate_filter.py` — **15 passed** (≥6): floor 55/70; clamp
+  on/off; SELL filtered at score<50; clean BUY passes; SELL ok at neutral;
+  spread-too-wide / not-tradeable / epic-not-in-universe rejects; drift-incoherent
+  SELL **and** BUY warn-but-pass; drift `None` no-warn; `brain_context=None`
+  graceful. No conftest change needed (`research_context` + `dataclasses.replace`).
+- **Concept reconciliation:** dated §6 annotation added to
+  `docs/concepts/phase4_research_plan_konzept.md` (local `FilterVerdict`; literal
+  `50.0` floor boundary; `_DRIFT_COHERENCE_PCT=0.5` soft warn; universe-entry-based
+  checks).
+- **Verification:** `py_compile` clean; `pytest tests/ -v` → **76 passed**
+  (61 + 15). `test_validator.py` stays **18** (≥12). `candidate_filter.py` imports
+  nothing from `anthropic`/`broker_wrapper`/`external_data`/`persistence`.
+  **Not committed** (operator triggers commits).
+
+### Next — Step 7 (`research.py` orchestrator)
+- `class Research(__init__(broker, db, state, market_data, llm, config))` + `run()
+  -> list[Candidate]` (concept §7, tests ≥5). Flow: session-health pre-flight
+  (`is_connected`/`connect`, `get_account().ok`, anchor `get_price` TRADEABLE) →
+  `ResearchAbort` on fail; `build_context`; `confidence_threshold` +
+  `resolve_allowed_directions`; `build_prompt`; the **single** `llm.ask_candidate`
+  (`LLMResponseError` → abstain); `validate_candidate(... score_at_pick=
+  context.bot_score, drift_at_pick=<context.brain_context["drift_pct"]>)`; then
+  `apply_filter`; PASS → `state.save_candidates([candidate.to_dict()])`. Every
+  abstain/reject/error → `save_candidates([])`. stderr logging; stdout = result
+  JSON only. Use `FakeLLM` (already in conftest) + the existing fakes.
+- Then Step 8 scripts (`wiring.py`, `smoke_test.py`, `live_test.py`,
+  `research/credentials.py` shim) — **operator** runs the live ones — and Step 9
+  docs finalize.
+
+### Open questions / blockers
+- None. `_DRIFT_COHERENCE_PCT = 0.5` is a deliberately blunt soft-warn constant
+  (not tuned); the hard momentum VETO is Phase 5 (IG real-time bars), not here.
+
+---
+
+## Session stopped — 2026-06-08 (Step 5, superseded by Step 6 above)
 
 ### Completed — Step 5 (`llm_client.py` + token meter + `.gitignore` fix)
 - `research/llm_client.py` — `LLMClient.ask_candidate(system, user, json_schema) -> dict`,
