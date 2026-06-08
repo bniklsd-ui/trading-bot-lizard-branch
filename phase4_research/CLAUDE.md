@@ -6,8 +6,10 @@ layer** — the single AI step (candidate selection) wrapped in deterministic
 code-side validation, filtering, and persistence. Full design and all locked
 decisions: `../docs/concepts/phase4_research_plan_konzept.md`.
 
-**Status:** 🚧 in progress — step-by-step build per the concept's
-"Build-Reihenfolge". See `## Session stopped` at the bottom for the current step.
+**Status:** ✅ Code-complete + live-verified (2026-06-08). 88 mocked tests green;
+`scripts/live_test.py` → `RESULT: 3/3 passed` against IG Demo + a real LLM call. See
+the latest `## Session stopped` block below for the final state. Next phase (Phase 5)
+is kicked off in the browser concept session, not here.
 
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which
@@ -94,9 +96,10 @@ See `research/models.py` (`Candidate`).
 7. ✅ `research.py` orchestrator (+ tests, **8** ≥5) — composes Steps 2–6, every
    non-PASS branch → `save_candidates([])`. `__init__.py` now exports
    `Research`/`ResearchConfig`.
-8. ☐ `scripts/` — `wiring.py`, `smoke_test.py`, `live_test.py` (operator runs the
-   live ones; not in CI).
-9. ☐ finalize `README.md` + this file.
+8. ✅ `scripts/` — `wiring.py`, `smoke_test.py`, `live_test.py` + `research/
+   credentials.py` shim (operator runs the live ones; not in CI).
+9. ✅ finalize `README.md` + this file (+ top-level `CLAUDE.md`/`README.md` flipped to
+   ✅ live-verified after the operator gate passed).
 
 **Phase-4 gate:** `pytest tests/ -v` green, **≥40 tests**, `test_validator.py`
 ≥12; `live_test.py` writes a valid `turbo_candidates.json` (or a documented
@@ -168,7 +171,127 @@ totals the log by model/day. Stays entirely in Phase 4.
 - **No concept↔code mismatch** found this step — inherited contracts re-verified
   against the repo code and all matched the concept.
 
-## Session stopped — 2026-06-08 (Step 7)
+## Session stopped — 2026-06-08 (Step 9 + Structured-Outputs schema fix, live-verified)
+
+### Completed — schema fix + Step 9 (docs) — Phase 4 is DONE
+- **Live gate exposed a real bug** (operator ran `smoke_test.py`/`live_test.py`): every
+  Structured-Output call 400'd — `output_config.format.schema: Invalid schema: Enum value
+  '…' does not match declared type '['string', 'null']'`. Anthropic Structured Outputs
+  **rejects JSON-Schema type-array unions** (`{"type": ["string","null"]}`); the supported
+  union form is `anyOf`. Numeric constraints (`minimum`/`maximum`) are also unsupported.
+  - **`research/prompt.py:_build_schema`** — nullable `epic`/`direction`/`confidence` now
+    use `anyOf` (string/number branch + `{"type":"null"}` branch); dropped `minimum`/
+    `maximum` on `confidence` (range enforced independently by `validator.py` — defence in
+    depth; the decoding-layer enum stays as the anti-hallucination guard). Empty universe →
+    `epic` enum `[]` (well-formed; never sent — orchestrator abstains first).
+  - **`research/llm_client.py`** — hardened the plain-call fallback with a pure
+    `_extract_json_object()` (recovers the first balanced `{…}` from prose-wrapped text);
+    retry policy + single `_raw_call` site unchanged. (Once the schema is valid this path is
+    essentially never hit — it's the safety net.)
+- **Positive proof-test added** (`tests/test_research.py::
+  test_run_valid_pick_is_accepted_and_persisted_to_contract`) — the deterministic mirror of
+  the hallucination-reject: a fabricated, fully-valid BUY pick flows through validator +
+  filter + persistence and is asserted against the **frozen 10-field contract** (same checks
+  `live_test.py` runs on a real pick). Guarantees the PASS path in CI without a live pick.
+- **Concept reconciliation:** dated §4 annotation + corrected the inline schema stub to the
+  `anyOf` form (`docs/concepts/phase4_research_plan_konzept.md`, Code = Source of Truth).
+- **Docs finalized (Step 9):** this file + `README.md` flipped to ✅ live-verified (+ a
+  `## Run` section); top-level `CLAUDE.md` "Current state" + root `README.md` now show
+  Phase 4 ✅ abgeschlossen + live-verifiziert.
+- **Reversibility:** annotated baseline tag **`phase4-pre-schema-fix`** (`81d7362`) captures
+  the broken pre-fix state; concept-doc working copy backed up to
+  `/tmp/phase4_konzept.pre-schema-fix.bak`.
+- **Verification:** `pytest tests/ -v` → **88 passed** (was 84; +3 fallback/​helper in
+  `test_llm_client.py`, +1 positive proof-test). `test_validator.py` stays **18** (≥12).
+  Operator live re-run: `smoke_test.py`/`live_test.py` now log a single `POST /v1/messages
+  "HTTP/1.1 200 OK"` (no 400, no fallback, no retry) → genuine model abstain →
+  `live_test.py` `RESULT: 3/3 passed`, exit 0. **Not committed** (operator triggers commits).
+
+### Next — Phase 5 (browser concept session, not here)
+- Phase 4 is code-complete and live-verified; the only remaining cross-phase item (the
+  Phase-5 momentum VETO against IG real-time bars) is explicitly carried over (concept §13).
+  The Phase-5 concept/transition happens in the Claude browser interface, then implementation
+  returns to Claude Code.
+
+### Open questions / blockers
+- None. If a future model/SDK rejects the `anyOf` schema, the hardened plain-call fallback
+  + the always-on validator/filter still guarantee a safe abstain (never a fabricated trade).
+
+---
+
+## Session stopped — 2026-06-08 (Step 8)
+
+### Completed — Step 8 (`scripts/` wiring + smoke + live + credentials shim)
+- `research/credentials.py` — the **single, documented** phase-isolation exception
+  (Decision 6). Self-contained `sys.path` bootstrap to `phase1_broker_wrapper`
+  (`Path(__file__).parents[2]`) → re-exports `broker_wrapper.credentials.get_credential`
+  (`__all__`). Docstring states *why* (Hard Rule 1: one keyring path, no second
+  credential code path). Key `anthropic_api_key`; seed via Phase-1
+  `scripts/store_credential.py`. **Not** imported by unit tests (LLM key is a ctor arg,
+  mocked) → suite stays keyring-free.
+- `scripts/wiring.py` — `build_research(config=None) -> Research`. `sys.path` bootstrap
+  (own pkg + P1/P2/P3), builds **real** collaborators: broker via Phase-1 factory
+  **`get_broker("ig_demo")`** (canonical build point — no direct `IGAdapter(...)`),
+  `Database(data/trading_bot.sqlite)`, `StateManager(data/state)`,
+  `MarketDataFetcher(TickerMapper+register_volume_proxy(anchor, config.volume_proxy),
+  FileCache(data/cache))`, `LLMClient(... api_key=get_credential("anthropic_api_key"),
+  token_meter_path=data/state/llm_usage.json, config=config)`. Cross-phase imports are
+  **lazy inside `build_research`** → `import scripts.wiring` is network/DB-free; only the
+  *call* reads the keyring. No network at construction (IG connect + SDK are lazy in
+  `run()`).
+- `scripts/smoke_test.py` — one **live DRY** run. Swaps `research.state` for a `_DryState`
+  (no-op `save_candidates` recorder) **after** `build_research`, prints the deterministic
+  context (universe / brain / score / risk via an extra `build_context`) + the cycle
+  outcome to **stderr**, and the would-be-saved JSON to **stdout**. Prints, does not
+  assert. Argparse `--epic/--volume-proxy/--model/--verbose`.
+- `scripts/live_test.py` — the **hard-asserted Phase-4 gate**. Real `StateManager`,
+  `clear_candidates()` → `run()` → asserts: run() didn't raise; `load_candidates()`
+  mirrors the `run()` return (the one-save invariant); on a PICK the persisted dict
+  honours the **frozen 10-field contract** (keys / epic∈allowlist / direction∈{BUY,SELL}
+  / conf 0–100 / source=="research" / ISO `generated_at` / numeric `spread_pct_at_pick`);
+  on an ABSTAIN the list is empty. Both outcomes = `exit 0`. `_Check` table + `RESULT:
+  N/M passed` → stderr; persisted JSON → stdout. The hallucination **proof-test** is
+  *not* forced live (a real model won't hallucinate on demand) — it's deterministically
+  covered by `test_research.py` (invented epic) + `test_validator.py` in CI; `live_test`
+  guarantees the same validator/filter path runs live and only a contract-valid pick is
+  persisted.
+- **Concept reconciliation:** dated §8 annotation added to
+  `docs/concepts/phase4_research_plan_konzept.md` (self-bootstrapping shim; `get_broker`
+  factory; lazy cross-phase imports; DRY-via-state-swap; live proof-test = CI-covered;
+  no script unit tests).
+- **Verification:** `py_compile` clean on all four; `smoke_test.py --help` /
+  `live_test.py --help` → exit 0 (no network — `anthropic` lazy in `_raw_call`, yfinance
+  lazy in P3); `import scripts.wiring` resolves (shim path-bootstrap works);
+  `pytest tests/ -v` → **still 84 passed** (`test_validator.py` 18 ≥ 12; scripts not
+  collected). **Not committed** (operator triggers commits).
+
+### Next — Step 9 (finalize `README.md` + this `CLAUDE.md`)
+- `README.md`: flip the banner to ✅ code-complete; add a `## Run` section with the live
+  commands (`python scripts/smoke_test.py`, `python scripts/live_test.py`) + the prereqs
+  (IG Demo creds, `anthropic_api_key` in keyring, `pip install -r requirements.txt`) and
+  the stdout/stderr split.
+- This `CLAUDE.md`: confirm the AI-boundary / Candidate-contract / 8-decisions sections
+  are final; mark the confidence-floor explicitly provisional (Phase-7 replaces).
+- After Step 9 the **only** open item is the operator's live gate run (below).
+
+### Operator's gate (the user runs this — Claude does code + mocked tests only)
+- `cd phase4_research && python scripts/live_test.py` → expect a valid
+  `data/state/turbo_candidates.json` **or** a documented clean abstain, `exit 0`.
+- Prereqs: `pip install -r requirements.txt` (installs `anthropic` in the venv); IG Demo
+  creds + `anthropic_api_key` seeded in the keyring (Phase-1
+  `scripts/store_credential.py anthropic_api_key`). Run `scripts/smoke_test.py` first for
+  a DRY sanity check. Market-closed → expect a clean abstain (still `exit 0`).
+- When the gate passes, mark Phase 4 ✅ live-verified in the **top-level** `CLAUDE.md`
+  "Current state" + root `README.md` (Phase-5 concept/transition happens in the browser
+  session, not here).
+
+### Open questions / blockers
+- None. Step 8 is code-complete; the live run is the operator's job. `anthropic` is not
+  needed for unit tests (lazy + mocked); it's only required for the two live scripts.
+
+---
+
+## Session stopped — 2026-06-08 (Step 7, superseded by Step 8 above)
 
 ### Completed — Step 7 (`research.py` orchestrator — the full `run()` cycle)
 - `research/research.py` — `class Research(__init__(broker, db, state, market_data,

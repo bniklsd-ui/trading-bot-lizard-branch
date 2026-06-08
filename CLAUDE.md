@@ -77,9 +77,31 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 3 — External Data (yFinance): ✅ abgeschlossen +
-live-verifiziert. Phase-4-Konzept (turbo_research) ausstehend (Browser-Konzept-Session
+**Active phase:** Phase 4 — Research (LLM candidate selection): ✅ abgeschlossen +
+live-verifiziert. Phase-5-Konzept (ig_bot Gates 1–5) ausstehend (Browser-Konzept-Session
 leitet den Phasenwechsel ein — nicht hier in Claude Code).
+
+**Phase 4 status:** ✅ Abgeschlossen + live-verifiziert (2026-06-08)
+- 88 Unit-Tests grün (gemockt, `_raw_call` der einzige mockbare LLM-Punkt — kein
+  Netzwerk, kein `anthropic`-Import im Unit-Run; `test_validator.py` 18 ≥ 12) +
+  live-verifiziert via `phase4_research/scripts/live_test.py` → `RESULT: 3/3 passed`
+  gegen IG Demo + realen LLM-Call (run() ohne Exception, 1-Save-Invariante,
+  Abstain → leere Liste). `smoke_test.py` als DRY-Sanity vorgeschaltet.
+- **Einziger AI-Schritt** = `llm_client.ask_candidate` ("welcher Kandidat?"). Alles
+  andere ist Code: Context-Assembly (P1/P2/P3), Validator (Halluzinations-Guard),
+  `candidate_filter` (das reale Gate), Persistenz, Retry. LLM-Output erreicht **nie**
+  `open_position` ohne Validator + Filter; LLM-`confidence` ist Rohdatum, **nicht** das
+  Gate (Phase 7 ankert es an Outcomes).
+- Code in `phase4_research/` (importiert nichts aus Phase 1/2/3 zur Laufzeit — nur
+  via `scripts/wiring.py`-Bootstrap; Phasen-Isolation) · Konzept in
+  `docs/concepts/phase4_research_plan_konzept.md` · Candidate-Persistenz in
+  gitignored Root-`data/state/turbo_candidates.json` (Legacy-Name, TTL 30 min);
+  Token-/Kosten-Log in `data/state/llm_usage.json` (gitignored).
+- Erkenntnis (Code = Source of Truth, Konzept §4 annotiert): **Anthropic Structured
+  Outputs lehnen JSON-Schema-Type-Arrays ab** (`{"type": ["string","null"]}` → HTTP
+  400) — der Code nutzt `anyOf` für nullable Enums; numerische Constraints
+  (`minimum`/`maximum`) sind ebenfalls nicht unterstützt → der `confidence`-Bereich
+  wird vom Validator durchgesetzt. Baseline-Tag vor dem Fix: `phase4-pre-schema-fix`.
 
 **Phase 3 status:** ✅ Abgeschlossen + live-verifiziert (2026-06-02)
 - 70 Unit-Tests grün (gemockt, `_raw_download` monkeypatched — kein Netzwerk) +

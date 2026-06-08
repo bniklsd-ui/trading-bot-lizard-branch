@@ -1,7 +1,9 @@
 # Phase 4 — Research (LLM candidate selection)
 
-> **Status:** 🚧 In progress — **Step 1 done** (scaffold + `models.py`).
-> Build order and all locked decisions: `../docs/concepts/phase4_research_plan_konzept.md`.
+> **Status:** ✅ Code-complete + live-verified (2026-06-08). 88 mocked unit tests
+> green (no network); `scripts/live_test.py` → `RESULT: 3/3 passed` against IG Demo +
+> a real LLM call. Build order and all locked decisions:
+> `../docs/concepts/phase4_research_plan_konzept.md`.
 
 ## What this is
 
@@ -36,30 +38,47 @@ There is no `CALL`/`PUT` anywhere.
 Every real LLM call's token usage (input/output, incl. cache fields) is logged
 to `data/state/llm_usage.json` with **both** `est_cost_usd` (Anthropic's billing
 unit) and `est_cost_eur` (via a configurable rate in `ResearchConfig`), so spend
-is auditable after the fact. A `scripts/usage_report.py` summary readout totals
-it by model/day. *(Built in Step 5 — not present yet.)*
+is auditable after the fact. `scripts/usage_report.py` totals it by model/day.
 
 ## Layout
 
 ```
 research/
   models.py          # ✅ contracts: Candidate, ResearchContext, ResearchConfig, ValidationResult, exceptions
-  validator.py       # ☐ hallucination guard (Step 2 — the safety core)
-  context_builder.py # ☐ deterministic context from P1/P2/P3 (Step 3)
-  prompt.py          # ☐ (system, user, json_schema) builder (Step 4)
-  llm_client.py      # ☐ Anthropic wrapper + token meter (Step 5)
-  candidate_filter.py# ☐ the real deterministic gate (Step 6)
-  research.py        # ☐ orchestrator run() (Step 7)
-scripts/             # ☐ wiring / smoke_test / live_test (Step 8)
-tests/               # mocked, no network — tests begin at Step 2 (validator ≥12)
+  validator.py       # ✅ hallucination guard (the safety core)
+  context_builder.py # ✅ deterministic context from P1/P2/P3
+  prompt.py          # ✅ (system, user, json_schema) builder — anyOf nullable enums
+  llm_client.py      # ✅ Anthropic wrapper (Structured Outputs + fallback + 1 retry) + token meter
+  candidate_filter.py# ✅ the real deterministic gate
+  research.py        # ✅ orchestrator run()
+  credentials.py     # ✅ keyring shim (documented phase-isolation exception, Decision 6)
+scripts/             # ✅ wiring / smoke_test / live_test + usage_report
+tests/               # ✅ mocked, no network — 88 green (validator 18 ≥12)
 ```
 
-## Commands
+## Commands (CI / local — no network)
 
 ```bash
-pip install -r requirements.txt        # only needed for the live scripts
-pytest tests/ -v                       # mocked, no network (from this directory)
+pytest tests/ -v                       # 88 mocked tests, no network (from this directory)
 ```
 
-Live scripts (`smoke_test.py`, `live_test.py`) arrive in Step 8 and are run by
-the operator (Niklas), never in CI.
+## Run (live — operator only, real network)
+
+The two live scripts talk to **IG Demo** and the **real Anthropic API**; they are
+run by the operator, never in CI. Prereqs:
+
+```bash
+pip install -r requirements.txt        # installs `anthropic` into the venv
+# seed the LLM key into the OS keyring (reuses Phase-1's keyring, SERVICE "tradingbot"):
+python ../phase1_broker_wrapper/scripts/store_credential.py anthropic_api_key
+# IG Demo creds must already be seeded (Phase-1 store_credential.py).
+```
+
+```bash
+python scripts/smoke_test.py           # DRY sanity: prints context + cycle outcome, saves nothing
+python scripts/live_test.py            # hard-asserted gate: writes turbo_candidates.json or a clean abstain
+```
+
+**Output discipline:** machine-readable JSON (the would-be / persisted candidate
+list) → **stdout**; all human-facing logs + the `RESULT:` line → **stderr**.
+Market-closed (or a cautious model) → a clean abstain (empty list), still `exit 0`.
