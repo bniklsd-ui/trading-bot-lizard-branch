@@ -143,6 +143,43 @@ def _strip_fences(text: str) -> str:
     return s.strip()
 
 
+def _extract_json_object(text: str) -> str | None:
+    """Extract the first balanced top-level ``{...}`` object from ``text``.
+
+    The structured path returns clean JSON. The plain-call **fallback** has no
+    schema constraint, so the model may wrap the JSON in prose ("Here is my
+    pick: {…}") — a bare ``json.loads`` then fails at char 0. This walks the text
+    for the first ``{`` and returns the substring through its balanced closing
+    ``}`` (string-aware, so braces inside string literals don't miscount).
+    Returns ``None`` if no balanced object is present. Pure / SDK-free.
+    """
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
 def _extract_text(message: Any) -> str:
     """Concatenate the ``text`` blocks of an Anthropic ``Message``.
 
@@ -311,6 +348,7 @@ class LLMClient:
         outputs" and triggers an in-attempt fallback to a plain call — it does
         **not** consume the retry. Any other exception propagates unchanged.
         """
+        used_fallback = False
         try:
             message = self._raw_call(system, user, json_schema=json_schema)
         except Exception as exc:  # noqa: BLE001 - classified by helper
@@ -319,10 +357,21 @@ class LLMClient:
                     "structured output rejected (%s) — falling back to plain call", exc
                 )
                 message = self._raw_call(system, user, json_schema=None)
+                used_fallback = True
             else:
                 raise
 
-        raw = json.loads(_strip_fences(_extract_text(message)))
+        text = _strip_fences(_extract_text(message))
+        try:
+            raw = json.loads(text)
+        except json.JSONDecodeError:
+            # The schema-free fallback may wrap the JSON in prose; recover the first
+            # balanced object before giving up. A miss re-raises unchanged → still a
+            # parse failure, still eligible for the single retry (Decision 8).
+            snippet = _extract_json_object(text) if used_fallback else None
+            if snippet is None:
+                raise
+            raw = json.loads(snippet)
         # Best-effort metering — never let a meter problem break the pick.
         try:
             token_meter.record(

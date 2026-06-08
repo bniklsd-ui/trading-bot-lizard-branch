@@ -53,7 +53,10 @@ def test_universe_in_user_and_schema_enum(research_context: ResearchContext) -> 
 
     assert DEFAULT_EPIC in user
     assert "Germany 40 Cash" in user  # the name column
-    assert schema["properties"]["epic"]["enum"] == [DEFAULT_EPIC, None]
+    # Nullable enum via anyOf (string-branch + null-branch) — NOT a type-array union.
+    epic_schema = schema["properties"]["epic"]
+    assert epic_schema["anyOf"][0]["enum"] == [DEFAULT_EPIC]
+    assert {"type": "null"} in epic_schema["anyOf"]
 
 
 def test_none_market_values_rendered_honestly(research_context: ResearchContext) -> None:
@@ -82,13 +85,17 @@ def test_whole_snapshot_none(research_context: ResearchContext) -> None:
 
 
 def test_schema_shape(research_context: ResearchContext) -> None:
-    """Schema required / additionalProperties / confidence bounds are exact."""
+    """Schema required / additionalProperties / confidence shape are exact."""
     _, _, schema = build_prompt(research_context, THRESHOLD, BOTH)
 
     assert schema["required"] == ["abstain", "reasoning"]
     assert schema["additionalProperties"] is False
+    # confidence is a nullable number via anyOf. Numeric bounds (minimum/maximum)
+    # are deliberately ABSENT — Structured Outputs rejects them; the [0,100] range
+    # is enforced independently by validator.py.
     conf = schema["properties"]["confidence"]
-    assert conf["minimum"] == 0 and conf["maximum"] == 100
+    assert {branch["type"] for branch in conf["anyOf"]} == {"number", "null"}
+    assert "minimum" not in conf and "maximum" not in conf
     assert schema["properties"]["abstain"]["type"] == "boolean"
 
 
@@ -101,7 +108,8 @@ def test_direction_clamp_reflected(research_context: ResearchContext) -> None:
     """
     _, user, schema = build_prompt(research_context, THRESHOLD, ("BUY",))
 
-    assert schema["properties"]["direction"]["enum"] == ["BUY", None]
+    assert schema["properties"]["direction"]["anyOf"][0]["enum"] == ["BUY"]
+    assert {"type": "null"} in schema["properties"]["direction"]["anyOf"]
     assert "permitted directions: BUY" in user
     assert "direction must be one of [BUY]." in user
 
@@ -133,5 +141,8 @@ def test_floor_and_score_in_user(research_context: ResearchContext) -> None:
 def test_empty_universe_edge() -> None:
     """Empty universe → schema epic enum [None], no instruments table, no crash."""
     _, user, schema = build_prompt(_empty_context(), THRESHOLD, BOTH)
-    assert schema["properties"]["epic"]["enum"] == [None]
+    # Empty universe → empty string-branch enum (still well-formed; never sent to
+    # the API — the orchestrator abstains before the LLM call on an empty universe).
+    assert schema["properties"]["epic"]["anyOf"][0]["enum"] == []
+    assert {"type": "null"} in schema["properties"]["epic"]["anyOf"]
     assert "none right now" in user.lower()

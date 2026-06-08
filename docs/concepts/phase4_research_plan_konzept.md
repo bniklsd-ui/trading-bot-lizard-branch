@@ -346,6 +346,25 @@ Prüfreihenfolge (jeder Fail → `valid=False` + `rejected_reason`):
 > (kein `broker_wrapper`/`external_data`/`persistence`-Import). `test_prompt.py`: **10 grün**
 > (≥5 erfüllt).
 
+> **Korrigiert 2026-06-08 (nach Live-Test, Code = Source of Truth):** Der erste
+> Live-Lauf (`smoke_test.py`/`live_test.py`) lieferte bei **jedem** Structured-Output-Call
+> `HTTP 400 — output_config.format.schema: Invalid schema: Enum value '…' does not match
+> declared type '['string', 'null']'`. Ursache: Anthropic Structured Outputs akzeptiert
+> **keine JSON-Schema-Type-Arrays** (`{"type": ["string","null"]}`) — der unterstützte
+> Union-Mechanismus ist **`anyOf`**. Ebenso sind **numerische Constraints
+> (`minimum`/`maximum`) nicht unterstützt**. `_build_schema` baut nullable Felder daher
+> jetzt als `anyOf` (String-/Number-Branch + `{"type":"null"}`-Branch) **ohne** `minimum`/
+> `maximum`; der `confidence`-Bereich `[0,100]` wird ohnehin **unabhängig vom Validator**
+> (`validator.py`) durchgesetzt (Defense-in-Depth — der Validator bleibt das reale Gate,
+> die Decoding-Layer-Enum bleibt zusätzlich erhalten). Leeres Universum → `epic`-Enum `[]`
+> (statt `[None]`; wohlgeformt, wird nie gesendet — Orchestrator abstaint vorher). Der
+> 400-getriggerte Fallback (`json_schema=None`) scheiterte zudem am Parsen (Modell
+> antwortet ohne Schema in Prosa → `json.loads`-Fehler bei char 0); **gehärtet** in
+> `llm_client._extract_json_object` (extrahiert das erste balancierte `{…}`-Objekt aus
+> Prosa-umhülltem Text; Miss → unverändertes Re-raise → weiterhin 1 Retry/Safe-Abstain).
+> Baseline-Tag vor dem Fix: `phase4-pre-schema-fix` (`81d7362`). `test_prompt.py` 10 +
+> `test_llm_client.py` 13 grün; Suite **87 grün** (`test_validator.py` bleibt 18).
+
 `build_prompt(context, threshold, allowed_directions) -> tuple[str, str, dict]`
 → `(system, user, json_schema)`.
 - **System:** Rolle = Research-Analyst eines DAX-Intraday-CFD-Bots; wähle ≤1 Instrument
@@ -356,13 +375,16 @@ Prüfreihenfolge (jeder Fail → `valid=False` + `rejected_reason`):
   **handelbare Instrumente als Tabelle (epic, name, spread%, min_size)** · Antwortformat.
 - **`json_schema`** für Structured Outputs:
   ```python
+  # anyOf statt Type-Array-Union (Type-Arrays → HTTP 400; siehe 2026-06-08-Note oben).
   {
     "type": "object",
     "properties": {
       "abstain": {"type": "boolean"},
-      "epic": {"type": ["string", "null"], "enum": [*epics, None]},  # dynamisch!
-      "direction": {"type": ["string", "null"], "enum": ["BUY", "SELL", None]},
-      "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+      "epic": {"anyOf": [{"type": "string", "enum": list(epics)},      # dynamisch!
+                         {"type": "null"}]},
+      "direction": {"anyOf": [{"type": "string", "enum": ["BUY", "SELL"]},
+                              {"type": "null"}]},
+      "confidence": {"anyOf": [{"type": "number"}, {"type": "null"}]},  # kein min/max
       "reasoning": {"type": "string"},
     },
     "required": ["abstain", "reasoning"],
@@ -537,6 +559,33 @@ Flow (alles außer dem einen LLM-Call ist Code):
 - `live_test.py`: voller Zyklus gegen IG Demo + echtes LLM → schreibt valide
   `turbo_candidates.json` **oder** dokumentiert sauber den Abstain-Grund.
   **Hart asserted**, `exit 0` = PASS. Läuft **nicht** in CI.
+
+> **Angepasst 2026-06-08 (Step 8 gebaut, Code = Source of Truth):**
+> - **`research/credentials.py`** (Decision-6-Shim) macht den `sys.path`-Bootstrap zu
+>   `phase1_broker_wrapper` **selbst** (`Path(__file__).parents[2]`), damit der Shim
+>   eigenständig importierbar ist (unabhängig davon, ob `wiring.py` den Pfad schon gesetzt
+>   hat). Re-exportiert `broker_wrapper.credentials.get_credential` (Service `tradingbot`,
+>   Key `anthropic_api_key`).
+> - **`wiring.py`** baut den Broker via die Phase-1-Factory **`get_broker("ig_demo")`**
+>   (kein direkter `IGAdapter(...)`-Aufruf — die Factory ist der kanonische Bau-Punkt) und
+>   löst `usage_log_path` auf `<repo_root>/data/state/llm_usage.json` auf. Cross-Phase-
+>   Importe (`broker_wrapper`/`persistence`/`external_data`) sind **lazy in
+>   `build_research`** → `import scripts.wiring` bleibt netzwerk-/DB-frei; nur der Aufruf
+>   liest den Keyring.
+> - **`smoke_test.py`** realisiert „DRY" durch **Austausch von `research.state`** gegen
+>   eine `_DryState` (no-op `save_candidates`, das den Payload nur merkt) **nach** dem
+>   `build_research`. Der Kontext-Druck nutzt einen zusätzlichen `build_context`-Aufruf
+>   (run() baut intern erneut) — bewusst akzeptiert für ein manuelles Smoke (eine
+>   Extra-Broker-Probe).
+> - **`live_test.py`**: Der **Beweis-Test** (Halluzination → Validator-REJECT) wird
+>   **nicht** live erzwungen — ein echtes Modell halluziniert nicht auf Kommando. Er ist
+>   **deterministisch in `tests/test_research.py`** (erfundenes Epic) + `test_validator.py`
+>   abgedeckt und läuft in CI. `live_test.py` garantiert stattdessen, dass derselbe
+>   Validator-/Filter-Pfad live läuft und **nur** ein vertrags-valider Pick je persistiert
+>   wird (10-Feld-Contract-Assertion nach `load_candidates()`). Sowohl ein valider Pick
+>   als auch ein sauberer Abstain sind `exit 0` (Done-Kriterium erfüllt).
+> - **Keine Unit-Tests für `scripts/`** (live, nicht-deterministisch, keyring-/netzgebunden)
+>   — exakt das Phase-3-Muster. Suite bleibt **84 grün** (Scripts nicht gesammelt).
 
 ### 9. `README.md` + `CLAUDE.md`
 - `CLAUDE.md`: AI-Grenze, Candidate-Contract, die 8 Entscheidungen, **`## Session

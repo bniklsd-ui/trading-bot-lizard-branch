@@ -12,7 +12,12 @@ import json
 
 import pytest
 
-from research.llm_client import LLMClient, _strip_fences, _supports_sampling
+from research.llm_client import (
+    LLMClient,
+    _extract_json_object,
+    _strip_fences,
+    _supports_sampling,
+)
 from research.models import LLMResponseError, ResearchConfig
 
 from tests.conftest import (
@@ -168,3 +173,56 @@ def test_strip_fences_handles_plain_and_fenced() -> None:
     assert _strip_fences('{"a": 1}') == '{"a": 1}'
     assert _strip_fences('```json\n{"a": 1}\n```') == '{"a": 1}'
     assert _strip_fences('```\n{"a": 1}\n```') == '{"a": 1}'
+
+
+def test_extract_json_object_recovers_first_balanced_object() -> None:
+    # Prose before and after a balanced object → just the object.
+    assert _extract_json_object('Here is my pick: {"epic": "X"} hope that helps') == (
+        '{"epic": "X"}'
+    )
+    # Braces inside string literals must not miscount the depth.
+    assert _extract_json_object('{"reasoning": "a } b { c"}') == (
+        '{"reasoning": "a } b { c"}'
+    )
+    # Nested objects are balanced through the matching close brace.
+    assert _extract_json_object('x {"a": {"b": 1}} y') == '{"a": {"b": 1}}'
+    # No object present → None.
+    assert _extract_json_object("no json here at all") is None
+
+
+def test_fallback_recovers_prose_wrapped_json() -> None:
+    """Structured 400 → plain fallback returns JSON wrapped in prose → recovered."""
+    client = _client()
+    pick = {"abstain": False, "epic": "IX.D.DAX.IFMM.IP", "direction": "BUY",
+            "confidence": 60, "reasoning": "ok"}
+    prose = "Based on the data, here is my pick: " + json.dumps(pick)
+    fake = FakeRawCall([
+        BadRequestError("output_config not supported"),  # structured call 400s
+        make_text_message(prose),                        # plain call, prose-wrapped
+    ])
+    client._raw_call = fake  # type: ignore[method-assign]
+
+    result = client.ask_candidate("sys", "usr", SCHEMA)
+
+    assert result == pick
+    # One attempt: structured (schema) then plain (None) — recovered, no retry.
+    assert len(fake.calls) == 2
+    assert fake.calls[1]["json_schema"] is None
+
+
+def test_fallback_pure_prose_still_raises_after_retry() -> None:
+    """Fallback with no JSON object at all → parse failure → single retry → raise."""
+    client = _client()
+    fake = FakeRawCall([
+        BadRequestError("output_config not supported"),  # attempt 1: structured 400
+        make_text_message("I cannot pick anything right now."),  # attempt 1: plain prose
+        BadRequestError("output_config not supported"),  # attempt 2 (retry): 400
+        make_text_message("Still no structured answer."),        # attempt 2: plain prose
+    ])
+    client._raw_call = fake  # type: ignore[method-assign]
+
+    with pytest.raises(LLMResponseError):
+        client.ask_candidate("sys", "usr", SCHEMA)
+
+    # Two attempts, each = structured(400) + plain → four raw calls. Safe abstain.
+    assert len(fake.calls) == 4

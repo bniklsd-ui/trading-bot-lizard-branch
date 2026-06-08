@@ -136,25 +136,34 @@ def _build_schema(
 ) -> dict[str, Any]:
     """Build the Structured-Outputs JSON schema with dynamic epic/direction enums.
 
+    Nullable fields use ``anyOf`` (a *string/number* branch + a ``null`` branch),
+    **not** a JSON-Schema type-array union (``{"type": ["string", "null"]}``):
+    Anthropic Structured Outputs rejects type-arrays — they 400 with
+    ``Enum value '…' does not match declared type '['string', 'null']'``. ``anyOf``
+    is the supported union mechanism. Numeric constraints (``minimum``/``maximum``)
+    are also unsupported by Structured Outputs, so ``confidence`` carries none here;
+    its ``[0, 100]`` range is enforced independently by ``validator.py`` (defence in
+    depth — the validator is the real guard regardless of the decoding layer).
+
     ``epic`` is constrained to exactly the real universe (plus ``null``); an empty
-    universe yields ``[None]`` (valid — the orchestrator abstains before calling
-    the LLM, but the schema must never be malformed). ``direction`` reflects the
-    already-applied long-bias clamp (BUY-only → ``["BUY", None]``).
+    universe yields an empty ``enum`` (valid — the orchestrator abstains before
+    calling the LLM, but the schema must never be malformed). ``direction``
+    reflects the already-applied long-bias clamp (BUY-only → enum ``["BUY"]``).
     """
     return {
         "type": "object",
         "properties": {
             "abstain": {"type": "boolean"},
-            "epic": {"type": ["string", "null"], "enum": [*epics, None]},
+            "epic": {
+                "anyOf": [{"type": "string", "enum": list(epics)}, {"type": "null"}]
+            },
             "direction": {
-                "type": ["string", "null"],
-                "enum": [*allowed_directions, None],
+                "anyOf": [
+                    {"type": "string", "enum": list(allowed_directions)},
+                    {"type": "null"},
+                ]
             },
-            "confidence": {
-                "type": ["number", "null"],
-                "minimum": 0,
-                "maximum": 100,
-            },
+            "confidence": {"anyOf": [{"type": "number"}, {"type": "null"}]},
             "reasoning": {"type": "string"},
         },
         "required": ["abstain", "reasoning"],

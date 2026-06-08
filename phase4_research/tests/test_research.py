@@ -13,6 +13,7 @@ and the LLM is asked **only** after the session-health + non-empty-universe gate
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -242,3 +243,75 @@ def test_run_drift_coherence_warn_still_passes() -> None:
     assert result[0].direction == "SELL"
     assert result[0].drift_at_pick == pytest.approx(2.0)
     assert state.saved == [[result[0].to_dict()]]
+
+
+# --------------------------------------------------------------------------- #
+# 8. Positive proof-test — a fabricated GOOD pick is accepted & persisted      #
+# --------------------------------------------------------------------------- #
+
+# The frozen Phase-4 → Phase-5 candidate contract (models.Candidate). The
+# persisted dict must carry EXACTLY these keys — no more, no less.
+_CONTRACT_KEYS = {
+    "epic",
+    "direction",
+    "llm_confidence",
+    "reasoning",
+    "spread_pct_at_pick",
+    "drift_at_pick",
+    "score_at_pick",
+    "threshold_applied",
+    "generated_at",
+    "source",
+}
+
+
+def test_run_valid_pick_is_accepted_and_persisted_to_contract() -> None:
+    """Positive proof-test: a fabricated, fully-valid model pick BECOMES a trade.
+
+    The deterministic mirror of ``test_run_validator_reject_hallucinated_epic_…``:
+    where that proves a *bad* pick is caught, this proves a *good* pick flows all
+    the way through validator + filter + persistence and lands as a contract-valid
+    candidate. We fabricate the LLM answer a real model *should* return on a clean
+    setup — an in-universe BUY, confidence well above the floor, coherent with the
+    positive (delayed) drift so not even the soft drift-warn fires — and assert the
+    same frozen 10-field contract ``live_test.py`` asserts on a real pick, so the
+    PASS path is guaranteed in CI without needing a live model to pick on demand.
+    """
+    pick = {
+        "abstain": False,
+        "epic": DEFAULT_EPIC,
+        "direction": "BUY",  # coherent with the default +0.42% drift → no soft warn
+        "confidence": 80.0,  # comfortably ≥ the default floor (55)
+        "reasoning": "Uptrend intact, spread tight, volume unremarkable — clean long.",
+    }
+    llm = FakeLLM(raw=pick)
+    research, state, llm, broker = _research(llm=llm)
+
+    result = research.run()
+
+    # --- it was accepted: exactly one candidate, returned AND persisted once ---
+    assert len(result) == 1
+    candidate = result[0]
+    assert isinstance(candidate, Candidate)
+    persisted = state.saved
+    assert persisted == [[candidate.to_dict()]]  # the one-save invariant
+    saved_dict = persisted[0][0]
+
+    # --- it honours the frozen Phase-4 → Phase-5 contract (live_test.py parity) ---
+    assert set(saved_dict) == _CONTRACT_KEYS
+    assert saved_dict["epic"] == DEFAULT_EPIC  # in the code-provided universe
+    assert saved_dict["direction"] in ("BUY", "SELL")
+    assert saved_dict["direction"] == "BUY"
+    assert 0 <= saved_dict["llm_confidence"] <= 100
+    assert saved_dict["llm_confidence"] == pytest.approx(80.0)  # stored verbatim
+    assert saved_dict["source"] == "research"
+    # spread_pct_at_pick is the FRESH live recheck value (not the model's word).
+    assert isinstance(saved_dict["spread_pct_at_pick"], float)
+    assert saved_dict["spread_pct_at_pick"] == pytest.approx(0.03)
+    assert isinstance(saved_dict["threshold_applied"], (int, float))
+    # generated_at is a parseable ISO-8601 UTC stamp (…Z).
+    assert saved_dict["generated_at"].endswith("Z")
+    datetime.fromisoformat(saved_dict["generated_at"].replace("Z", "+00:00"))
+    # the AI was asked exactly once, and a real reasoning string survived.
+    assert len(llm.calls) == 1
+    assert saved_dict["reasoning"] == pick["reasoning"]
