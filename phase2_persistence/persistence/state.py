@@ -24,6 +24,9 @@ from persistence.timeutil import parse_iso
 
 ACCOUNT_STATE_FILE = "ig_state.json"
 BOT_CONFIG_FILE = "ig_config.json"
+# Legacy name; content = DAX-CFD candidates, not turbos/options. Do NOT rename —
+# Phase-2/Phase-5 Gate-2 contract depends on this exact filename.
+# (Adjusted for Phase-4 Step-0 terminology fix — concept-demanded; file unchanged.)
 CANDIDATES_FILE = "turbo_candidates.json"
 
 CANDIDATES_TTL_MIN = 30

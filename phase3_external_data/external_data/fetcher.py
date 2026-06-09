@@ -340,7 +340,7 @@ class MarketDataFetcher:
         self._cache.set(key, records, _ttl_for_resolution(resolution))
         return records
 
-    # -- Phase 4 (turbo_research) -----------------------------------------
+    # -- Phase 4 (research) -----------------------------------------------
 
     def get_drift(self, epic: str) -> DriftResult | None:
         """Intraday drift vs. today's open. ``None`` off-hours (intraday-guarded)."""

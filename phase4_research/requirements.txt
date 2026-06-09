@@ -1,0 +1,16 @@
+# Phase 4 — Research (LLM candidate selection).
+#
+# The Anthropic SDK is the ONLY new runtime dependency. It is needed solely for
+# the live scripts (smoke_test.py / live_test.py) and the real LLM call inside
+# llm_client.py. Unit tests do NOT need it installed: the single raw SDK call is
+# lazy-imported and mocked (the Phase-3 `_raw_download` pattern), so `pytest`
+# runs with no network and no SDK present.
+#
+# Pin range is conservative; bump the lower bound when you adopt a newer
+# Structured-Outputs API and verify the beta header / output_format usage.
+
+# runtime (live scripts + real LLM call only)
+anthropic>=0.40,<1.0
+
+# dev / test
+pytest>=7.4.0

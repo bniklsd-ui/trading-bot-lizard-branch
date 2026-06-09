@@ -7,7 +7,7 @@
 
 ## What this project is
 
-A multi-phase, AI-augmented options trading bot for the DAX.
+A multi-phase, AI-augmented CFD trading bot for the DAX.
 Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 
 The bot is structured around a **5-Gate Execution Pipeline** with adversarial
@@ -77,9 +77,40 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 3 — External Data (yFinance): ✅ abgeschlossen +
-live-verifiziert. Phase-4-Konzept (turbo_research) ausstehend (Browser-Konzept-Session
+**Active phase:** Phase 4 — Research (LLM candidate selection): ✅ abgeschlossen +
+live-verifiziert. Phase-5-Konzept (ig_bot Gates 1–5) ausstehend (Browser-Konzept-Session
 leitet den Phasenwechsel ein — nicht hier in Claude Code).
+
+**Phase 4 status:** ✅ Code-complete + live-**getestet** (Pipeline-Logik), **noch
+nicht profit-validiert** (2026-06-09)
+- ⚠ **Live-getestet ≠ profit-validiert:** Die Pipeline läuft nachweislich korrekt
+  end-to-end (IG Demo + echter LLM-Call) — korrekter Kontext, contract-valider Pick
+  **oder** sauberer Abstain, sicherer No-Trade auf **jedem** Fehlerpfad (zuletzt
+  bestätigt: Markt-geschlossen-Abstain um 07:18, `exit 0`). **Unbekannt** bleibt, ob
+  der Bot *profitable* Trades macht — es wurden **keine echten Trades platziert oder
+  ausgewertet**. Das ist hier bewusst so: Ausführung = Phase 5, Edge/Profitabilität =
+  viel später (Phase 7 Outcome-Anchoring + Live-Betrieb). Grünes Licht heißt „die
+  Logik funktioniert", **nicht** „der Bot ist profitabel".
+- 88 Unit-Tests grün (gemockt, `_raw_call` der einzige mockbare LLM-Punkt — kein
+  Netzwerk, kein `anthropic`-Import im Unit-Run; `test_validator.py` 18 ≥ 12) +
+  live-getestet via `phase4_research/scripts/live_test.py` → `RESULT: 3/3 passed`
+  gegen IG Demo + realen LLM-Call (run() ohne Exception, 1-Save-Invariante,
+  Abstain → leere Liste). `smoke_test.py` als DRY-Sanity vorgeschaltet.
+- **Einziger AI-Schritt** = `llm_client.ask_candidate` ("welcher Kandidat?"). Alles
+  andere ist Code: Context-Assembly (P1/P2/P3), Validator (Halluzinations-Guard),
+  `candidate_filter` (das reale Gate), Persistenz, Retry. LLM-Output erreicht **nie**
+  `open_position` ohne Validator + Filter; LLM-`confidence` ist Rohdatum, **nicht** das
+  Gate (Phase 7 ankert es an Outcomes).
+- Code in `phase4_research/` (importiert nichts aus Phase 1/2/3 zur Laufzeit — nur
+  via `scripts/wiring.py`-Bootstrap; Phasen-Isolation) · Konzept in
+  `docs/concepts/phase4_research_plan_konzept.md` · Candidate-Persistenz in
+  gitignored Root-`data/state/turbo_candidates.json` (Legacy-Name, TTL 30 min);
+  Token-/Kosten-Log in `data/state/llm_usage.json` (gitignored).
+- Erkenntnis (Code = Source of Truth, Konzept §4 annotiert): **Anthropic Structured
+  Outputs lehnen JSON-Schema-Type-Arrays ab** (`{"type": ["string","null"]}` → HTTP
+  400) — der Code nutzt `anyOf` für nullable Enums; numerische Constraints
+  (`minimum`/`maximum`) sind ebenfalls nicht unterstützt → der `confidence`-Bereich
+  wird vom Validator durchgesetzt. Baseline-Tag vor dem Fix: `phase4-pre-schema-fix`.
 
 **Phase 3 status:** ✅ Abgeschlossen + live-verifiziert (2026-06-02)
 - 70 Unit-Tests grün (gemockt, `_raw_download` monkeypatched — kein Netzwerk) +

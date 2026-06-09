@@ -24,7 +24,7 @@ POSITIONS = [{
 }]
 CANDIDATE = {
     "epic": "IX.D.DAX.IFMM.IP",
-    "direction": "CALL",
+    "direction": "BUY",  # BUY/SELL contract (was legacy "CALL"; Phase-4 Step-0 fix)
     "confidence": 72,
 }
 
