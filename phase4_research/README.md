@@ -1,9 +1,18 @@
 # Phase 4 — Research (LLM candidate selection)
 
-> **Status:** ✅ Code-complete + live-verified (2026-06-08). 88 mocked unit tests
+> **Status:** ✅ Code-complete + live-**tested** (2026-06-09). 88 mocked unit tests
 > green (no network); `scripts/live_test.py` → `RESULT: 3/3 passed` against IG Demo +
 > a real LLM call. Build order and all locked decisions:
 > `../docs/concepts/phase4_research_plan_konzept.md`.
+>
+> ⚠ **Live-tested, not profit-validated.** The pipeline is proven to run *correctly*
+> end-to-end — correct context, a contract-valid pick **or** a clean abstain, and a
+> safe no-trade on every failure path (last confirmed: a markets-closed abstain at
+> 07:18, `exit 0`). Whether the bot makes **profitable** trades is **unknown**: no
+> real trades have been placed or evaluated. That's correct at this stage — execution
+> is Phase 5, and edge/profitability is a much later concern (Phase 7
+> outcome-anchoring + live running). Green means "the logic works," **not** "the bot
+> is profitable."
 
 ## What this is
 

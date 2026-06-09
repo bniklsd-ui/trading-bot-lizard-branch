@@ -16,12 +16,19 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 1     | Broker API Wrapper                  | ✅ Abgeschlossen (live-verifiziert, Demo)            |
 | 2     | Persistenz (SQLite + JSON)          | ✅ Abgeschlossen (live-verifiziert, Demo)            |
 | 3     | External Data (yFinance)            | ✅ Abgeschlossen (live-verifiziert, ^GDAXI)          |
-| 4     | research.py + LLM (`turbo_*` = legacy) | ✅ Abgeschlossen (live-verifiziert, IG Demo + LLM) |
+| 4     | research.py + LLM (`turbo_*` = legacy) | ✅ Abgeschlossen — live-**getestet** (Logik), noch nicht profit-validiert ¹ |
 | 5     | ig_bot.py Gates 1–5 + pre_trade     | Nicht begonnen                                      |
 | 6     | Bull/Bear/Judge Debate              | Nicht begonnen                                      |
 | 7     | Reward/Punishment + Brain           | Nicht begonnen                                      |
 | 8     | Scheduler                           | Nicht begonnen                                      |
 | 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert)       |
+
+¹ **Live-getestet ≠ profit-validiert.** Die Research-Pipeline läuft nachweislich
+korrekt end-to-end (IG Demo + echter LLM-Call): korrekter Kontext, contract-valider
+Pick oder sauberer Abstain, sicherer No-Trade auf jedem Fehlerpfad. **Ob der Bot
+profitable Trades macht, ist unbekannt** — es wurden keine echten Trades platziert.
+Das ist hier korrekt: Ausführung kommt erst in Phase 5, Edge/Profitabilität viel
+später (Phase 7 + Live-Betrieb). „Die Logik funktioniert" ≠ „der Bot ist profitabel".
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)

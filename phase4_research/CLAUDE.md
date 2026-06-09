@@ -6,10 +6,17 @@ layer** — the single AI step (candidate selection) wrapped in deterministic
 code-side validation, filtering, and persistence. Full design and all locked
 decisions: `../docs/concepts/phase4_research_plan_konzept.md`.
 
-**Status:** ✅ Code-complete + live-verified (2026-06-08). 88 mocked tests green;
+**Status:** ✅ Code-complete + live-**tested** (2026-06-09). 88 mocked tests green;
 `scripts/live_test.py` → `RESULT: 3/3 passed` against IG Demo + a real LLM call. See
 the latest `## Session stopped` block below for the final state. Next phase (Phase 5)
 is kicked off in the browser concept session, not here.
+
+> ⚠ **Live-tested ≠ profit-validated.** "Live-tested" here means the pipeline runs
+> *correctly* end-to-end (correct context, contract-valid pick or clean abstain, safe
+> no-trade on every failure path — incl. a real markets-closed abstain at 07:18). It
+> does **not** mean the bot is profitable: no real trades have been placed or
+> evaluated, so the bot's edge is **unknown** and out of scope here. Trade execution
+> is Phase 5; profitability is anchored to outcomes only in Phase 7 + live running.
 
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which

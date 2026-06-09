@@ -81,10 +81,19 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 live-verifiziert. Phase-5-Konzept (ig_bot Gates 1–5) ausstehend (Browser-Konzept-Session
 leitet den Phasenwechsel ein — nicht hier in Claude Code).
 
-**Phase 4 status:** ✅ Abgeschlossen + live-verifiziert (2026-06-08)
+**Phase 4 status:** ✅ Code-complete + live-**getestet** (Pipeline-Logik), **noch
+nicht profit-validiert** (2026-06-09)
+- ⚠ **Live-getestet ≠ profit-validiert:** Die Pipeline läuft nachweislich korrekt
+  end-to-end (IG Demo + echter LLM-Call) — korrekter Kontext, contract-valider Pick
+  **oder** sauberer Abstain, sicherer No-Trade auf **jedem** Fehlerpfad (zuletzt
+  bestätigt: Markt-geschlossen-Abstain um 07:18, `exit 0`). **Unbekannt** bleibt, ob
+  der Bot *profitable* Trades macht — es wurden **keine echten Trades platziert oder
+  ausgewertet**. Das ist hier bewusst so: Ausführung = Phase 5, Edge/Profitabilität =
+  viel später (Phase 7 Outcome-Anchoring + Live-Betrieb). Grünes Licht heißt „die
+  Logik funktioniert", **nicht** „der Bot ist profitabel".
 - 88 Unit-Tests grün (gemockt, `_raw_call` der einzige mockbare LLM-Punkt — kein
   Netzwerk, kein `anthropic`-Import im Unit-Run; `test_validator.py` 18 ≥ 12) +
-  live-verifiziert via `phase4_research/scripts/live_test.py` → `RESULT: 3/3 passed`
+  live-getestet via `phase4_research/scripts/live_test.py` → `RESULT: 3/3 passed`
   gegen IG Demo + realen LLM-Call (run() ohne Exception, 1-Save-Invariante,
   Abstain → leere Liste). `smoke_test.py` als DRY-Sanity vorgeschaltet.
 - **Einziger AI-Schritt** = `llm_client.ask_candidate` ("welcher Kandidat?"). Alles
