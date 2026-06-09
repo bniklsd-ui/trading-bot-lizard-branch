@@ -77,6 +77,7 @@ python scripts/store_credential.py ig_demo_username
 python scripts/store_credential.py ig_demo_password
 python scripts/store_credential.py ig_demo_api_key
 python scripts/store_credential.py ig_demo_account_id
+python scripts/store_credential.oy anthropic_api_key
 
 # 5. Smoke test gegen Demo
 python scripts/smoke_test.py --epic IX.D.DAX.IFMM.IP
