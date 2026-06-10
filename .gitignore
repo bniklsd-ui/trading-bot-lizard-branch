@@ -103,6 +103,11 @@ data/cache/
 # specific data/state/*.json files are ignored above (ig_state.json,
 # turbo_candidates.json); the usage log wasn't covered, so add it here.
 data/state/llm_usage.json
+# Phase 5 execution state (write-ahead deal_reference / in-flight order records,
+# written at runtime by the operator's live run). Added 2026-06-10 (Step 2): the
+# same reconciliation Phase 3/4 did — only specific data/state/*.json files are
+# ignored above; this operational idempotency store wasn't covered, so add it.
+data/state/execution_state.json
 
 # --- Logs ---
 *.log

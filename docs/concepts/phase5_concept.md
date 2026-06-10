@@ -271,6 +271,22 @@ class ExecutionState:
   `open_references()` listet pending+open; korrupte Datei → Exception; atomic-write
   hinterlässt keine halbe Datei.
 
+> **Annotation 2026-06-10 (Step 2 umgesetzt — Code = Source of Truth):**
+> - **Datei-Form:** `{"records": {<deal_reference>: {…}}}` — ein Dict, gekeyt auf die
+>   (uuid-eindeutige) `deal_reference`. Pro Record: `deal_reference, epic, direction,
+>   size, stop_level, limit_level, status, deal_id, recorded_at, updated_at`.
+> - **Record-Status-Vokabular** = `PENDING → OPEN → CLOSED` (bewusst **getrennt** vom
+>   `ExecutionResult.status` aus `models.py`; das ist der persistierte Order-Lifecycle,
+>   nicht das Cycle-Ergebnis). `open_references()` = Refs in `{PENDING, OPEN}`.
+> - **Unbekannte Ref bei `mark_open`/`mark_closed` → `ExecutionError`** (nie still
+>   anlegen/überschreiben — signalisiert einen Logikfehler; konsistent mit „nie still
+>   überschreiben" für die korrupte Datei).
+> - **Atomic-Write + ISO-Stamp** spiegeln die verifizierte Phase-2-`persistence.state`-
+>   Konvention (temp + `os.replace`; `_format_iso`/`_utcnow` lokal, **kein** Cross-Phase-
+>   Import → Phasen-Isolation bleibt).
+> - 10 Tests (≥6) grün; `pytest phase5_execution/tests -v` → **33 passed** (23 + 10).
+>   **Neu:** `tests/conftest.py` mit `make_order_plan`/`order_plan`-Factory.
+
 ### 3. `gates.py` + Tests — Gate 1/2/3/5 (reine, testbare Funktionen)
 ```python
 def gate_time_window(now: datetime, config) -> GateVerdict:
