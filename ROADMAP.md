@@ -103,8 +103,8 @@ that passes downstream consumption.
 - [ ] Gate 2: Load Candidates (calls Phase 4 if missing)
 - [ ] Gate 3: Constraints (budget, concurrent positions)
 - [ ] Gate 4: Broker sizing
-- [ ] Gate 5: Direction Fix
-- [ ] `pre_trade_option_check()` — 4 VETOs
+- [ ] Gate 5: Direction Consistency (`gate_direction_consistency` — pass-through check, no FLIP)
+- [ ] `pre_trade_check()` — 4 VETOs
 - [ ] Place order via broker_wrapper
 - [ ] Monitor position
 - [ ] Close position
