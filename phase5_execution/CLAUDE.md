@@ -98,10 +98,10 @@ phase5_execution/
 ├── CLAUDE.md             # ✅ (diese Datei)
 ├── execution/
 │   ├── __init__.py       # ✅ (exportiert noch nichts)
-│   ├── config.py         # ⬜ Step 1 — ExecutionConfig
-│   ├── exceptions.py     # ⬜ Step 1
-│   ├── protocols.py      # ⬜ Step 1 — Broker/Db/State Protocols
-│   ├── models.py         # ⬜ Step 1 — OrderPlan/GateVerdict/VetoVerdict/ExecutionResult
+│   ├── config.py         # ✅ Step 1 — ExecutionConfig (frozen)
+│   ├── exceptions.py     # ✅ Step 1 — ExecutionError-Hierarchie
+│   ├── protocols.py      # ✅ Step 1 — Broker/Db/State Protocols + EnvelopeLike
+│   ├── models.py         # ✅ Step 1 — OrderPlan/GateVerdict/VetoVerdict/ExecutionResult
 │   ├── execution_state.py# ⬜ Step 2 — write-ahead Idempotenz
 │   ├── gates.py          # ⬜ Step 3 — Gate 1/2/3/5
 │   ├── sizing.py         # ⬜ Step 4 — Gate 4
@@ -112,54 +112,52 @@ phase5_execution/
 │   └── ig_bot.py         # ⬜ Step 9 — CLI Composition Root
 ├── scripts/              # ⬜ Step 10 — wiring/smoke_test/live_test
 └── tests/
-    └── test_packaging.py # ✅ Step C — editable-install Beweis (6 Tests grün)
+    ├── test_packaging.py # ✅ Step C — editable-install Beweis (6 Tests grün)
+    ├── test_config.py    # ✅ Step 1 — Config-Defaults + frozen (4 Tests)
+    └── test_models.py    # ✅ Step 1 — Models + Exceptions (13 Tests)
 ```
 
-## Session stopped — 2026-06-10 (Step 0 + Step C)
+## Session stopped — 2026-06-10 (Step 1)
 
 ### Stand
-Composition-Root steht; **noch keine Execution-Logik**. `pytest phase5_execution/tests -v` →
-**6 passed** (Packaging-Beweis). Alle bestehenden Suites grün geblieben: P1 49 · P2 59 · P3 70 ·
-P4 88. **Nicht committet** (Operator triggert Commits — Step 0 und Step C sind zwei eigene Commits).
+**Step 1 erledigt** (Typen/Config, **keine Logik, kein I/O, kein Netzwerk**).
+`pytest phase5_execution/tests -v` → **23 passed** (6 Packaging + 4 Config + 13 Models/Exceptions).
+Bestehende Suites unberührt (P1 49 · P2 59 · P3 70 · P4 88). **Nicht committet, falls** der
+Operator den Step-1-Commit selbst triggert (sonst als eigener atomarer Commit `phase5: ...`).
+Steps 0 + C sind bereits committet (Branch `phase5-execution`, `ed9c407`, `1a35f2a`).
 
-### Zuletzt gemacht
-- **Step 0 (Terminologie):** `ROADMAP.md` Phase-5-Abschnitt korrigiert — „Gate 5: Direction Fix"
-  → `gate_direction_consistency` (kein FLIP), `pre_trade_option_check()` → `pre_trade_check()`.
-  (Root-`CLAUDE.md`/`README.md` waren bereits sauber; ROADMAP-Zeile „FLIP-logic" bleibt — die
-  gehört zu **Phase 6** Bull/Bear/Judge, kein Options-Erbe.) Greenfield-Paket → Step-0-`grep`
-  trivial sauber.
-- **Step C (editable installs):** `pyproject.toml` für alle fünf Pakete (`broker-wrapper`,
-  `persistence`, `external-data`, `research`, `execution`) mit
-  `[tool.setuptools.packages.find] include=["<pkg>*"]` (schließt `scripts`/`tests` aus).
-  `scripts/dev_install.sh` (Repo-Root, P1→P2→P3→P4→P5). Phase-5-Skeleton: `execution/__init__.py`
-  (leer), `requirements.txt`, `README.md`, `tests/__init__.py`, `tests/test_packaging.py`.
-  Alle fünf editable installiert, `find_spec` aus `/tmp` für alle fünf True (kein `sys.path`).
-- **Konzept-Reconciliation** (`docs/concepts/phase5_concept.md`, dated 2026-06-10): `max_spread_pct`
-  = **0.5 % (nicht ~1.8 pts)**; `risk_pct` Config = Prozent → `/100`; `get_ohlcv`-Bar-Shape +
-  `close`-Feld; `open_position` `stop/limit` = absolute Level; `OrderResult.status`-Enum;
-  Paket-Layout `execution/` genestet (Tree war schematisch).
+### Zuletzt gemacht (Step 1)
+- `execution/config.py` — `ExecutionConfig` (`@dataclass(frozen=True)`), alle §0-Tunables.
+  Reconciled Units: `max_spread_pct=0.5` (**% of ask**), `risk_pct_*` als **Prozent** (sizing.py
+  teilt /100). **Neues Feld** `max_parallel_positions=1` (nicht in §0-Tabelle; Gate 3/VETO 4
+  brauchen es; v1) → Konzept §0 mit dated Annotation ergänzt.
+- `execution/exceptions.py` — `ExecutionError`(Basis, `code`-Attr) → `GateRejected`,
+  `VetoRejected`, `ExecutionAbort` (fail-closed), `ReconcileConflict`. Gate/VETO = no-trade
+  (exit 0); Abort = Operator/exit≠0.
+- `execution/protocols.py` — `EnvelopeLike` + `BrokerProtocol`/`DbProtocol`/`StateProtocol`
+  (`@runtime_checkable`), nur die geprüften Methoden. Hält die Kernlogik frei von harten
+  Schwester-Imports.
+- `execution/models.py` — frozen `OrderPlan`/`GateVerdict`/`VetoVerdict`/`ExecutionResult`
+  (Status-Strings im Docstring dokumentiert). `OrderPlan` = Phase-6-Naht.
+- `execution/__init__.py` bleibt export-leer (Phase-4-Präzedenz: Public-Surface erst mit dem
+  Orchestrator, Step 8). Tests importieren Submodule direkt (`from execution.config import …`).
 
-### Nächster Schritt
-**Step 1** (eine Step pro Session): `execution/config.py` (`ExecutionConfig` frozen dataclass,
-alle Felder aus Konzept §0 — `max_spread_pct=0.5`, `risk_pct_*` als Prozent, MINUTE_5/12,
-0.15 %, stop=30/limit=45, Fenster 09:00–17:30 / square-off 17:15 Europe/Berlin, poll=15,
-require_confirm=True, max_hold=240, reconcile_unexpected_aborts=True) · `exceptions.py`
-(`ExecutionError`→`GateRejected`/`VetoRejected`/`ExecutionAbort`/`ReconcileConflict`) ·
-`protocols.py` (Broker/Db/State Protocols — nur die geprüften Methoden) · `models.py`
-(`OrderPlan`/`GateVerdict`/`VetoVerdict`/`ExecutionResult` frozen). Tests: Config-Defaults +
-Verdict-Immutabilität. `conftest.py` mit `FakeBroker` (deckt `get_ohlcv`/`open_position`/
-`get_open_positions`/`reconcile_positions`/`close_position`) kommt mit den ersten Logik-Steps.
+### Nächster Schritt — **Step 2** (`execution_state.py`)
+`ExecutionState(path="data/state/execution_state.json")`: `record_pending(plan)` (write-ahead
+**vor** `open_position`), `mark_open(ref, deal_id)`, `mark_closed(ref)`, `open_references()`,
+`get(ref)`. Atomar schreiben (temp + `os.replace`), korrupte Datei → `ExecutionError`, nie still
+überschreiben. `tests/test_execution_state.py` ≥6. **Hier startet `tests/conftest.py`** (noch kein
+Broker nötig — `tmp_path`-Fixture reicht; `FakeBroker` kommt mit Step 3/5/6).
 
 ### Offene Punkte / [VERIFY]
-- Erledigt für Step C. Verbleibende [VERIFY] für spätere Steps: exakte IG-Erwartung der
-  absoluten `stop_level`/`limit_level`-Richtung im **Live**-Test (Step 6/10, Operator) — Code
-  rechnet BUY: stop unter / limit über Entry, SELL umgekehrt.
+- Verbleibend für spätere Steps: IG-Erwartung der absoluten `stop_level`/`limit_level`-Richtung
+  im **Live**-Test (Step 6/10, Operator) — Code rechnet BUY: stop unter / limit über Entry.
 
 ### Gotchas
-- `setuptools` war im venv **nicht** vorinstalliert; `dev_install.sh` installiert es upfront.
-  Bei frischem venv ohne Netzwerk schlägt der editable-Install der build-isolation fehl.
-- Leeres Junk-Verzeichnis `broker_wrapper/{adapters,streaming}` (Brace-Expansion-Artefakt, kein
-  `__init__.py`) → von `find` ignoriert; **nicht** Phase 5, nicht angefasst.
+- `setuptools` war im venv **nicht** vorinstalliert; `dev_install.sh` installiert es upfront
+  (frischer venv ohne Netzwerk → build-isolation-Install schlägt fehl).
 - `pytest` nutzt `phase5_execution/pyproject.toml` als rootdir-Config (kein `[tool.pytest]` nötig).
-- `import research`/`external_data` ziehen `anthropic`/`yfinance` NICHT beim Import (lazy) — der
-  Packaging-Test nutzt trotzdem bewusst `find_spec` statt echtem Import (robust + nebenwirkungsfrei).
+- Tests importieren `from execution.<modul>` — funktioniert dank des editable Installs aus Step C
+  (kein `sys.path`-Hack).
+- Step-0-`grep` (`-i`) matcht das **englische Wort „call"**; deshalb in `.py`-Kommentaren
+  „research run"/„broker I/O" statt „…call" verwendet, damit der Done-Check sauber bleibt.

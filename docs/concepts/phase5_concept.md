@@ -61,6 +61,12 @@
 >   `build_order_plan` rechnet die Punkt-Distanzen relativ zum Entry-Preis in absolute Level um.
 >   `OrderResult.data.status ∈ {ACCEPTED, REJECTED, PENDING, UNKNOWN}` (ACCEPTED = bestätigt,
 >   PENDING = Confirm-Timeout → fail-closed).
+>
+> **Annotation 2026-06-10 (Step 1 — neues Config-Feld):** `ExecutionConfig.max_parallel_positions`
+> (Default **1**) steht **nicht** in der obigen Defaults-Tabelle, wird aber von Gate 3 und VETO 4
+> gebraucht („offene Positionen < max_parallel"). Default 1 = DAX-Intraday, eine Position; **v1**,
+> am Profit zu tunen. PENDING-Recheck-Tunables (`order.py`, Step 6) kommen erst, wenn sie konsumiert
+> werden.
 
 ---
 
