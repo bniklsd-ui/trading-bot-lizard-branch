@@ -103,7 +103,7 @@ phase5_execution/
 │   ├── protocols.py      # ✅ Step 1 — Broker/Db/State Protocols + EnvelopeLike
 │   ├── models.py         # ✅ Step 1 — OrderPlan/GateVerdict/VetoVerdict/ExecutionResult
 │   ├── execution_state.py# ✅ Step 2 — write-ahead Idempotenz (10 Tests)
-│   ├── gates.py          # ⬜ Step 3 — Gate 1/2/3/5
+│   ├── gates.py          # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
 │   ├── sizing.py         # ⬜ Step 4 — Gate 4
 │   ├── vetos.py          # ⬜ Step 5 — pre_trade_check (4 VETOs)
 │   ├── order.py          # ⬜ Step 6 — place/reconcile/build_order_plan
@@ -116,58 +116,68 @@ phase5_execution/
     ├── test_packaging.py       # ✅ Step C — editable-install Beweis (6 Tests grün)
     ├── test_config.py          # ✅ Step 1 — Config-Defaults + frozen (4 Tests)
     ├── test_models.py          # ✅ Step 1 — Models + Exceptions (13 Tests)
-    └── test_execution_state.py # ✅ Step 2 — write-ahead Idempotenz (10 Tests)
+    ├── test_execution_state.py # ✅ Step 2 — write-ahead Idempotenz (10 Tests)
+    └── test_gates.py           # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
 ```
 
-## Session stopped — 2026-06-10 (Step 2)
+## Session stopped — 2026-06-10 (Step 3)
 
 ### Stand
-**Step 2 erledigt** (`execution_state.py` — write-ahead Idempotenz, **erste Logik + I/O**,
-kein Netzwerk). `pytest phase5_execution/tests -v` → **33 passed** (23 + 10 execution_state).
-Bestehende Suites unberührt (P1 49 · P2 59 · P3 70 · P4 88). **Nicht committet** — Operator
-triggert die Commits (sonst eigener atomarer Commit `phase5: execution_state write-ahead
-idempotency (Step 2)`). Steps 0 + C committet (`ed9c407`, `1a35f2a`); Step 1 ggf. noch offen.
+**Step 3 erledigt** (`gates.py` — Gate 1/2/3/5, reine Funktionen, kein I/O/Clock/AI/Netzwerk).
+`pytest phase5_execution/tests -v` → **48 passed** (33 + 15 gates). Bestehende Suites unberührt
+(P1 49 · P2 59 · P3 70 · P4 88). Steps 0 + C + 1 + 2 committet (`…`, `bf2de18`); **Step 3
+committet, falls** der Operator es triggert (sonst atomarer Commit `phase5: gates 1/2/3/5
+(Step 3)`).
 
-### Zuletzt gemacht (Step 2)
-- `execution/execution_state.py` — `ExecutionState(path="data/state/execution_state.json")`
-  mit `record_pending(plan)` (write-ahead **vor** `open_position`), `mark_open(ref, deal_id)`,
-  `mark_closed(ref)`, `open_references()` (Refs in `{PENDING, OPEN}` → reconcile-Input),
-  `get(ref)` (Copy oder `None`). Datei-Form `{"records": {<ref>: {…}}}`, 10 Felder/Record.
-  Record-Status `PENDING→OPEN→CLOSED` (bewusst getrennt von `ExecutionResult.status`).
-  Atomic-Write (temp + `os.replace`) + ISO-Stamp gespiegelt aus P2 `persistence.state`
-  (lokale `_utcnow`/`_format_iso`, **kein** Cross-Phase-Import). Korrupte Datei **und**
-  unbekannte Ref → `ExecutionError` (nie still überschreiben/anlegen).
-- `tests/conftest.py` — **neu** (erste Phase-5-Conftest): `make_order_plan`-Factory (unique
-  `bot-<uuid4hex>`-Ref, alle Felder überschreibbar) + `order_plan`-Single-Fixture.
-- `tests/test_execution_state.py` — **10 Tests**: write-ahead vor „Order"; mark_open/closed-
-  Übergänge; open_references pending+open ohne closed; korrupte Datei → Exception (alle
-  Read-Pfade); kein `.tmp`-Rest + Durability über „Neustart"; unbekannte Ref ×2 → Exception;
-  `get` unknown→None / known→Copy (Tamper-sicher); fehlende Datei liest leer (legt sie nicht an).
-- **Konzept §2** mit dated Annotation (2026-06-10) ergänzt: Datei-Form, Status-Vokabular,
-  unbekannte-Ref-raises, Atomic/ISO aus P2, Testzahl.
+### Zuletzt gemacht (Step 3)
+- `execution/gates.py` — vier Funktionen:
+  - `gate_time_window(now, config)` — Gate 1: `now`→`ZoneInfo(config.tz)`, Time-of-Day
+    inklusive `start ≤ t ≤ end`; lokaler `_parse_hhmm`.
+  - `gate_load_candidates(state, research_runner, config) -> (GateVerdict, dict|None)` — Gate 2:
+    `candidates_are_fresh()` → bei stale `research_runner()` (injiziert, lazy) → `load_candidates()`
+    neu lesen; **erster** Candidate; leer → Abstain (`ok=False, None`).
+  - `gate_constraints(account_env, open_positions_env, candidate, config)` — Gate 3:
+    `available > 0` (aus `get_account().data`), `len(positions) < max_parallel_positions`;
+    **env-nicht-ok → reject** (fail-safe).
+  - `gate_direction_consistency(candidate, open_positions_env)` — Gate 5: direction ∈ {BUY,SELL},
+    keine offene **Gegen**-Position auf **demselben** Epic; **kein** FLIP. Env-nicht-ok → reject.
+  - Gate-IDs: `time_window`/`load_candidates`/`constraints`/`direction_consistency`.
+- `tests/conftest.py` — gewachsen (Phase-4-Rhythmus): `_FakeEnv` (duck-typed `.ok`/`.data`),
+  `make_candidate`-Factory (Phase-4 10-Key-Contract), `FakeState` (konfigurierbar
+  `candidates_are_fresh`/`load_candidates`, recording `clear_candidates`). `DEFAULT_EPIC` ergänzt.
+- `tests/test_gates.py` — **15 Tests** (≥8): Gate1 in/out/custom-Fenster inkl. tz-Konvertierung;
+  Gate2 fresh→erster Pick (Runner nicht gerufen) / stale→Runner→reload / leer→Abstain; Gate3
+  budget+room pass / kein-budget / at-max-parallel / env-nicht-ok ×2; Gate5 invalid-direction /
+  Gegen-Position / gleiche-Richtung+anderes-Epic pass / env-nicht-ok.
+- **Konzept §3** mit dated Annotation (2026-06-10): tz-Konvertierung, erster-Candidate, available-
+  Lesepfad, env-nicht-ok→reject, Gate-5-nur-Gegen-Position, Gate-IDs, Testzahl.
 
-### Nächster Schritt — **Step 3** (`gates.py` — Gate 1/2/3/5)
-Reine, testbare Funktionen (Konzept §3): `gate_time_window(now, config)`,
-`gate_load_candidates(state, research_runner, config) -> (GateVerdict, dict|None)` (Gate 2:
-`load_candidates()`+`candidates_are_fresh()`; stale/leer → injizierten `research_runner()`
-rufen, neu laden; leer → Abstain), `gate_constraints(account_env, open_positions_env,
-candidate, config)` (Gate 3: budget>0, offene < `max_parallel_positions`),
-`gate_direction_consistency(candidate, open_positions_env)` (Gate 5: direction ∈ {BUY,SELL},
-keine offene Gegen-Position auf demselben Epic — **kein** FLIP). `research_runner: Callable`
-injiziert (Phase 4 lazy). Tests ≥8. **`conftest.py` wächst** um `FakeBroker`/`FakeState`/
-`FakeDB` + Envelope-Fake (noch kein Netzwerk).
+### Nächster Schritt — **Step 4** (`sizing.py` — Gate 4)
+Konzept §4: `select_risk_pct(db, config)` (`get_risk_level()`: KONSERVATIV →
+`risk_pct_conservative`, AGGRESSIV → `risk_pct_aggressive`) und
+`compute_size(account_env, price_env, market_info_env, risk_pct, config) -> (float, str|None)`
+über P1 `calc_position_size(available_balance=…, risk_pct=risk_pct/100, price=ask,
+point_value=1.0)`, **ab auf 0.1**; Ergebnis `< market_info.min_deal_size` → `(0.0,
+'below_min_deal_size')` (kein Trade, kein Clamp nach oben). **Wichtig:** Config-`risk_pct` ist
+**Prozent** → `/100` an `calc_position_size` (Konzept §0-Annotation). Tests ≥5. `conftest.py`
+wächst um `FakeDB` (`get_risk_level`) — `FakeBroker` erst Step 5/6.
 
 ### Offene Punkte / [VERIFY]
-- Verbleibend für spätere Steps: IG-Erwartung der absoluten `stop_level`/`limit_level`-Richtung
-  im **Live**-Test (Step 6/10, Operator) — Code rechnet BUY: stop unter / limit über Entry.
+- IG-Erwartung der absoluten `stop_level`/`limit_level`-Richtung im **Live**-Test (Step 6/10,
+  Operator) — Code rechnet BUY: stop unter / limit über Entry.
 - `get_ohlcv`-Bar-Shape (`close`-Feld) für VETO 3 erst in Step 5 endgültig gegen `ig_adapter.py`
-  zu prüfen (Konzept nennt `{timestamp, open, high, low, close, volume}`).
+  prüfen (Konzept nennt `{timestamp, open, high, low, close, volume}`).
+- `calc_position_size`-Signatur (`available_balance`, `risk_pct` als Bruchteil, `point_value`,
+  Ab-Rundung auf 0.1) in Step 4 direkt gegen `filters.py` gegenlesen, bevor `sizing.py` baut.
 
 ### Gotchas
 - `setuptools` war im venv **nicht** vorinstalliert; `dev_install.sh` installiert es upfront.
 - `pytest` nutzt `phase5_execution/pyproject.toml` als rootdir-Config (kein `[tool.pytest]` nötig).
-- Tests importieren `from execution.<modul>` — dank editable Install aus Step C (kein `sys.path`).
+- Tests importieren `from execution.<modul>` + `from tests.conftest import …` — dank editable
+  Install aus Step C (kein `sys.path`).
 - Step-0-`grep` (`-i`) matcht das **englische Wort „call"**; daher in Kommentaren
   „order"/„broker I/O" statt „…call" — Done-Check sauber halten.
-- `execution_state.json` ist neuer operativer State unter `data/state/` — gitignored prüfen,
-  falls ein Live-Lauf ihn anlegt (analog `turbo_candidates.json`/`llm_usage.json`).
+- `execution_state.json` ist nun **gitignored** (root `.gitignore`, Step-2-Reconciliation,
+  analog `turbo_candidates.json`/`llm_usage.json`).
+- Gates nehmen **Envelopes direkt** (kein Broker) → kein FakeBroker in Step 3 nötig; der kommt
+  mit den VETOs (Step 5) / Order (Step 6), die selbst `get_price`/`get_ohlcv`/`get_open_positions` rufen.

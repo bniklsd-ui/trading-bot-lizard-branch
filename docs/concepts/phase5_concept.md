@@ -307,6 +307,25 @@ def gate_direction_consistency(candidate, open_positions_env) -> GateVerdict:
   Abstain; Gate3 kein Budget → reject; Gate5 ungültige Richtung → reject; Gate5 offene
   Gegen-Position → reject.
 
+> **Annotation 2026-06-10 (Step 3 umgesetzt — Code = Source of Truth):**
+> - **Gate 1 tz:** `now` wird nach `ZoneInfo(config.tz)` konvertiert (`astimezone` wenn
+>   tz-aware, sonst als bereits-in-Zone angenommen); Vergleich auf **Time-of-Day**,
+>   inklusive Grenzen `start ≤ t ≤ end`. Lokaler `_parse_hhmm`-Helper.
+> - **Gate 2** liefert den **ersten** Candidate (Phase 4 persistiert ≤1). Reihenfolge:
+>   `candidates_are_fresh()` → bei stale `research_runner()` rufen → `load_candidates()`
+>   neu lesen (persistierte Datei = Single Source). Leer → Abstain (`ok=False, None`).
+> - **Gate 3 budget** liest `available` aus `get_account().data` (verifiziert gegen
+>   `ig_adapter.py:520` / `models.py:65`), Schwelle `available ≤ 0 → reject`. Positionen aus
+>   `get_open_positions().data["positions"]` (`{"positions":[…]}`, nie nackt). **Env-nicht-ok
+>   → reject** (fail-safe: Eignung nicht verifizierbar = nicht eignungsfähig) — bewusst
+>   getrennt vom VETO (Step 5, frischer Snapshot).
+> - **Gate 5** blockt **nur** eine offene **Gegen**-Position auf **demselben** Epic; gleiche
+>   Richtung / anderes Epic blockt hier nicht (Parallel-Count = Gate 3 / VETO 4). Env-nicht-ok
+>   → reject. Kein Fix/FLIP.
+> - Gate-IDs: `"time_window"`/`"load_candidates"`/`"constraints"`/`"direction_consistency"`.
+> - 15 Tests (≥8) grün; `pytest phase5_execution/tests -v` → **48 passed** (33 + 15).
+>   `conftest.py` gewachsen um `_FakeEnv`, `make_candidate`-Factory, `FakeState`.
+
 ### 4. `sizing.py` + Tests — Gate 4
 ```python
 def select_risk_pct(db, config) -> float:
