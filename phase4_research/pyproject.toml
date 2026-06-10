@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research"
+version = "0.1.0"
+description = "Phase 4 — research layer (single LLM candidate-selection call + deterministic guards)."
+requires-python = ">=3.11"
+# Runtime dependency (anthropic) stays in requirements.txt and is lazy-imported only
+# in the live scripts / real LLM call. This packaging metadata exists only to enable
+# editable installs (`pip install -e`) so the Phase-5 composition root can resolve
+# `import research` without sys.path hacks. The sibling `scripts` and `tests`
+# directories are deliberately excluded from the installed package by the include glob.
+
+[tool.setuptools.packages.find]
+include = ["research*"]

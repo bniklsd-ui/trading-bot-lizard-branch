@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "external-data"
+version = "0.1.0"
+description = "Phase 3 — external market-data layer (yFinance, cached) for the DAX CFD trading bot."
+requires-python = ">=3.11"
+# Runtime dependencies (yfinance, pandas) stay in requirements.txt (dev workflow).
+# This packaging metadata exists only to enable editable installs (`pip install -e`)
+# so the Phase-5 composition root can resolve `import external_data` without sys.path hacks.
+
+[tool.setuptools.packages.find]
+include = ["external_data*"]

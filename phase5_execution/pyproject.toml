@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "execution"
+version = "0.1.0"
+description = "Phase 5 — execution pipeline (Gates 1-5, 4 VETOs, order/monitor) for the DAX CFD trading bot."
+requires-python = ">=3.11"
+# Runtime dependencies stay in requirements.txt (dev workflow). This packaging
+# metadata exists only to enable editable installs (`pip install -e`) so the
+# composition root (`ig_bot.py` / `scripts/wiring.py`) resolves `import execution`
+# without sys.path hacks. `scripts` and `tests` are excluded by the include glob.
+#
+# Layout note: the importable package is `execution/` nested under this `phase5_execution/`
+# project dir, mirroring the established repo convention (phase4_research/ -> research/,
+# phase3_external_data/ -> external_data/). The concept's schematic flat tree is realised
+# this way so editable installs and package discovery stay clean.
+
+[tool.setuptools.packages.find]
+include = ["execution*"]

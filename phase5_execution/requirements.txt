@@ -1,0 +1,12 @@
+# Phase 5 — Execution pipeline.
+#
+# Phase 5 has NO new runtime dependencies of its own: gates, VETOs, sizing,
+# order, monitoring and reconcile are pure code over the sibling packages'
+# contracts. The broker / persistence / research runtime deps come in via those
+# packages' own editable installs (see scripts/dev_install.sh at the repo root).
+#
+# There is no AI call in Phase 5 (and therefore no `anthropic` / token-meter
+# here) — the single LLM call stays in Phase 4, triggered lazily through Gate 2.
+
+# dev / test
+pytest>=7.4.0
