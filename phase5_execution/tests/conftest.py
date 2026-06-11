@@ -137,3 +137,23 @@ class FakeState:
     def clear_candidates(self) -> None:
         self.clear_calls += 1
         self.candidates = []
+
+
+# --- Step 4 (sizing) ------------------------------------------------------
+
+
+class FakeDB:
+    """Configurable stand-in for ``Database`` (Gate 4 surface only).
+
+    Exposes ``get_risk_level()`` returning a settable ``"AGGRESSIV"`` /
+    ``"KONSERVATIV"`` value (Decision F). ``Database`` is read-only in Phase 5,
+    so this fake has no write surface.
+    """
+
+    def __init__(self, *, risk_level: str = "KONSERVATIV") -> None:
+        self.risk_level = risk_level
+        self.risk_level_calls = 0
+
+    def get_risk_level(self) -> str:
+        self.risk_level_calls += 1
+        return self.risk_level

@@ -338,6 +338,27 @@ def compute_size(account_env, price_env, market_info_env, risk_pct, config) -> t
 - Tests (≥5): konservativer vs aggressiver risk_pct via mock `get_risk_level`; Rundung ab
   auf 0.1; Size unter min → `(0.0, reason)`; `available`-Lesepfad korrekt; 0-Balance → kein Trade.
 
+> **Annotation 2026-06-11 (Step 4 umgesetzt — Code = Source of Truth):**
+> - **Phasen-Isolation gehalten (Operator-Entscheidung):** `compute_size` importiert
+>   **nicht** `broker_wrapper.filters.calc_position_size`, sondern spiegelt dessen
+>   verifizierte Arithmetik lokal in `_round_down_size` (`int(raw * 10) / 10.0`,
+>   `notional = balance × risk_pct`, `0.0` bei nicht-positiver Balance/Preis) — gleiche
+>   Disziplin wie `gates.py`/`execution_state.py` (Schwester-Imports nur lazy in der
+>   Wiring-Schicht). Bewusste Kopplung: ändert sich die Phase-1-Formel, muss dieser Helper
+>   nachziehen (Hinweis im Docstring).
+> - **`risk_pct`-Einheiten:** Config-Werte sind **Prozent**; `compute_size` übergibt
+>   `risk_pct / 100` (Bruchteil) an die Arithmetik — wie §0-Annotation festgelegt.
+> - **Reason-Vokabular (no-trade Codes):** `account_snapshot_unavailable` /
+>   `price_snapshot_unavailable` / `market_info_snapshot_unavailable` (env nicht ok,
+>   fail-safe) und `below_min_deal_size`. **0-Balance** liefert size `0.0` → fällt unter
+>   `min_deal_size` → ebenfalls `below_min_deal_size` (ein klarer Code, kein separater
+>   `zero_size`).
+> - **Lesepfade** (gegen `ig_adapter.py` `.to_dict()` geprüft): `available` aus
+>   `get_account().data`, `ask` aus `get_price().data`, `min_deal_size` aus
+>   `get_market_info().data`. `env.ok` immer vor `env.data`.
+> - 11 Tests (≥5) grün; `pytest phase5_execution/tests -v` → **59 passed** (48 + 11).
+>   `conftest.py` gewachsen um `FakeDB` (`get_risk_level`).
+
 ### 5. `vetos.py` + Tests — `pre_trade_check()` = die 4 HARTEN VETOs
 **Alle auf FRISCHEM Snapshot unmittelbar vor der Order. Erster Fail = Abbruch.**
 ```python

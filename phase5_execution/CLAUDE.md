@@ -104,7 +104,7 @@ phase5_execution/
 │   ├── models.py         # ✅ Step 1 — OrderPlan/GateVerdict/VetoVerdict/ExecutionResult
 │   ├── execution_state.py# ✅ Step 2 — write-ahead Idempotenz (10 Tests)
 │   ├── gates.py          # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
-│   ├── sizing.py         # ⬜ Step 4 — Gate 4
+│   ├── sizing.py         # ✅ Step 4 — Gate 4 (11 Tests)
 │   ├── vetos.py          # ⬜ Step 5 — pre_trade_check (4 VETOs)
 │   ├── order.py          # ⬜ Step 6 — place/reconcile/build_order_plan
 │   ├── monitor.py        # ⬜ Step 7 — Polling + Time-Stop
@@ -117,58 +117,57 @@ phase5_execution/
     ├── test_config.py          # ✅ Step 1 — Config-Defaults + frozen (4 Tests)
     ├── test_models.py          # ✅ Step 1 — Models + Exceptions (13 Tests)
     ├── test_execution_state.py # ✅ Step 2 — write-ahead Idempotenz (10 Tests)
-    └── test_gates.py           # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
+    ├── test_gates.py           # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
+    └── test_sizing.py          # ✅ Step 4 — Gate 4 (11 Tests)
 ```
 
-## Session stopped — 2026-06-10 (Step 3)
+## Session stopped — 2026-06-11 (Step 4)
 
 ### Stand
-**Step 3 erledigt** (`gates.py` — Gate 1/2/3/5, reine Funktionen, kein I/O/Clock/AI/Netzwerk).
-`pytest phase5_execution/tests -v` → **48 passed** (33 + 15 gates). Bestehende Suites unberührt
-(P1 49 · P2 59 · P3 70 · P4 88). Steps 0 + C + 1 + 2 committet (`…`, `bf2de18`); **Step 3
-committet, falls** der Operator es triggert (sonst atomarer Commit `phase5: gates 1/2/3/5
-(Step 3)`).
+**Step 4 erledigt** (`sizing.py` — Gate 4: `select_risk_pct` + `compute_size`, reine Funktionen,
+kein I/O/Clock/AI/Netzwerk, **keine** Schwester-Imports). `pytest phase5_execution/tests -v` →
+**59 passed** (48 + 11 sizing). Bestehende Suites unberührt (P1 49 · P2 59 · P3 70 · P4 88).
+Steps 0 + C + 1 + 2 + 3 committet (zuletzt `fe0d18f`); **Step 4 committet, falls** der Operator
+es triggert (sonst atomarer Commit `phase5: sizing Gate 4 (Step 4)`).
 
-### Zuletzt gemacht (Step 3)
-- `execution/gates.py` — vier Funktionen:
-  - `gate_time_window(now, config)` — Gate 1: `now`→`ZoneInfo(config.tz)`, Time-of-Day
-    inklusive `start ≤ t ≤ end`; lokaler `_parse_hhmm`.
-  - `gate_load_candidates(state, research_runner, config) -> (GateVerdict, dict|None)` — Gate 2:
-    `candidates_are_fresh()` → bei stale `research_runner()` (injiziert, lazy) → `load_candidates()`
-    neu lesen; **erster** Candidate; leer → Abstain (`ok=False, None`).
-  - `gate_constraints(account_env, open_positions_env, candidate, config)` — Gate 3:
-    `available > 0` (aus `get_account().data`), `len(positions) < max_parallel_positions`;
-    **env-nicht-ok → reject** (fail-safe).
-  - `gate_direction_consistency(candidate, open_positions_env)` — Gate 5: direction ∈ {BUY,SELL},
-    keine offene **Gegen**-Position auf **demselben** Epic; **kein** FLIP. Env-nicht-ok → reject.
-  - Gate-IDs: `time_window`/`load_candidates`/`constraints`/`direction_consistency`.
-- `tests/conftest.py` — gewachsen (Phase-4-Rhythmus): `_FakeEnv` (duck-typed `.ok`/`.data`),
-  `make_candidate`-Factory (Phase-4 10-Key-Contract), `FakeState` (konfigurierbar
-  `candidates_are_fresh`/`load_candidates`, recording `clear_candidates`). `DEFAULT_EPIC` ergänzt.
-- `tests/test_gates.py` — **15 Tests** (≥8): Gate1 in/out/custom-Fenster inkl. tz-Konvertierung;
-  Gate2 fresh→erster Pick (Runner nicht gerufen) / stale→Runner→reload / leer→Abstain; Gate3
-  budget+room pass / kein-budget / at-max-parallel / env-nicht-ok ×2; Gate5 invalid-direction /
-  Gegen-Position / gleiche-Richtung+anderes-Epic pass / env-nicht-ok.
-- **Konzept §3** mit dated Annotation (2026-06-10): tz-Konvertierung, erster-Candidate, available-
-  Lesepfad, env-nicht-ok→reject, Gate-5-nur-Gegen-Position, Gate-IDs, Testzahl.
+### Zuletzt gemacht (Step 4)
+- `execution/sizing.py` — zwei Funktionen + privater Helper:
+  - `select_risk_pct(db, config)` — Gate-4-Hebel: `get_risk_level()` AGGRESSIV →
+    `risk_pct_aggressive`, sonst `risk_pct_conservative` (Prozent-Wert).
+  - `compute_size(account_env, price_env, market_info_env, risk_pct, config) -> (float, str|None)`
+    — fail-safe: jedes env-nicht-ok → `(0.0, "<name>_snapshot_unavailable")`. Liest `available`/
+    `ask`/`min_deal_size` aus `.data`. Größe via `_round_down_size(... risk_pct/100 ...)`;
+    `size < min_deal_size` → `(0.0, "below_min_deal_size")` (kein Up-Clamp). Erfolg → `(size, None)`.
+  - `_round_down_size` — **lokaler** Spiegel von P1 `filters.calc_position_size`
+    (`int(raw * 10) / 10.0`, `notional = balance × risk_pct`, `0.0` bei nicht-positiver
+    Balance/Preis). **Bewusst nicht importiert** (Phasen-Isolation, Operator-Entscheidung) →
+    bei Formeländerung in P1 hier nachziehen (Docstring-Hinweis).
+- `tests/conftest.py` — `FakeDB` ergänzt (`get_risk_level`, settable; DB ist Phase-5 read-only).
+- `tests/test_sizing.py` — **11 Tests** (≥5): risk-level → risk_pct ×2; aggressiv > konservativ;
+  Ab-Rundung auf 0.1 (1.37→1.3); unter min → `below_min_deal_size`; kein Up-Clamp; `available`-
+  Lesepfad skaliert; 0-Balance → no-trade; env-nicht-ok ×3 (account/price/market_info).
+  Float-saubere Testwerte (ask=1000, Balance auf 0.1-Grid).
+- **Konzept §4** mit dated Annotation (2026-06-11): lokale Arithmetik statt Import (Phasen-
+  Isolation), `risk_pct/100`-Einheit, Reason-Vokabular, Lesepfade, Testzahl.
 
-### Nächster Schritt — **Step 4** (`sizing.py` — Gate 4)
-Konzept §4: `select_risk_pct(db, config)` (`get_risk_level()`: KONSERVATIV →
-`risk_pct_conservative`, AGGRESSIV → `risk_pct_aggressive`) und
-`compute_size(account_env, price_env, market_info_env, risk_pct, config) -> (float, str|None)`
-über P1 `calc_position_size(available_balance=…, risk_pct=risk_pct/100, price=ask,
-point_value=1.0)`, **ab auf 0.1**; Ergebnis `< market_info.min_deal_size` → `(0.0,
-'below_min_deal_size')` (kein Trade, kein Clamp nach oben). **Wichtig:** Config-`risk_pct` ist
-**Prozent** → `/100` an `calc_position_size` (Konzept §0-Annotation). Tests ≥5. `conftest.py`
-wächst um `FakeDB` (`get_risk_level`) — `FakeBroker` erst Step 5/6.
+### Nächster Schritt — **Step 5** (`vetos.py` — `pre_trade_check()` = die 4 HARTEN VETOs)
+Konzept §5: `veto_status_and_window(price_env, now, config)` · `veto_spread(price_env, config)` ·
+`veto_momentum(broker, epic, direction, config)` (★ `get_ohlcv(epic, momentum_resolution,
+momentum_count)`, `net_return=(close_last−close_first)/close_first` über **`close`**; BUY &
+`≤ −threshold` → Veto, SELL & `≥ +threshold` → Veto; Datenfehler/zu wenige Bars → fail-closed
+Veto; **NIEMALS** P3 `get_momentum()`) · `veto_position_conflict(open_positions_env, candidate,
+config)` · `pre_trade_check(broker, candidate, now, config)` (ruft alle 4 frisch, erstes
+`ok=False` zurück). Tests ≥10. `conftest.py` wächst um **`FakeBroker`** (`get_price`/`get_ohlcv`/
+`get_open_positions`). **Zuerst** `get_ohlcv`-Bar-Shape (`close`-Feld) direkt gegen
+`ig_adapter.py` gegenlesen, bevor `veto_momentum` baut.
 
 ### Offene Punkte / [VERIFY]
 - IG-Erwartung der absoluten `stop_level`/`limit_level`-Richtung im **Live**-Test (Step 6/10,
   Operator) — Code rechnet BUY: stop unter / limit über Entry.
-- `get_ohlcv`-Bar-Shape (`close`-Feld) für VETO 3 erst in Step 5 endgültig gegen `ig_adapter.py`
+- `get_ohlcv`-Bar-Shape (`close`-Feld) für VETO 3 in Step 5 endgültig gegen `ig_adapter.py`
   prüfen (Konzept nennt `{timestamp, open, high, low, close, volume}`).
-- `calc_position_size`-Signatur (`available_balance`, `risk_pct` als Bruchteil, `point_value`,
-  Ab-Rundung auf 0.1) in Step 4 direkt gegen `filters.py` gegenlesen, bevor `sizing.py` baut.
+- `calc_position_size`-Mirror: bei P1-Formeländerung `_round_down_size` in `sizing.py` nachziehen
+  (bewusste Kopplung, Phasen-Isolation > DRY hier — Konzept-§4-Annotation).
 
 ### Gotchas
 - `setuptools` war im venv **nicht** vorinstalliert; `dev_install.sh` installiert es upfront.
@@ -179,5 +178,8 @@ wächst um `FakeDB` (`get_risk_level`) — `FakeBroker` erst Step 5/6.
   „order"/„broker I/O" statt „…call" — Done-Check sauber halten.
 - `execution_state.json` ist nun **gitignored** (root `.gitignore`, Step-2-Reconciliation,
   analog `turbo_candidates.json`/`llm_usage.json`).
-- Gates nehmen **Envelopes direkt** (kein Broker) → kein FakeBroker in Step 3 nötig; der kommt
-  mit den VETOs (Step 5) / Order (Step 6), die selbst `get_price`/`get_ohlcv`/`get_open_positions` rufen.
+- Sizing ist float-empfindlich: `int(raw*10)/10.0` schneidet ab — z. B. raw `0.6` → `0.5`
+  (Double-Repräsentation). Testwerte auf das 0.1-Grid legen (ask=1000, Balance-Vielfache),
+  sonst „überraschen" die Erwartungen.
+- Gates **und** Sizing nehmen **Envelopes direkt** (kein Broker) → erst die VETOs (Step 5) /
+  Order (Step 6) brauchen `FakeBroker` (sie rufen `get_price`/`get_ohlcv`/`get_open_positions`).
