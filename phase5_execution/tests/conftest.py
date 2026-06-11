@@ -183,12 +183,21 @@ def make_bars(closes: list[float]) -> list[dict[str, Any]]:
 
 
 class FakeBroker:
-    """Configurable, call-recording stand-in for the broker (VETO surface).
+    """Configurable, invocation-recording stand-in for the broker (VETO + order surface).
 
-    Exposes ``get_price``/``get_ohlcv``/``get_open_positions``, each returning a
-    preset ``_FakeEnv``. ``ohlcv_raises`` makes ``get_ohlcv`` raise (fail-closed
-    path). Call args are recorded so tests can assert short-circuiting (e.g.
-    ``get_ohlcv`` never invoked after a status veto).
+    Exposes ``get_price``/``get_ohlcv``/``get_open_positions`` (VETO surface, Step 5)
+    plus ``open_position``/``reconcile_positions`` (order surface, Step 6), each
+    returning a preset ``_FakeEnv``. ``ohlcv_raises`` makes ``get_ohlcv`` raise
+    (fail-closed path). Invocation args are recorded so tests can assert short-circuiting
+    (e.g. ``get_ohlcv`` never invoked after a status veto) and the single-order
+    invariant (``open_position_calls`` length == 1).
+
+    Order surface (Step 6):
+        open_env: the ``_FakeEnv`` ``open_position`` returns (default an ACCEPTED
+            ``OrderResult`` dict). Set ``ok=False`` for the transport-error path.
+        reconcile_env: the ``_FakeEnv`` ``reconcile_positions`` returns (default an
+            empty present/missing/unexpected). Drives the PENDING re-check + startup
+            reconcile tests.
     """
 
     def __init__(
@@ -198,6 +207,8 @@ class FakeBroker:
         ohlcv_env: _FakeEnv | None = None,
         positions_env: _FakeEnv | None = None,
         ohlcv_raises: bool = False,
+        open_env: _FakeEnv | None = None,
+        reconcile_env: _FakeEnv | None = None,
     ) -> None:
         self.price_env = price_env or _FakeEnv(
             ok=True,
@@ -214,10 +225,36 @@ class FakeBroker:
         self.ohlcv_env = ohlcv_env or _FakeEnv(ok=True, data={"bars": make_bars([18000.0, 18000.0])})
         self.positions_env = positions_env or _FakeEnv(ok=True, data={"positions": []})
         self.ohlcv_raises = ohlcv_raises
+        self.open_env = open_env or _FakeEnv(
+            ok=True,
+            data={
+                "deal_reference": None,   # filled with the caller's ref on invocation
+                "deal_id": "DIAAAA-FAKE",
+                "status": "ACCEPTED",
+                "epic": DEFAULT_EPIC,
+                "direction": "BUY",
+                "size": 0.5,
+                "level": 18000.0,
+                "reason": None,
+                "timestamp": "2026-06-11T09:05:01Z",
+            },
+        )
+        self.reconcile_env = reconcile_env or _FakeEnv(
+            ok=True,
+            data={
+                "broker_position_count": 0,
+                "broker_deal_ids": [],
+                "present": [],
+                "missing": [],
+                "unexpected": [],
+            },
+        )
 
         self.get_price_calls: list[str] = []
         self.get_ohlcv_calls: list[tuple[str, str, int]] = []
         self.get_open_positions_calls = 0
+        self.open_position_calls: list[dict[str, Any]] = []
+        self.reconcile_calls: list[list[str] | None] = []
 
     def get_price(self, epic: str) -> _FakeEnv:
         self.get_price_calls.append(epic)
@@ -232,3 +269,37 @@ class FakeBroker:
     def get_open_positions(self) -> _FakeEnv:
         self.get_open_positions_calls += 1
         return self.positions_env
+
+    def open_position(
+        self,
+        epic: str,
+        direction: str,
+        size: float,
+        order_type: str = "MARKET",
+        *,
+        level: float | None = None,
+        stop_level: float | None = None,
+        limit_level: float | None = None,
+        deal_reference: str | None = None,
+        currency: str | None = None,
+    ) -> _FakeEnv:
+        self.open_position_calls.append(
+            {
+                "epic": epic,
+                "direction": direction,
+                "size": size,
+                "stop_level": stop_level,
+                "limit_level": limit_level,
+                "deal_reference": deal_reference,
+            }
+        )
+        # Echo the caller's reference into the result, like the real adapter does.
+        if self.open_env.ok and isinstance(self.open_env.data, dict):
+            self.open_env.data["deal_reference"] = deal_reference
+        return self.open_env
+
+    def reconcile_positions(
+        self, expected_references: list[str] | None = None
+    ) -> _FakeEnv:
+        self.reconcile_calls.append(expected_references)
+        return self.reconcile_env

@@ -437,6 +437,41 @@ def place_order(broker, exec_state, plan, config) -> ExecutionResult:
   ein** open_position-Call; reconcile_startup missing → mark_closed; unexpected → Abort;
   nicht-retryable Reject → raise + state aufgeräumt; deal_reference eindeutig pro Plan.
 
+> **Annotation 2026-06-11 (Step 6 umgesetzt — Code = Source of Truth):**
+> - **[VERIFY] `deal_reference`-Länge aufgelöst** (gegen `ig_adapter.py:809`
+>   `_new_deal_reference` + Kommentar *"IG accepts up to 30 chars"*): der Konzept-Stub
+>   `'bot-' + uuid4().hex` ist **36 Zeichen** und würde von IG abgelehnt. `build_order_plan`
+>   nutzt daher **`f"bot-{uuid4().hex[:24]}"`** (28 Zeichen, ≤30), wie der Adapter selbst.
+>   Test prüft `len(deal_reference) <= 30`.
+> - **[VERIFY] Stop-/Limit-Richtung & Preis-Seite:** `stop_level`/`limit_level` sind
+>   **absolute Level** (gegen `ig_adapter.py:585` `open_position` → `body["stopLevel"]`/
+>   `["limitLevel"]`). Entry-Seite: **BUY rechnet vom `ask`, SELL vom `bid`** (Spread in
+>   Fill-Richtung kreuzen); BUY → stop **unter**/limit **über**, SELL invertiert. Die echte
+>   IG-Erwartung der absoluten Level bleibt ein **Operator-Live-Check** (Step 10).
+> - **PENDING-Recheck-Tunables neu in `ExecutionConfig`** (Konzept §0 hatte sie „erst bei
+>   Konsum" vertagt): `pending_recheck_attempts=3`, `pending_recheck_interval_s=2.0` (v1).
+>   `place_order` nimmt ein injizierbares `sleep_fn=time.sleep` → Tests treiben die
+>   Re-Check-Schleife ohne echtes Warten.
+> - **Refinement Schritt 5 (Reject-Handling):** der Konzept-Stub sagte *„klarer Reject
+>   (z.B. nicht-retryable error) → mark_closed; raise"*. **Verfeinert:** nur ein bestätigter
+>   **`status == "REJECTED"`** heißt definitiv „keine Position" → `mark_closed` + `ExecutionAbort`.
+>   Ein **opaker `not env.ok`-Transportfehler** ist **mehrdeutig** (die Order *kann* live sein,
+>   da der Adapter erst nach dem POST `/confirms` pollt) → wird wie `PENDING` behandelt: Record
+>   bleibt **PENDING**, `ExecutionAbort` (fail-closed), Startup-Reconcile löst es im nächsten
+>   Lauf. „Nie eine möglicherweise-live Order als closed markieren, nie blind eine zweite Order."
+>   `UNKNOWN`-Status → ebenfalls Re-Check-Pfad (fail-closed).
+> - **`OrderResult.data`-Form** (gegen `models.py:96` + `_normalize_deal_status:899`):
+>   `{deal_reference, deal_id, status, epic, direction, size, level, reason, timestamp}`,
+>   `status ∈ {ACCEPTED, REJECTED, PENDING, UNKNOWN}`. `reconcile_positions(...).data` =
+>   `{broker_position_count, broker_deal_ids, present, missing, unexpected}` (die drei Mengen
+>   nur bei gesetzten `expected_references`). Nach PENDING→present holt `_lookup_deal_id` die
+>   `deal_id` aus `get_open_positions` (Refs ↔ deal_id-Mapping); fehlende deal_id ist nicht
+>   fatal (Ref ist der Idempotenz-Schlüssel).
+> - **VETO/Order-Naht Phase 6** unverändert: `build_order_plan` + `place_order` sind reine
+>   Funktionen, Broker duck-typed (`execution.*` + stdlib only, kein Schwester-Import).
+> - 15 Tests (≥8) grün; `pytest phase5_execution/tests -v` → **94 passed** (79 + 15).
+>   `conftest.py` `FakeBroker` um `open_position`/`reconcile_positions` erweitert.
+
 ### 7. `monitor.py` + Tests — Polling + Time-Stop + Close
 ```python
 def monitor_position(broker, exec_state, plan, deal_id, config, *,

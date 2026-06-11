@@ -68,6 +68,14 @@ class ExecutionConfig:
         reconcile_unexpected_aborts: on startup reconcile, an *unexpected* broker
             position (we have no record of it) aborts fail-closed when True
             (Decision E) rather than stacking another order.
+
+    Order placement (``order.py``, Step 6 — Decision E idempotency):
+        pending_recheck_attempts: when ``open_position`` returns ``PENDING`` (confirm
+            timeout), how many times ``place_order`` re-checks the broker via
+            ``reconcile_positions`` before failing closed. It **never** retries the
+            order itself — a blind second order is the risk this guards against.
+        pending_recheck_interval_s: pause between those re-checks (injected
+            ``sleep_fn`` in tests, so no real wait). Both **v1, tune at profit**.
     """
 
     # --- time / window ---
@@ -96,3 +104,7 @@ class ExecutionConfig:
     max_parallel_positions: int = 1        # v1 default (not in §0 table)
     require_confirm: bool = True
     reconcile_unexpected_aborts: bool = True
+
+    # --- order placement (Step 6 — PENDING fail-closed re-check) ---
+    pending_recheck_attempts: int = 3      # v1, tune at profit
+    pending_recheck_interval_s: float = 2.0  # v1, tune at profit

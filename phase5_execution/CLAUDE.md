@@ -106,7 +106,7 @@ phase5_execution/
 │   ├── gates.py          # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
 │   ├── sizing.py         # ✅ Step 4 — Gate 4 (11 Tests)
 │   ├── vetos.py          # ✅ Step 5 — pre_trade_check (4 VETOs) (20 Tests)
-│   ├── order.py          # ⬜ Step 6 — place/reconcile/build_order_plan
+│   ├── order.py          # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
 │   ├── monitor.py        # ⬜ Step 7 — Polling + Time-Stop
 │   ├── executor.py       # ⬜ Step 8 — Orchestrator
 │   └── ig_bot.py         # ⬜ Step 9 — CLI Composition Root
@@ -119,10 +119,90 @@ phase5_execution/
     ├── test_execution_state.py # ✅ Step 2 — write-ahead Idempotenz (10 Tests)
     ├── test_gates.py           # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
     ├── test_sizing.py          # ✅ Step 4 — Gate 4 (11 Tests)
-    └── test_vetos.py           # ✅ Step 5 — pre_trade_check 4 VETOs (20 Tests)
+    ├── test_vetos.py           # ✅ Step 5 — pre_trade_check 4 VETOs (20 Tests)
+    └── test_order.py           # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
 ```
 
-## Session stopped — 2026-06-11 (Step 5)
+## Session stopped — 2026-06-11 (Step 6)
+
+### Stand
+**Step 6 erledigt** (`order.py` — der erste Order-Pfad: `reconcile_startup` /
+`build_order_plan` / `place_order` mit Write-ahead-Idempotenz + PENDING-fail-closed,
+Decision E). Reine Funktionen, Broker duck-typed (`execution.*` + stdlib only, **keine**
+Schwester-Imports). `pytest phase5_execution/tests -v` → **94 passed** (79 + 15 order).
+Bestehende Suites unberührt (P1 49 · P2 59 · P3 70 · P4 88). Steps 0 + C + 1–5 committet
+(zuletzt `3833179`); **Step 6 committet, falls** der Operator es triggert (sonst atomarer
+Commit `phase5: order.py write-ahead place + reconcile (Step 6)`).
+
+### Zuletzt gemacht (Step 6)
+- `execution/order.py` — drei Funktionen (alle Logging → stderr):
+  - `reconcile_startup(broker, exec_state, config)` — vor jedem Lauf:
+    `reconcile_positions(expected_references=open_references())`. Leere Refs → kein
+    Broker-Request. `not env.ok` → `ExecutionAbort` (Truth unverifizierbar). `missing` →
+    `mark_closed` (Orphan, INFO). `unexpected` → bei `reconcile_unexpected_aborts`
+    `ReconcileConflict`, sonst WARNING. `present` bleibt offen (Monitor-Sache, Step 7).
+  - `build_order_plan(candidate, size, price_env, config)` — **rein**. `deal_reference =
+    f"bot-{uuid4().hex[:24]}"` (≤30 Zeichen, **IG-Limit**, wie Adapter `_new_deal_reference`).
+    Entry-Seite: **BUY vom `ask`, SELL vom `bid`**; BUY → stop **unter**/limit **über**,
+    SELL invertiert; absolute Level aus `stop_/limit_distance_points`.
+  - `place_order(broker, exec_state, plan, config, *, sleep_fn=time.sleep)` — 1)
+    `record_pending` **WRITE-AHEAD vor** dem einzigen `open_position`; 2) ein
+    `open_position(..., deal_reference=ref)`; 3) Branch: **ACCEPTED** → `mark_open` →
+    `ExecutionResult("OPEN")`; **PENDING/UNKNOWN** → `_resolve_pending` (bounded Re-Check
+    via `reconcile_positions([ref])`, max `pending_recheck_attempts`, `sleep_fn` dazwischen;
+    present → `_lookup_deal_id`+`mark_open`, sonst Record bleibt **PENDING** + `ExecutionAbort`,
+    **kein** zweiter Order-Call); **REJECTED** → `mark_closed` + `ExecutionAbort`;
+    **`not env.ok`** (Transportfehler, mehrdeutig) → Record bleibt **PENDING** + `ExecutionAbort`.
+- `config.py` — neue Felder `pending_recheck_attempts=3` / `pending_recheck_interval_s=2.0`
+  (v1; Konzept §0 hatte sie „bei Konsum" vertagt).
+- `tests/conftest.py` — `FakeBroker` um `open_position` (recording `open_position_calls`,
+  echo der Ref ins Result) + `reconcile_positions` (recording `reconcile_calls`, konfig.
+  present/missing/unexpected) erweitert.
+- `tests/test_order.py` — **15 Tests** (≥8): build_order_plan BUY/SELL-Level + Ref-Länge≤30
+  + Ref-Unique; write-ahead **vor** `open_position`; ACCEPTED → OPEN; PENDING→present → OPEN
+  (genau **ein** Order-Call); PENDING ungelöst → Abort, Record **PENDING**, ein Call,
+  N Re-Checks; UNKNOWN → Re-Check; Transportfehler → Abort + PENDING; REJECTED → CLOSED +
+  Abort; reconcile_startup empty/missing/unexpected-abort/unexpected-warn/not-ok.
+- **Konzept §6** mit dated Annotation (2026-06-11): deal_reference-Länge-[VERIFY] gelöst,
+  Stop/Limit-Richtung + Preis-Seite, neue Config-Felder, Reject-Refinement (nur REJECTED →
+  mark_closed; Transportfehler bleibt PENDING), OrderResult/reconcile-`.data`-Form.
+
+### Nächster Schritt — **Step 7** (`monitor.py` — Polling + Time-Stop + Close)
+Konzept §7: `monitor_position(broker, exec_state, plan, deal_id, config, *,
+now_fn=datetime.now, sleep_fn=time.sleep) -> ExecutionResult`. Loop alle `poll_interval_s`:
+`get_open_positions` → `deal_id` weg → broker-SL/TP gefüllt → `mark_closed`,
+status `CLOSED_BY_BROKER`. `now >= square_off_time` **oder** `elapsed >= max_hold_minutes`
+→ `broker.close_position(deal_id)` → `mark_closed`, status `TIME_STOP`. `now_fn`/`sleep_fn`
+injiziert (deterministische Tests, kein echtes Warten). `close_position`-Fehler →
+`ExecutionAbort`. **Zuerst** `close_position` gegen `ig_adapter.py:661` gegenlesen (schlägt
+Richtung/Size selbst nach, `.data={"deal_id","status":"submitted"}`). Tests ≥6 (FakeBroker um
+`close_position` erweitern; gemockte `now_fn`/`sleep_fn`): Position verschwindet →
+CLOSED_BY_BROKER; square_off → TIME_STOP; max_hold → TIME_STOP; close-Fehler → Abort;
+Loop terminiert immer; state am Ende closed.
+
+### Offene Punkte / [VERIFY]
+- IG-Erwartung der **absoluten** `stop_level`/`limit_level` (BUY: stop unter/limit über) bleibt
+  ein **Operator-Live-Check** (Step 10) — Unit-Tests prüfen nur die Arithmetik.
+- `_lookup_deal_id` toleriert eine fehlende `deal_id` (Ref ist der Idempotenz-Schlüssel); ob
+  IG nach PENDING→present zuverlässig die `deal_reference` an der Position mitliefert, ist im
+  Live-Test (Step 10) zu bestätigen.
+
+### Gotchas
+- **Step-0-`grep` (`-i`) matcht das englische Wort „call"** (und `\bCALL\b` auch in „call-…",
+  bare „Call"): in neuen Kommentaren/Docstrings „invocation"/„order"/„broker request" statt
+  „…call" — sonst verschmutzt der Done-Check. Identifier `*_calls` sind ok (`\bCALL\b` matcht
+  „calls" nicht).
+- `_FakeEnv` hat **kein** `error`-Attribut by default; `place_order` liest es via
+  `getattr(env, "error", None)`. Im Transportfehler-Test wird `broker.open_env.error` dynamisch
+  gesetzt (dataclass nicht frozen).
+- `place_order(..., sleep_fn=_no_sleep)` in Tests → Re-Check-Schleife ohne echtes Warten;
+  `pending_recheck_interval_s=0.0` in der Test-Config zusätzlich.
+- Eine **PENDING/Transportfehler-Order wird NIE `mark_closed`** — nur `REJECTED` (bestätigt
+  keine Position). Das ist der Kern von „nie blind eine zweite Order".
+
+---
+
+## Session stopped — 2026-06-11 (Step 5, superseded by Step 6 above)
 
 ### Stand
 **Step 5 erledigt** (`vetos.py` — `pre_trade_check()` = die 4 HARTEN VETOs auf frischem
