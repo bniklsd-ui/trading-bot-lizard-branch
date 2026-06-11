@@ -605,6 +605,34 @@ Flow (alles Code):
 - **`live_test.py`:** voller open→close-Zyklus gegen IG Demo (kleine Size), hart asserted,
   `exit 0` = PASS. **Operator führt es aus**, läuft **nicht** in CI.
 
+> **Annotation 2026-06-11 (Step 10 umgesetzt — Code = Source of Truth):**
+> - **`build_executor(config, *, confirm_fn, broker_name="ig_demo", research_config=None,
+>   epic_override=None)`** — `confirm_fn` ist ein **Pflicht-Keyword** (vom Aufrufer: `ig_bot`
+>   stdin/`--yes`/`--dry`, `smoke` ein Dry-Decliner, `live` Auto-Confirm), nicht in der
+>   Factory hartkodiert. **Kein `sys.path`-Hack in `wiring.py`** (editable installs); der
+>   einzige `sys.path.insert` lebt in den **Entry-Scripts** (`ig_bot`/`smoke`/`live`), um das
+>   nicht-installierte `scripts`-Paket aufzulösen.
+> - **`research_runner` baut `Research` selbst** aus dem installierten `research`-Paket
+>   (`Research`/`ResearchConfig`/`LLMClient`/`credentials.get_credential`) und **teilt
+>   broker/db/state** mit dem Executor — **nicht** `build_research(cfg).run()` aus Phase-4-
+>   `scripts.wiring` (nicht installiert + `scripts`-Namenskollision mit Phase 5). Die geteilte
+>   `StateManager`-Instanz garantiert, dass Research in dieselbe `turbo_candidates.json`
+>   persistiert, die Gate 2 neu liest; der Rückgabewert (`[c.to_dict() …]`) wird von
+>   `gate_load_candidates` ignoriert (Persistenz-Seiteneffekt ist der Zweck).
+> - **tz-aware `now_fn`** = `lambda: datetime.now(ZoneInfo(config.tz))` aus der Factory (der
+>   Executor-Default `datetime.now` ist **naiv** → Gate-1/VETO-Fenster sonst server-tz-abhängig).
+> - **`smoke_test.py`** fährt die volle Pipeline DRY über `make_confirm_fn(dry=True)` (keine
+>   `open_position`); die Gate/VETO-Gründe stehen im Executor-stderr-Log (INFO). Es re-
+>   implementiert den Flow **nicht** (anders als die §10-Skizze „druckt jeden Verdict") —
+>   der Executor ist die eine Quelle des Flows; smoke nutzt seine Logs + das Ergebnis.
+> - **`live_test.py`** überschreibt `max_hold_minutes=1`/`poll_interval_s=10`, damit eine
+>   platzierte Order schnell per Time-Stop schließt (kein 4-h-Block); Auto-Confirm
+>   (`make_confirm_fn(auto_yes=True)`). Asserts: kein Raise, kein `ABORT`, bei Order `deal_id`
+>   + `exec_state`-Record `CLOSED`; sauberes `NO_TRADE`/Abstain = valider exit-0.
+> - `scripts/__init__.py` macht `scripts` zum Paket (wie Phase 4). **Keine** Unit-Tests für
+>   die drei Scripts (Keyring/IG-Demo/echte Order — Operator-Job). `pytest phase5_execution/
+>   tests -v` → **126 passed** (unverändert; Scripts nicht collected).
+
 ### 11. `README.md` · `requirements.txt` · `CLAUDE.md`
 - `requirements.txt`: nur Phase-5-eigene Dev-Deps (Runtime-Deps der Schwester-Packages
   kommen über deren editable installs).

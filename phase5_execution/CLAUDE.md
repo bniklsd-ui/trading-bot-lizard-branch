@@ -110,7 +110,7 @@ phase5_execution/
 │   ├── monitor.py        # ✅ Step 7 — Polling + Time-Stop + Close (6 Tests)
 │   ├── executor.py       # ✅ Step 8 — Orchestrator (8 Tests)
 │   └── ig_bot.py         # ✅ Step 9 — CLI Composition Root (18 Tests)
-├── scripts/              # ⬜ Step 10 — wiring/smoke_test/live_test
+├── scripts/              # ✅ Step 10 — wiring/smoke_test/live_test (operator-run, no CI)
 └── tests/
     ├── conftest.py             # ✅ Step 2 — make_order_plan/order_plan Factory
     ├── test_packaging.py       # ✅ Step C — editable-install Beweis (6 Tests grün)
@@ -126,7 +126,87 @@ phase5_execution/
     └── test_ig_bot.py          # ✅ Step 9 — CLI helpers (exit/serialise/argparse/confirm, 18 Tests)
 ```
 
-## Session stopped — 2026-06-11 (Step 8)
+## Session stopped — 2026-06-11 (Steps 9 + 10)
+
+### Stand
+**Steps 9 + 10 erledigt** — Phase 5 ist **code-complete**. `ig_bot.py` (CLI-Entry, Step 9)
++ `scripts/` (`wiring.py`/`smoke_test.py`/`live_test.py`, Step 10, operator-run). `pytest
+phase5_execution/tests -v` → **126 passed** (108 + 18 ig_bot). Bestehende Suites unberührt
+(P1 49 · P2 59 · P3 70 · P4 88). Steps 0 + C + 1–9 committet (zuletzt `14f2c32`); **Step 10
+committet, falls** der Operator es triggert (sonst atomarer Commit `phase5: wiring + smoke +
+live scripts (Step 10)`). **Einziges offenes Item: der Operator-Live-Gate** (`scripts/
+live_test.py` gegen IG Demo) + Step 11 (`README.md`/`requirements.txt`, Top-Level-Doku-Flip).
+
+### Zuletzt gemacht (Steps 9 + 10)
+- **`execution/ig_bot.py`** (Step 9) — CLI-Entry im `execution`-Paket (`python -m
+  execution.ig_bot`). Reine, getestete Helfer: `exit_code` (1 nur bei `ABORT`, sonst 0),
+  `result_to_dict` (`dataclasses.asdict`, rekursiv in `OrderPlan` → JSON auf **stdout**),
+  `build_arg_parser`/`parse_args` (`--yes`/`--dry`/`--epic`/`--broker`/`--verbose`),
+  `make_confirm_fn` (`--yes`→True · `--dry`→logge Plan + False (keine Order) · sonst stdin
+  `y/N`, `input_fn` injizierbar). `main()` importiert `scripts.wiring.build_executor` **lazy**
+  (ein `sys.path.insert(<phase5_execution/>)`) → kein Keyring/Netz bei `--help`/Unit-Tests.
+  Human-Summary → **stderr**.
+- **`execution/__init__.py`** — stale „exports land with Step 1" aufgelöst: exportiert jetzt
+  `Executor`/`ExecutionConfig`/`ExecutionState`/`ExecutionResult`/`OrderPlan`/`GateVerdict`/
+  `VetoVerdict`.
+- **`tests/test_ig_bot.py`** — **18 Tests** (rein, kein Netz/Keyring/Wiring-Import):
+  `exit_code` je Status (ABORT→1, Rest→0), `result_to_dict` mit/ohne Plan (JSON-roundtrip),
+  argparse-Defaults+Flags, `make_confirm_fn` (yes/dry/stdin y·Y·yes·n·""·nope).
+- **`scripts/wiring.py`** (Step 10) — `build_executor(config, *, confirm_fn,
+  broker_name="ig_demo", research_config=None, epic_override=None) -> Executor`. Editable-
+  Install-Imports (**kein** sys.path). Baut `get_broker(broker_name)`, `Database`,
+  `StateManager`, `ExecutionState`. **`research_runner`** = Closure, die eine `Research`
+  **lazy** baut und **broker/db/state teilt** (→ persistiert in dieselbe
+  `turbo_candidates.json`, die Gate 2 liest); `Research` wird **direkt** aus dem installierten
+  `research`-Paket konstruiert (nicht Phase-4-`scripts.build_research` — `scripts`-Namens-
+  kollision; §10-Reconciliation). **tz-aware `now_fn`** = `lambda: datetime.now(ZoneInfo(
+  config.tz))` (der Executor-Default `datetime.now` ist naiv → Gate-1/VETO-Fenster sonst
+  server-tz-abhängig).
+- **`scripts/smoke_test.py`** — DRY: `make_confirm_fn(dry=True)` → volle Pipeline, **keine**
+  `open_position`. Druckt Outcome + would-be-Plan (stderr) + Result-JSON (stdout). Mirror P4.
+- **`scripts/live_test.py`** — hart-asserted Operator-Gate: `make_confirm_fn(auto_yes=True)`,
+  Config-Override `max_hold_minutes=1`/`poll_interval_s=10` → platzierte Order schließt
+  schnell per Time-Stop (kein 4-h-Block). Asserts: run() ohne Raise; Status ∈ clean set (kein
+  ABORT); bei platzierter Order `deal_id` + `exec_state`-Record endet `CLOSED`; sauberes
+  `NO_TRADE`/Abstain = valider exit-0. `RESULT: N/M` → stderr, JSON → stdout.
+- **Konzept §9 + §10** mit dated Annotationen (2026-06-11).
+
+### Nächster Schritt — **Step 11** (`README.md` · `requirements.txt` + Doku-Flip) + Operator-Gate
+- `requirements.txt`: nur Phase-5-eigene Dev-Deps (Runtime kommt über die editable installs
+  der Schwester-Packages). `README.md`: kurz — was `phase5_execution/` ist (erster
+  Execution-Pfad, Demo, manueller Trigger), wie man `ig_bot.py`/`smoke_test.py`/`live_test.py`
+  startet, Verweis auf diese `CLAUDE.md`.
+- **Operator-Gate (der User führt es aus — Claude macht Code + gemockte Tests):** frische venv
+  → `bash scripts/dev_install.sh` → `python phase5_execution/scripts/smoke_test.py` (DRY-Sanity,
+  keine Order) → `python phase5_execution/scripts/live_test.py` (realer open→close gegen IG
+  Demo, `exit 0` = PASS; markt-geschlossen → sauberer NO_TRADE/Abstain, ebenfalls exit 0).
+- Wenn der Live-Gate grün ist: Top-Level-`CLAUDE.md` „Current state" + Root-`README` auf
+  Phase 5 ✅ live-verifiziert flippen (Phase-6-Konzept/Transition in der Browser-Session).
+
+### Offene Punkte / [VERIFY]
+- **IG-Erwartung der absoluten SL/TP-Level** (BUY: stop unter/limit über) bleibt der
+  **Operator-Live-Check** in `live_test.py` — Unit-Tests prüfen nur die Arithmetik.
+- **`live_test.py` platziert eine echte Demo-Order** und hält sie ~1 min (Time-Stop). Bei
+  realistischer Demo-Balance rundet die Size evtl. auf 0.0 → `below_min_deal_size` (NO_TRADE,
+  exit 0) — dann wird **keine** Order platziert; ggf. `risk_pct`/Balance prüfen, kein Bug.
+- `close_position`-vanished-Edge (Monitor, Step 7) bleibt v1 grob (Abort statt Error-Parse).
+
+### Gotchas
+- **Step-0-`grep` (`-i`)** matcht „call"/„put": in neuer Prosa „invocation"/„order"/„broker
+  request"; `*_calls` ok. `ig_bot.py` + `scripts/*` sind sauber geprüft.
+- **`scripts/` ist NICHT installiert** (pyproject `include=["execution*"]`) — die drei Scripts
+  laufen direkt mit `sys.path.insert(<phase5_execution/>)` + `from scripts.wiring import …`
+  (Phase-4-Muster). Das `execution`-Runtime-Paket bleibt sys.path-frei (editable install).
+- **`scripts.wiring` darf NICHT Phase-4-`scripts.wiring` importieren** (gleicher Modulname →
+  Kollision); Phase-5-Wiring baut `Research` selbst aus dem `research`-Paket.
+- **`research_runner` teilt den Broker** mit dem Executor — der Broker ist beim Gate-2-Aufruf
+  bereits via `_ensure_session()` connected; `Research._preflight` sieht `is_connected()=True`.
+- `--epic` ist ein **Research-Allow-List-Override** (an `build_executor(epic_override=…)`), kein
+  `ExecutionConfig`-Feld; der Executor nimmt das Epic aus dem Candidate.
+
+---
+
+## Session stopped — 2026-06-11 (Step 8, superseded by Steps 9 + 10 above)
 
 ### Stand
 **Step 8 erledigt** (`executor.py` — der Orchestrator, der den ganzen Pfad komponiert:
