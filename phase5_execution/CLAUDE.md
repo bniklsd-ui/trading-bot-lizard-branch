@@ -107,7 +107,7 @@ phase5_execution/
 │   ├── sizing.py         # ✅ Step 4 — Gate 4 (11 Tests)
 │   ├── vetos.py          # ✅ Step 5 — pre_trade_check (4 VETOs) (20 Tests)
 │   ├── order.py          # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
-│   ├── monitor.py        # ⬜ Step 7 — Polling + Time-Stop
+│   ├── monitor.py        # ✅ Step 7 — Polling + Time-Stop + Close (6 Tests)
 │   ├── executor.py       # ⬜ Step 8 — Orchestrator
 │   └── ig_bot.py         # ⬜ Step 9 — CLI Composition Root
 ├── scripts/              # ⬜ Step 10 — wiring/smoke_test/live_test
@@ -120,10 +120,91 @@ phase5_execution/
     ├── test_gates.py           # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
     ├── test_sizing.py          # ✅ Step 4 — Gate 4 (11 Tests)
     ├── test_vetos.py           # ✅ Step 5 — pre_trade_check 4 VETOs (20 Tests)
-    └── test_order.py           # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
+    ├── test_order.py           # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
+    └── test_monitor.py         # ✅ Step 7 — Polling + Time-Stop + Close (6 Tests)
 ```
 
-## Session stopped — 2026-06-11 (Step 6)
+## Session stopped — 2026-06-11 (Step 7)
+
+### Stand
+**Step 7 erledigt** (`monitor.py` — Polling-Loop + Time-Stop + broker-seitige
+Close-Erkennung, Decision H). Reine Funktion, Broker duck-typed (`execution.*` + stdlib
+only, **keine** Schwester-Imports), `now_fn`/`sleep_fn` injiziert (deterministische Tests,
+kein echtes Warten). `pytest phase5_execution/tests -v` → **100 passed** (94 + 6 monitor).
+Bestehende Suites unberührt (P1 49 · P2 59 · P3 70 · P4 88). Steps 0 + C + 1–6 committet
+(zuletzt `2027f19`); **Step 7 committet, falls** der Operator es triggert (sonst atomarer
+Commit `phase5: monitor.py polling + time-stop close (Step 7)`).
+
+### Zuletzt gemacht (Step 7)
+- `execution/monitor.py` — `monitor_position(broker, exec_state, plan, deal_id, config, *,
+  now_fn=datetime.now, sleep_fn=time.sleep) -> ExecutionResult`:
+  - `entry = now_fn()` **einmal** (Max-Hold-Anker). Loop:
+    1. `get_open_positions` — `ok` **und** `deal_id` **nicht** in `positions` → broker-SL/TP
+       gefüllt → `mark_closed` → `ExecutionResult("CLOSED_BY_BROKER")`. **`not ok`** → **kein**
+       Close inferieren (WARNING, weiter pollen).
+    2. Time-Stop: `_is_after_square_off(now, config)` **oder** `(now−entry) ≥ max_hold` →
+       `close_position(deal_id)`; `not ok` → `ExecutionAbort`; sonst `mark_closed` →
+       `ExecutionResult("TIME_STOP")` (`detail` trägt `square_off`/`max_hold`).
+    3. `sleep_fn(poll_interval_s)`, repeat.
+  - `_is_after_square_off` **reused** `gates._parse_hhmm` + `gate_time_window`-tz-Idiom.
+  - `_position_present(positions_env, deal_id)` — `any(p["deal_id"]==deal_id)`.
+- `tests/conftest.py` — `FakeBroker` um `close_position` (recording `close_position_calls`,
+  konfig. `close_env`) + `positions_sequence` (eine Env pro `get_open_positions`-Aufruf,
+  letzte wiederholt → „present then gone") erweitert.
+- `tests/test_monitor.py` — **6 Tests** (≥6): present→gone → CLOSED_BY_BROKER (kein
+  close-Call, ein Sleep); square_off → TIME_STOP (close-Call); max_hold → TIME_STOP;
+  close-Fehler → ExecutionAbort (genau ein close-Versuch); mehrere Polls mit Sleep dazwischen
+  + Terminierung; `not ok`-Read → **kein** falscher Close, Time-Stop beendet. `_Clock`-Helper
+  (Sequenz, letzte wiederholt) + zählendes `sleep_fn`.
+- **Konzept §7** mit dated Annotation (2026-06-11): `close_position`-Contract +
+  vanished-position-Edge (v1 Abort), Max-Hold-Anker, not-ok-Read-inferiert-keinen-Close,
+  `_parse_hhmm`-Reuse, Status-Vokabular.
+
+### Nächster Schritt — **Step 8** (`executor.py` — Orchestrator, der ganze Pfad)
+Konzept §8: `class Executor(__init__(broker, db, state, exec_state, config, research_runner,
+confirm_fn))` + `run() -> ExecutionResult`. Flow (alles Code, **keine AI** außer dem
+lazy Phase-4-`research_runner` in Gate 2):
+1. `connect()`/`is_connected()` + Session-Health (`get_account().ok`) → Fail → Abort.
+2. `reconcile_startup(...)` → Konflikt → Abort.
+3. **Gate 1** `gate_time_window` → fail → `ExecutionResult("NO_TRADE", reason)`.
+4. **Gate 2** `gate_load_candidates` (ggf. `research_runner()`); leer → `NO_TRADE` (Abstain).
+5. **Gate 3** `gate_constraints` + **Gate 5** `gate_direction_consistency` → fail → `NO_TRADE`.
+6. **Gate 4** Sizing (`select_risk_pct`/`compute_size`); size<min → `NO_TRADE`.
+7. **`pre_trade_check`** (4 VETOs, frisch) → fail → `NO_TRADE` (Grund geloggt).
+8. `plan = build_order_plan(...)`.
+9. **Human-Confirm:** `if config.require_confirm and not confirm_fn(plan): return
+   ExecutionResult("ABORTED_BY_USER")` — **kein** `open_position`.
+10. `place_order(...)` → bei OPEN: `monitor_position(...)`.
+11. Jede REJECT/VETO/Abort-Begründung → **stderr**; stdout nur Ergebnis-JSON (Step 9 `ig_bot`).
+`confirm_fn: Callable[[OrderPlan], bool]` injiziert. Tests ≥8 (FakeBroker): voller Pfad
+open→close; Gate-1-Fail → kein LLM/keine Order; Gate-2-Abstain; VETO-Fail; size<min;
+`require_confirm`+confirm=False → ABORTED_BY_USER (**kein** open_position); Session-Health-Fail
+→ Abort; reconcile-Konflikt → Abort.
+
+### Offene Punkte / [VERIFY]
+- IG-Erwartung der absoluten SL/TP-Level (BUY: stop unter/limit über) bleibt **Operator-Live-Check**
+  (Step 10).
+- `close_position`-vanished-Edge (Time-Stop-Close gegen schon-geschlossene Position →
+  ExecutionAbort) ist v1 bewusst grob — späteres Refinement (Error parsen → CLOSED_BY_BROKER
+  statt Abort).
+- Confirm-Fn-Signatur/Prompt-Pfad in Step 8/9 festzurren (stdin `y/N`, `--yes` → `lambda _p: True`).
+
+### Gotchas
+- **Step-0-`grep` (`-i`)** matcht das englische Wort „call"/„Call" (auch bare): in neuen
+  Kommentaren/Docstrings „invocation"/„poll"/„broker request" statt „…call". Identifier
+  `*_calls` sind ok (`\bCALL\b` matcht „calls" nicht).
+- Monitor-Tests: `now_fn` wird **einmal für `entry`** + **einmal pro Loop-Iteration** gerufen
+  → `_Clock`-Sequenz entsprechend dimensionieren (erste = entry). `mark_closed` braucht einen
+  **existierenden** Record → in Tests `record_pending`+`mark_open` (Fixture `open_plan`) vor
+  `monitor_position`.
+- `positions_sequence` mutiert die Liste (`pop(0)`) bis 1 Element bleibt (wiederholt) — pro
+  Test eine frische Liste bauen.
+- Time-Stop-Reihenfolge: **erst** Position-weg-Check, **dann** Time-Stop (wenn Broker schon
+  geschlossen hat, kein eigener Close).
+
+---
+
+## Session stopped — 2026-06-11 (Step 6, superseded by Step 7 above)
 
 ### Stand
 **Step 6 erledigt** (`order.py` — der erste Order-Pfad: `reconcile_startup` /

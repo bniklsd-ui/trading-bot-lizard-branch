@@ -488,6 +488,32 @@ def monitor_position(broker, exec_state, plan, deal_id, config, *,
   erreicht → TIME_STOP; close_position-Fehler → ExecutionAbort (Operator); Loop terminiert
   immer; state am Ende `closed`.
 
+> **Annotation 2026-06-11 (Step 7 umgesetzt — Code = Source of Truth):**
+> - **`close_position`-Contract** (gegen `ig_adapter.py:661`): der Adapter schlägt
+>   Richtung/Size **selbst** nach und schließt gegenläufig; ok → `.data={"deal_id",
+>   "status":"submitted"}`. **Ist die `deal_id` nicht (mehr) offen → Error-Envelope**
+>   (`BrokerError`). **Edge (v1):** verschwindet die Position *zwischen* dem
+>   `get_open_positions`-Check und dem Time-Stop-`close_position`, schlägt der Close fehl →
+>   `ExecutionAbort` (Konzept §7 „close_position-Fehler → Abort"; sicher, kein Doppel-Schritt,
+>   Operator reconciled). Bewusst **nicht** den Error geparst, um „schon weg" von echtem
+>   Fehler zu unterscheiden — späteres Refinement.
+> - **Max-Hold-Anker:** `entry = now_fn()` **einmal beim Monitor-Eintritt**; `elapsed =
+>   now − entry ≥ max_hold_minutes`. (Konzept ließ den Anker offen.)
+> - **Unsicherer Read:** ein **`not ok`** `get_open_positions` wird **nicht** als Close
+>   interpretiert (keine Schließung aus einem fehlgeschlagenen Read inferieren) → WARNING +
+>   weiter pollen; der Time-Stop garantiert Terminierung.
+> - **Square-Off-Prädikat** wiederverwendet `gates._parse_hhmm` + das
+>   `gate_time_window`-tz-Idiom (`now.astimezone(ZoneInfo(config.tz))` falls tz-aware, sonst
+>   in-Zone angenommen) — Vergleich `time-of-day ≥ square_off_time`. Keine Duplikat-Logik.
+> - **Status-Vokabular** (bereits in `models.py` dokumentiert): `CLOSED_BY_BROKER` /
+>   `TIME_STOP`; `ExecutionResult.detail` trägt `square_off` bzw. `max_hold`. **Keine**
+>   models-/config-Änderung nötig (`poll_interval_s`/`square_off_time`/`max_hold_minutes`
+>   existieren).
+> - **Naht Phase 6** unberührt: reine Funktion, Broker duck-typed (`execution.*` + stdlib only).
+> - 6 Tests (≥6) grün; `pytest phase5_execution/tests -v` → **100 passed** (94 + 6).
+>   `conftest.py` `FakeBroker` um `close_position` + `positions_sequence` (eine Env pro
+>   `get_open_positions`-Aufruf, letzte wiederholt) erweitert.
+
 ### 8. `executor.py` + Tests — Orchestrator (der ganze Pfad)
 ```python
 class Executor:

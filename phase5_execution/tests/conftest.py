@@ -198,6 +198,15 @@ class FakeBroker:
         reconcile_env: the ``_FakeEnv`` ``reconcile_positions`` returns (default an
             empty present/missing/unexpected). Drives the PENDING re-check + startup
             reconcile tests.
+
+    Monitor surface (Step 7):
+        close_env: the ``_FakeEnv`` ``close_position`` returns (default ok
+            ``{"deal_id", "status": "submitted"}``). Set ``ok=False`` for the
+            close-failure-at-time-stop path.
+        positions_sequence: optional list of ``_FakeEnv`` returned one-per
+            ``get_open_positions`` invocation (the last repeats once exhausted), so a
+            test can make a position **present then gone**. When omitted, the single
+            ``positions_env`` is returned every time.
     """
 
     def __init__(
@@ -209,6 +218,8 @@ class FakeBroker:
         ohlcv_raises: bool = False,
         open_env: _FakeEnv | None = None,
         reconcile_env: _FakeEnv | None = None,
+        close_env: _FakeEnv | None = None,
+        positions_sequence: list[_FakeEnv] | None = None,
     ) -> None:
         self.price_env = price_env or _FakeEnv(
             ok=True,
@@ -249,12 +260,17 @@ class FakeBroker:
                 "unexpected": [],
             },
         )
+        self.close_env = close_env or _FakeEnv(
+            ok=True, data={"deal_id": "DIAAAA-FAKE", "status": "submitted"},
+        )
+        self.positions_sequence = list(positions_sequence) if positions_sequence else None
 
         self.get_price_calls: list[str] = []
         self.get_ohlcv_calls: list[tuple[str, str, int]] = []
         self.get_open_positions_calls = 0
         self.open_position_calls: list[dict[str, Any]] = []
         self.reconcile_calls: list[list[str] | None] = []
+        self.close_position_calls: list[str] = []
 
     def get_price(self, epic: str) -> _FakeEnv:
         self.get_price_calls.append(epic)
@@ -268,6 +284,11 @@ class FakeBroker:
 
     def get_open_positions(self) -> _FakeEnv:
         self.get_open_positions_calls += 1
+        if self.positions_sequence:
+            # One env per invocation; the last repeats once the sequence is exhausted.
+            if len(self.positions_sequence) > 1:
+                return self.positions_sequence.pop(0)
+            return self.positions_sequence[0]
         return self.positions_env
 
     def open_position(
@@ -297,6 +318,10 @@ class FakeBroker:
         if self.open_env.ok and isinstance(self.open_env.data, dict):
             self.open_env.data["deal_reference"] = deal_reference
         return self.open_env
+
+    def close_position(self, deal_id: str) -> _FakeEnv:
+        self.close_position_calls.append(deal_id)
+        return self.close_env
 
     def reconcile_positions(
         self, expected_references: list[str] | None = None
