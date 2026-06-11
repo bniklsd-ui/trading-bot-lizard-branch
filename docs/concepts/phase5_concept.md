@@ -387,6 +387,30 @@ def pre_trade_check(broker, candidate, now, config) -> VetoVerdict:
   Bars → veto; `get_ohlcv`-Error → veto; Spread frisch über Max → veto; Status ≠ TRADEABLE
   → veto; Gegen-Position → veto; `pre_trade_check` bricht beim ersten Fail ab.
 
+> **Annotation 2026-06-11 (Step 5 umgesetzt — Code = Source of Truth):**
+> - **[VERIFY] Bar-Shape aufgelöst** (gegen `ig_adapter.py:384` + `_parse_bar:819`,
+>   `models.py:OHLCBar`): `get_ohlcv(...).data` = `{"bars": [...], "allowance": {...}}`;
+>   je Bar ein Dict (aus `OHLCBar.__dict__`) mit Keys `timestamp, open, high, low, close,
+>   volume` (Mid aus bid/ask). VETO 3 liest **`close`**. `MINUTE_5` ∈ `VALID_RESOLUTIONS`,
+>   `get_price().data.spread_pct` ist **Prozent** (`(ask-bid)/ask*100`).
+> - **`net_return` als Prozent:** der Code rechnet `net_return_pct = (close_last −
+>   close_first)/close_first × 100` und vergleicht gegen `momentum_veto_threshold_pct`
+>   (= **Prozent**, Default 0.15). Konsistent mit `spread_pct`/`max_spread_pct` und dem
+>   `_pct`-Namen — sonst hätte der Bruchteil (0.0015) nie die Schwelle (0.15) erreicht.
+> - **Window-Prädikat wiederverwendet:** `veto_status_and_window` nutzt
+>   `gates.gate_time_window(now, config).ok` (gleiches Paket) — keine Duplikat-tz-Logik.
+> - **Fail-closed Exception-Handling:** `veto_momentum` fängt ein breites `Exception`
+>   um den `get_ohlcv`-Datenabruf → Veto (mit stderr-Log), der Order-Pfad läuft nie bei
+>   einem unerwarteten Datenfehler weiter. Auch `env.ok=False` / <2 Bars / fehlender
+>   bzw. 0-Close → Veto.
+> - **VETO-4** blockt eine offene **Gegen**-Position auf demselben Epic **und** erzwingt
+>   `len(positions) ≥ max_parallel_positions` auf dem frischen Snapshot.
+> - **VETO-IDs:** `status_window`/`spread`/`momentum`/`position_conflict`; `pre_trade_check`
+>   gibt bei Erfolg `VetoVerdict(ok=True, veto="pre_trade_check")` und short-circuited beim
+>   ersten Fail (ein Status-Veto erreicht `get_ohlcv` nie — im Test geprüft).
+> - 20 Tests (≥10) grün; `pytest phase5_execution/tests -v` → **79 passed** (59 + 20).
+>   `conftest.py` gewachsen um `FakeBroker` + `make_bars`-Helper.
+
 ### 6. `order.py` + Tests — Platzieren mit Write-ahead, Confirm, PENDING-fail-closed
 ```python
 def reconcile_startup(broker, exec_state, config) -> None:

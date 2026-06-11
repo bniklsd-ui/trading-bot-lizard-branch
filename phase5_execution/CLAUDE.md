@@ -105,7 +105,7 @@ phase5_execution/
 │   ├── execution_state.py# ✅ Step 2 — write-ahead Idempotenz (10 Tests)
 │   ├── gates.py          # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
 │   ├── sizing.py         # ✅ Step 4 — Gate 4 (11 Tests)
-│   ├── vetos.py          # ⬜ Step 5 — pre_trade_check (4 VETOs)
+│   ├── vetos.py          # ✅ Step 5 — pre_trade_check (4 VETOs) (20 Tests)
 │   ├── order.py          # ⬜ Step 6 — place/reconcile/build_order_plan
 │   ├── monitor.py        # ⬜ Step 7 — Polling + Time-Stop
 │   ├── executor.py       # ⬜ Step 8 — Orchestrator
@@ -118,54 +118,70 @@ phase5_execution/
     ├── test_models.py          # ✅ Step 1 — Models + Exceptions (13 Tests)
     ├── test_execution_state.py # ✅ Step 2 — write-ahead Idempotenz (10 Tests)
     ├── test_gates.py           # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
-    └── test_sizing.py          # ✅ Step 4 — Gate 4 (11 Tests)
+    ├── test_sizing.py          # ✅ Step 4 — Gate 4 (11 Tests)
+    └── test_vetos.py           # ✅ Step 5 — pre_trade_check 4 VETOs (20 Tests)
 ```
 
-## Session stopped — 2026-06-11 (Step 4)
+## Session stopped — 2026-06-11 (Step 5)
 
 ### Stand
-**Step 4 erledigt** (`sizing.py` — Gate 4: `select_risk_pct` + `compute_size`, reine Funktionen,
-kein I/O/Clock/AI/Netzwerk, **keine** Schwester-Imports). `pytest phase5_execution/tests -v` →
-**59 passed** (48 + 11 sizing). Bestehende Suites unberührt (P1 49 · P2 59 · P3 70 · P4 88).
-Steps 0 + C + 1 + 2 + 3 committet (zuletzt `fe0d18f`); **Step 4 committet, falls** der Operator
-es triggert (sonst atomarer Commit `phase5: sizing Gate 4 (Step 4)`).
+**Step 5 erledigt** (`vetos.py` — `pre_trade_check()` = die 4 HARTEN VETOs auf frischem
+Snapshot, fail-closed; reine Funktionen außer dem `get_ohlcv`-Abruf in VETO 3, **keine**
+Schwester-Imports). `pytest phase5_execution/tests -v` → **79 passed** (59 + 20 vetos).
+Bestehende Suites unberührt (P1 49 · P2 59 · P3 70 · P4 88). Steps 0 + C + 1 + 2 + 3 + 4
+committet (zuletzt `4d9ba4e`); **Step 5 committet, falls** der Operator es triggert (sonst
+atomarer Commit `phase5: pre_trade_check 4 VETOs (Step 5)`).
 
-### Zuletzt gemacht (Step 4)
-- `execution/sizing.py` — zwei Funktionen + privater Helper:
-  - `select_risk_pct(db, config)` — Gate-4-Hebel: `get_risk_level()` AGGRESSIV →
-    `risk_pct_aggressive`, sonst `risk_pct_conservative` (Prozent-Wert).
-  - `compute_size(account_env, price_env, market_info_env, risk_pct, config) -> (float, str|None)`
-    — fail-safe: jedes env-nicht-ok → `(0.0, "<name>_snapshot_unavailable")`. Liest `available`/
-    `ask`/`min_deal_size` aus `.data`. Größe via `_round_down_size(... risk_pct/100 ...)`;
-    `size < min_deal_size` → `(0.0, "below_min_deal_size")` (kein Up-Clamp). Erfolg → `(size, None)`.
-  - `_round_down_size` — **lokaler** Spiegel von P1 `filters.calc_position_size`
-    (`int(raw * 10) / 10.0`, `notional = balance × risk_pct`, `0.0` bei nicht-positiver
-    Balance/Preis). **Bewusst nicht importiert** (Phasen-Isolation, Operator-Entscheidung) →
-    bei Formeländerung in P1 hier nachziehen (Docstring-Hinweis).
-- `tests/conftest.py` — `FakeDB` ergänzt (`get_risk_level`, settable; DB ist Phase-5 read-only).
-- `tests/test_sizing.py` — **11 Tests** (≥5): risk-level → risk_pct ×2; aggressiv > konservativ;
-  Ab-Rundung auf 0.1 (1.37→1.3); unter min → `below_min_deal_size`; kein Up-Clamp; `available`-
-  Lesepfad skaliert; 0-Balance → no-trade; env-nicht-ok ×3 (account/price/market_info).
-  Float-saubere Testwerte (ask=1000, Balance auf 0.1-Grid).
-- **Konzept §4** mit dated Annotation (2026-06-11): lokale Arithmetik statt Import (Phasen-
-  Isolation), `risk_pct/100`-Einheit, Reason-Vokabular, Lesepfade, Testzahl.
+### Zuletzt gemacht (Step 5)
+- `execution/vetos.py` — 4 VETOs + Orchestrator (alle → `VetoVerdict`, fail-closed):
+  - `veto_status_and_window(price_env, now, config)` — VETO 1: env-nicht-ok / `market_status
+    != "TRADEABLE"` / außerhalb Fenster → Veto. Fenster-Prädikat **reused** via
+    `gates.gate_time_window(now, config).ok` (gleiches Paket, keine tz-Duplikat-Logik).
+  - `veto_spread(price_env, config)` — VETO 2: frischer `spread_pct > max_spread_pct` → Veto
+    (nicht `spread_pct_at_pick`).
+  - `veto_momentum(broker, epic, direction, config)` — VETO 3 (★ `get_ohlcv`): `net_return_pct
+    = (close_last−close_first)/close_first × 100` über **`close`**; BUY & `≤ −threshold` /
+    SELL & `≥ +threshold` → Veto. env-nicht-ok / **breites Exception** / <2 Bars / fehlender
+    bzw. 0-Close → fail-closed Veto (stderr-Log). NIEMALS P3 `get_momentum()`. „v1, am Profit
+    zu tunen".
+  - `veto_position_conflict(open_positions_env, candidate, config)` — VETO 4: offene
+    **Gegen**-Position auf demselben Epic **oder** `len(positions) ≥ max_parallel_positions`
+    → Veto. Lokales `_OPPOSITE`.
+  - `pre_trade_check(broker, candidate, now, config)` — ein frischer `get_price` → VETO 1+2;
+    `veto_momentum` (eigener `get_ohlcv`); frischer `get_open_positions` → VETO 4. Erstes
+    `ok=False` zurück (short-circuit), sonst `VetoVerdict(ok=True, veto="pre_trade_check")`.
+  - VETO-IDs: `status_window`/`spread`/`momentum`/`position_conflict`.
+- `tests/conftest.py` — **`FakeBroker`** (`get_price`/`get_ohlcv`/`get_open_positions`,
+  konfigurierbar inkl. `ohlcv_raises`, recording für Short-Circuit-Asserts) + `make_bars`-Helper.
+- `tests/test_vetos.py` — **20 Tests** (≥10): jeder VETO pass+fail; Momentum BUY-Abwärts /
+  SELL-Aufwärts veto, innerhalb Threshold pass, aligned-Rally pass, zu wenige Bars / env-nicht-ok
+  / raise → veto; Spread über Max; Status ≠ TRADEABLE; außerhalb Fenster; Gegen-Position;
+  at-max-parallel; `pre_trade_check` all-pass (4 frische Snapshots) **und** Short-Circuit
+  (Status-Veto ⇒ `get_ohlcv`/`get_open_positions` nie gerufen).
+- **Konzept §5** mit dated Annotation (2026-06-11): Bar-Shape-[VERIFY] aufgelöst (`close`),
+  `net_return`-als-Prozent, Window-Reuse, Exception→fail-closed, VETO-IDs, Testzahl.
 
-### Nächster Schritt — **Step 5** (`vetos.py` — `pre_trade_check()` = die 4 HARTEN VETOs)
-Konzept §5: `veto_status_and_window(price_env, now, config)` · `veto_spread(price_env, config)` ·
-`veto_momentum(broker, epic, direction, config)` (★ `get_ohlcv(epic, momentum_resolution,
-momentum_count)`, `net_return=(close_last−close_first)/close_first` über **`close`**; BUY &
-`≤ −threshold` → Veto, SELL & `≥ +threshold` → Veto; Datenfehler/zu wenige Bars → fail-closed
-Veto; **NIEMALS** P3 `get_momentum()`) · `veto_position_conflict(open_positions_env, candidate,
-config)` · `pre_trade_check(broker, candidate, now, config)` (ruft alle 4 frisch, erstes
-`ok=False` zurück). Tests ≥10. `conftest.py` wächst um **`FakeBroker`** (`get_price`/`get_ohlcv`/
-`get_open_positions`). **Zuerst** `get_ohlcv`-Bar-Shape (`close`-Feld) direkt gegen
-`ig_adapter.py` gegenlesen, bevor `veto_momentum` baut.
+### Nächster Schritt — **Step 6** (`order.py` — Platzieren mit Write-ahead, Confirm, PENDING-fail-closed)
+Konzept §6: `reconcile_startup(broker, exec_state, config)` (vor jedem Lauf
+`reconcile_positions(expected_references=exec_state.open_references())`; `missing` →
+`mark_closed`, `unexpected` → bei `reconcile_unexpected_aborts` `ExecutionAbort`/`ReconcileConflict`).
+`build_order_plan(candidate, size, price_env, config)` (`deal_reference="bot-"+uuid4().hex`;
+`stop_level`/`limit_level` aus `stop_/limit_distance_points` relativ zum Preis — **BUY: stop
+unter / limit über**, SELL umgekehrt; absolute Level). `place_order(broker, exec_state, plan,
+config)` (1) `record_pending` **WRITE-AHEAD vor** `open_position`; 2) `open_position(...,
+deal_reference=ref)`; 3) ACCEPTED → `mark_open`; 4) **PENDING** → bounded Re-Check
+(`reconcile_positions([ref])`/`get_open_positions`, max N), present → `mark_open`, sonst
+`ExecutionAbort` (**kein** zweiter `open_position`-Call); 5) klarer Reject → `mark_closed` +
+raise). Tests ≥8 (FakeBroker; write-ahead vor Order; PENDING → genau **ein** `open_position`-Call
++ Abort; reconcile missing/unexpected). **Zuerst** gegen `ig_adapter.py` prüfen: `open_position`-
+Signatur (`stop_level`/`limit_level` absolut, `deal_reference`, `currency`), `OrderResult.data`-
+Felder (`status ∈ {ACCEPTED,REJECTED,PENDING,UNKNOWN}`, `deal_id`), `reconcile_positions`-`.data`
+(`present/missing/unexpected`). FakeBroker um `open_position`/`reconcile_positions` erweitern.
 
 ### Offene Punkte / [VERIFY]
 - IG-Erwartung der absoluten `stop_level`/`limit_level`-Richtung im **Live**-Test (Step 6/10,
-  Operator) — Code rechnet BUY: stop unter / limit über Entry.
-- `get_ohlcv`-Bar-Shape (`close`-Feld) für VETO 3 in Step 5 endgültig gegen `ig_adapter.py`
-  prüfen (Konzept nennt `{timestamp, open, high, low, close, volume}`).
+  Operator) — Code rechnet BUY: stop unter / limit über Entry. In Step 6 die `open_position`-
+  Signatur + `OrderResult.data`-Form direkt gegen `ig_adapter.py` gegenlesen, bevor `order.py` baut.
 - `calc_position_size`-Mirror: bei P1-Formeländerung `_round_down_size` in `sizing.py` nachziehen
   (bewusste Kopplung, Phasen-Isolation > DRY hier — Konzept-§4-Annotation).
 
@@ -174,12 +190,16 @@ config)` · `pre_trade_check(broker, candidate, now, config)` (ruft alle 4 frisc
 - `pytest` nutzt `phase5_execution/pyproject.toml` als rootdir-Config (kein `[tool.pytest]` nötig).
 - Tests importieren `from execution.<modul>` + `from tests.conftest import …` — dank editable
   Install aus Step C (kein `sys.path`).
+- **`make_candidate`/`make_order_plan` sind pytest-Fixtures** (geben eine Factory zurück) →
+  **nicht** direkt `from tests.conftest import make_candidate` aufrufen; als Test-Parameter
+  anfordern. `FakeBroker`/`FakeState`/`FakeDB`/`make_bars`/`_FakeEnv` sind hingegen direkt
+  importierbar.
 - Step-0-`grep` (`-i`) matcht das **englische Wort „call"**; daher in Kommentaren
   „order"/„broker I/O" statt „…call" — Done-Check sauber halten.
 - `execution_state.json` ist nun **gitignored** (root `.gitignore`, Step-2-Reconciliation,
   analog `turbo_candidates.json`/`llm_usage.json`).
 - Sizing ist float-empfindlich: `int(raw*10)/10.0` schneidet ab — z. B. raw `0.6` → `0.5`
-  (Double-Repräsentation). Testwerte auf das 0.1-Grid legen (ask=1000, Balance-Vielfache),
-  sonst „überraschen" die Erwartungen.
-- Gates **und** Sizing nehmen **Envelopes direkt** (kein Broker) → erst die VETOs (Step 5) /
-  Order (Step 6) brauchen `FakeBroker` (sie rufen `get_price`/`get_ohlcv`/`get_open_positions`).
+  (Double-Repräsentation). Testwerte auf das 0.1-Grid legen.
+- VETO 3 `net_return` ist **Prozent** (`×100`) — passend zu `momentum_veto_threshold_pct`/
+  `spread_pct`. Bei neuen Momentum-Tests Closes so wählen, dass der Prozent-Move klar über/unter
+  0.15 liegt.
