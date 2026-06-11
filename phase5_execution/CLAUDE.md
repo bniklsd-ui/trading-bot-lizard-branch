@@ -171,6 +171,25 @@ live_test.py` gegen IG Demo) + Step 11 (`README.md`/`requirements.txt`, Top-Leve
   `NO_TRADE`/Abstain = valider exit-0. `RESULT: N/M` → stderr, JSON → stdout.
 - **Konzept §9 + §10** mit dated Annotationen (2026-06-11).
 
+### ⚠ PRIORITÄT nächste Session — **Position-Sizing überarbeiten** (Operator-Befund 2026-06-11)
+- **Befund (live bestätigt):** Mit geseedetem Candidate lief der volle Pfad bis **Gate 4**;
+  `compute_size` lieferte `below_min_deal_size` → `NO_TRADE`. Ursache ist die **Sizing-Mathematik**,
+  nicht die Pipeline: `_round_down_size` rechnet `notional = balance × (risk_pct/100)`, dann
+  `size = notional / price`. Für DAX ~18000 @ €1/Punkt, `min_deal_size=0.5`, `risk_pct=0.5 %`
+  braucht das eine Balance von **~€1.8 M**, um überhaupt Size 0.5 zu erreichen. Selbst das
+  **30 K**-Demokonto (Operator) rundet auf **0.0**.
+- **Anforderung (Operator):** Das echte Konto wird mit **~€1 K Budget** laufen. Sizing **muss**
+  bei ~€1 K eine sinnvolle, handelbare Size (≥ `min_deal_size` 0.5) liefern.
+- **Richtung (zu bestätigen, nicht gelockt):** vom notional-÷-Preis-Modell auf ein
+  **Risk-per-Trade-÷-Stop-Distanz-Modell** wechseln: `size = (balance × risk_pct) /
+  (stop_distance_points × point_value)` — die Size hängt dann an der **SL-Distanz** statt am
+  Indexpreis (€1 K × 2 % / (30 × €1) ≈ 0.66 → ab 0.5). Betrifft `execution/sizing.py`
+  (`_round_down_size`/`compute_size`), die Config-`risk_pct_*`/`stop_distance_points` und die
+  **bewusste Phase-1-`calc_position_size`-Spiegelung** (Kopplung lösen oder mitziehen). Ist eine
+  **Semantik-Änderung** → Konzept §4/Decision F + Annotation aktualisieren, Operator gegenlesen.
+- v1 war `below_min_deal_size` als „kein Bug" markiert — der Operator hat es jetzt als
+  **echtes Sizing-Problem** eingeordnet. Siehe auch Projekt-Memory `project_phase5_sizing_rework`.
+
 ### Nächster Schritt — **Step 11** (`README.md` · `requirements.txt` + Doku-Flip) + Operator-Gate
 - `requirements.txt`: nur Phase-5-eigene Dev-Deps (Runtime kommt über die editable installs
   der Schwester-Packages). `README.md`: kurz — was `phase5_execution/` ist (erster
@@ -186,9 +205,12 @@ live_test.py` gegen IG Demo) + Step 11 (`README.md`/`requirements.txt`, Top-Leve
 ### Offene Punkte / [VERIFY]
 - **IG-Erwartung der absoluten SL/TP-Level** (BUY: stop unter/limit über) bleibt der
   **Operator-Live-Check** in `live_test.py` — Unit-Tests prüfen nur die Arithmetik.
-- **`live_test.py` platziert eine echte Demo-Order** und hält sie ~1 min (Time-Stop). Bei
-  realistischer Demo-Balance rundet die Size evtl. auf 0.0 → `below_min_deal_size` (NO_TRADE,
-  exit 0) — dann wird **keine** Order platziert; ggf. `risk_pct`/Balance prüfen, kein Bug.
+- **Sizing rundet auf 0.0 → `below_min_deal_size`** auch auf dem 30 K-Demokonto (live bestätigt
+  2026-06-11). **Das ist jetzt ein bekanntes Sizing-Problem** (kein „kein Bug" mehr) → siehe die
+  ⚠-PRIORITÄT oben. Bis zur Überarbeitung platziert `live_test.py` deshalb i. d. R. **keine**
+  Order (sauberer `NO_TRADE`, exit 0); der Order-/Monitor-Pfad bleibt damit live **noch ungetestet**
+  (in CI über `test_executor.py`/`test_order.py` gedeckt). Zum manuellen Durchspielen vorerst ein
+  Candidate seeden **und** `risk_pct`/Balance temporär hochsetzen.
 - `close_position`-vanished-Edge (Monitor, Step 7) bleibt v1 grob (Abort statt Error-Parse).
 
 ### Gotchas
