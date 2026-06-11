@@ -541,6 +541,30 @@ Flow (alles Code):
   → kein Order; size<min → kein Order; `require_confirm` + confirm_fn=False → ABORTED_BY_USER,
   **kein** open_position; Session-Health-Fail → Abort; reconcile-Konflikt → Abort.
 
+> **Annotation 2026-06-11 (Step 8 umgesetzt — Code = Source of Truth):**
+> - **Injizierte `now_fn`/`sleep_fn` am `Executor`** (keyword-only, Default `datetime.now`/
+>   `time.sleep`): die §8-Signatur-Skizze listet sie nicht, aber `monitor.py`/`order.py`
+>   injizieren sie bereits — derselbe Pattern macht Gate 1, den VETO-Fenster-Check, die
+>   PENDING-Re-Check-Schleife und den Monitor-Loop **deterministisch testbar** (kein echtes
+>   Warten). `now = now_fn()` wird **einmal** geholt und für Gate 1 **und** `pre_trade_check`
+>   wiederverwendet (die VETO-Frische kommt aus neu geholten Broker-Snapshots, nicht der
+>   Wall-Clock); `now_fn` wird zusätzlich an `monitor_position` durchgereicht.
+> - **Aborts werden `return`ed, nicht `raise`d:** `ExecutionAbort`/`ReconcileConflict` werden
+>   an der `run()`-Grenze gefangen und als `ExecutionResult(status="ABORT", …)` zurückgegeben
+>   (Status-Vokabular bereits in `models.py` dokumentiert) → Step-9-`ig_bot` mappt
+>   `status == "ABORT"` auf `exit != 0`. Ein einziges Ergebnis-Objekt zum Serialisieren.
+> - **Single-Fetch-Reuse:** `get_account` wird in `_ensure_session()` einmal geholt und für
+>   Gate 3 + Sizing wiederverwendet; `get_open_positions` einmal für Gate 3 **und** Gate 5;
+>   `get_price` einmal für Sizing **und** `build_order_plan`. `pre_trade_check` holt seine
+>   **eigenen** frischen Snapshots (das ist der Sinn der VETOs). Weniger Broker-Roundtrips,
+>   gleiche Korrektheit im synchronen Single-Run.
+> - **FakeBroker erweitert** (conftest): Session-/Sizing-Fläche `is_connected`/`connect`/
+>   `get_account`/`get_market_info` (Default `available` modest → Default-Pfad no-traded am
+>   Sizing; der Happy-Path-Test setzt `available=2_000_000` für eine valide Size ≈0.5).
+> - 8 Tests (≥8) grün; `pytest phase5_execution/tests -v` → **108 passed** (100 + 8). Proof-
+>   Tests (b) adverse-Momentum-VETO + (c) Confirm-abgelehnt liegen hier; (a) PENDING→ein
+>   `open_position`+Abort in `test_order.py`.
+
 ### 9. `ig_bot.py` — CLI-Entry / Composition Root
 - `argparse`: `--yes` (confirm überspringen), `--epic` (optional Override), `--dry`
   (Gates+VETOs ohne Order), `--broker ig_demo` (Default).

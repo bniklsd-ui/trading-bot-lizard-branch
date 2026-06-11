@@ -108,7 +108,7 @@ phase5_execution/
 │   ├── vetos.py          # ✅ Step 5 — pre_trade_check (4 VETOs) (20 Tests)
 │   ├── order.py          # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
 │   ├── monitor.py        # ✅ Step 7 — Polling + Time-Stop + Close (6 Tests)
-│   ├── executor.py       # ⬜ Step 8 — Orchestrator
+│   ├── executor.py       # ✅ Step 8 — Orchestrator (8 Tests)
 │   └── ig_bot.py         # ⬜ Step 9 — CLI Composition Root
 ├── scripts/              # ⬜ Step 10 — wiring/smoke_test/live_test
 └── tests/
@@ -121,10 +121,93 @@ phase5_execution/
     ├── test_sizing.py          # ✅ Step 4 — Gate 4 (11 Tests)
     ├── test_vetos.py           # ✅ Step 5 — pre_trade_check 4 VETOs (20 Tests)
     ├── test_order.py           # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
-    └── test_monitor.py         # ✅ Step 7 — Polling + Time-Stop + Close (6 Tests)
+    ├── test_monitor.py         # ✅ Step 7 — Polling + Time-Stop + Close (6 Tests)
+    └── test_executor.py        # ✅ Step 8 — full-cycle orchestrator (8 Tests)
 ```
 
-## Session stopped — 2026-06-11 (Step 7)
+## Session stopped — 2026-06-11 (Step 8)
+
+### Stand
+**Step 8 erledigt** (`executor.py` — der Orchestrator, der den ganzen Pfad komponiert:
+Session-Health → Reconcile → Gate 1/2/3/5 → Gate 4 Sizing → 4 VETOs → Confirm → Place →
+Monitor). **Reine Komposition** — keine neue Broker-/Gate-/VETO-Logik. `execution.*` +
+stdlib only, Broker/DB/State duck-typed (kein Schwester-Import). `pytest
+phase5_execution/tests -v` → **108 passed** (100 + 8 executor). Bestehende Suites unberührt
+(P1 49 · P2 59 · P3 70 · P4 88). Steps 0 + C + 1–7 committet (zuletzt `9faab0a`); **Step 8
+committet, falls** der Operator es triggert (sonst atomarer Commit `phase5: executor.py
+orchestrator (Step 8)`).
+
+### Zuletzt gemacht (Step 8)
+- `execution/executor.py` — `class Executor(__init__(broker, db, state, exec_state, config,
+  research_runner, confirm_fn, *, now_fn=datetime.now, sleep_fn=time.sleep))` + `run() ->
+  ExecutionResult`. Flow (alles Code, **keine AI** außer dem lazy P4-`research_runner` in Gate 2):
+  1. `_ensure_session()` — `is_connected()` → sonst `connect()` (`.ok`); `get_account()`
+     (`.ok`) → sonst `ExecutionAbort`. Das Account-Env wird **zurückgegeben + downstream
+     wiederverwendet** (ein `get_account` pro Lauf).
+  2. `reconcile_startup(...)` — `ExecutionAbort`/`ReconcileConflict` → `ABORT`.
+  3. `now = now_fn()` **einmal** (Gate 1 + VETO-Fenster teilen es). **Gate 1**
+     `gate_time_window` → fail → `NO_TRADE`.
+  4. **Gate 2** `gate_load_candidates` (lazy `research_runner` bei stale) → leer → `NO_TRADE`.
+  5. `positions_env = get_open_positions()` **einmal** → **Gate 3** `gate_constraints` +
+     **Gate 5** `gate_direction_consistency` (teilen das Env) → fail → `NO_TRADE`.
+  6. **Gate 4** `get_price`(reused) + `get_market_info` + `select_risk_pct` + `compute_size`
+     → `reason is not None` → `NO_TRADE`.
+  7. **`pre_trade_check`** (4 frische VETOs) → fail → `NO_TRADE`.
+  8. `build_order_plan(..., price_env)` (reused Gate-4-Preis).
+  9. **Human-Confirm:** `require_confirm and not confirm_fn(plan)` → `ABORTED_BY_USER`
+     (**kein** `open_position`, **kein** `record_pending`).
+  10. `place_order(..., sleep_fn)`; bei `status=="OPEN"` → `monitor_position(..., now_fn,
+      sleep_fn)`. `ExecutionAbort` aus place/monitor → `ABORT`.
+  - **Aborts werden returned, nicht geraised** (`status="ABORT"`) → Step-9-`ig_bot` macht
+    `exit != 0` bei `ABORT`. Logging → **stderr**; stdout bleibt Step-9-JSON. Helper
+    `_no_trade`/`_abort`.
+- `tests/conftest.py` — `FakeBroker` um die Session-/Sizing-Fläche erweitert: `is_connected`
+  (default True) / `connect` / `get_account` (default `available` **modest** → Default-Pfad
+  no-traded am Sizing) / `get_market_info` (default `min_deal_size=0.5`) + Recording-Counter.
+- `tests/test_executor.py` — **8 Tests** (≥8): voller Pfad open→CLOSED_BY_BROKER (ein
+  `open_position`, Record CLOSED, `research_runner` nicht gerufen); Gate-1-Fenster-Fail (kein
+  Research/keine Order, `get_open_positions` nie); Gate-2-Abstain; **adverse-Momentum-VETO**
+  (Proof-Test b, keine Order); size<min; **Confirm abgelehnt** (Proof-Test c, keine Order,
+  kein Write-ahead); Session-Health-Fail → ABORT; Reconcile-Konflikt (`unexpected`) → ABORT.
+- **Konzept §8** mit dated Annotation (2026-06-11): injizierte `now_fn`/`sleep_fn` am
+  `Executor`; Aborts als `status="ABORT"` returned statt geraised; Single-Fetch-Reuse von
+  account/positions/price; `account_env`-Reuse Session-Health↔Gate-3/Sizing.
+
+### Nächster Schritt — **Step 9** (`ig_bot.py` — CLI-Entry / Composition Root)
+Konzept §9: `argparse` (`--yes` confirm-Override → `lambda _p: True`; `--epic` Override;
+`--dry` = Gates+VETOs ohne Order; `--broker ig_demo` Default). Baut den Executor über
+`scripts/wiring.build_executor(config)` (Step 10), `confirm_fn` = stdin `y/N`-Prompt
+(Default). Druckt das `ExecutionResult` als **JSON auf stdout**, Logs auf **stderr**.
+`exit 0` bei sauberem Lauf (auch `NO_TRADE`/`ABORTED_BY_USER`), `exit != 0` **nur** bei
+`status == "ABORT"`. ⚠ Step 9 + 10 (wiring/scripts) hängen zusammen — `ig_bot` braucht
+`build_executor`; ggf. Step 10 (`wiring.py`) zuerst oder gemeinsam. Keine Unit-Tests für die
+Live-Scripts (Operator führt sie aus); `ig_bot`-Argparse/Exit-Code-Mapping ist testbar.
+
+### Offene Punkte / [VERIFY]
+- IG-Erwartung der absoluten SL/TP-Level (BUY: stop unter/limit über) bleibt **Operator-
+  Live-Check** (Step 10 `live_test.py`).
+- `close_position`-vanished-Edge (Time-Stop-Close gegen schon-geschlossene Position →
+  ExecutionAbort) bleibt v1 grob (Monitor, Step 7) — späteres Refinement.
+- Sizing-Realität: bei realistischer Demo-Balance rundet die Size oft auf 0.0 → `below_min
+  _deal_size` (kein Trade). Der Happy-Path-Test nutzt bewusst `available=2_000_000`, damit
+  eine valide Size (≈0.5) entsteht — **kein** Hinweis auf einen Bug, nur Test-Arithmetik.
+
+### Gotchas
+- **Step-0-`grep` (`-i`)** matcht das englische Wort „call"/„put": in neuen Kommentaren/
+  Docstrings „invocation"/„broker request"/„order" statt „…call". `*_calls` ist ok.
+  `executor.py` + `conftest.py`-Zusatz sind gegen den Grep sauber geprüft.
+- **`now_fn` wird einmal in `run()` gerufen** (Gate 1 + VETO teilen `now`) **und dann an
+  `monitor_position` durchgereicht** (das es pro Loop ruft). Fixe `lambda: _at(10,0)` deckt
+  beides ab; für Gate-1-Fail eine out-of-window-`lambda`.
+- **`positions_sequence` im Voll-Pfad** muss **4** Envs liefern: Gate-3/5-Fetch (1, leer),
+  VETO-4-Fetch (1, leer), Monitor-Poll-present (1), Monitor-Poll-gone (1) — der Executor holt
+  `get_open_positions` für Gate 3+5 **einmal** (geteiltes Env).
+- **`research_runner`** wird in Gate 2 **nur bei `not candidates_are_fresh()`** gerufen — die
+  meisten Tests nutzen `FakeState(fresh=True, candidates=[…])` → Runner nicht gerufen.
+
+---
+
+## Session stopped — 2026-06-11 (Step 7, superseded by Step 8 above)
 
 ### Stand
 **Step 7 erledigt** (`monitor.py` — Polling-Loop + Time-Stop + broker-seitige

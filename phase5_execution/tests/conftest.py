@@ -10,6 +10,9 @@ credentials:
   contract dict), and a ``FakeState`` (configurable candidate freshness/loading).
   ``FakeBroker``/``FakeDB`` arrive with Steps 4/5 — the gates take envelopes
   directly, so no broker fake is needed yet.
+- Step 8 (executor): ``FakeBroker`` grows the session-health + market-info surface
+  (``is_connected``/``connect``/``get_account``/``get_market_info``) the orchestrator
+  composes — the earlier per-module fakes only needed the VETO/order/monitor surface.
 """
 
 from __future__ import annotations
@@ -207,6 +210,17 @@ class FakeBroker:
             ``get_open_positions`` invocation (the last repeats once exhausted), so a
             test can make a position **present then gone**. When omitted, the single
             ``positions_env`` is returned every time.
+
+    Session / sizing surface (Step 8 — the orchestrator's session-health + Gate 4):
+        is_connected: what ``is_connected()`` returns (default ``True``).
+        connect_env: the ``_FakeEnv`` ``connect()`` returns (default ok). Set
+            ``is_connected=False`` + ``ok=False`` for the connect-failure path.
+        account_env: the ``_FakeEnv`` ``get_account()`` returns (default ok with a
+            **modest** ``available`` so the default path no-trades at sizing). Set
+            ``ok=False`` for the session-health-fail path; raise ``available`` for the
+            happy path.
+        market_info_env: the ``_FakeEnv`` ``get_market_info(epic)`` returns (default ok
+            with ``min_deal_size`` 0.5).
     """
 
     def __init__(
@@ -220,6 +234,10 @@ class FakeBroker:
         reconcile_env: _FakeEnv | None = None,
         close_env: _FakeEnv | None = None,
         positions_sequence: list[_FakeEnv] | None = None,
+        is_connected: bool = True,
+        connect_env: _FakeEnv | None = None,
+        account_env: _FakeEnv | None = None,
+        market_info_env: _FakeEnv | None = None,
     ) -> None:
         self.price_env = price_env or _FakeEnv(
             ok=True,
@@ -264,6 +282,26 @@ class FakeBroker:
             ok=True, data={"deal_id": "DIAAAA-FAKE", "status": "submitted"},
         )
         self.positions_sequence = list(positions_sequence) if positions_sequence else None
+        self._is_connected = is_connected
+        self.connect_env = connect_env or _FakeEnv(ok=True, data={"connected": True})
+        self.account_env = account_env or _FakeEnv(
+            ok=True,
+            data={
+                "balance": 100000.0,
+                "available": 100000.0,   # modest → default path no-trades at sizing
+                "profit_loss": 0.0,
+                "currency": "EUR",
+            },
+        )
+        self.market_info_env = market_info_env or _FakeEnv(
+            ok=True,
+            data={
+                "min_deal_size": 0.5,
+                "currency": "EUR",
+                "instrument_type": "CFD",
+                "market_status": "TRADEABLE",
+            },
+        )
 
         self.get_price_calls: list[str] = []
         self.get_ohlcv_calls: list[tuple[str, str, int]] = []
@@ -271,6 +309,24 @@ class FakeBroker:
         self.open_position_calls: list[dict[str, Any]] = []
         self.reconcile_calls: list[list[str] | None] = []
         self.close_position_calls: list[str] = []
+        self.connect_calls = 0
+        self.get_account_calls = 0
+        self.get_market_info_calls: list[str] = []
+
+    def is_connected(self) -> bool:
+        return self._is_connected
+
+    def connect(self) -> _FakeEnv:
+        self.connect_calls += 1
+        return self.connect_env
+
+    def get_account(self) -> _FakeEnv:
+        self.get_account_calls += 1
+        return self.account_env
+
+    def get_market_info(self, epic: str) -> _FakeEnv:
+        self.get_market_info_calls.append(epic)
+        return self.market_info_env
 
     def get_price(self, epic: str) -> _FakeEnv:
         self.get_price_calls.append(epic)
