@@ -109,7 +109,7 @@ phase5_execution/
 │   ├── order.py          # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
 │   ├── monitor.py        # ✅ Step 7 — Polling + Time-Stop + Close (6 Tests)
 │   ├── executor.py       # ✅ Step 8 — Orchestrator (8 Tests)
-│   └── ig_bot.py         # ⬜ Step 9 — CLI Composition Root
+│   └── ig_bot.py         # ✅ Step 9 — CLI Composition Root (18 Tests)
 ├── scripts/              # ⬜ Step 10 — wiring/smoke_test/live_test
 └── tests/
     ├── conftest.py             # ✅ Step 2 — make_order_plan/order_plan Factory
@@ -122,7 +122,8 @@ phase5_execution/
     ├── test_vetos.py           # ✅ Step 5 — pre_trade_check 4 VETOs (20 Tests)
     ├── test_order.py           # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
     ├── test_monitor.py         # ✅ Step 7 — Polling + Time-Stop + Close (6 Tests)
-    └── test_executor.py        # ✅ Step 8 — full-cycle orchestrator (8 Tests)
+    ├── test_executor.py        # ✅ Step 8 — full-cycle orchestrator (8 Tests)
+    └── test_ig_bot.py          # ✅ Step 9 — CLI helpers (exit/serialise/argparse/confirm, 18 Tests)
 ```
 
 ## Session stopped — 2026-06-11 (Step 8)

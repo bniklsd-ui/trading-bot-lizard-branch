@@ -573,6 +573,28 @@ Flow (alles Code):
 - Druckt Ergebnis-Envelope als JSON auf stdout, Logs auf stderr. `exit 0` bei sauberem
   Lauf (auch `NO_TRADE`/`ABORTED_BY_USER` sind kein Fehler), `exit != 0` nur bei `ExecutionAbort`.
 
+> **Annotation 2026-06-11 (Step 9 umgesetzt — Code = Source of Truth):**
+> - **`ig_bot.py` liegt im `execution`-Paket** (`execution/ig_bot.py`, wie der Modul-Baum) →
+>   `python -m execution.ig_bot`. Der `build_executor`-Import ist **lazy in `main()`** (ein
+>   `sys.path.insert(<phase5_execution/>)` + `from scripts.wiring import build_executor`), damit
+>   `--help` + die Unit-Tests **kein** Keyring/Netz brauchen. Das ist die **einzige**
+>   `sys.path`-Stelle und nur im Entry-Script (Phase-4-Präzedenz) — das `execution`-Runtime-Paket
+>   bleibt sys.path-frei.
+> - **Exit-Code:** `exit_code(result)` = `1` **nur** bei `status == "ABORT"`, sonst `0`
+>   (`NO_TRADE`/`ABORTED_BY_USER` sind saubere Läufe). Aborts werden vom Executor als
+>   `status="ABORT"` **zurückgegeben** (nicht geraised, Step-8-Entscheidung) → `ig_bot` mappt sie.
+> - **`--dry` = Confirm-False:** kein eigener Dry-Modus im Executor — `make_confirm_fn(dry=True)`
+>   loggt den gebauten `OrderPlan` und gibt `False` → die volle Gate/Sizing/VETO-Pipeline läuft,
+>   der Plan wird gebaut, **kein** `open_position` (Confirm-Gate stoppt), Ergebnis
+>   `ABORTED_BY_USER` (von `ig_bot` als „DRY RUN" gelabelt). Kein Executor-Change.
+> - **`--epic`** ist ein **Research-Allow-List-Override** (Phase-4-Semantik), kein
+>   `ExecutionConfig`-Feld — `ig_bot` reicht `epic_override` an `build_executor` durch (die
+>   `ResearchConfig` für den `research_runner`); der Executor selbst nimmt das Epic aus dem Candidate.
+> - **Ergebnis-Serialisierung:** `result_to_dict = dataclasses.asdict` (rekursiv in den
+>   `OrderPlan`) → JSON auf **stdout**, Human-Summary auf **stderr**.
+> - 18 Tests (≥) grün (`test_ig_bot.py`, rein, kein Netz/Keyring/Wiring-Import); `pytest
+>   phase5_execution/tests -v` → **126 passed** (108 + 18).
+
 ### 10. `scripts/`
 - **`wiring.py`:** baut **echte** `IGAdapter` (Demo-Creds via Keyring), `Database`,
   `StateManager`, `ExecutionState`, `research_runner = lambda: build_research(cfg).run()`
