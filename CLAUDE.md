@@ -77,9 +77,27 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 5 — Execution (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close):
-✅ abgeschlossen + live-verifiziert (Order-/Monitor-Pfad). Phase-6-Konzept (Bull/Bear/Judge)
-ausstehend (Browser-Konzept-Session leitet den Phasenwechsel ein — nicht hier in Claude Code).
+**Active phase:** Phase 6 — Bull/Bear/Judge-Debatte (`phase6_debate/`): 🚧 in Arbeit, **Step 0**
+(Naming-Hygiene + Doc-Abgleich). Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close)
+bleibt ✅ abgeschlossen + live-verifiziert (Order-/Monitor-Pfad).
+
+**Phase 6 status:** 🚧 In Arbeit — Konzept **gelockt** (`docs/concepts/phase6_debate_concept.md`,
+11 Entscheidungen A–K, Contracts gegen echten Repo-Code 2026-06-12 verifiziert). Step 0 (diese
+Session): Naming-Hygiene + Doc-Abgleich (kein Code).
+- **Erster Mehr-Agenten-AI-Pfad + teuerster Pfad im System** → Kostenkorrektheit (Caching +
+  Metering + Caps) wiegt so schwer wie Funktionsumfang.
+- **AI-Grenze (Kernprinzip):** AI macht **nur** Bull/Bear-Argumente + Judge-Synthese. Kontextaufbau,
+  Budget/Caps, Persistenz, Fehlerbehandlung sind deterministischer Code. Die Debatte bekommt
+  **niemals** den Broker oder eine VETO-/Gate-Funktion — sie *kann* keinen VETO umgehen, weil sie
+  ihn nicht referenziert.
+- **Richtungsquelle:** Der Judge emittiert die finale `direction`, die vom P4-Seed **abweichen darf**
+  (Flip BUY↔SELL, Decision B). Judge-`decision ∈ {TRADE, ABSTAIN}` qualitativ; `confidence` ist
+  **advisory und gatet NICHTS** (Decision H). Jeder Fehler/Cap-Breach → fail-closed **ABSTAIN →
+  NO_TRADE**, nie „trotzdem traden" (Decision J).
+- **Naht:** `debate_runner` zwischen Gate 2 und Gate 3 in `executor.run()`; **Default-Passthrough
+  hält Phase 5 AI-frei** (Step 9). Neues Paket `phase6_debate/` (gespiegelt an `phase4_research/`);
+  Cross-Phase-Reuse von `research.LLMClient`/`token_meter`/Pricing ist die **dokumentierte Ausnahme**
+  (Decision F). DB bleibt read-only (P7) → nur `data/state/debate_log.json` (gitignored, P9-kompatibel).
 
 **Phase 5 status:** ✅ Code-complete + live-**verifiziert** (Order-/Monitor-Pfad), **noch
 nicht profit-validiert** (2026-06-12)
