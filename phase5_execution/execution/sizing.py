@@ -12,13 +12,21 @@ Pure, testable functions: the orchestrator (Step 8) fetches the broker envelopes
 once and passes them in; nothing here does I/O or calls AI. Phase-isolated —
 stdlib + ``execution`` types only, **no** sibling-package imports.
 
-The notional→size arithmetic **mirrors** the verified Phase-1
-``broker_wrapper.filters.calc_position_size`` (``notional = balance × risk_pct``;
-round **down** to the 0.1 IG CFD step; ``0.0`` on non-positive balance/price). It
-is re-implemented locally rather than imported, holding the same strict
-phase-isolation the gates and ``execution_state`` modules keep (cross-phase imports
-live only in the lazy wiring layer). If the Phase-1 formula ever changes, this
-helper must track it — see the dated concept §4 annotation.
+**Sizing model — risk-per-trade ÷ stop-distance (operator decision 2026-06-12).**
+The size is the position whose worst-case loss at the stop ≈ the risk budget::
+
+    risk_amount = available_balance × risk_pct          # money at risk if stopped
+    raw_size    = risk_amount / (stop_distance_points × point_value)
+
+so ``size`` scales with the **SL distance**, not the index price. This deliberately
+**diverges** from the Phase-1 ``broker_wrapper.filters.calc_position_size`` notional
+÷ price model that this helper used to mirror: that model needed a ~€1.8M balance to
+reach size 0.5 on DAX ~18000, so a real ~€1K-budget account never produced a
+tradeable size (live-confirmed ``below_min_deal_size`` on 2026-06-11). The mirror is
+now **intentionally broken** — do not "fix" it back to the Phase-1 formula; see the
+dated concept §4 annotation. A notional/leverage **cap** (``max_leverage``) keeps the
+otherwise price-unbounded risk model from requesting more margin than the account can
+hold. Round **down** to the 0.1 IG CFD step; ``0.0`` on any non-positive input.
 """
 
 from __future__ import annotations
@@ -27,22 +35,37 @@ from typing import Any
 
 from execution.config import ExecutionConfig
 
-def _round_down_size(
-    *, available_balance: float, risk_pct: float, price: float, point_value: float = 1.0
+def _size_from_risk(
+    *,
+    available_balance: float,
+    risk_pct: float,
+    stop_distance_points: float,
+    price: float,
+    max_leverage: float,
+    point_value: float = 1.0,
 ) -> float:
-    """Size so exposure ≈ ``available_balance × risk_pct``, rounded down to 0.1.
+    """Risk-per-trade size, leverage-capped, rounded **down** to the 0.1 IG step.
 
-    Local mirror of Phase-1 ``filters.calc_position_size`` — kept byte-for-byte on
-    the arithmetic (``int(raw * 10) / 10.0``) so the two never diverge. ``risk_pct``
-    is a **fraction** here, ``notional = size × price × point_value``. Returns
-    ``0.0`` on non-positive balance or price (fail-safe), never a negative size.
+    ``risk_pct`` is a **fraction** here (``compute_size`` passes ``config %`` ÷ 100).
+    The size is the position whose loss at the stop ≈ ``available_balance × risk_pct``::
+
+        raw_size = (available_balance × risk_pct) / (stop_distance_points × point_value)
+
+    A notional ceiling ``cap_size = (available_balance × max_leverage) / (price ×
+    point_value)`` guards against the risk model requesting more margin than the
+    account can hold (it only bites pathological cases — e.g. a tiny stop distance on
+    a large balance — never normal ~€1K sizing). Returns ``0.0`` on any non-positive
+    balance, stop distance or price (fail-safe), never a negative size.
     """
-    if available_balance <= 0 or price <= 0:
+    if available_balance <= 0 or stop_distance_points <= 0 or price <= 0:
         return 0.0
-    target_notional = available_balance * risk_pct
-    raw_size = target_notional / (price * point_value)
+    risk_amount = available_balance * risk_pct
+    raw_size = risk_amount / (stop_distance_points * point_value)
+    # Notional/leverage safety cap — never request more margin than the account holds.
+    cap_size = (available_balance * max_leverage) / (price * point_value)
+    sized = min(raw_size, cap_size)
     # Round DOWN to the 0.1 IG CFD step so we never exceed the risk budget.
-    return max(0.0, int(raw_size * 10) / 10.0)
+    return max(0.0, int(sized * 10) / 10.0)
 
 
 def select_risk_pct(db: Any, config: ExecutionConfig) -> float:
@@ -72,8 +95,10 @@ def compute_size(
     Returns ``(size, reason)``: ``reason`` is ``None`` on success, otherwise a
     no-trade code (the executor logs it to stderr). ``risk_pct`` is the **percent**
     from :func:`select_risk_pct`; it is divided by 100 to the fraction
-    ``_round_down_size`` expects (config ``risk_pct`` is a percent, the Phase-1
-    helper takes a fraction — concept §0 annotation).
+    :func:`_size_from_risk` expects (config ``risk_pct`` is a percent — concept §0
+    annotation). The risk-per-trade model reads ``config.stop_distance_points`` (the
+    SL offset the size is sized against) and ``config.max_leverage`` (the notional
+    safety cap); the live ``ask`` feeds only the cap, not the risk arithmetic.
 
     Fail-safe: any envelope that is not ``ok`` is a no-trade (we cannot verify the
     size). A rounded size below the instrument's ``min_deal_size`` is a no-trade
@@ -90,9 +115,14 @@ def compute_size(
     ask = float((price_env.data or {}).get("ask", 0) or 0)
     min_deal_size = float((market_info_env.data or {}).get("min_deal_size", 0) or 0)
 
-    # Config risk_pct is a PERCENT (0.5 → 0.5%); the helper takes a fraction.
-    size = _round_down_size(
-        available_balance=available, risk_pct=risk_pct / 100, price=ask, point_value=1.0
+    # Config risk_pct is a PERCENT (2.0 → 2.0%); the helper takes a fraction.
+    size = _size_from_risk(
+        available_balance=available,
+        risk_pct=risk_pct / 100,
+        stop_distance_points=config.stop_distance_points,
+        price=ask,
+        max_leverage=config.max_leverage,
+        point_value=1.0,
     )
 
     if size < min_deal_size:

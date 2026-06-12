@@ -25,7 +25,7 @@
 | **C** | Composition Root | **Editable installs** (`pip install -e` pro Package, je ein minimales `pyproject.toml`). | `ig_bot.py` ist der erste echte Composition Root; Phase 8 läuft das als Daemon. `sys.path`-Hacks sind für einen langlebigen Scheduler + saubere `pytest`-Collection fragil. Das Handover hat das **bewusst hierher** vertagt. |
 | **D** | Human-Confirm | Phase 5 bleibt **Demo**. Confirm-Gate vor `open_position` **default AN** (`require_confirm=True`); Override `--yes` für spätere Automatik. | Baut den Code-Pfad, den Live zwingend braucht, jetzt statt in P8 anzuflanschen. „Defense against runtime AI agency" ist architektonisch. |
 | **E** | Idempotenz | Eigene `deal_reference` (`bot-{uuid4hex}`) **write-ahead** persistieren **vor** `open_position`. **Reconcile-on-Startup** jeden Lauf. `PENDING` → **kein** Retry-Order, bounded Re-Check, sonst **fail-closed** + Operator-Hinweis. | Echtes Geld-Risiko. Doppel-Order-Schutz > Komfort. Nie blind eine zweite Order. |
-| **F** | Sizing (Gate 4) | `risk_pct` aus `load_bot_config()`, **score-gekoppelt** via `get_risk_level()`. `calc_position_size(point_value=1.0)`, ab auf 0.1. **Gerundete Size < `min_deal_size` → kein Trade.** | Nutzt vorhandene P1/P2-Hebel, kein neues System. |
+| **F** | Sizing (Gate 4) | `risk_pct` **score-gekoppelt** via `get_risk_level()`. **`⟳ 2026-06-12`: Risk-per-Trade ÷ Stop-Distanz** statt notional ÷ Preis — `size = balance × risk_pct / (stop_distance_points × point_value)`, Notional-Cap `max_leverage`, ab auf 0.1. **Gerundete Size < `min_deal_size` → kein Trade.** (Spiegel von P1 `calc_position_size` bewusst aufgehoben — §4-Annotation.) | ~€1 K-Budget muss handelbar sein; das alte Modell lieferte stets `below_min`. |
 | **G** | SL/TP | **Beim Entry** (`stop_level`/`limit_level`). v1: **feste Punkte aus Config**. ATR als dokumentierter späterer Swap (kann die VETO-Bars wiederverwenden). | Risiko vor dem Monitoring definiert; überlebt Monitor-Crash broker-seitig. Feste Punkte = kleinste stille Fehlerfläche. |
 | **H** | Monitoring/Close | **Polling** (`get_open_positions`/`get_price`). Close-Trigger: (a) Position weg (broker-seitiges SL/TP gefüllt), (b) **Time-Stop** (Square-off + `max_hold`). Lightstreamer (PRICE-Sub) erst P8. | Robust, kein Stream-Lifecycle bei manuellem Trigger. |
 
@@ -39,8 +39,9 @@
 | `max_spread_pct` | `0.5` (**% of ask**, nicht Punkte) — wie Phase-4 `ResearchConfig.max_spread_pct` | VETO 2 |
 | `momentum_resolution` / `momentum_count` | `MINUTE_5` / `12` (≈1 h) | VETO 3 |
 | `momentum_veto_threshold_pct` | `0.15` | VETO 3 |
-| `risk_pct_conservative` / `risk_pct_aggressive` | `0.5` / `1.0` (**Prozent**) | Gate 4, Wahl via `get_risk_level()` |
-| `stop_distance_points` / `limit_distance_points` | `30` / `45` (1.5R) | SL/TP |
+| `risk_pct_conservative` / `risk_pct_aggressive` | `⟳ 2026-06-12` `2.0` / `3.0` (**Prozent, Risk-per-Trade**) | Gate 4, Wahl via `get_risk_level()` |
+| `max_leverage` | `⟳ 2026-06-12` `20.0` (Notional-Cap = balance × this; ESMA-Hauptindex-Grenze) | Gate 4 Sizing-Deckel |
+| `stop_distance_points` / `limit_distance_points` | `30` / `45` (1.5R) | SL/TP (Sizing-Basis seit `⟳ 2026-06-12`) |
 | `poll_interval_s` | `15` | Monitor |
 | `require_confirm` | `True` | Human-Confirm |
 | `reconcile_unexpected_aborts` | `True` | Reconcile fail-closed |
@@ -358,6 +359,31 @@ def compute_size(account_env, price_env, market_info_env, risk_pct, config) -> t
 >   `get_market_info().data`. `env.ok` immer vor `env.data`.
 > - 11 Tests (≥5) grün; `pytest phase5_execution/tests -v` → **59 passed** (48 + 11).
 >   `conftest.py` gewachsen um `FakeDB` (`get_risk_level`).
+
+> **Annotation 2026-06-12 (Sizing-Modell überarbeitet — Operator-Befund + -Entscheidung; Code = Source of Truth):**
+> - **Problem (live bestätigt 2026-06-11):** Das ursprüngliche **notional-÷-Preis**-Modell
+>   (`size = balance × risk_pct / (price × point_value)`, Spiegel von Phase-1
+>   `calc_position_size`) braucht für DAX ~18000 @ €1/Punkt und `min_deal_size=0.5` eine
+>   Balance von **~€1.8 M**, um überhaupt Size 0.5 zu erreichen. Das echte Konto läuft mit
+>   **~€1 K Budget** → das alte Modell lieferte **immer** `below_min_deal_size` → `NO_TRADE`.
+> - **Neues Modell (Risk-per-Trade ÷ Stop-Distanz):**
+>   `raw_size = (balance × risk_pct) / (stop_distance_points × point_value)`, gedeckelt durch
+>   `cap_size = (balance × max_leverage) / (price × point_value)`, **ab** auf 0.1. Die Size
+>   hängt jetzt an der **SL-Distanz**, nicht am Indexpreis (€1 K × 2 % / (30 × €1) = 0.66 → 0.6).
+> - **Phase-1-Spiegel bewusst aufgehoben:** `sizing._size_from_risk` spiegelt
+>   `broker_wrapper.filters.calc_position_size` **nicht mehr** — die Kopplung ist absichtlich
+>   gelöst (Docstring in `sizing.py` warnt davor, sie „zurückzufixen"). Phase-1 selbst bleibt
+>   unangetastet (Phasen-Isolation; Phase 5 editiert nur eigene Dateien).
+> - **Neue/​geänderte Config (Operator-Entscheidung 2026-06-12, „v1, tune at profit"):**
+>   `risk_pct_conservative` `0.5 → 2.0`, `risk_pct_aggressive` `1.0 → 3.0` (jetzt
+>   **Risk-per-Trade-Prozente** = Verlust am Stop, nicht Notional-Prozente); neues
+>   `max_leverage = 20.0` (Notional-Deckel = ESMA-Retail-Hauptindex-Grenze, greift nur bei
+>   pathologischer Übergröße, nie bei normaler ~€1 K-Sizing). Siehe Decision-F-Zeile + Config-
+>   Tabelle (beide mit `⟳ 2026-06-12` markiert).
+> - **Reason-Vokabular unverändert** (`*_snapshot_unavailable`, `below_min_deal_size`); kein
+>   Upward-Clamp. Tests: `test_sizing.py` neu gerechnet + 2 neue Fälle (€1 K-Regression,
+>   Leverage-Cap); `test_executor.py`/`conftest.py` Balances auf realistische ~€0.4–1.5 K
+>   angepasst; `test_config.py` Defaults. `pytest phase5_execution/tests -v` → **128 passed**.
 
 ### 5. `vetos.py` + Tests — `pre_trade_check()` = die 4 HARTEN VETOs
 **Alle auf FRISCHEM Snapshot unmittelbar vor der Order. Erster Fail = Abbruch.**

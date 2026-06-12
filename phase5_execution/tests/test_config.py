@@ -31,9 +31,10 @@ def test_defaults_match_locked_concept_values() -> None:
     assert cfg.momentum_count == 12
     assert cfg.momentum_veto_threshold_pct == 0.15
 
-    # sizing (percent — sizing.py divides by 100)
-    assert cfg.risk_pct_conservative == 0.5
-    assert cfg.risk_pct_aggressive == 1.0
+    # sizing (risk-per-trade percent — sizing.py divides by 100; reworked 2026-06-12)
+    assert cfg.risk_pct_conservative == 2.0
+    assert cfg.risk_pct_aggressive == 3.0
+    assert cfg.max_leverage == 20.0
 
     # SL / TP (absolute-level offsets in points)
     assert cfg.stop_distance_points == 30.0

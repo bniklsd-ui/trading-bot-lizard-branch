@@ -104,7 +104,7 @@ phase5_execution/
 │   ├── models.py         # ✅ Step 1 — OrderPlan/GateVerdict/VetoVerdict/ExecutionResult
 │   ├── execution_state.py# ✅ Step 2 — write-ahead Idempotenz (10 Tests)
 │   ├── gates.py          # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
-│   ├── sizing.py         # ✅ Step 4 — Gate 4 (11 Tests)
+│   ├── sizing.py         # ✅ Step 4 — Gate 4 (13 Tests; sizing reworked 2026-06-12)
 │   ├── vetos.py          # ✅ Step 5 — pre_trade_check (4 VETOs) (20 Tests)
 │   ├── order.py          # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
 │   ├── monitor.py        # ✅ Step 7 — Polling + Time-Stop + Close (6 Tests)
@@ -118,13 +118,66 @@ phase5_execution/
     ├── test_models.py          # ✅ Step 1 — Models + Exceptions (13 Tests)
     ├── test_execution_state.py # ✅ Step 2 — write-ahead Idempotenz (10 Tests)
     ├── test_gates.py           # ✅ Step 3 — Gate 1/2/3/5 (15 Tests)
-    ├── test_sizing.py          # ✅ Step 4 — Gate 4 (11 Tests)
+    ├── test_sizing.py          # ✅ Step 4 — Gate 4 (13 Tests; sizing reworked 2026-06-12)
     ├── test_vetos.py           # ✅ Step 5 — pre_trade_check 4 VETOs (20 Tests)
     ├── test_order.py           # ✅ Step 6 — place/reconcile/build_order_plan (15 Tests)
     ├── test_monitor.py         # ✅ Step 7 — Polling + Time-Stop + Close (6 Tests)
     ├── test_executor.py        # ✅ Step 8 — full-cycle orchestrator (8 Tests)
     └── test_ig_bot.py          # ✅ Step 9 — CLI helpers (exit/serialise/argparse/confirm, 18 Tests)
 ```
+
+## Session stopped — 2026-06-12 (Position-Sizing-Rework — Gate 4)
+
+### Stand
+**Sizing-Rework erledigt** (die ⚠ PRIORITÄT aus der Steps-9+10-Session unten). Gate 4
+sizt jetzt nach **Risk-per-Trade ÷ Stop-Distanz** statt notional ÷ Preis → ein ~€1 K-
+Budget liefert eine handelbare Size ≥ `min_deal_size`. **Operator-gegengelesen** (beide
+offenen Entscheidungen im Plan-Mode bestätigt). `pytest phase5_execution/tests -v` →
+**128 passed** (war 126; +2 neue Sizing-Tests). Andere Suites unberührt (P1 49 · P2 59 ·
+P3 70 · P4 88) — die Änderung ist Phase-5-isoliert. **Nicht committet** (Operator triggert).
+
+### Zuletzt gemacht
+- **`execution/sizing.py`** — `_round_down_size` → **`_size_from_risk`**:
+  `raw = (balance × risk_pct) / (stop_distance_points × point_value)`, Notional-Deckel
+  `cap = (balance × max_leverage) / (price × point_value)`, `min(raw, cap)`, **ab** auf 0.1,
+  `0.0` bei nicht-positiver Balance/Stop/Preis. `compute_size`-Signatur **unverändert**
+  (`config` trägt `stop_distance_points`/`max_leverage`); Reason-Codes unverändert; `risk_pct/100`
+  bleibt. Modul-/Funktions-Docstrings warnen explizit: P1-`calc_position_size`-Spiegel **bewusst
+  gelöst** — nicht „zurückfixen".
+- **`execution/config.py`** — `risk_pct_conservative` `0.5→2.0`, `risk_pct_aggressive` `1.0→3.0`
+  (jetzt Risk-per-Trade-Prozente), **neu** `max_leverage: float = 20.0`. Docstrings + Reconcile-
+  Notiz aktualisiert. (Operator-Entscheidung 2026-06-12: 2.0/3.0 + Notional-Cap.)
+- **Tests** — `test_sizing.py` neu gerechnet (stop=30/pt=1, preisunabhängig) + 2 neue Fälle:
+  `test_thousand_euro_budget_is_tradeable` (die Regression: €1 K → 0.6 ≥ 0.5) und
+  `test_leverage_cap_clips_oversized_risk` (tiny Stop + große Balance → Cap greift).
+  `test_executor.py`/`conftest.py` Balances auf realistische ~€0.4–1.5 K (Default 400 → no-trade,
+  Happy-Path 1500 → 1.0 lot); `test_config.py` Defaults + `max_leverage`.
+- **Konzept** `docs/concepts/phase5_concept.md` — dated §4-Annotation (2026-06-12) + Decision-F-
+  Zeile + Config-Tabelle (`⟳ 2026-06-12`-Marker, `max_leverage`-Zeile).
+
+### Nächster Schritt — Operator-Live-Gate (⚠ ZWEI offene Aktionen) + Step 11
+- **Live-Test-Lauf 2026-06-12 ~07:38 (Operator):** `live_test.py` lief sauber, aber Gate 1
+  (Handelsfenster) hat **vor** Sizing/Order kurzgeschlossen — `07:38 outside trade window
+  09:00-17:30 Europe/Berlin` → `NO_TRADE`, `RESULT: 2/2 passed`, exit 0. Der Markt/​das
+  Fenster war noch zu; der Order-/Monitor-Pfad mit dem neuen Sizing ist damit **noch nicht**
+  live durchlaufen. **Das ist KEIN Fehler** — nur das Zeitfenster.
+- ⚠ **Aktion 1 — Candidate NEU SEEDEN:** der frisch geseedete Candidate (2026-06-12, 30-min
+  TTL) **läuft vor 09:00 ab**. Vor dem nächsten Live-Lauf neu seeden (gleiches 10-Feld-Format,
+  `source:"research"`, via `StateManager.save_candidates([...])` für frische TTL). **Kein**
+  `risk_pct`/Balance-Hack mehr nötig — das ~30 K-Demo (oder ~€1 K) liefert jetzt eine valide Size.
+- ⚠ **Aktion 2 — Live-Test ERNEUT laufen, INNERHALB des Fensters (09:00–17:30 Europe/Berlin):**
+  `python scripts/smoke_test.py` (DRY) → `python scripts/live_test.py` gegen IG Demo. Jetzt
+  erwartet: echter open→Time-Stop-close (kein erzwungenes `below_min`-NO_TRADE mehr), `exit 0` —
+  **das** ist der eigentliche Beweis fürs neue Sizing + den Order-/Monitor-Pfad.
+- Danach **Step 11** (`README.md`/`requirements.txt` + Top-Level-Doku-Flip) wie unten beschrieben.
+
+### Offene Punkte
+- Order-/Monitor-Pfad ist live weiterhin **ungetestet** (07:38-Lauf brach an Gate 1 ab), bis der
+  Operator **innerhalb des Fensters** mit frischem Candidate + neuem Sizing einen Trade durchspielt
+  (in CI über `test_executor.py`/`test_order.py` gedeckt). Siehe Aktion 1 + 2 oben.
+- `max_leverage=20.0` / `risk_pct` 2.0/3.0 sind **v1** (am Profit zu tunen, nicht jetzt).
+
+---
 
 ## Session stopped — 2026-06-11 (Steps 9 + 10)
 
@@ -171,7 +224,7 @@ live_test.py` gegen IG Demo) + Step 11 (`README.md`/`requirements.txt`, Top-Leve
   `NO_TRADE`/Abstain = valider exit-0. `RESULT: N/M` → stderr, JSON → stdout.
 - **Konzept §9 + §10** mit dated Annotationen (2026-06-11).
 
-### ⚠ PRIORITÄT nächste Session — **Position-Sizing überarbeiten** (Operator-Befund 2026-06-11)
+### ✅ ERLEDIGT 2026-06-12 (siehe Session-Block oben) — ~~⚠ PRIORITÄT — Position-Sizing überarbeiten~~ (Operator-Befund 2026-06-11)
 - **Befund (live bestätigt):** Mit geseedetem Candidate lief der volle Pfad bis **Gate 4**;
   `compute_size` lieferte `below_min_deal_size` → `NO_TRADE`. Ursache ist die **Sizing-Mathematik**,
   nicht die Pipeline: `_round_down_size` rechnet `notional = balance × (risk_pct/100)`, dann
@@ -205,12 +258,11 @@ live_test.py` gegen IG Demo) + Step 11 (`README.md`/`requirements.txt`, Top-Leve
 ### Offene Punkte / [VERIFY]
 - **IG-Erwartung der absoluten SL/TP-Level** (BUY: stop unter/limit über) bleibt der
   **Operator-Live-Check** in `live_test.py` — Unit-Tests prüfen nur die Arithmetik.
-- **Sizing rundet auf 0.0 → `below_min_deal_size`** auch auf dem 30 K-Demokonto (live bestätigt
-  2026-06-11). **Das ist jetzt ein bekanntes Sizing-Problem** (kein „kein Bug" mehr) → siehe die
-  ⚠-PRIORITÄT oben. Bis zur Überarbeitung platziert `live_test.py` deshalb i. d. R. **keine**
-  Order (sauberer `NO_TRADE`, exit 0); der Order-/Monitor-Pfad bleibt damit live **noch ungetestet**
-  (in CI über `test_executor.py`/`test_order.py` gedeckt). Zum manuellen Durchspielen vorerst ein
-  Candidate seeden **und** `risk_pct`/Balance temporär hochsetzen.
+- ~~**Sizing rundet auf 0.0 → `below_min_deal_size`**~~ **✅ behoben 2026-06-12** (Risk-per-Trade-
+  Modell, siehe Session-Block oben): das ~30 K-Demo **und** ein ~€1 K-Konto liefern jetzt eine
+  valide Size. Manuelles Durchspielen braucht **keinen** Balance-/`risk_pct`-Hack mehr — nur einen
+  **frisch geseedeten** Candidate (der alte ist abgelaufen). Der Order-/Monitor-Pfad bleibt live
+  ungetestet, bis der Operator das mit frischem Candidate durchspielt (CI deckt ihn).
 - `close_position`-vanished-Edge (Monitor, Step 7) bleibt v1 grob (Abort statt Error-Parse).
 
 ### Gotchas

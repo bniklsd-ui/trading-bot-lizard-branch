@@ -16,9 +16,10 @@ verified against ``ig_adapter.py`` / ``filters.py``):
 - ``max_spread_pct`` is a **percent of ask** (``Price.spread_pct`` =
   ``(ask-bid)/ask*100``), not points — the "~1.8 pts" guess was wrong. Default
   ``0.5`` mirrors Phase-4 ``ResearchConfig.max_spread_pct``.
-- ``risk_pct_conservative`` / ``risk_pct_aggressive`` are **percent**;
-  ``calc_position_size`` consumes a *fraction*, so ``sizing.py`` (Step 4) divides
-  these by 100.
+- ``risk_pct_conservative`` / ``risk_pct_aggressive`` are **percent**; the risk
+  sizer consumes a *fraction*, so ``sizing.py`` divides these by 100. As of
+  2026-06-12 these are **risk-per-trade** percents (loss at the stop), not notional
+  percents — the model was switched off notional ÷ price (see ``sizing.py``).
 """
 
 from __future__ import annotations
@@ -47,11 +48,20 @@ class ExecutionConfig:
             trade (BUY into a sharp drop / SELL into a sharp rally). **v1, tune at
             profit** — a blunt guard, not a hidden confidence system.
 
-    Sizing (Gate 4):
+    Sizing (Gate 4 — risk-per-trade ÷ stop-distance, operator decision 2026-06-12):
         risk_pct_conservative / risk_pct_aggressive: **percent** of available
-            balance to expose, chosen by ``Database.get_risk_level()``
-            (KONSERVATIV / AGGRESSIV). ``sizing.py`` passes ``value / 100`` to
-            ``calc_position_size`` (which takes a fraction).
+            balance put **at risk per trade** (worst-case loss if the stop is hit),
+            chosen by ``Database.get_risk_level()`` (KONSERVATIV / AGGRESSIV).
+            ``sizing.py`` passes ``value / 100`` (a fraction) into the risk-sizer;
+            ``size = risk_amount / (stop_distance_points × point_value)``. Defaults
+            2.0 / 3.0 give a tradeable ≥ ``min_deal_size`` 0.5 lot at the real ~€1K
+            budget (the old 0.5 / 1.0 notional defaults rounded to 0.0 — see
+            ``sizing.py`` for the model switch). **v1, tune at profit.**
+        max_leverage: notional safety cap — the order's notional may not exceed
+            ``available_balance × max_leverage`` (``sizing.py`` clips the risk size
+            to this). Default 20.0 = the ESMA retail major-index ceiling (5% margin),
+            so it only guards pathological oversizing, never normal ~€1K sizing.
+            **v1, tune at profit.**
 
     SL / TP (set at entry, broker-side — survives a monitor crash):
         stop_distance_points / limit_distance_points: point offsets from the
@@ -93,8 +103,9 @@ class ExecutionConfig:
     momentum_veto_threshold_pct: float = 0.15  # v1, tune at profit
 
     # --- sizing (Gate 4) ---
-    risk_pct_conservative: float = 0.5     # percent; sizing.py divides by 100
-    risk_pct_aggressive: float = 1.0       # percent; sizing.py divides by 100
+    risk_pct_conservative: float = 2.0     # percent; sizing.py divides by 100
+    risk_pct_aggressive: float = 3.0       # percent; sizing.py divides by 100
+    max_leverage: float = 20.0             # notional cap = balance × this (ESMA ceiling)
 
     # --- SL / TP ---
     stop_distance_points: float = 30.0     # v1, tune at profit

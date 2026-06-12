@@ -216,9 +216,9 @@ class FakeBroker:
         connect_env: the ``_FakeEnv`` ``connect()`` returns (default ok). Set
             ``is_connected=False`` + ``ok=False`` for the connect-failure path.
         account_env: the ``_FakeEnv`` ``get_account()`` returns (default ok with a
-            **modest** ``available`` so the default path no-trades at sizing). Set
-            ``ok=False`` for the session-health-fail path; raise ``available`` for the
-            happy path.
+            **tiny** ``available`` so the default path no-trades at sizing — the
+            risk-per-trade model rounds it below ``min_deal_size``). Set ``ok=False``
+            for the session-health-fail path; raise ``available`` for the happy path.
         market_info_env: the ``_FakeEnv`` ``get_market_info(epic)`` returns (default ok
             with ``min_deal_size`` 0.5).
     """
@@ -287,8 +287,11 @@ class FakeBroker:
         self.account_env = account_env or _FakeEnv(
             ok=True,
             data={
-                "balance": 100000.0,
-                "available": 100000.0,   # modest → default path no-trades at sizing
+                "balance": 400.0,
+                # Tiny → default path no-trades at sizing. Under the risk-per-trade
+                # model (2% / 30pt) this rounds to 0.2 < min_deal_size 0.5; a happy
+                # path raises this (e.g. ~€1500 → 1.0 lot). See sizing.py.
+                "available": 400.0,
                 "profit_loss": 0.0,
                 "currency": "EUR",
             },

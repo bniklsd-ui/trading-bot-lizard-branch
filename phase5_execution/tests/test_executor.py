@@ -127,7 +127,7 @@ def test_full_path_open_then_closed_by_broker(
 ) -> None:
     """Every gate/VETO passes, order ACCEPTED, position present then gone → CLOSED_BY_BROKER."""
     broker = FakeBroker(
-        account_env=_account(2_000_000.0),  # large enough that size ≈ 0.5 ≥ min 0.5
+        account_env=_account(1500.0),  # 2% / 30pt → 1.0 lot ≥ min 0.5 (risk-per-trade model)
         positions_sequence=[
             _positions(),                  # Gate 3 + Gate 5 (one fetch)
             _positions(),                  # VETO 4 (pre_trade_check)
@@ -175,7 +175,7 @@ def test_gate1_outside_window_no_research_no_order(
 
 def test_gate2_abstain_no_order(exec_state: ExecutionState) -> None:
     """Fresh-but-empty candidate store → abstain (NO_TRADE), no order."""
-    broker = FakeBroker(account_env=_account(2_000_000.0))
+    broker = FakeBroker(account_env=_account(1500.0))
     state = FakeState(fresh=True, candidates=[])  # abstain
     executor, runner = _build(broker, state, exec_state)
 
@@ -197,7 +197,7 @@ def test_veto_adverse_momentum_blocks_order(
     from tests.conftest import make_bars
 
     broker = FakeBroker(
-        account_env=_account(2_000_000.0),
+        account_env=_account(1500.0),
         ohlcv_env=_FakeEnv(ok=True, data={"bars": make_bars([18000.0, 17900.0])}),  # -0.56%
     )
     state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
@@ -216,8 +216,9 @@ def test_veto_adverse_momentum_blocks_order(
 def test_size_below_min_no_order(
     exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
 ) -> None:
-    """A modest balance rounds the size below min_deal_size → NO_TRADE, no order."""
-    broker = FakeBroker(account_env=_account(100_000.0))  # size rounds to 0.0 < 0.5
+    """A tiny balance rounds the size below min_deal_size → NO_TRADE, no order."""
+    # 2% of 400 / 30 = 0.266 → 0.2 < min_deal_size 0.5 (risk-per-trade model).
+    broker = FakeBroker(account_env=_account(400.0))
     state = FakeState(fresh=True, candidates=[make_candidate()])
     executor, _ = _build(broker, state, exec_state)
 
@@ -235,7 +236,7 @@ def test_confirm_declined_places_no_order(
     exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
 ) -> None:
     """A declined human-confirm places no order and writes no write-ahead record."""
-    broker = FakeBroker(account_env=_account(2_000_000.0))
+    broker = FakeBroker(account_env=_account(1500.0))
     state = FakeState(fresh=True, candidates=[make_candidate()])
     executor, _ = _build(broker, state, exec_state, confirm_fn=_no)
 
@@ -280,7 +281,7 @@ def test_reconcile_conflict_aborts(
     exec_state.record_pending(seeded)
 
     broker = FakeBroker(
-        account_env=_account(2_000_000.0),
+        account_env=_account(1500.0),
         reconcile_env=_FakeEnv(
             ok=True,
             data={
