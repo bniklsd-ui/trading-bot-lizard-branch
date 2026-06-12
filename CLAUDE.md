@@ -77,9 +77,34 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 4 — Research (LLM candidate selection): ✅ abgeschlossen +
-live-verifiziert. Phase-5-Konzept (ig_bot Gates 1–5) ausstehend (Browser-Konzept-Session
-leitet den Phasenwechsel ein — nicht hier in Claude Code).
+**Active phase:** Phase 5 — Execution (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close):
+✅ abgeschlossen + live-verifiziert (Order-/Monitor-Pfad). Phase-6-Konzept (Bull/Bear/Judge)
+ausstehend (Browser-Konzept-Session leitet den Phasenwechsel ein — nicht hier in Claude Code).
+
+**Phase 5 status:** ✅ Code-complete + live-**verifiziert** (Order-/Monitor-Pfad), **noch
+nicht profit-validiert** (2026-06-12)
+- ⚠ **Live-verifiziert ≠ profit-validiert** (gleiche Disziplin wie Phase 4): der Pfad
+  *platziert und schließt korrekt* — `phase5_execution/scripts/live_test.py` (SELL-Seed,
+  im Fenster) platzierte eine **echte** IG-Demo-Order (ACCEPTED, `deal_id=DIAAAAXQ6CSGTA5`)
+  und schloss sie per Time-Stop → `RESULT: 4/4 passed`. Damit ist der ganze Pfad end-to-end
+  live bewiesen (Gates → Sizing → 4 VETOs → place → monitor → close), **nicht** nur in CI.
+  **Unbekannt** bleibt die Profitabilität (nur **ein** Trade, kein Edge gemessen) —
+  Outcome-Anchoring ist Phase 7 + Live-Betrieb.
+- **KEINE AI in Phase 5** (Kernprinzip): Gates, VETOs, Sizing, Order, Monitoring, Reconcile
+  sind deterministischer Code. Die einzige AI bleibt der eine Phase-4-Research-Call (lazy
+  über Gate 2). VETOs sind HART (kein Trade); Datenfehler/zu wenige Bars → fail-closed.
+- 130 Unit-Tests grün (gemockt, kein Netzwerk, keine echte Order; `pytest phase5_execution/
+  tests`). Bestehende Suites unberührt (P1 49 · P2 59 · P3 70 · P4 88).
+- Code in `phase5_execution/execution/` (Paket `execution`, editable-install Composition Root —
+  kein `sys.path`-Hack) · Konzept in `docs/concepts/phase5_concept.md` · CLI `python -m
+  execution.ig_bot` · Operator-Live-Gate via `scripts/seed_candidate.py` → `smoke_test.py` →
+  `live_test.py` (Demo only, manueller Trigger, **kein** Scheduler = Phase 8).
+- Erkenntnisse (Code = Source of Truth, Konzept §4/§6 annotiert): (1) Position-Sizing auf
+  **Risk-per-Trade ÷ Stop-Distanz** umgestellt (statt notional ÷ Preis) → ein ~€1 K-Budget
+  liefert eine handelbare Size ≥ `min_deal_size`. (2) IG verlangt am `POST /positions/otc`
+  ein nicht-null **`currencyCode`** → `OrderPlan` trägt jetzt `currency` (aus `get_market_info`,
+  Fallback `EUR`). v1-Tuning-Parameter (`risk_pct` 2.0/3.0, `stop=30`/`limit=45`,
+  `momentum_threshold=0.15`, `max_leverage=20`) bleiben am Profit zu tunen (Phase 7).
 
 **Phase 4 status:** ✅ Code-complete + live-**getestet** (Pipeline-Logik), **noch
 nicht profit-validiert** (2026-06-09)

@@ -99,20 +99,25 @@ that passes downstream consumption.
 
 **Goal:** First end-to-end execution path. Manual trigger only, no scheduler yet.
 
-- [ ] Gate 1: Time Window check
-- [ ] Gate 2: Load Candidates (calls Phase 4 if missing)
-- [ ] Gate 3: Constraints (budget, concurrent positions)
-- [ ] Gate 4: Broker sizing
-- [ ] Gate 5: Direction Consistency (`gate_direction_consistency` — pass-through check, no FLIP)
-- [ ] `pre_trade_check()` — 4 VETOs
-- [ ] Place order via broker_wrapper
-- [ ] Monitor position
-- [ ] Close position
+- [x] Gate 1: Time Window check
+- [x] Gate 2: Load Candidates (calls Phase 4 if missing)
+- [x] Gate 3: Constraints (budget, concurrent positions)
+- [x] Gate 4: Broker sizing (risk-per-trade ÷ stop-distance)
+- [x] Gate 5: Direction Consistency (`gate_direction_consistency` — pass-through check, no FLIP)
+- [x] `pre_trade_check()` — 4 VETOs (status/window, spread, momentum via `get_ohlcv`, position conflict)
+- [x] Place order via broker_wrapper (write-ahead `deal_reference`, PENDING fail-closed)
+- [x] Monitor position (polling, time-stop close)
+- [x] Close position
+- [x] Startup reconcile (orphan PENDING → mark_closed)
 
 **Done when:** Manually triggering `ig_bot.py` against IG Demo opens and
-closes a trade through all gates successfully.
+closes a trade through all gates successfully. ✅ 130 unit tests green +
+live-verified via `phase5_execution/scripts/live_test.py` (real SELL order
+open → time-stop-close, IG Demo, `RESULT: 4/4 passed`) — 2026-06-12.
+⚠ Live-verified ≠ profit-validated (edge is Phase 7 + live running).
 
-**Directory:** `phase5_execution/` *(to be created)*
+**Directory:** [`phase5_execution/`](./phase5_execution/)
+**Concept:** [`docs/concepts/phase5_concept.md`](./docs/concepts/phase5_concept.md)
 
 ---
 

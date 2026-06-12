@@ -126,6 +126,51 @@ phase5_execution/
     └── test_ig_bot.py          # ✅ Step 9 — CLI helpers (exit/serialise/argparse/confirm, 18 Tests)
 ```
 
+## Session stopped — 2026-06-12 (Step 11 — Doku-Abschluss + Repo-weiter Phase-5-Flip)
+
+### Stand
+**Step 11 erledigt — Phase 5 ist DOKU-vollständig abgeschlossen.** Die Live-Gate-Verifikation
+(Block direkt unten) ist die fachliche Wahrheit; Step 11 bringt nur die Doku in Deckung. Keine
+Produktiv-Code-Änderung (Code ist done + live bewiesen). `pytest phase5_execution/tests -q` →
+**130 passed** (unverändert — die Doku-Edits berühren keinen Code-Pfad). Committet auf
+`phase5-execution` als ein atomarer Commit (`phase5: Step 11 docs + repo-wide phase-5 flip`).
+**Merge → `main` bleibt die Operator-Entscheidung** (Zeitpunkt/PR).
+
+### Zuletzt gemacht (Step 11)
+- **`README.md` (Phase 5)** — der stale „Status: in progress … modules are not built yet"-Banner
+  war schlicht falsch → auf ✅ code-complete + live-verifiziert (Demo) geflippt, mit dem
+  live-verified≠profit-validated-Caveat (gleiche Disziplin wie Phase 4). **Run-Sektion korrigiert:**
+  der CLI-Entry ist `python -m execution.ig_bot` (lief vorher fälschlich als
+  `python phase5_execution/ig_bot.py`); `--dry`/`--yes`/`--epic` dokumentiert; Operator-Live-Gate
+  als Reihenfolge `seed_candidate.py --direction SELL` → `smoke_test.py` → `live_test.py`
+  (TTL-30-min-Hinweis, Richtung = aktueller `get_ohlcv`-net-return für VETO 3, Fenster
+  09:00–17:30 Europe/Berlin). stdout=JSON / stderr=Logs + `dev_install.sh`-Setup beibehalten.
+- **`requirements.txt` (Phase 5)** — geprüft, **unverändert korrekt** (keine neuen Runtime-Deps;
+  nur `pytest`; Runtime über die editable installs der Schwester-Pakete).
+- **Top-Level `../CLAUDE.md` „Current state"** — Active phase Phase 4 → **Phase 5 ✅ abgeschlossen
+  + live-verifiziert**; Phase-5-Status-Block ergänzt (130 Tests; live SELL open→Time-Stop-close
+  2026-06-12; `currencyCode`-Fix; Risk-per-Trade-Sizing; live-verified≠profit-validated;
+  Phase-6-Konzept in der Browser-Session).
+- **Root `../README.md`** — Status-Tabelle Phase 5 „Nicht begonnen" → ✅ Abgeschlossen
+  (live-verifiziert, Demo) + Fußnote mit dem live-verified≠profit-Caveat.
+- **`../ROADMAP.md`** — Phase-5-Checkboxen gehakt + „Done when … ✅ 130 unit tests +
+  live-verified via `live_test.py` (real open→time-stop-close, IG Demo) — 2026-06-12"
+  (Muster wie Phase 2).
+- **Keine Konzept-Annotation** — Step 11 ist reine Doku, keine Design-Entscheidung geändert.
+
+### Nächster Schritt
+- **Operator:** Merge `phase5-execution` → `main` (Zeitpunkt/PR nach Wahl).
+- **Phase 6** (Bull/Bear/Judge) — Konzept/Transition passiert in der **Browser-Session**, nicht
+  hier. Carry-over bleibt: `risk_pct`/Stop-Limit/Momentum-Threshold/`max_leverage` sind **v1**
+  (am Profit zu tunen, Phase 7); SL/TP-Level-Richtung BUY ist live nur implizit (über SELL)
+  bestätigt — expliziter BUY-Live-Check nice-to-have, nicht blockierend.
+
+### Offene Punkte / blockers
+- Keine. Phase 5 ist code-complete, live-verifiziert (4/4) und doku-konsistent. Profitabilität
+  ist bewusst out-of-scope (Phase 7 + Live-Betrieb).
+
+---
+
 ## Session stopped — 2026-06-12 (Live-Gate GRÜN — Order-/Monitor-Pfad live-verifiziert)
 
 ### Stand
