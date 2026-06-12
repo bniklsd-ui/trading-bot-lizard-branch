@@ -176,8 +176,8 @@ class Executor:
         if not veto.ok:
             return self._no_trade(veto.veto, veto.reason)
 
-        # 8) Build the resolved order plan (reuse the Gate-4 fresh price).
-        plan = build_order_plan(candidate, size, price_env, self.config)
+        # 8) Build the resolved order plan (reuse the Gate-4 fresh price + market info).
+        plan = build_order_plan(candidate, size, price_env, market_info_env, self.config)
 
         # 9) Human-confirm — the last gate before any broker order (Decision D).
         if self.config.require_confirm and not self.confirm_fn(plan):

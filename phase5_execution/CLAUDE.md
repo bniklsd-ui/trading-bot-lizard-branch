@@ -126,6 +126,109 @@ phase5_execution/
     └── test_ig_bot.py          # ✅ Step 9 — CLI helpers (exit/serialise/argparse/confirm, 18 Tests)
 ```
 
+## Session stopped — 2026-06-12 (Live-Gate GRÜN — Order-/Monitor-Pfad live-verifiziert)
+
+### Stand
+**🎉 Operator-Live-Gate bestanden — der echte Order-/Monitor-Pfad ist live-verifiziert.**
+`live_test.py` (SELL-Seed, im Fenster) → `RESULT: 4/4 passed`: echte Demo-Order **ACCEPTED**
+(`deal_id=DIAAAAXQ6CSGTA5`), `monitor_position` → **Time-Stop-Close** (`max_hold=1m`),
+write-ahead-Record endet `CLOSED`, `plan.currency="EUR"`. Startup-Reconcile räumte zuvor das
+alte orphan-PENDING (`missing → mark_closed`). Damit ist Phase 5 **end-to-end live bewiesen**
+(Gates → Sizing → 4 VETOs → place → monitor → close), nicht nur in CI.
+Dahin führten drei Fixes dieser Session (alle unten): Seed-Tool, Diagnose-Logging, `currencyCode`.
+`pytest phase5_execution/tests -q` → **130 passed**. **Noch NICHT committet** — Commit + Step 11
+ist der nächste Schritt (siehe unten).
+
+### Zuletzt gemacht
+- **`scripts/seed_candidate.py`** (neu) — schreibt **einen** manuellen Candidate (frozen
+  10-Feld-Kontrakt, `source:"research"`, Default `BUY IX.D.DAX.IFMM.IP`, conf 70) über
+  `StateManager.save_candidates([...])` → frische `generated_at`/`expires_at` (TTL 30 min) in
+  dieselbe `turbo_candidates.json`, die Gate 2 liest. Argparse `--epic/--direction/--confidence`.
+  Output-Disziplin wie smoke/live: Fortschritt → stderr, persistierter Candidate-JSON → stdout.
+  Mustert die `_REPO_ROOT = parents[2]`-Pfadauflösung von `wiring.py`; `persistence` kommt über
+  den Editable-Install (kein `sys.path`-Hack). **Kein** `risk_pct`/Balance-Hack — das neue
+  Risk-per-Trade-Sizing liefert bei ~30 K-Demo (und ~€1 K) eine valide Size.
+- **Live ausgeführt** (lokaler File-Write, kein Netz): frischer Seed gestempelt,
+  `candidates_are_fresh() -> True` bestätigt → Gate 2 nutzt den Seed und überspringt den
+  Research-Runner.
+- Keine Design-Entscheidung geändert → **keine** Konzept-Annotation nötig (reines Operator-Tool;
+  Seeding-Logik delegiert an die Phase-2-getestete `save_candidates`). Kein Script-Unit-Test
+  (konsistent mit `smoke_test.py`/`live_test.py` — Scripts werden nicht collected).
+
+### ✅ Operator-Live-Gate erledigt (2026-06-12) — wie reproduzieren
+Lief mit (im Fenster 09:00–17:30 Europe/Berlin, momentum-konformer Richtung):
+1. `python scripts/seed_candidate.py --direction SELL` — **unmittelbar vor** dem Lauf (TTL 30 min!).
+2. `python scripts/smoke_test.py` (DRY-Sanity, keine Order) — optional.
+3. `python scripts/live_test.py` → `RESULT: 4/4 passed` (echte Order → Time-Stop-Close).
+Richtung **mit** dem aktuellen `get_ohlcv`-net-return wählen (VETO 3, siehe unten).
+
+### Nächster Schritt — **Step 11** (Abschluss: Doku-Flip + Commit + Merge)
+- **Commit** der drei Session-Änderungen ist beim Schreiben dieses Blocks erfolgt (Branch
+  `phase5-execution`): seed-tool · broker-error-message · `currencyCode`-Fix. Siehe `git log`.
+- **`README.md` / `requirements.txt`** prüfen/finalisieren (Phase-5-eigene Dev-Deps; Runtime über
+  Editable-Installs). README: was `phase5_execution/` ist + `ig_bot.py`/`smoke_test.py`/
+  `live_test.py`/**`seed_candidate.py`** Start, Verweis auf diese `CLAUDE.md`.
+- **Top-Level-Doku-Flip:** `../CLAUDE.md` „Current state" + Root-`README.md` auf **Phase 5 ✅
+  abgeschlossen + live-verifiziert** (Order-/Monitor-Pfad live bewiesen). Phase-6-Konzept/Transition
+  passiert in der **Browser-Session**, nicht hier.
+- **Merge** `phase5-execution` → `main` (Operator entscheidet Zeitpunkt/PR).
+- ⚠ **Live-verifiziert ≠ profit-validiert** (gleiche Disziplin wie Phase 4): der Pfad platziert/
+  schließt korrekt; Edge/Profitabilität ist Phase 7 (Outcome-Anchoring) + Live-Betrieb.
+
+### VETO 3 (Momentum) live bestätigt — 2026-06-12
+- Mit frischem Seed lief `live_test.py` sauber bis zu den VETOs (Sizing blockt nicht mehr) und
+  stoppte zweimal an **VETO 3**: `BUY into drop: net_return -0.200% / -0.180% <= -0.15%`. Der
+  echte DAX driftet ~0.18–0.20 % abwärts → ein BUY kämpft gegen den Tape. **Kein Bug** — der
+  fail-closed Momentum-Guard (`veto_momentum`, MINUTE_5×12 `get_ohlcv`-Closes) feuert exakt wie
+  architektiert. Schöne Live-Bestätigung von VETO 3.
+- **Betriebs-Tipp (um den Order-Pfad live zu üben, OHNE einen VETO zu lockern):** in **Richtung
+  des aktuellen `get_ohlcv`-net-return seeden** — bei Abwärtsdrift `seed_candidate.py --direction
+  SELL` (SELL ist *mit* dem Move → VETO 3 passt). `momentum_veto_threshold_pct` **nicht**
+  hochdrehen, um einen Trade zu erzwingen. Momentum ist Echtzeit + Seed-TTL 30 min → Seed +
+  `live_test.py` **direkt hintereinander** im Fenster laufen. (Markt flach, `|net_return| <
+  0.15 %` → beide Richtungen passieren VETO 3.) Gate 5 akzeptiert SELL; `score_at_pick=50` ist
+  nur advisory (Phase-4-Long-Bias-Clamp gilt in Phase 5 nicht — Richtung kommt fertig).
+
+### `open_position` → BROKER_ERROR live (2026-06-12) — Ursache `currencyCode`, GEFIXT
+- Mit SELL-Seed liefen alle 4 VETOs durch, `build_order_plan` baute (`SELL`, size **19.9**,
+  stop 24552.2 / limit 24477.2 = Entry 24522.2 ±30/45 — Arithmetik korrekt), und `open_position`
+  kam zurück mit `not env.ok`, `error.code = "BROKER_ERROR"`. Der Executor reagierte **korrekt**:
+  write-ahead PENDING, **kein** zweiter Order-Aufruf, `ExecutionAbort` → `status=ABORT`, „left
+  PENDING for startup reconcile" (Decision E). `live_test.py` wertet ABORT als nicht-clean →
+  `1/2 passed`; das ist die strenge Happy-Path-Assertion, **kein** Code-Bug. (Beim Folgelauf
+  wurde das alte orphan-PENDING vom Startup-Reconcile sauber `missing → mark_closed` — bestätigt:
+  keine Position eröffnet.)
+- **Diagnose-Logging zuerst** (`execution/order.py`, Transport-Error-Zweig): loggt + hängt jetzt
+  `error["message"]` an (nicht nur den gemappten `code`). Damit zeigte der nächste Lauf den
+  **echten** IG-errorCode: **`400 validation.null-not-allowed.request.currencyCode`**.
+- **Ursache (gefunden):** IG verlangt am `POST /positions/otc` ein **nicht-null `currencyCode`**;
+  `ig_adapter.open_position` setzt es nur bedingt (`if currency: body["currencyCode"] = currency`,
+  `ig_adapter.py:330`), und Phase 5 übergab **kein** `currency` → Feld fehlte → 400. (`_poll_confirms`
+  raised **nicht** bei Timeout → wäre `PENDING` gewesen; war's nicht → API-Layer-Reject, keine Position.)
+- **Fix (dieser Lauf, alles Phase-5-`execution/`):** `currency` durchgereicht.
+  `OrderPlan` trägt jetzt **`currency: str`**; `build_order_plan(candidate, size, price_env,
+  **market_info_env**, config)` löst die Währung aus `market_info` (`get_market_info(epic).data
+  ["currency"]`) auf, Fallback **`config.default_currency = "EUR"`**; `place_order` übergibt
+  `currency=plan.currency` an `open_position`; der Executor reicht das schon für Gate-4 geholte
+  `market_info_env` weiter (kein zweiter Abruf). Konzept §6 + dated Annotation aktualisiert.
+- **Verifikation:** `pytest phase5_execution/tests -v` → **130 passed** (war 128; +2
+  `build_order_plan`-Currency-Tests, + Asserts in `place_order`-/`config`-Tests). **Nicht committet.**
+- **Nächster Schritt (Operator):** SELL neu seeden + `live_test.py` → `currencyCode`-400 ist weg.
+  Erwartung: echter open→Time-Stop-close (`exit 0`) **oder** — jetzt dank Message-Logging
+  sichtbar — der **nächste** IG-Validation-Fehler (Level-Präzision `.x`, Min-Stop-Distanz, oder
+  Max-Deal-Size bei `size 19.9`). Erst bei Auftreten gezielt fixen, nicht vorher raten.
+
+### Offene Punkte
+- **Order-/Monitor-Pfad ist jetzt live-verifiziert** (4/4) — keine Folge-Validation-Fehler hinter
+  `currencyCode` aufgetreten (Order ACCEPTED auf Anhieb, `size 19.9` + Level `24621.5/24546.5`
+  von IG Demo akzeptiert). SL/TP-Level-Richtung (BUY: stop unter/limit über) ist damit für SELL
+  implizit live bestätigt; ein expliziter BUY-Live-Check bleibt nice-to-have, nicht blockierend.
+- **Nur ein** Live-Trade beweist den Pfad, **nicht** die Profitabilität (Phase 7). `risk_pct`
+  2.0/3.0, `max_leverage=20`, `stop=30`/`limit=45`, `momentum_threshold=0.15` bleiben **v1**.
+- Verbleibend für **Step 11**: README/requirements + Top-Level-Doku-Flip + Merge (siehe oben).
+
+---
+
 ## Session stopped — 2026-06-12 (Position-Sizing-Rework — Gate 4)
 
 ### Stand

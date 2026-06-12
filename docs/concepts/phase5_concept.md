@@ -498,6 +498,29 @@ def place_order(broker, exec_state, plan, config) -> ExecutionResult:
 > - 15 Tests (≥8) grün; `pytest phase5_execution/tests -v` → **94 passed** (79 + 15).
 >   `conftest.py` `FakeBroker` um `open_position`/`reconcile_positions` erweitert.
 
+> **Annotation 2026-06-12 (Live-Befund — `currencyCode` Pflicht — Code = Source of Truth):**
+> - **Operator-Live-Lauf** (SELL-Seed, im Handelsfenster) erreichte `open_position` und bekam
+>   `HTTP 400 validation.null-not-allowed.request.currencyCode`. **Ursache:** IG verlangt am
+>   `POST /positions/otc` ein **nicht-null `currencyCode`**; der Adapter setzt es nur
+>   bedingt (`if currency: body["currencyCode"] = currency`, `ig_adapter.py:330`), und Phase 5
+>   übergab kein `currency` → Feld fehlte → 400. Die Order wurde am API-Layer abgelehnt
+>   (`_poll_confirms` raised **nicht** bei Timeout → wäre `PENDING`); keine Position eröffnet.
+> - **Fix:** `currency` durchgereicht. `OrderPlan` trägt jetzt **`currency: str`**;
+>   `build_order_plan(candidate, size, price_env, market_info_env, config)` (neuer Param
+>   `market_info_env`, **symmetrisch** zu `price_env`) löst die Währung aus der
+>   Instrument-`market_info` (`get_market_info(epic).data["currency"]`) auf, Fallback
+>   **`config.default_currency = "EUR"`** (EUR-Konto/-Instrument). `place_order` übergibt
+>   `currency=plan.currency` an `open_position`. Der Executor reicht das bereits für Gate-4-Sizing
+>   geholte `market_info_env` weiter (kein zweiter Abruf).
+> - **Diagnose-Logging** (`order.py`, Transport-Error-Zweig): loggt + hängt jetzt
+>   `error["message"]` an (nicht nur den gemappten `code`) — dort steckt der echte IG-errorCode;
+>   ohne ihn war der Abort-Grund nicht diagnostizierbar.
+> - Tests: `pytest phase5_execution/tests -v` → **130 passed** (+2 `build_order_plan`-Currency-Fälle:
+>   aus `market_info` / Fallback; `place_order`-Forward + `test_config` `default_currency` ergänzt).
+> - **[VERIFY] offen:** ob hinter dem `currencyCode`-Fix ein **nächster** IG-Validation-Fehler
+>   liegt (Level-Präzision `.x`, Min-Stop-Distanz, Max-Deal-Size bei `size 19.9`) — jetzt dank
+>   Message-Logging diagnostizierbar; erst bei Auftreten gezielt fixen.
+
 ### 7. `monitor.py` + Tests — Polling + Time-Stop + Close
 ```python
 def monitor_position(broker, exec_state, plan, deal_id, config, *,

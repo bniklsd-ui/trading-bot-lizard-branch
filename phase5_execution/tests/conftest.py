@@ -52,6 +52,7 @@ def make_order_plan() -> Callable[..., OrderPlan]:
         stop_level: float = 17970.0,
         limit_level: float = 18045.0,
         deal_reference: str | None = None,
+        currency: str = "EUR",
     ) -> OrderPlan:
         return OrderPlan(
             epic=epic,
@@ -60,6 +61,7 @@ def make_order_plan() -> Callable[..., OrderPlan]:
             stop_level=stop_level,
             limit_level=limit_level,
             deal_reference=deal_reference or f"bot-{uuid.uuid4().hex}",
+            currency=currency,
         )
 
     return _factory
@@ -371,6 +373,7 @@ class FakeBroker:
                 "stop_level": stop_level,
                 "limit_level": limit_level,
                 "deal_reference": deal_reference,
+                "currency": currency,
             }
         )
         # Echo the caller's reference into the result, like the real adapter does.

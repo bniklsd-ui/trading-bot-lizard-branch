@@ -30,16 +30,18 @@ def test_order_plan_constructs_and_reads_back() -> None:
         stop_level=17970.0,
         limit_level=18045.0,
         deal_reference="bot-deadbeef",
+        currency="EUR",
     )
     assert plan.direction == "BUY"
     assert plan.size == 0.5
     assert plan.stop_level == 17970.0
     assert plan.limit_level == 18045.0
     assert plan.deal_reference.startswith("bot-")
+    assert plan.currency == "EUR"
 
 
 def test_order_plan_is_frozen() -> None:
-    plan = OrderPlan("E", "SELL", 0.5, 1.0, 2.0, "bot-x")
+    plan = OrderPlan("E", "SELL", 0.5, 1.0, 2.0, "bot-x", "EUR")
     with pytest.raises(dataclasses.FrozenInstanceError):
         plan.size = 1.0  # type: ignore[misc]
 
@@ -61,7 +63,7 @@ def test_verdicts_are_frozen(verdict: object) -> None:
 
 
 def test_execution_result_open_shape() -> None:
-    plan = OrderPlan("E", "BUY", 0.5, 1.0, 2.0, "bot-y")
+    plan = OrderPlan("E", "BUY", 0.5, 1.0, 2.0, "bot-y", "EUR")
     res = ExecutionResult(status="OPEN", deal_id="DIAAA", plan=plan, detail="opened")
     assert res.status == "OPEN"
     assert res.deal_id == "DIAAA"

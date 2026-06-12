@@ -69,6 +69,12 @@ class ExecutionConfig:
             **absolute** ``stop_level`` / ``limit_level`` IG expects. **v1, tune
             at profit** (ATR-based sizing is a documented later swap).
 
+    Order currency:
+        default_currency: IG's ``open_position`` requires a non-null ``currencyCode``
+            (HTTP 400 otherwise). ``build_order_plan`` resolves the currency from the
+            instrument's ``market_info``; this is the fallback when that is absent
+            (the account + DAX cash CFD are EUR).
+
     Constraints / safety:
         max_parallel_positions: Gate 3 + VETO 4 cap on concurrent open positions.
             Not in the concept §0 table; default 1 (DAX intraday, single position)
@@ -110,6 +116,12 @@ class ExecutionConfig:
     # --- SL / TP ---
     stop_distance_points: float = 30.0     # v1, tune at profit
     limit_distance_points: float = 45.0    # v1 (1.5R), tune at profit
+
+    # --- order currency ---
+    # IG's open_position requires a non-null currencyCode (HTTP 400 otherwise).
+    # build_order_plan resolves it from the instrument's market_info; this is the
+    # fallback used only when market_info lacks a currency (EUR account/instrument).
+    default_currency: str = "EUR"
 
     # --- constraints / safety ---
     max_parallel_positions: int = 1        # v1 default (not in §0 table)

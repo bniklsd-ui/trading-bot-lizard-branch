@@ -109,6 +109,7 @@ def build_order_plan(
     candidate: dict[str, Any],
     size: float,
     price_env: Any,
+    market_info_env: Any,
     config: ExecutionConfig,
 ) -> OrderPlan:
     """Build the resolved :class:`OrderPlan` from a candidate, size and fresh price.
@@ -121,15 +122,25 @@ def build_order_plan(
       - BUY  → stop **below** / limit **above** the entry price.
       - SELL → stop **above** / limit **below** the entry price.
 
+    ``currency`` is the instrument's ``market_info`` currency (IG's required
+    ``currencyCode`` — a null one is rejected with HTTP 400), falling back to
+    ``config.default_currency`` when the env is not ok / lacks a currency.
+
     Args:
         candidate: the Phase-4 contract dict (``epic`` / ``direction`` consumed here).
         size: the rounded position size from Gate 4 (``sizing.py``).
         price_env: the fresh ``get_price`` envelope (``.data`` has ``bid`` / ``ask``).
-        config: tunables (``stop_distance_points`` / ``limit_distance_points``).
+        market_info_env: the fresh ``get_market_info`` envelope (``.data`` has
+            ``currency``); reused from Gate-4 sizing.
+        config: tunables (``stop_distance_points`` / ``limit_distance_points`` /
+            ``default_currency``).
     """
     epic = candidate["epic"]
     direction = candidate["direction"]
     data = price_env.data or {}
+    currency = (getattr(market_info_env, "data", None) or {}).get(
+        "currency"
+    ) or config.default_currency
 
     # Entry-side reference price: cross the spread the way the order will fill.
     if direction == "BUY":
@@ -154,6 +165,7 @@ def build_order_plan(
         stop_level=stop_level,
         limit_level=limit_level,
         deal_reference=f"bot-{uuid4().hex[:24]}",
+        currency=currency,
     )
 
 
@@ -255,18 +267,24 @@ def place_order(
         stop_level=plan.stop_level,
         limit_level=plan.limit_level,
         deal_reference=ref,
+        currency=plan.currency,
     )
 
     # 4) Transport error: ambiguous whether the order landed → fail closed, stay PENDING.
     if not env.ok:
         error = getattr(env, "error", None) or {}
+        code = error.get("code", "?")
+        # Surface the broker's underlying message too — for a generic BROKER_ERROR the
+        # real IG errorCode lives there (e.g. min stop distance / level precision), not
+        # in the mapped code. Without it the abort reason is undiagnosable.
+        message = error.get("message", "")
         logger.error(
-            "open_position transport error for %s (%s) — leaving PENDING, failing closed",
-            ref, error.get("code", "?"),
+            "open_position transport error for %s (%s: %s) — leaving PENDING, failing closed",
+            ref, code, message,
         )
         raise ExecutionAbort(
             f"open_position for {ref} returned a transport error "
-            f"({error.get('code', '?')}); state unknown — left PENDING for startup "
+            f"({code}: {message}); state unknown — left PENDING for startup "
             "reconcile; no second order placed"
         )
 

@@ -36,6 +36,12 @@ def _no_sleep(_seconds: float) -> None:
     return None
 
 
+# A fresh get_market_info envelope (the instrument's currency lives in ``.data``).
+def _market_info_env(currency: str | None = "EUR", ok: bool = True) -> _FakeEnv:
+    data: dict[str, Any] = {"currency": currency} if currency is not None else {}
+    return _FakeEnv(ok=ok, data=data)
+
+
 # --- build_order_plan -----------------------------------------------------
 
 
@@ -46,7 +52,10 @@ def test_build_order_plan_buy_levels_and_reference(
     candidate = make_candidate(direction="BUY")
     price_env = _FakeEnv(ok=True, data={"bid": 17999.0, "ask": 18000.0})
 
-    plan = build_order_plan(candidate, size=0.5, price_env=price_env, config=config)
+    plan = build_order_plan(
+        candidate, size=0.5, price_env=price_env,
+        market_info_env=_market_info_env(), config=config,
+    )
 
     # BUY fills at ask; stop below, limit above.
     assert plan.direction == "BUY"
@@ -64,7 +73,10 @@ def test_build_order_plan_sell_levels_inverted(
     candidate = make_candidate(direction="SELL")
     price_env = _FakeEnv(ok=True, data={"bid": 17999.0, "ask": 18000.0})
 
-    plan = build_order_plan(candidate, size=0.5, price_env=price_env, config=config)
+    plan = build_order_plan(
+        candidate, size=0.5, price_env=price_env,
+        market_info_env=_market_info_env(), config=config,
+    )
 
     # SELL fills at bid; stop above, limit below.
     assert plan.stop_level == 17999.0 + config.stop_distance_points
@@ -77,9 +89,40 @@ def test_build_order_plan_reference_is_unique(
 ) -> None:
     config = ExecutionConfig()
     price_env = _FakeEnv(ok=True, data={"bid": 17999.0, "ask": 18000.0})
-    plan_a = build_order_plan(make_candidate(), 0.5, price_env, config)
-    plan_b = build_order_plan(make_candidate(), 0.5, price_env, config)
+    mi = _market_info_env()
+    plan_a = build_order_plan(make_candidate(), 0.5, price_env, mi, config)
+    plan_b = build_order_plan(make_candidate(), 0.5, price_env, mi, config)
     assert plan_a.deal_reference != plan_b.deal_reference
+
+
+def test_build_order_plan_currency_from_market_info(
+    make_candidate: Callable[..., dict[str, Any]],
+) -> None:
+    """The IG ``currencyCode`` is taken from the instrument's market_info."""
+    config = ExecutionConfig(default_currency="EUR")
+    price_env = _FakeEnv(ok=True, data={"bid": 17999.0, "ask": 18000.0})
+    plan = build_order_plan(
+        make_candidate(), 0.5, price_env, _market_info_env(currency="USD"), config
+    )
+    assert plan.currency == "USD"
+
+
+def test_build_order_plan_currency_falls_back_to_config(
+    make_candidate: Callable[..., dict[str, Any]],
+) -> None:
+    """A not-ok / currency-less market_info falls back to ``config.default_currency``."""
+    config = ExecutionConfig(default_currency="EUR")
+    price_env = _FakeEnv(ok=True, data={"bid": 17999.0, "ask": 18000.0})
+    # market_info missing a currency
+    plan_missing = build_order_plan(
+        make_candidate(), 0.5, price_env, _market_info_env(currency=None), config
+    )
+    assert plan_missing.currency == "EUR"
+    # market_info not ok (its data is empty)
+    plan_not_ok = build_order_plan(
+        make_candidate(), 0.5, price_env, _FakeEnv(ok=False, data={}), config
+    )
+    assert plan_not_ok.currency == "EUR"
 
 
 # --- place_order: write-ahead + ACCEPTED ----------------------------------
@@ -117,11 +160,12 @@ def test_place_order_accepted_marks_open(
     assert record is not None
     assert record["status"] == OPEN
     assert record["deal_id"] == "DIAAAA-FAKE"
-    # open_position received our absolute levels + write-ahead reference.
+    # open_position received our absolute levels + write-ahead reference + currency.
     placed = broker.open_position_calls[0]
     assert placed["deal_reference"] == order_plan.deal_reference
     assert placed["stop_level"] == order_plan.stop_level
     assert placed["limit_level"] == order_plan.limit_level
+    assert placed["currency"] == order_plan.currency  # IG currencyCode (was missing → 400)
 
 
 # --- place_order: PENDING fail-closed -------------------------------------

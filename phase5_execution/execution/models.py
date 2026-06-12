@@ -37,6 +37,8 @@ class OrderPlan:
     ``stop_level`` / ``limit_level`` are **absolute price levels** (not point
     distances) — IG's ``stopLevel`` / ``limitLevel``. ``deal_reference`` is the
     write-ahead idempotency key (``bot-<uuid4hex>``), persisted *before* the order.
+    ``currency`` is IG's required ``currencyCode`` (resolved from the instrument's
+    ``market_info``, with a config fallback — IG rejects a null currency with HTTP 400).
     """
 
     epic: str
@@ -45,6 +47,7 @@ class OrderPlan:
     stop_level: float
     limit_level: float
     deal_reference: str
+    currency: str             # IG currencyCode (e.g. "EUR") — required by open_position
 
 
 @dataclass(frozen=True)

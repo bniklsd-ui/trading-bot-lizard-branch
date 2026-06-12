@@ -40,6 +40,9 @@ def test_defaults_match_locked_concept_values() -> None:
     assert cfg.stop_distance_points == 30.0
     assert cfg.limit_distance_points == 45.0
 
+    # order currency (IG currencyCode fallback — EUR account/instrument)
+    assert cfg.default_currency == "EUR"
+
     # constraints / safety
     assert cfg.max_parallel_positions == 1
     assert cfg.require_confirm is True

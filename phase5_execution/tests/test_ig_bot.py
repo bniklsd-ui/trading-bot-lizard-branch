@@ -30,6 +30,7 @@ def _plan() -> OrderPlan:
         stop_level=17970.0,
         limit_level=18045.0,
         deal_reference="bot-deadbeef",
+        currency="EUR",
     )
 
 
