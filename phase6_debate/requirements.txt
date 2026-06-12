@@ -1,0 +1,15 @@
+# Phase 6 — Bull/Bear/Judge debate.
+#
+# Phase 6 has NO new runtime dependency of its own. The single LLM stack is
+# REUSED from Phase 4 (the documented cross-phase exception, concept Decision F):
+# `research.LLMClient` / `research.token_meter` / the pricing rows in
+# `ResearchConfig`. The `anthropic` runtime dep therefore arrives via the
+# `research` (Phase 4) editable install — see `scripts/dev_install.sh` at the repo
+# root, which installs P1 -> ... -> P6 in dependency order.
+#
+# The debate adds only Bull/Bear arguments + Judge synthesis on top of that one
+# shared call site; the rest (context, budget/caps, audit, fail-closed) is pure
+# code. No unit test imports a real LLM — the shared client is faked/mocked.
+
+# dev / test
+pytest>=7.4.0

@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 #
-# dev_install.sh — Phase-5 composition root (concept §"Step C").
+# dev_install.sh — composition root (concept §"Step C", Phase 5 + Phase 6).
 #
 # Editable-install every phase package in dependency order (P1 -> P2 -> P3 -> P4
-# -> P5) into the *currently active* virtualenv, so that
-#   import broker_wrapper / persistence / external_data / research / execution
+# -> P5 -> P6) into the *currently active* virtualenv, so that
+#   import broker_wrapper / persistence / external_data / research / execution / debate
 # all resolve at runtime WITHOUT any sys.path manipulation, and `pytest`
-# collects cleanly. Run once per fresh venv.
+# collects cleanly. Run once per fresh venv. (P6 imports `research`, so it is
+# installed after P4.)
 #
 # Usage:
 #   source <your-venv>/bin/activate
 #   bash scripts/dev_install.sh
-#   pytest phase5_execution/tests -v       # green => Step C proven
+#   pytest phase5_execution/tests -v       # green => Step C proven (P5)
+#   pytest phase6_debate/tests -v          # green => Step C proven (P6)
 #
 # Editable installs change only *packaging*, not code dependencies: each phase
 # still imports its siblings only through their defined contracts (cross-phase
@@ -32,10 +34,11 @@ for pkg in \
     phase2_persistence \
     phase3_external_data \
     phase4_research \
-    phase5_execution
+    phase5_execution \
+    phase6_debate
 do
     echo "dev_install: pip install -e $pkg"
     "$PY" -m pip install -e "$ROOT/$pkg"
 done
 
-echo "dev_install: all five packages installed editable. Run: pytest phase5_execution/tests -v"
+echo "dev_install: all six packages installed editable. Run: pytest phase6_debate/tests -v"

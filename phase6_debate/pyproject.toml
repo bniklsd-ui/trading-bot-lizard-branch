@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "debate"
+version = "0.1.0"
+description = "Phase 6 — Bull/Bear/Judge debate (adversarial direction decision) for the DAX CFD trading bot."
+requires-python = ">=3.11"
+# Runtime dependency (anthropic) is NOT declared here: Phase 6 reuses the Phase-4
+# LLM stack (`research.LLMClient` / `research.token_meter` / pricing) as the
+# documented cross-phase exception (concept Decision F), so `anthropic` arrives
+# via the `research` editable install. This packaging metadata exists only to
+# enable editable installs (`pip install -e`) so `import debate` resolves at
+# runtime without sys.path hacks. The sibling `scripts` and `tests` directories
+# are deliberately excluded from the installed package by the include glob.
+#
+# Layout note: the importable package is `debate/` nested under this
+# `phase6_debate/` project dir, mirroring the established repo convention
+# (phase4_research/ -> research/, phase5_execution/ -> execution/).
+
+[tool.setuptools.packages.find]
+include = ["debate*"]
