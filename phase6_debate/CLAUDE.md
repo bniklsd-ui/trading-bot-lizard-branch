@@ -106,7 +106,7 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 | `debate/timeutil.py` | ISO-8601-UTC-Stempel (`_utcnow()`-Seam, je Phase dupliziert) → `DebateContext.generated_at` | ✅ Modul 2 |
 | `debate/prompts.py` | Bull/Bear/Judge System+User-Templates + JSON-Schemas (DE) | ✅ Modul 3 |
 | `debate/llm_caching.py` | additiver `cache_control`-Wrapper um `research.LLMClient` + Meter-Erweiterung | ✅ Modul 4 |
-| `debate/budget.py` | Call-/Token-/Wall-Clock-Caps + kumulatives Metering, fail-closed | ⏳ Modul 5 |
+| `debate/budget.py` | Call-/Token-/Wall-Clock-Caps + kumulatives Metering, fail-closed | ✅ Modul 5 |
 | `debate/debate.py` | Orchestrator: Runden-Loop, Early-Stop, Kompression, fail-closed (Kern) | ⏳ Modul 6 |
 | `debate/audit.py` | `debate_log.json` (vorwärtskompatibles Schema) | ⏳ Modul 7 |
 | `debate/credentials.py` | reuse Phase-1 `get_credential("anthropic_api_key")` | ⏳ Modul 8 |
@@ -145,6 +145,65 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 - Operator-`live_test.py`: Debatte im vollen Executor gegen IG Demo, sauberes Ende
   (TRADE→open/close **oder** ABSTAIN→NO_TRADE), `debate_log.json` entsteht, `usage_report`
   zeigt **Cache-Reads > 0**. `exit 0`.
+
+---
+
+## Session stopped — 2026-06-15 (Modul 5 — `debate/budget.py`)
+
+### Completed
+- **Modul 5 — `debate/budget.py` + `tests/test_budget.py`** ✅ (≥6 → **10 neue Tests**):
+  `class DebateBudget(config, *, now_fn=time.monotonic)` — die **Kosten-Disziplin-Struktur**
+  der Phase (Decision E/J). `register(usage: dict)` faltet pro Turn genau den
+  `ask_agent`-Rückgabe-Record (`token_meter`-Shape) in die Akkumulatoren (zählt **einen** Turn,
+  toleriert fehlende Keys **und** `{}` via `_as_int`/`_as_float`). `check()` raised
+  **`DebateBudgetExceeded` beim ERSTEN** Breach von `max_total_calls` /
+  `max_cumulative_input_tokens` / `max_cumulative_output_tokens` / `wall_clock_timeout_s`
+  (Grenze: **`>` = Breach, `==` erlaubt** = Cap ist „max allowed"; Breach-Detail genannt + auf
+  stderr geloggt). `summary() -> dict` liefert das Aggregat in **exakt der Audit-Key-Menge**
+  (Modul 7 / Concept §7: `input_tokens`/`output_tokens`/`cache_read_input_tokens`/
+  `cache_creation_input_tokens`/`est_cost_usd`/`est_cost_eur`) **+ `total_calls`** (additiv,
+  forward-compat-unschädlich) → passt ohne Reshaping auf `DebateOutcome.token_summary`.
+- **Wall-Clock deterministisch:** `now_fn` injiziert (wie P5 `executor`/`monitor`); Tests
+  nutzen einen `_FakeClock` (Sequenz, letzter Wert wiederholt) → **kein echtes Warten**;
+  Boundary-Test pinnt `==` erlaubt / `>` breacht.
+- **Isolation:** `budget.py` importiert nur `debate.models` (`DebateBudgetExceeded`/
+  `DebateConfig`) + stdlib (`time`/`logging`/`typing`) — **kein** `anthropic`/`broker_wrapper`/
+  `research`. Hygiene-grep clean.
+- **Verifiziert:** `pytest phase6_debate/tests -q` → **48 passed** (38 + 10); Regression grün:
+  **P4 88** · **P5 130** (Session ist rein additiv im P6-Paket — keine Fremd-Datei berührt).
+  **Nicht committet** (User triggert Commits).
+
+### Next
+- **Modul 6 — `debate/debate.py` + `tests/test_debate.py`** (≥12 Tests, Concept §6, **Kern der
+  Phase**): `class Debate(broker, llm_client, config, *, audit=None, now_fn=time.monotonic)` +
+  `run(candidate: dict) -> DebateOutcome`. Flow: (1) `build_debate_context(candidate, broker,
+  config)` — Fehler → **ABSTAIN** (fail-closed, kein Agenten-Request); (2) Runden-Loop
+  `1..max_rounds`: **Bull**(Haiku) → **Bear**(Haiku) → **Judge**(Sonnet) via `ask_agent` +
+  `prompts.build_*_prompt`; nach jedem Turn `budget.register(usage)` + `budget.check()` (Breach
+  → ABSTAIN); (3) Transkript-Kompression bei `compression_trigger_pct` (deterministisch, **kein**
+  Extra-Request in v1); (4) Early-Stop bei Judge-`conclude=true`; (5) Endurteil = letzter
+  Judge-Output → `DebateOutcome`, `decision=="ABSTAIN"` → `direction=None`; (6) **jeder**
+  `DebateError`/`DebateLLMError`/`DebateBudgetExceeded` an jeder Stelle → ABSTAIN (nie Exception
+  nach außen, nie „trotzdem traden"); (7) `audit.write(...)` vor Return (falls gesetzt — Audit ist
+  aber erst Modul 7; in Modul 6 `audit=None`/injizierter Stub). `confidence` darf in **keiner**
+  Steuer-Verzweigung auftauchen (advisory-only-Test). `token_summary` = `budget.summary()`.
+- **`Debate`-Export** landet in `debate/__init__.py` mit Modul 6 (Concept §"Modul-Tree":
+  `exports: Debate, DebateConfig, DebateOutcome`).
+
+### Offene Punkte / [VERIFY]
+- Kein [VERIFY] offen für Modul 6 (Context-Builder/Prompts/Caching/Budget sind alle gebaut +
+  grün). Übrig fürs Paket: `scripts.wiring`-Namenskollision (P4/P5/P6) → **Modul 8**.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase6-debate`**. Module 1–3 committet (`b2da0db`, `a82cbc7`, `3275626`); **Modul 4
+  + Modul 5 noch nicht committet** — Working Tree liegt zur Review. ⚠ **Modul 4 fasst 4 P4-Dateien
+  an** (additiv) — beim Commit mit hineinnehmen (s. Modul-4-Block unten); **Modul 5 ist rein im
+  P6-Paket** (`debate/budget.py` + `tests/test_budget.py`).
+- `DebateBudget.summary()` liefert `total_calls` **zusätzlich** zu den 6 Audit-Keys — Modul 6/7
+  dürfen sich darauf verlassen, dass die 6 Audit-Keys da sind, und `total_calls` ignorieren/nutzen.
+- `register` zählt **jeden** Turn (auch leeres `{}`-Usage); `check()` ist getrennt → Modul 6 ruft
+  beide pro Turn (erst `register`, dann `check`).
+- `budget.py` ist **kein** Top-Level-Export — Zugriff via `from debate.budget import DebateBudget`.
 
 ---
 
