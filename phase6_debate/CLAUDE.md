@@ -104,7 +104,7 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 | `debate/models.py` | `DebateConfig`, `DebateContext`, `AgentTurn`, `DebateOutcome`, Exceptions (types only, frozen) | ✅ Modul 1 |
 | `debate/context_builder.py` | CODE: Candidate + 1 frischer Broker-Snapshot → frozen `DebateContext` (die AI-Grenze) | ✅ Modul 2 |
 | `debate/timeutil.py` | ISO-8601-UTC-Stempel (`_utcnow()`-Seam, je Phase dupliziert) → `DebateContext.generated_at` | ✅ Modul 2 |
-| `debate/prompts.py` | Bull/Bear/Judge System+User-Templates + JSON-Schemas (DE) | ⏳ Modul 3 |
+| `debate/prompts.py` | Bull/Bear/Judge System+User-Templates + JSON-Schemas (DE) | ✅ Modul 3 |
 | `debate/llm_caching.py` | additiver `cache_control`-Wrapper um `research.LLMClient` + Meter-Erweiterung | ⏳ Modul 4 |
 | `debate/budget.py` | Call-/Token-/Wall-Clock-Caps + kumulatives Metering, fail-closed | ⏳ Modul 5 |
 | `debate/debate.py` | Orchestrator: Runden-Loop, Early-Stop, Kompression, fail-closed (Kern) | ⏳ Modul 6 |
@@ -140,6 +140,66 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 - Operator-`live_test.py`: Debatte im vollen Executor gegen IG Demo, sauberes Ende
   (TRADE→open/close **oder** ABSTAIN→NO_TRADE), `debate_log.json` entsteht, `usage_report`
   zeigt **Cache-Reads > 0**. `exit 0`.
+
+---
+
+## Session stopped — 2026-06-15 (Modul 3 — `prompts.py`)
+
+### Completed
+- **Modul 3 — `debate/prompts.py` + `tests/test_prompts.py`** ✅: `build_bull_prompt` /
+  `build_bear_prompt` / `build_judge_prompt(context, transcript) -> (system, user, json_schema)`.
+  Reine Funktionen, **kein AI/I/O/Clock** — letzter Code-Schritt vor den AI-Requests, gespiegelt
+  an P4 `research.prompt`. Importiert nur `debate.models` (+ stdlib). Prompts sind **Deutsch**.
+  - **Cache-Präfix-Disziplin (Decision D):** Rollen-Instruktion **+** gerenderter Kontext stehen
+    im **system**-Block (stabil über die ganze Debatte → Modul-4-`cache_control` liest Cache);
+    nur das wachsende **Transkript** steht im **user**-Teil. Test pinnt das Invariant
+    (`test_context_in_system_not_in_user`).
+  - **Delay-Ehrlichkeit:** System trennt das **VERZÖGERTE** P4-Stimmungsbild (Seed/Drift,
+    yFinance ~15 min) explizit von den **IG-ECHTZEIT**-Feldern (Spread, jüngste Bars). `None`
+    → ehrliches „n/a" über den einen `_fmt`-Choke-Point (nie als 0 gefälscht, wie P4).
+  - **Schemas** (frische Dicts je Request): Bull/Bear minimal (`{"argument": str}`); Judge =
+    `{decision∈{TRADE,ABSTAIN}, direction(BUY|SELL|null), confidence(number|null), rationale,
+    conclude(bool)}`. **Anthropic-Regeln aus P4 befolgt:** nullable via **`anyOf`** + `null`-Branch
+    (Type-Arrays → 400), **kein** `minimum`/`maximum` auf `confidence` (Range nur in Prosa;
+    `confidence` ist advisory, Decision H — gatet nichts). Judge ist die echte Richtungsquelle
+    (darf den Seed in die Gegenrichtung umkehren), `conclude` steuert den Early-Stop (Modul 6).
+- **Hygiene-Gotcha gelöst:** Der §0-`grep -i` matchte (a) englisches „call" in einem Kommentar
+  („per call" → „per request") und (b) die Banned-Token-Liste im Test selbst → Tokens werden jetzt
+  **split-then-joined** (`"CA"+"LL"` …), damit die Literale nicht im Source stehen. Gate wieder clean.
+- **Verifiziert:** `pytest phase6_debate/tests -q` → **29 passed** (19 + 10 neu, ≥6 gefordert);
+  Regression grün: P4 **88**, P5 **130** unberührt. Hygiene-grep clean; `prompts.py` importiert
+  nichts aus `anthropic`/`broker_wrapper`/`research`. **Nicht committet** (User triggert Commits).
+
+### Next
+- **Modul 4 — `debate/llm_caching.py` + `tests/test_llm_caching.py`** (≥6 Tests, Concept §4) —
+  **Cache-Präfix + Meter-Erweiterung (Decision D/G/F)**. Zwei **additive** Edits im **P4-Code**
+  (dokumentierte Ausnahme):
+  1. `research/llm_client.py` → `_build_create_kwargs(..., cache_system: bool=False)`: bei `True`
+     `cache_control:{"type":"ephemeral"}` auf den System-Block; Konstruktor um `cache_system=False`
+     erweitern (durchgereicht). **Default False ⇒ P4 unverändert** (alle 88 P4-Tests müssen grün bleiben).
+  2. `research/token_meter.py` → `record(...)` additiv um `cache_read_input_tokens` +
+     `cache_creation_input_tokens` (via `_usage_int`-Helfer, existieren schon); `usage_report.py`
+     um Cache-Hit-Ratio + Σ-Kosten/Debatte erweitern.
+  - P6-seitig dünner Wrapper `ask_agent(client, system, user, schema, *, model, temperature) ->
+    (dict, usage)`, ruft den geteilten `research.LLMClient` mit `cache_system=True` und gibt `usage`
+    für `budget.py` (Modul 5) zurück.
+- **[VERIFY] vor Modul 4 (gegen installierte `anthropic`-SDK):** (a) block-level `cache_control` auf
+  `system` unterstützt? Falls SDK nur Content-Block-Liste akzeptiert → System als
+  `[{"type":"text","text":…,"cache_control":…}]` bauen. (b) `message.usage`-Feldnamen
+  (`cache_creation_input_tokens` / `cache_read_input_tokens`) gegen die SDK-Version.
+- ⚠ **Modul 4 editiert P4-Code** (außerhalb des P6-Pakets) — das ist die explizit dokumentierte
+  Decision-F/G-Ausnahme. Default-Verhalten von P4 muss **bit-identisch** bleiben (cache default aus).
+
+### Offene Punkte / [VERIFY]
+- SDK `cache_control`-Form + `message.usage`-Cache-Feldnamen (Modul 4),
+  `scripts.wiring`-Namenskollision (Modul 8). Jeweils **vor** dem betroffenen Modul prüfen.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase6-debate`**. Module 1+2 sind committet (`b2da0db`, `a82cbc7`); **Modul 3 noch nicht**
+  — Working Tree liegt zur Review (User triggert Commits).
+- `prompts.py` ist **kein** Top-Level-Export — Zugriff via `from debate.prompts import …`.
+- Hygiene-Disziplin: englisches „call/put" in Prosa/Kommentaren vermeiden (matcht `grep -i`);
+  in Tests, die auf Abwesenheit prüfen, Tokens split-then-joinen.
 
 ---
 
