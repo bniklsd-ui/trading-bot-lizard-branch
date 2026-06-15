@@ -38,12 +38,20 @@ the config names. Extended thinking is **off** by default (the deterministic
 choice — it also preserves the small ``max_tokens`` budget for the answer);
 ``enable_thinking=True`` sends ``thinking={"type": "adaptive"}``.
 
-## Caching: intentionally not used
+## Caching: off by default; opt-in for cross-phase reuse
 
-The call runs once per ~30-min cycle (longer than the 5-minute cache TTL) and
-the system prompt sits below the per-model minimum cacheable prefix, so prompt
-caching would only ever pay the write premium for no read. The meter still reads
-the cache usage fields (they stay 0).
+Phase 4 itself does **not** cache: its call runs once per ~30-min cycle (longer
+than the 5-minute cache TTL) and the system prompt sits below the per-model
+minimum cacheable prefix, so prompt caching would only ever pay the write premium
+for no read. The meter still reads the cache usage fields (they stay 0).
+
+``cache_system`` (constructor, default ``False``) keeps that behaviour intact for
+Phase 4. Phase 6 reuses this client for its multi-turn debate (the documented
+Decision-F cross-phase exception) and constructs it with ``cache_system=True`` so
+the stable system+context prefix carries a ``cache_control: {"type":"ephemeral"}``
+marker — read on every later turn of a role. When the flag is on the ``system``
+field is sent as a single-element content-block list (a plain string cannot carry
+the marker; SDK ≥ 0.106 ``TextBlockParam`` exposes ``cache_control``).
 
 ## Retry (Decision 8) — exactly 1, transient only
 
@@ -213,6 +221,7 @@ class LLMClient:
         token_meter_path: str | None = None,
         config: ResearchConfig | None = None,
         enable_thinking: bool = False,
+        cache_system: bool = False,
     ) -> None:
         """Configure the client (no network call here — the SDK is lazy-built).
 
@@ -229,6 +238,10 @@ class LLMClient:
                 defaults to ``ResearchConfig()`` if not given.
             enable_thinking: send adaptive thinking when ``True`` (off by
                 default — see module docstring).
+            cache_system: mark the ``system`` block with ``cache_control`` so a
+                stable prefix is cached across requests. **Default ``False`` →
+                Phase-4 behaviour is unchanged.** Phase 6 sets it ``True`` for its
+                multi-turn debate (Decision F/D). See the module docstring.
         """
         self.model = model
         self._api_key = api_key
@@ -238,25 +251,46 @@ class LLMClient:
         self.token_meter_path = token_meter_path
         self.config = config if config is not None else ResearchConfig()
         self.enable_thinking = enable_thinking
+        self.cache_system = cache_system
+        # Last meter record (token counts + cost), captured per successful call so
+        # a reusing caller (Phase-6 debate budget) can read per-turn usage without
+        # changing ``ask_candidate``'s return. ``None`` until the first call.
+        self.last_usage: dict[str, Any] | None = None
         self._client: Any = None  # lazily built inside _raw_call
 
     # ------------------------------------------------------------------ #
     # Request construction (pure — directly unit-testable, SDK-free)      #
     # ------------------------------------------------------------------ #
     def _build_create_kwargs(
-        self, system: str, user: str, *, json_schema: dict | None
+        self, system: str, user: str, *, json_schema: dict | None,
+        cache_system: bool = False,
     ) -> dict[str, Any]:
         """Build the ``messages.create`` kwargs (no SDK call, no network).
 
         Sampling params are included only when the model accepts them; thinking
         and the structured-output ``output_config`` are added conditionally.
-        Factored out so the request surface (esp. the Opus sampling-param drop)
-        can be asserted without touching the SDK.
+        Factored out so the request surface (esp. the Opus sampling-param drop and
+        the cache marker) can be asserted without touching the SDK.
+
+        When ``cache_system`` is ``True`` the ``system`` field is sent as a
+        single-element content-block list carrying ``cache_control`` (a plain
+        string cannot hold the marker). When ``False`` (the Phase-4 default) it
+        stays a plain string — byte-identical to the pre-cache request.
         """
+        if cache_system:
+            system_field: Any = [
+                {
+                    "type": "text",
+                    "text": system,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+        else:
+            system_field = system
         kwargs: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "system": system,
+            "system": system_field,
             "messages": [{"role": "user", "content": user}],
         }
         if _supports_sampling(self.model):
@@ -290,7 +324,9 @@ class LLMClient:
                 max_retries=0,
                 timeout=self.timeout_s,
             )
-        kwargs = self._build_create_kwargs(system, user, json_schema=json_schema)
+        kwargs = self._build_create_kwargs(
+            system, user, json_schema=json_schema, cache_system=self.cache_system
+        )
         return self._client.messages.create(**kwargs)
 
     # ------------------------------------------------------------------ #
@@ -372,9 +408,11 @@ class LLMClient:
             if snippet is None:
                 raise
             raw = json.loads(snippet)
-        # Best-effort metering — never let a meter problem break the pick.
+        # Best-effort metering — never let a meter problem break the pick. The
+        # returned record is captured on ``self.last_usage`` so a reusing caller
+        # (the Phase-6 debate budget) can read per-turn token usage.
         try:
-            token_meter.record(
+            self.last_usage = token_meter.record(
                 getattr(message, "usage", None),
                 self.model,
                 self.config,

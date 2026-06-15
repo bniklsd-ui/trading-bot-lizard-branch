@@ -105,7 +105,7 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 | `debate/context_builder.py` | CODE: Candidate + 1 frischer Broker-Snapshot → frozen `DebateContext` (die AI-Grenze) | ✅ Modul 2 |
 | `debate/timeutil.py` | ISO-8601-UTC-Stempel (`_utcnow()`-Seam, je Phase dupliziert) → `DebateContext.generated_at` | ✅ Modul 2 |
 | `debate/prompts.py` | Bull/Bear/Judge System+User-Templates + JSON-Schemas (DE) | ✅ Modul 3 |
-| `debate/llm_caching.py` | additiver `cache_control`-Wrapper um `research.LLMClient` + Meter-Erweiterung | ⏳ Modul 4 |
+| `debate/llm_caching.py` | additiver `cache_control`-Wrapper um `research.LLMClient` + Meter-Erweiterung | ✅ Modul 4 |
 | `debate/budget.py` | Call-/Token-/Wall-Clock-Caps + kumulatives Metering, fail-closed | ⏳ Modul 5 |
 | `debate/debate.py` | Orchestrator: Runden-Loop, Early-Stop, Kompression, fail-closed (Kern) | ⏳ Modul 6 |
 | `debate/audit.py` | `debate_log.json` (vorwärtskompatibles Schema) | ⏳ Modul 7 |
@@ -115,10 +115,15 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 | P5 `executor.py`-Edit + Regression | `debate_runner`-Naht + ≥4 neue Executor-Tests | ⏳ Modul 9 |
 
 ## Offene [VERIFY] (vor dem Bauen gegen echten Code / SDK prüfen)
-1. **`anthropic`-SDK-Version** unterstützt block-level `cache_control` auf `system`
-   (bzw. System als Content-Block-Liste). Falls nicht → Form anpassen.
-2. **`message.usage`-Cache-Feldnamen** (`cache_creation_input_tokens` /
-   `cache_read_input_tokens`) gegen die SDK-Version.
+1. ~~**`anthropic`-SDK block-level `cache_control` auf `system`**~~ ✅ **RESOLVED
+   (Modul 4, 2026-06-15, SDK 0.106.0):** Ein plain-String-`system` kann **keinen**
+   `cache_control`-Marker tragen → System als **Content-Block-Liste** senden:
+   `system=[{"type":"text","text":…,"cache_control":{"type":"ephemeral"}}]`.
+   `anthropic.types.TextBlockParam` hat das Feld `cache_control`;
+   `CacheControlEphemeralParam` = `{type, ttl?}`, also ist `{"type":"ephemeral"}` gültig.
+2. ~~**`message.usage`-Cache-Feldnamen**~~ ✅ **RESOLVED (Modul 4, SDK 0.106.0):**
+   `Usage` hat `cache_read_input_tokens` **und** `cache_creation_input_tokens`
+   (beide werden von `token_meter._usage_int` bereits gelesen).
 3. ~~**`get_ohlcv.data["bars"]` Close-Feldname**~~ ✅ **RESOLVED (Modul 2, 2026-06-15):**
    `get_ohlcv(epic, res, count).data = {"bars":[…], "allowance":{…}}`; jede Bar =
    `OHLCBar.__dict__ = {timestamp, open, high, low, close, volume}`; Close-Feld = **`close`**
@@ -140,6 +145,58 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 - Operator-`live_test.py`: Debatte im vollen Executor gegen IG Demo, sauberes Ende
   (TRADE→open/close **oder** ABSTAIN→NO_TRADE), `debate_log.json` entsteht, `usage_report`
   zeigt **Cache-Reads > 0**. `exit 0`.
+
+---
+
+## Session stopped — 2026-06-15 (Modul 4 — `llm_caching.py` + additive P4-Edits)
+
+### Completed
+- **Modul 4 — `debate/llm_caching.py` + `tests/test_llm_caching.py`** ✅ (≥6 → **9 neue Tests**):
+  dünner P6-Seam `ask_agent(client, system, user, schema, *, model, temperature) -> (dict, dict)`
+  über den **einen geteilten** `research.LLMClient` (Decision-F-Reuse; **kein** zweiter Call-Punkt,
+  **kein** `llm_common`). Setzt `client.model`/`temperature` pro Turn, gibt `(answer, usage_record)`
+  zurück (`usage` = `token_meter`-Record-dict → passt auf `DebateBudget.register`, Modul 5).
+  Client-Fehler → **`DebateLLMError`** (fail-closed → ABSTAIN). Importiert nur `debate.models` +
+  stdlib (Client duck-typed via `Protocol`; **kein** `anthropic`-Import).
+- **Additive P4-Edits (dokumentierte Decision-F/G-Ausnahme, P4-Default bit-identisch):**
+  1. `research/llm_client.py`: Ctor `cache_system: bool = False` + `_build_create_kwargs(...,
+     cache_system=False)` → bei `True` wird `system` zur **Content-Block-Liste** mit
+     `cache_control:{"type":"ephemeral"}` (plain-String kann den Marker nicht tragen, SDK 0.106
+     `TextBlockParam`). `_raw_call` reicht `self.cache_system` durch. Neu: `self.last_usage` fängt
+     in `_attempt` den Meter-Record ab (Per-Turn-Usage für den reusing caller).
+  2. `research/token_meter.py`: `record(...)` additiv um `cache_read_input_tokens` +
+     `cache_creation_input_tokens` (8-Feld-Record; alte 6 unverändert).
+  3. `scripts/usage_report.py`: `cache_hit_ratio()` + Cache-Spalten + Cache-Hit-Zeile im TOTAL.
+  4. `tests/test_token_meter.py`: Frozen-Shape-Test auf 8 Keys angepasst.
+- **[VERIFY] #1 + #2 RESOLVED** (SDK 0.106.0) — Content-Block-Liste für `cache_control`;
+  `Usage` hat beide Cache-Felder. Details: Concept §4 + die [VERIFY]-Liste oben.
+- **Verifiziert:** `pytest phase6_debate/tests -q` → **38 passed** (29 + 9); Regression grün:
+  **P4 88** (additive Edits, Default unverändert), **P5 130**. Hygiene-grep clean (Achtung: `\bPUT\b`
+  matcht das engl. Verb „put", `\bCALL\b` „call" → in Prosa „set/request" nutzen). `llm_caching.py`
+  importiert nichts aus `anthropic`. `usage_report` zeigt Cache-Hit-Ratio (manuell sanity-geprüft).
+  **Nicht committet** (User triggert Commits).
+
+### Next
+- **Modul 5 — `debate/budget.py` + `tests/test_budget.py`** (≥6 Tests, Concept §5, Decision E/J):
+  `class DebateBudget.__init__(config, *, now_fn=time.monotonic)`; `register(usage: dict)` (nach
+  jedem Turn — `usage` ist genau der `ask_agent`-Rückgabe-dict); `check()` → **raises
+  `DebateBudgetExceeded`** beim **ersten** Breach von `max_total_calls` /
+  `max_cumulative_input_tokens` / `max_cumulative_output_tokens` / `wall_clock_timeout_s`;
+  `summary() -> dict` (Aggregat für `DebateOutcome.token_summary`, inkl. Cache-Felder).
+  Tests mit **injizierter `now_fn`** (gemockte Zeit, **kein echtes Warten**): jeder Cap einzeln löst
+  aus; Aggregat summiert input/output/cache; unter Cap kein Raise; Wall-Clock deterministisch.
+- **Kein [VERIFY] offen für Modul 5.** (Übrig: `scripts.wiring`-Namenskollision → Modul 8.)
+
+### Offene Punkte / [VERIFY]
+- `scripts.wiring`-Namenskollision (P4/P5/P6) — **vor Modul 8** prüfen. Sonst nichts offen.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase6-debate`**. Module 1–3 committet (`b2da0db`, `a82cbc7`, `3275626`); **Modul 4
+  noch nicht** — Working Tree liegt zur Review. **Modul 4 fasst P4-Dateien an** (4 Stück, additiv) —
+  beim Commit mit hineinnehmen (`research/llm_client.py`, `research/token_meter.py`,
+  `scripts/usage_report.py`, `tests/test_token_meter.py`) + die P4-`CLAUDE.md`-Notiz.
+- `ask_agent`-`usage` ist ein **dict** (Record), kein SDK-Usage-Objekt → Modul 5 `register` nimmt dicts.
+- Geteilter Client: `cache_system` wird **bei Konstruktion** gesetzt (Modul 8 wiring), nicht pro Call.
 
 ---
 

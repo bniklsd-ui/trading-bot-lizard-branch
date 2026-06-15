@@ -124,6 +124,21 @@ totals the log by model/day. Stays entirely in Phase 4.
 > (root `.gitignore`, dated reconciliation block mirroring the Phase-3 `data/cache/`
 > rule). Verified via `git check-ignore data/state/llm_usage.json`.
 
+> 🔁 **Phase-6 additive edit (2026-06-15, Decision F/G — code = source of truth):**
+> Phase 6 reuses this stack (the documented cross-phase exception) and extended it
+> **additively**, default behaviour for Phase 4 **unchanged**:
+> - `token_meter.record` now also logs `cache_read_input_tokens` +
+>   `cache_creation_input_tokens` (8-field record; old 6 keys unchanged → no consumer
+>   break; they stay `0` for Phase 4, which doesn't cache). `test_token_meter` updated
+>   to the 8-key shape; all 88 P4 tests stay green.
+> - `LLMClient(cache_system=False)` (new ctor arg, **default off** = P4 untouched) +
+>   `_build_create_kwargs(..., cache_system=False)`: when on, `system` is sent as a
+>   content-block list carrying `cache_control:{"type":"ephemeral"}` (SDK 0.106
+>   `TextBlockParam`). `LLMClient.last_usage` now captures the meter record per call
+>   so a reusing caller can read per-turn usage. `usage_report.py` gained a
+>   cache-hit-ratio + the two cache columns.
+> - Full detail lives in `phase6_debate/` (Modul 4) + `docs/concepts/phase6_debate_concept.md` §4.
+
 ## Conventions
 - `from __future__ import annotations`, type hints + docstrings everywhere.
 - Own typed exceptions (`research/models.py`: `ResearchError` base,

@@ -63,17 +63,23 @@ def test_record_returns_frozen_shape_without_path() -> None:
 
     rec = token_meter.record(usage, "claude-sonnet-4-6", config, path=None)
 
+    # Shape after the additive Phase-6 cache fields (Decision G): the original six
+    # keys are unchanged; the two ``cache_*`` keys were added (0 here — no cache).
     assert set(rec) == {
         "ts",
         "model",
         "input_tokens",
         "output_tokens",
+        "cache_read_input_tokens",
+        "cache_creation_input_tokens",
         "est_cost_usd",
         "est_cost_eur",
     }
     assert rec["model"] == "claude-sonnet-4-6"
     assert rec["input_tokens"] == 100
     assert rec["output_tokens"] == 50
+    assert rec["cache_read_input_tokens"] == 0
+    assert rec["cache_creation_input_tokens"] == 0
 
 
 def test_record_appends_to_json_array(tmp_path, monkeypatch) -> None:

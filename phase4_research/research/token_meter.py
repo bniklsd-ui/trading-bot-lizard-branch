@@ -125,8 +125,15 @@ def record(
 ) -> dict[str, Any]:
     """Build a usage record and append it to the usage log.
 
-    The record shape is frozen (CLAUDE.md "Token / cost meter"):
-    ``{ts, model, input_tokens, output_tokens, est_cost_usd, est_cost_eur}``.
+    The record shape (CLAUDE.md "Token / cost meter") is:
+    ``{ts, model, input_tokens, output_tokens, cache_read_input_tokens,
+    cache_creation_input_tokens, est_cost_usd, est_cost_eur}``.
+
+    The two ``cache_*`` fields were added **additively** for Phase 6 (Decision G):
+    Phase 6 caches the stable debate prefix, so making the cache token counts
+    visible in the log is what lets ``usage_report`` show a cache-hit ratio. They
+    stay ``0`` for Phase 4 (which does not cache) — the older six-field consumers
+    are unaffected (purely additive; old keys unchanged).
 
     Args:
         usage: The response ``usage`` object (duck-typed).
@@ -148,6 +155,8 @@ def record(
         "model": model,
         "input_tokens": _usage_int(usage, "input_tokens"),
         "output_tokens": _usage_int(usage, "output_tokens"),
+        "cache_read_input_tokens": _usage_int(usage, "cache_read_input_tokens"),
+        "cache_creation_input_tokens": _usage_int(usage, "cache_creation_input_tokens"),
         "est_cost_usd": round(usd, 6),
         "est_cost_eur": round(eur, 6),
     }

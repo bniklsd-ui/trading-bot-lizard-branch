@@ -20,8 +20,28 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Record keys produced by token_meter.record (frozen shape).
-_NUMERIC_KEYS = ("input_tokens", "output_tokens", "est_cost_usd", "est_cost_eur")
+# Record keys produced by token_meter.record. The two ``cache_*`` keys were added
+# additively for Phase 6 (Decision G); older logs without them aggregate as 0.
+_NUMERIC_KEYS = (
+    "input_tokens",
+    "output_tokens",
+    "cache_read_input_tokens",
+    "cache_creation_input_tokens",
+    "est_cost_usd",
+    "est_cost_eur",
+)
+
+
+def cache_hit_ratio(bucket: dict[str, float]) -> float:
+    """Fraction of input tokens served from cache: read / (read + fresh input).
+
+    ``0.0`` when nothing was cached (incl. Phase-4 logs that never cache). This is
+    the headline number for Phase 6's expensive cached debate path.
+    """
+    cached = bucket.get("cache_read_input_tokens", 0) or 0
+    fresh = bucket.get("input_tokens", 0) or 0
+    denom = cached + fresh
+    return (cached / denom) if denom else 0.0
 
 
 def _empty_bucket() -> dict[str, float]:
@@ -67,13 +87,17 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _format_bucket_table(title: str, buckets: dict[str, dict[str, float]]) -> str:
     lines = [title, "-" * len(title)]
-    header = f"{'key':<28}{'calls':>7}{'in_tok':>12}{'out_tok':>12}{'USD':>12}{'EUR':>12}"
+    header = (
+        f"{'key':<28}{'calls':>7}{'in_tok':>12}{'out_tok':>12}"
+        f"{'cache_rd':>12}{'cache_hit':>10}{'USD':>12}{'EUR':>12}"
+    )
     lines.append(header)
     for key in sorted(buckets):
         b = buckets[key]
         lines.append(
             f"{key:<28}{int(b['calls']):>7}{int(b['input_tokens']):>12}"
-            f"{int(b['output_tokens']):>12}{b['est_cost_usd']:>12.4f}"
+            f"{int(b['output_tokens']):>12}{int(b['cache_read_input_tokens']):>12}"
+            f"{cache_hit_ratio(b):>10.1%}{b['est_cost_usd']:>12.4f}"
             f"{b['est_cost_eur']:>12.4f}"
         )
     return "\n".join(lines)
@@ -89,6 +113,9 @@ def format_report(summary: dict[str, Any]) -> str:
             (
                 f"TOTAL: {int(total['calls'])} calls, "
                 f"{int(total['input_tokens'])} in / {int(total['output_tokens'])} out tok, "
+                f"cache-hit {cache_hit_ratio(total):.1%} "
+                f"({int(total['cache_read_input_tokens'])} read / "
+                f"{int(total['cache_creation_input_tokens'])} write tok), "
                 f"${total['est_cost_usd']:.4f} / €{total['est_cost_eur']:.4f}"
             ),
         ]

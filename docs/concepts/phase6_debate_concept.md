@@ -299,6 +299,25 @@ Zwei additive Edits **im P4-Code** (Decision F/G, dokumentierte Ausnahme):
 - **[VERIFY]** `message.usage`-Feldnamen (`cache_creation_input_tokens` / `cache_read_input_tokens`) gegen die SDK-Version.
 - Tests (≥6, FakeLLM/monkeypatched `_build_create_kwargs`): `cache_system=True` setzt den Marker, `False` (P4-Default) nicht; Meter-Record enthält die beiden Cache-Felder; Cache-Felder=0 bei P4-Default; `estimate_cost` rechnet Read 0.1× / Write 1.25× korrekt; unbekanntes Modell → Kosten 0 + Warnung (bestehendes Verhalten).
 
+> 📝 **Reconciliation 2026-06-15 (Code = Source of Truth, Modul 4, anthropic SDK 0.106.0):**
+> - **[VERIFY] #1 (cache_control-Form) RESOLVED:** plain-String-`system` kann den Marker nicht
+>   tragen → `_build_create_kwargs(cache_system=True)` baut `system` als
+>   `[{"type":"text","text":…,"cache_control":{"type":"ephemeral"}}]` (Content-Block-Liste,
+>   `TextBlockParam.cache_control`). `cache_system=False` (P4-Default) lässt `system` ein
+>   plain String → **P4-Request bit-identisch**. `cache_system` ist sowohl Konstruktor-Arg
+>   (default False) als auch optionaler `_build_create_kwargs`-Parameter; `_raw_call` reicht
+>   `self.cache_system` durch.
+> - **[VERIFY] #2 (usage-Feldnamen) RESOLVED:** `Usage` hat `cache_read_input_tokens` +
+>   `cache_creation_input_tokens` (von `_usage_int` schon gelesen).
+> - **`usage`-Rückgabe von `ask_agent` ist ein dict** (der `token_meter`-Record, via neuer
+>   additiver `LLMClient.last_usage`-Attribut-Erfassung in `_attempt`) — passt direkt auf
+>   `DebateBudget.register(usage: dict)` (§5). `ask_agent` setzt `client.model`/`temperature`
+>   pro Turn auf dem **einen geteilten** Client; Caching steuert das Konstruktor-`cache_system`,
+>   nicht der Call.
+> - **P4-Test-Anpassung (Teil der additiven Decision-G-Edit):** `test_record_returns_frozen_shape`
+>   prüft jetzt 8 Keys (6 alt + 2 Cache); alle 88 P4-Tests bleiben grün.
+> - **`ask_agent`-Fehler → `DebateLLMError`** (fail-closed; Orchestrator → ABSTAIN).
+
 ### 5. `budget.py` + Tests — Caps & kumulatives Metering (Decision E/J)
 ```python
 class DebateBudget:
