@@ -359,6 +359,23 @@ Flow (Richtung kommt vom Judge, Bull/Bear nur Argumente):
   `confidence` taucht in **keiner** Steuer-Verzweigung auf (advisory-only-Test); Audit wird genau einmal geschrieben;
   Transkript im Outcome ist vollständig + immutabel.
 
+> 📝 **Reconciliation 2026-06-15 (Code = Source of Truth, Modul 6 gebaut):** Zwei
+> Implementierungs-Details, die der §6-Stub offenließ:
+> - **`audit` ist ein injizierter Callable** `(outcome, ctx) -> None` (nicht ein
+>   Objekt mit `.write(...)`). Modul 7 liefert `write_debate(outcome, ctx, path)`;
+>   die Modul-8-`wiring` bindet das als `lambda o, c: write_debate(o, c, path)`. Das
+>   hält den Orchestrator von der Modul-7-Signatur entkoppelt (DI; Tests geben einen
+>   Recorder). Audit wird **genau einmal** vor Return gerufen, **nur** wenn `ctx`
+>   gebaut wurde; ein Audit-Fehler wird geloggt + geschluckt (bricht das Ergebnis nie).
+> - **Per-Rollen-`max_tokens` setzt der Orchestrator** direkt am geteilten Client
+>   (`llm_client.max_tokens = max_tokens_agent|max_tokens_judge`) **vor** `ask_agent`
+>   — der einzige Per-Turn-Knopf, den `ask_agent` (Modul 4) nicht setzt (`ask_agent`
+>   setzt Model + Temperatur). Vermeidet eine erneute Edit am bereits committeten
+>   Modul 4; `ask_agent`-Signatur bleibt unverändert.
+> - **Kompression:** das **volle** Transkript bleibt für `DebateOutcome.transcript` +
+>   Audit erhalten; nur die **Prompt-Sicht** wird ab Schwelle komprimiert
+>   (`_compress` = jüngster Turn je Agent, in Rundenreihenfolge) — Decision-I-konform.
+
 ### 7. `audit.py` + Tests — **vorwärtskompatibles JSON (Decision I)**
 ```python
 def write_debate(outcome: DebateOutcome, ctx: DebateContext, path: str | None) -> dict:

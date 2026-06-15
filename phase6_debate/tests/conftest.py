@@ -8,6 +8,11 @@ per module, mirroring the Phase-4/5 conftest rhythm:
   ``Envelope``, proving phase isolation), a ``make_bars`` helper, a configurable
   ``FakeBroker`` (``get_price``/``get_ohlcv``/``get_market_info``, invocation-
   recording), and a baseline ``candidate`` dict (the frozen Phase-4 contract).
+- Module 6 (``debate`` orchestrator): a scripted ``FakeLLM`` standing in for the
+  shared ``research.LLMClient`` — queued answers, configurable per-turn ``usage``
+  (sets ``last_usage`` like the real client), settable ``model``/``temperature``/
+  ``max_tokens``, and turn recording so tests can assert role order / budgets /
+  the (compressed) transcript each turn saw. No SDK, no network.
 """
 
 from __future__ import annotations
@@ -109,6 +114,62 @@ class FakeBroker:
     def get_market_info(self, epic: str) -> _FakeEnv:
         self.get_market_info_calls.append(epic)
         return self.market_info_env
+
+
+_DEFAULT_USAGE: dict[str, Any] = {
+    "input_tokens": 100,
+    "output_tokens": 20,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "est_cost_usd": 0.001,
+    "est_cost_eur": 0.0009,
+}
+
+
+class FakeLLM:
+    """Scripted stand-in for the shared ``research.LLMClient`` (no SDK, no network).
+
+    Returns ``answers`` in order from ``ask_candidate`` and sets ``last_usage`` to a
+    copy of ``usage`` per turn (exactly what ``llm_caching.ask_agent`` reads back).
+    The orchestrator sets ``model``/``temperature``/``max_tokens`` per turn; each is
+    recorded in ``turns`` at request time, and the ``user`` message each turn saw is
+    recorded in ``seen_users`` (so the compression test can assert the prompt view).
+    ``raises_on`` makes the request at that 0-based index raise (the fail-closed
+    request path). If the script runs out, the last answer is repeated.
+    """
+
+    def __init__(
+        self,
+        answers: list[dict[str, Any]],
+        *,
+        usage: dict[str, Any] | None = None,
+        raises_on: int | None = None,
+    ) -> None:
+        self._answers = list(answers)
+        self._i = 0
+        self._usage = usage if usage is not None else dict(_DEFAULT_USAGE)
+        self.raises_on = raises_on
+
+        # set per turn by ask_agent (model/temperature) + the orchestrator (max_tokens)
+        self.model = ""
+        self.temperature = 0.0
+        self.max_tokens = 0
+        self.last_usage: dict[str, Any] | None = None
+
+        self.turns: list[tuple[str, float, int]] = []  # (model, temperature, max_tokens)
+        self.seen_users: list[str] = []
+
+    def ask_candidate(self, system: str, user: str, json_schema: dict) -> dict:
+        idx = self._i
+        self._i += 1
+        self.turns.append((self.model, self.temperature, self.max_tokens))
+        self.seen_users.append(user)
+        if self.raises_on is not None and idx == self.raises_on:
+            raise RuntimeError("simulated LLM fault")
+        self.last_usage = dict(self._usage)
+        if idx >= len(self._answers):
+            return self._answers[-1]
+        return self._answers[idx]
 
 
 @pytest.fixture

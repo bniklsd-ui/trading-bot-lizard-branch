@@ -115,7 +115,7 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 | `debate/prompts.py` | Bull/Bear/Judge System+User-Templates + JSON-Schemas (DE) | ✅ Modul 3 |
 | `debate/llm_caching.py` | additiver `cache_control`-Wrapper um `research.LLMClient` + Meter-Erweiterung | ✅ Modul 4 |
 | `debate/budget.py` | Call-/Token-/Wall-Clock-Caps + kumulatives Metering, fail-closed | ✅ Modul 5 |
-| `debate/debate.py` | Orchestrator: Runden-Loop, Early-Stop, Kompression, fail-closed (Kern) | ⏳ Modul 6 |
+| `debate/debate.py` | Orchestrator: Runden-Loop, Early-Stop, Kompression, fail-closed (Kern) | ✅ Modul 6 |
 | `debate/audit.py` | `debate_log.json` (vorwärtskompatibles Schema) | ⏳ Modul 7 |
 | `debate/credentials.py` | reuse Phase-1 `get_credential("anthropic_api_key")` | ⏳ Modul 8 |
 | `scripts/wiring.py` · `smoke_test.py` · `live_test.py` | `build_debate` + `debate_runner`-Factory; Operator-Live | ⏳ Modul 8 |
@@ -153,6 +153,80 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 - Operator-`live_test.py`: Debatte im vollen Executor gegen IG Demo, sauberes Ende
   (TRADE→open/close **oder** ABSTAIN→NO_TRADE), `debate_log.json` entsteht, `usage_report`
   zeigt **Cache-Reads > 0**. `exit 0`.
+
+---
+
+## Session stopped — 2026-06-15 (Modul 6 — `debate/debate.py`, der Orchestrator-Kern)
+
+### Completed
+- **Modul 6 — `debate/debate.py` + `tests/test_debate.py`** ✅ (≥12 → **14 neue Tests**):
+  `class Debate(broker, llm_client, config, *, audit=None, now_fn=time.monotonic)` +
+  `run(candidate) -> DebateOutcome`. **Reine Komposition** der Module 2–5 — keine neue AI-Logik;
+  die einzige AI sind die Bull/Bear/Judge-Requests via `ask_agent`. Flow: `build_debate_context`
+  (Fehler → ABSTAIN, **null** Agenten-Requests) → Runden-Loop `1..max_rounds` je **Bull→Bear→Judge**
+  (`budget.register`+`budget.check` nach jedem Turn) → Early-Stop bei Judge-`conclude=true` →
+  Verdict aus letztem Judge-Answer.
+- **Fail-closed (Decision J):** `try/except DebateError` (deckt `DebateLLMError` +
+  `DebateBudgetExceeded` + Context-`DebateError`) **plus** defensives `except Exception` →
+  **ABSTAIN** mit `rationale=str(exc)`, Teil-Transkript/`token_summary` mitgeführt. **Nie** eine
+  Exception nach außen, **nie** „trotzdem traden".
+- **AI-Output-Validierung (Hard Rule 3):** `decision ∉ {TRADE,ABSTAIN}` → ABSTAIN; `TRADE` ohne
+  brauchbare `direction ∈ {BUY,SELL}` → fail-closed ABSTAIN; `ABSTAIN` → `direction=None`
+  (egal was das Modell lieferte). `confidence` wird via `_as_float` nur **geloggt/getragen** und
+  taucht in **keiner** Steuer-Verzweigung auf (Decision H — Test pinnt: low-conf tradet, high-conf
+  ABSTAIN tradet nicht).
+- **Deterministische Transkript-Kompression (v1, kein Extra-Request):** Latch bei kumulativen
+  Input-Tokens > `compression_trigger_pct × max_cumulative_input_tokens`; ab dann rendern die
+  Prompts eine **komprimierte Sicht** (`_compress` = jüngster Turn je Agent, in Rundenreihenfolge).
+  Das **volle** Transkript bleibt für `DebateOutcome.transcript` + Audit erhalten (Decision I) —
+  Test pinnt beides (Runde-1-Marker verschwindet aus dem späten Prompt, Outcome trägt alle 9 Turns).
+- **`Debate`-Export** in `debate/__init__.py` ergänzt (`from debate.debate import Debate`).
+- **Isolation:** `debate.py` importiert nur `debate.*` + stdlib — **kein** `anthropic`/
+  `broker_wrapper`/`research` (Broker + Client duck-typed via lokalem `Protocol`). Hygiene-grep clean.
+- **Verifiziert:** `pytest phase6_debate/tests -q` → **62 passed** (48 + 14); Regression grün:
+  **P4 88** · **P5 130** (Session rein additiv im P6-Paket — kein Fremd-File berührt).
+
+### Zwei dokumentierte Design-Entscheidungen (Code = Source of Truth; Concept §6 stimmt sonst)
+- **`audit` ist ein injizierter Callable** `(outcome, ctx) -> None`, nicht ein Objekt mit
+  `.write(...)`. Modul 7 liefert `write_debate(outcome, ctx, path)`; die Modul-8-`wiring` adaptiert
+  das zu diesem Callable (Pfad gebunden). Hält Modul 6 von der Modul-7-Signatur entkoppelt; Tests
+  geben einen Recorder. Audit wird **genau einmal** vor Return gerufen (nur wenn `ctx` gebaut wurde;
+  Audit-Fehler werden geloggt + geschluckt, brechen das Ergebnis nie).
+- **Per-Rollen-`max_tokens` setzt der Orchestrator** direkt am geteilten Client
+  (`self._llm.max_tokens = max_tokens_agent|max_tokens_judge`) **vor** `ask_agent` — das ist der
+  **einzige** Per-Turn-Knopf, den `ask_agent` nicht setzt (`ask_agent` setzt Model+Temperatur).
+  Vermeidet eine erneute Edit am committeten Modul 4. (→ Concept §6 mit dieser dated Reconciliation
+  zu annotieren, falls noch nicht.)
+
+### Next
+- **Modul 7 — `debate/audit.py` + `tests/test_audit.py`** (≥5 Tests, Concept §7, Decision I):
+  `write_debate(outcome: DebateOutcome, ctx: DebateContext, path: str | None) -> dict` — append an
+  `debate_log.json` (atomar via temp + `os.replace`; korrupte Datei → frisch + Warnung, wie
+  `token_meter._load_log`; `path=None` → nicht schreiben, Record zurückgeben). **Vorwärtskompatibles
+  Schema** (P9 `decision_context` / `market_regime_snapshots` ohne Reshaping ingestierbar):
+  `{ts, epic, seed_direction, final_decision, final_direction, confidence(advisory), rounds_used,
+  rationale, regime_snapshot{spread_pct, market_status, drift_at_pick, score_at_pick,
+  recent_bars_summary}, transcript[...], token_summary{...}}`. Mapping-Kommentar im Modul. Tests:
+  Schema vollständig + alle P9-Mapping-Keys; atomar; korrupte Datei → frisch; `path=None` schreibt
+  nicht; append erhält Vorgänger. **Wiring (Modul 8) adaptiert `write_debate` → den Audit-Callable.**
+
+### Offene Punkte / [VERIFY]
+- Kein [VERIFY] für Modul 7 offen. Übrig fürs Paket: `scripts.wiring`-Namenskollision (P4/P5/P6)
+  → **Modul 8** (P6-Wiring darf nicht P4/P5-`scripts.wiring` importieren — baut Client/Debate selbst).
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase6-debate`**. Module 1–5 committet (`b2da0db`…`ad6ff65`); **Modul 6 noch nicht** —
+  Working Tree liegt zur Review (rein im P6-Paket: `debate/debate.py`, `debate/__init__.py`,
+  `tests/conftest.py` (FakeLLM), `tests/test_debate.py`, diese `CLAUDE.md`). ⚠ **Neue Hard-Regel
+  (`4abd8b3`): Commit ⇒ Note-Update im selben Commit** — beim Committen die Modul-6-Zeile (✅) +
+  diesen Block mit hineinnehmen und „noch nicht committet" → „committet `<sha>`" flippen.
+- **`audit` = Callable**, nicht `.write`-Objekt (s. o.) — Modul 7 baut die Funktion, Modul 8 bindet
+  sie als `lambda o, c: write_debate(o, c, path)`.
+- **`FakeLLM`** (conftest) ist scripted: `answers`-Liste, `usage`-dict (→ `last_usage`),
+  `raises_on`-Index, `turns`/`seen_users`-Recording. Direkt importierbar
+  (`from tests.conftest import FakeLLM`), **kein** Fixture.
+- `_compress` hält den **jüngsten** Turn je Agent (nicht die Historie) — bewusst „verlustarm" v1;
+  LLM-basierte Kompression ist ein späterer Swap (Carry-over).
 
 ---
 

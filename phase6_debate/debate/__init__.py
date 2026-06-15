@@ -7,9 +7,9 @@ fail-closed handling — is deterministic code. The debate never sees the broker
 any VETO/Gate function, so it can't bypass a VETO.
 
 Public exports grow per module (mirrors how the Phase-4 ``research`` package grew
-its ``__init__``). Module 1 adds the data contracts; the orchestrator ``Debate``
-lands with ``debate.py`` (Module 6) and is exported then. Contract types are also
-importable directly from ``debate.models``.
+its ``__init__``). Module 1 added the data contracts; Module 6 adds the
+orchestrator ``Debate``. Contract types are also importable directly from
+``debate.models``.
 
 Full design + the 11 locked decisions (A–K):
 ``../docs/concepts/phase6_debate_concept.md``.
@@ -17,6 +17,7 @@ Full design + the 11 locked decisions (A–K):
 
 from __future__ import annotations
 
+from debate.debate import Debate
 from debate.models import (
     AgentTurn,
     DebateBudgetExceeded,
@@ -28,6 +29,7 @@ from debate.models import (
 )
 
 __all__ = [
+    "Debate",
     "DebateConfig",
     "DebateContext",
     "AgentTurn",
