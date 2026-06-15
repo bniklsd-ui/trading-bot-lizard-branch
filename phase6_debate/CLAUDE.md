@@ -39,6 +39,14 @@ kein Gate überschreiben (strukturell kein Force-Trigger: sie referenziert sie n
   Subtask „done" ohne grünes `pytest` (gemockt, **kein Netz, KEIN echtes LLM** in Unit-Tests).
 - **Cross-Phase-Reuse** (`research.LLMClient` / `research.token_meter` / Pricing) ist
   die **dokumentierte Ausnahme** (Decision F) — im Modul-Docstring benannt, nicht versteckt.
+- **Commit ⇒ Note-Update (zwingend, auch auf direkte Anweisung).** Jeder Commit, der ein
+  Modul/einen Step abschließt, **muss** im selben Commit den Status (Datei-/Modul-Tabelle
+  „⏳→✅") **und** den `## Session stopped`-Block dieser Datei aktualisieren — der „Nicht
+  committet"-Hinweis im Handover wird auf „committet `<sha>`" geflippt. Das gilt **auch**, wenn
+  der User „commit" sagt, **ohne** ein Note-Update zu erwähnen: erst die Note synchronisieren,
+  dann committen (Note im Commit enthalten). Grund: wiederkehrendes Problem — Step committet,
+  aber das Handover behauptet weiter „nicht committet" und die nächste Session startet auf
+  falschem Stand. Wenn ein Commit *kein* Step-Abschluss ist (z. B. WIP), das im Block vermerken.
 
 ## Die 11 Entscheidungen (A–K, gelockt)
 | # | Thema | Festlegung |
