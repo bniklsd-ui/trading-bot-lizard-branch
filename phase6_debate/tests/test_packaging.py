@@ -18,7 +18,9 @@ def test_debate_package_imports_via_editable_install() -> None:
     """`import debate` resolves through the installed package (no sys.path hack)."""
     import debate
 
-    # The Step-1 scaffold deliberately exports nothing yet — assert the contract
-    # of an installed-but-empty package rather than any concrete symbol.
+    # Since Module 1 the package re-exports its data contracts; assert one is
+    # reachable off the top-level package (proves the editable install + the
+    # __init__ re-export both work).
     assert hasattr(debate, "__all__")
-    assert debate.__all__ == []
+    assert "DebateConfig" in debate.__all__
+    assert debate.DebateConfig().max_rounds == 5

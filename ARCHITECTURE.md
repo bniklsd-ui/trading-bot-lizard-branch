@@ -121,5 +121,12 @@
 ## See also
 
 - Build plan: [`ROADMAP.md`](./ROADMAP.md)
-- Phase 1 concept: [`docs/concepts/phase1_broker_api_konzept.md`](./docs/concepts/phase1_broker_api_konzept.md)
-- Phase 1 implementation: [`phase1_broker_wrapper/`](./phase1_broker_wrapper/)
+
+Per-phase concept + implementation:
+
+- Phase 1 — [`docs/concepts/phase1_broker_api_konzept.md`](./docs/concepts/phase1_broker_api_konzept.md) · [`phase1_broker_wrapper/`](./phase1_broker_wrapper/)
+- Phase 2 — [`docs/concepts/phase2_persistence_konzept.md`](./docs/concepts/phase2_persistence_konzept.md) · [`phase2_persistence/`](./phase2_persistence/)
+- Phase 3 — [`docs/concepts/phase3_external_data_konzept.md`](./docs/concepts/phase3_external_data_konzept.md) · [`phase3_external_data/`](./phase3_external_data/)
+- Phase 4 — [`docs/concepts/phase4_research_plan_konzept.md`](./docs/concepts/phase4_research_plan_konzept.md) · [`phase4_research/`](./phase4_research/)
+- Phase 5 — [`docs/concepts/phase5_concept.md`](./docs/concepts/phase5_concept.md) · [`phase5_execution/`](./phase5_execution/)
+- Phase 6 — [`docs/concepts/phase6_debate_concept.md`](./docs/concepts/phase6_debate_concept.md) · [`phase6_debate/`](./phase6_debate/)

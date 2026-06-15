@@ -100,8 +100,8 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 | Datei | Zweck | Status |
 |---|---|---|
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step C) | ✅ |
-| `debate/__init__.py` | Paket-Marker (Exports noch leer; landen mit den Modulen) | ✅ Stub |
-| `debate/models.py` | `DebateConfig`, `DebateContext`, `AgentTurn`, `DebateOutcome`, Exceptions | ⏳ Modul 1 (nächster Schritt) |
+| `debate/__init__.py` | Paket-Marker; re-exportiert seit Modul 1 die Contract-Typen | ✅ |
+| `debate/models.py` | `DebateConfig`, `DebateContext`, `AgentTurn`, `DebateOutcome`, Exceptions (types only, frozen) | ✅ Modul 1 |
 | `debate/context_builder.py` | CODE: Candidate + 1 frischer Broker-Snapshot → frozen `DebateContext` (die AI-Grenze) | ⏳ Modul 2 |
 | `debate/prompts.py` | Bull/Bear/Judge System+User-Templates + JSON-Schemas (DE) | ⏳ Modul 3 |
 | `debate/llm_caching.py` | additiver `cache_control`-Wrapper um `research.LLMClient` + Meter-Erweiterung | ⏳ Modul 4 |
@@ -138,43 +138,48 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 
 ---
 
-## Session stopped — 2026-06-12 (Scaffold + Step C + Konzept-Korrektur)
+## Session stopped — 2026-06-15 (Modul 1 — `models.py`)
 
 ### Completed
-- **Step 0 (Naming-Hygiene + Doc-Abgleich)** ✅ committed (`c8d5ba1`, lokal, **nicht** gepusht):
-  `ROADMAP.md` + Root-`CLAUDE.md` Phase-6-Zeilen auf das gelockte 11-Entscheidungs-Konzept +
-  die AI-Grenze gezogen. `turbo_candidates.json` unangetastet; kein Code geändert.
-- **Konzept-Korrektur** in `docs/concepts/phase6_debate_concept.md`: dieses `CLAUDE.md` wird
-  **up-front im Scaffold** angelegt (wie P1–P5, z. B. P4 Step 1) — **nicht** auf Step 10
-  verschoben. Step 10 finalisiert nur noch `README.md` + den finalen Session-stopped-Stand.
-  Begründung: das `CLAUDE.md` ist die Wissens-/Protokoll-/Handover-Basis und muss ab Session 1
-  existieren. Step 0 / Scaffold / Step C im Konzept als **DONE** annotiert (nicht doppelt machen).
-- **Scaffold `phase6_debate/`** ✅ (gespiegelt an P4/P5): `pyproject.toml` (`name="debate"`,
-  `include=["debate*"]`), `requirements.txt` (nur `pytest`; `anthropic` via P4-Install),
-  `README.md`, dieses `CLAUDE.md`, `debate/__init__.py` (Exports noch leer), `tests/__init__.py`
-  + `tests/test_packaging.py` (Import-Smoke), `scripts/__init__.py`.
-- **Step C (Packaging)** ✅: `scripts/dev_install.sh` (Repo-Root) um `phase6_debate` erweitert
-  (Reihenfolge P1→…→P6, nach P4). `import debate` löst über den editable install auf — **kein
-  `sys.path`-Hack**.
-- **Verifiziert:** `pytest phase6_debate/tests -v` grün (Packaging-Smoke); P4 (88) + P5 (130)
-  Suiten unberührt grün; Step-0-grep auf `phase6_debate/` ohne Treffer.
+- **Modul 1 — `debate/models.py` + `tests/test_models.py`** ✅: alle Contract-Typen als
+  `@dataclass(frozen=True)` — `DebateConfig` (exakt die §0-Defaults: Bull/Bear=Haiku 4.5,
+  Judge=Sonnet 4.6, `max_rounds=5`, Caps 18/120k/12k/120s, `cache_system=True`,
+  `compression_trigger_pct=0.65`, Temps 0.4/0.4/0.1, `max_tokens_agent/judge=512/768`,
+  `debate_log_path`, **`confidence_gates_nothing=True`** = reine Selbst-Doku, Decision H),
+  `DebateContext` (frischer Snapshot + Seed-Felder), `AgentTurn`, `DebateOutcome` (+ `to_dict()`,
+  Transkript→list für den Audit). Exceptions `DebateError` → `DebateBudgetExceeded`/`DebateLLMError`
+  (alle → fail-closed ABSTAIN im Orchestrator). **7 Tests grün** (Packaging-Smoke + 6 Modell-Tests).
+- **Pricing bewusst NICHT in `DebateConfig`** dupliziert (Decision F): Kosten/USD→EUR kommen aus
+  der geteilten `research.ResearchConfig`, die den P4-`LLMClient`/`token_meter` konfiguriert.
+- `debate/__init__.py` re-exportiert jetzt die Contract-Typen (wie P4 sein `__init__` wachsen ließ);
+  `Debate`-Orchestrator-Export landet mit Modul 6.
+- **Isolation bestätigt:** `models.py` importiert nur stdlib (`dataclasses`, `typing`) — kein
+  `anthropic`/`broker_wrapper`/`research`. Hygiene-grep (`--include=*.py`) **clean** (Prosa nach der
+  §0-⚠-Vorgabe entschärft: „request/invocation" statt „call", „reverse" statt „flip", keine
+  Options-Identifier ausgeschrieben).
+- **Verifiziert:** `pytest phase6_debate/tests -q` → 7 passed; P4 (88) + P5 (130) unberührt grün.
 
 ### Next
-- **Modul 1 — `debate/models.py` + `tests/test_models.py`** (≥5 Tests): `DebateConfig` (alle
-  Felder aus der Defaults-Tabelle §0), `DebateContext`/`AgentTurn`/`DebateOutcome` (frozen,
-  immutabel), Exceptions (`DebateError` → `DebateBudgetExceeded`, `DebateLLMError`). Doku-Test:
-  `confidence` taucht in **keiner** Gating-Verzweigung auf; Konstante `confidence_gates_nothing`
-  existiert. Types only, keine Logik (wie P4-`models.py` Step 1). Danach Modul 2 (`context_builder`).
+- **Modul 2 — `debate/context_builder.py` + `tests/test_context_builder.py`** (≥6 Tests, FakeBroker):
+  `build_debate_context(candidate, broker, config) -> DebateContext`. **CODE-only, das ist die
+  AI-Grenze** — liest GENAU EINEN frischen Snapshot (`get_price` + `get_ohlcv` + `get_market_info`),
+  baut `recent_bars_summary` aus den IG-Echtzeit-Bars. `market_status ≠ TRADEABLE` / `get_ohlcv`-Fehler
+  → `DebateError` (→ ABSTAIN). Frischer `spread_pct` überschreibt `spread_pct_at_pick`. `drift_at_pick=None`
+  darf nicht crashen. Broker je Probe genau **einmal** gelesen.
+- **[VERIFY] vor Modul 2:** `get_ohlcv.data["bars"]`-Close-Feldname gegen echten P1-Code (gleiche
+  offene Stelle wie P5-VETO-3). conftest braucht einen `FakeBroker` mit `get_price`/`get_ohlcv`/
+  `get_market_info` (P4/P5-conftest als Vorlage).
 
 ### Offene Punkte / [VERIFY]
 - SDK `cache_control`-Form (Modul 4), `message.usage`-Cache-Feldnamen (Modul 4),
   `get_ohlcv`-Close-Feldname (Modul 2), `scripts.wiring`-Namenskollision (Modul 8). Jeweils
-  **vor** dem betroffenen Modul gegen echten Code/SDK prüfen — genau das hat in P4/P5 den
-  `CALL/PUT`- und `currencyCode`-Bug gefangen.
+  **vor** dem betroffenen Modul gegen echten Code/SDK prüfen.
 
 ### Gotchas (für den Re-Entry)
-- `debate/__init__.py` exportiert noch **nichts** — `import debate` ist absichtlich leer
-  (Exports landen mit Modul 1/6). Der Packaging-Test prüft genau das.
-- **Nicht committet** über Step 0 hinaus (User: „no commit yet") — Working Tree liegt zur
-  Review. Beim nächsten Commit: scaffold + Step C + Konzept-Korrektur sind ein logischer Block.
+- Branch **`phase6-debate`** (Scaffold-Commit `c810a3b`). Modul 1 ist **noch nicht committet** —
+  Working Tree liegt zur Review (User triggert Commits).
+- `DebateOutcome.to_dict()` normalisiert das Transkript-Tupel zu einer **list** (asdict lässt es
+  sonst Tupel) — der Audit (Modul 7) will ein JSON-Array.
 - `requirements.txt` enthält bewusst **kein** `anthropic` — es kommt über den P4-editable-install.
+- Hygiene-Disziplin: in Docstrings „request/invocation" statt „call", „reverse" statt „flip"
+  schreiben (sonst matcht der `grep -i`-Gate).
