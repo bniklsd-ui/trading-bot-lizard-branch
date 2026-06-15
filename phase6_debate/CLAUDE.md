@@ -102,7 +102,8 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step C) | ✅ |
 | `debate/__init__.py` | Paket-Marker; re-exportiert seit Modul 1 die Contract-Typen | ✅ |
 | `debate/models.py` | `DebateConfig`, `DebateContext`, `AgentTurn`, `DebateOutcome`, Exceptions (types only, frozen) | ✅ Modul 1 |
-| `debate/context_builder.py` | CODE: Candidate + 1 frischer Broker-Snapshot → frozen `DebateContext` (die AI-Grenze) | ⏳ Modul 2 |
+| `debate/context_builder.py` | CODE: Candidate + 1 frischer Broker-Snapshot → frozen `DebateContext` (die AI-Grenze) | ✅ Modul 2 |
+| `debate/timeutil.py` | ISO-8601-UTC-Stempel (`_utcnow()`-Seam, je Phase dupliziert) → `DebateContext.generated_at` | ✅ Modul 2 |
 | `debate/prompts.py` | Bull/Bear/Judge System+User-Templates + JSON-Schemas (DE) | ⏳ Modul 3 |
 | `debate/llm_caching.py` | additiver `cache_control`-Wrapper um `research.LLMClient` + Meter-Erweiterung | ⏳ Modul 4 |
 | `debate/budget.py` | Call-/Token-/Wall-Clock-Caps + kumulatives Metering, fail-closed | ⏳ Modul 5 |
@@ -118,8 +119,12 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
    (bzw. System als Content-Block-Liste). Falls nicht → Form anpassen.
 2. **`message.usage`-Cache-Feldnamen** (`cache_creation_input_tokens` /
    `cache_read_input_tokens`) gegen die SDK-Version.
-3. **`get_ohlcv.data["bars"]` Close-Feldname** (gleiche offene Stelle wie P5-VETO-3)
-   für `recent_bars_summary`.
+3. ~~**`get_ohlcv.data["bars"]` Close-Feldname**~~ ✅ **RESOLVED (Modul 2, 2026-06-15):**
+   `get_ohlcv(epic, res, count).data = {"bars":[…], "allowance":{…}}`; jede Bar =
+   `OHLCBar.__dict__ = {timestamp, open, high, low, close, volume}`; Close-Feld = **`close`**
+   (Mid-Price; `0.0`/`None` bei schlechten Daten). Quelle:
+   `phase1_broker_wrapper/.../ig_adapter.py` (`_parse_bar`), gespiegelt von P5-VETO-3
+   (`vetos.py:131`).
 4. **Modulnamen-Kollision** `scripts.wiring` (P4/P5/P6) — P6-Wiring darf nicht die
    falsche `wiring` importieren.
 
@@ -135,6 +140,60 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 - Operator-`live_test.py`: Debatte im vollen Executor gegen IG Demo, sauberes Ende
   (TRADE→open/close **oder** ABSTAIN→NO_TRADE), `debate_log.json` entsteht, `usage_report`
   zeigt **Cache-Reads > 0**. `exit 0`.
+
+---
+
+## Session stopped — 2026-06-15 (Modul 2 — `context_builder.py`)
+
+### Completed
+- **Modul 2 — `debate/context_builder.py` + `debate/timeutil.py` + `tests/conftest.py` +
+  `tests/test_context_builder.py`** ✅: `build_debate_context(candidate, broker, config)
+  -> DebateContext`. **CODE-only — die AI-Grenze.** Liest GENAU EINEN frischen Snapshot
+  (`get_price` → `get_ohlcv` → `get_market_info`, je **einmal**), faltet ihn mit dem
+  Candidate-Seed zu einem frozen `DebateContext`. Der Broker wird hier (Code) gelesen; die
+  Agenten bekommen ihn nie. Frischer `spread_pct`/`market_status` aus `get_price` überschreibt
+  `spread_pct_at_pick`; `recent_bars_summary` aus den IG-Echtzeit-Bars (first/last close + net %,
+  gespiegelt von P5-VETO-3). **Fail-closed:** not-ok-Envelope / raised fault / `market_status ≠
+  TRADEABLE` / <2 Bars / 0-oder-None-Close → `DebateError` (→ ABSTAIN im Orchestrator).
+  `drift_at_pick=None` crasht nicht. **Isolation:** importiert nur `debate.models`/
+  `debate.timeutil`/stdlib (Broker via lokalem `Protocol`) — kein `anthropic`/`broker_wrapper`/
+  `research`.
+- **`debate/timeutil.py`** — per-Phase-Duplikat (wie P1–P4) mit `_utcnow()`-Seam für
+  Test-Time-Freeze → `DebateContext.generated_at` (ISO-8601 UTC, ms, `Z`).
+- **`DebateConfig` additiv erweitert:** `bars_resolution="MINUTE_5"` + `bars_count=12` —
+  **verbatim aus den gelockten P5-Momentum-Defaults** (`ExecutionConfig`), kein erfundener
+  Wert. §0-Defaults-Tabelle hier + Concept-§0 mit dateiertem Reconciliation-Hinweis aktualisiert.
+- **[VERIFY] #3 (get_ohlcv-Close-Feld) RESOLVED** — `close` (s. oben).
+- **Verifiziert:** `pytest phase6_debate/tests -q` → **19 passed** (7 + 12 neu, ≥6 gefordert);
+  Regression grün: P4 **88**, P5 **130** unberührt. Hygiene-grep clean. **Nicht committet**
+  (User triggert Commits).
+
+### Next
+- **Modul 3 — `debate/prompts.py` + `tests/test_prompts.py`** (≥6 Tests, Concept §3):
+  drei System-Prompts (Bull/Bear/Judge, **Deutsch**) + drei Structured-Output-Schemas. System+
+  Kontext-Block **stabil über alle Turns** (Cache-Präfix, Decision D); nur das wachsende
+  Transkript steht im `user`-Teil. Prompts müssen **ehrlich** kommunizieren: `drift_at_pick`/
+  `seed_*` = verzögertes P4-Stimmungsbild (yFinance ~15 min), `spread_pct`/`recent_bars_summary`
+  = IG-Echtzeit. Judge-Schema: `{decision:"TRADE|ABSTAIN", direction:"BUY|SELL|null",
+  confidence:0-100, rationale, conclude:bool}` (`conclude` steuert Early-Stop). Tests: jedes
+  Schema valide; Kontext vollständig im stabilen Block; Transkript seriell im user-Teil;
+  `direction:null` bei ABSTAIN erlaubt; **kein** Options-Vokabular irgendwo (Hygiene).
+- **[VERIFY] vor Modul 3:** keine neue offene Stelle; Anthropic-Schema-Eigenheiten aus P4
+  beachten (Structured Outputs lehnen Type-Arrays/`minimum`/`maximum` ab → `anyOf` für nullable,
+  Range im Code prüfen; s. P4 `prompt.py:_build_schema`).
+
+### Offene Punkte / [VERIFY]
+- SDK `cache_control`-Form (Modul 4), `message.usage`-Cache-Feldnamen (Modul 4),
+  `scripts.wiring`-Namenskollision (Modul 8). Jeweils **vor** dem betroffenen Modul prüfen.
+  ([VERIFY] #3 `get_ohlcv`-Close ist erledigt.)
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase6-debate`**. Modul 1 **und** Modul 2 sind **noch nicht committet** —
+  Working Tree liegt zur Review (User triggert Commits).
+- `context_builder` ist **kein** Top-Level-Export (`debate/__init__.py` unverändert) — Zugriff
+  via `from debate.context_builder import build_debate_context` (wie P4 `build_context`).
+- `DebateConfig.bars_resolution`/`bars_count` sind der einzige config-Touch; `get_ohlcv` wird
+  mit genau diesen Werten gerufen (Test `test_each_probe_read_exactly_once` pinnt das).
 
 ---
 

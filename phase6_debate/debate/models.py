@@ -112,6 +112,11 @@ class DebateConfig:
         compression_trigger_pct: compress the transcript at ~this fraction of the
             token budget (deterministic, code-side in v1 — no extra LLM request).
 
+    Broker snapshot (Module 2 ``context_builder``):
+        bars_resolution / bars_count: the IG real-time ``get_ohlcv`` window that
+            feeds ``recent_bars_summary`` in the ``DebateContext``. Reused from the
+            locked Phase-5 momentum defaults (same bars, same instrument).
+
     Decoding:
         temperature_bull / temperature_bear: slight divergence wanted (0.4).
         temperature_judge: synthesis should be consistent (0.1).
@@ -141,6 +146,14 @@ class DebateConfig:
     # --- caching & compression (Decision D/G) ---
     cache_system: bool = True
     compression_trigger_pct: float = 0.65
+
+    # --- fresh broker snapshot (Module 2 context_builder) ---
+    # Resolution/count for the IG real-time bars that feed ``recent_bars_summary``.
+    # Reused verbatim from the locked Phase-5 momentum defaults
+    # (``ExecutionConfig.momentum_resolution`` / ``momentum_count``) — same bars,
+    # same instrument — not a new invented value. v1, tune at profit (Phase 7).
+    bars_resolution: str = "MINUTE_5"
+    bars_count: int = 12  # ≈ 1 h of MINUTE_5 bars
 
     # --- decoding ---
     temperature_bull: float = 0.4

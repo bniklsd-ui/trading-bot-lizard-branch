@@ -53,6 +53,16 @@
 | `max_tokens_judge` | `768` | Judge braucht Synthese-Raum |
 | `debate_log_path` | `data/state/debate_log.json` | gitignored Audit |
 | `confidence_gates_nothing` | `True` (Label/Doku) | Decision H — Konstante zur Selbstdokumentation, kein Verhalten |
+| `bars_resolution` | `"MINUTE_5"` | Module 2 — IG-Echtzeit-Bars für `recent_bars_summary` |
+| `bars_count` | `12` (≈ 1 h) | Module 2 — Bar-Fenster für `recent_bars_summary` |
+
+> 📝 **Reconciliation 2026-06-15 (Code = Source of Truth, Module 2):** Die obige
+> Tabelle hatte ursprünglich **keine** Bar-Resolution/-Count-Felder, der
+> `context_builder` braucht aber eine Auflösung/Anzahl für `get_ohlcv`. Die zwei
+> Felder `bars_resolution`/`bars_count` wurden **additiv** zu `DebateConfig`
+> ergänzt — **verbatim** aus den gelockten Phase-5-Momentum-Defaults übernommen
+> (`ExecutionConfig.momentum_resolution="MINUTE_5"` / `momentum_count=12`, gleiche
+> Bars, gleiches Instrument), kein neuer/erfundener Wert. v1, am Profit zu tunen.
 
 ### Anmerkung zu Decision H (bewusste Wette — für später festgehalten)
 
