@@ -89,6 +89,17 @@ Hand-off „Candidate → Gates → Order" so bauen, dass P6 die Richtungs-/Size
 (Bull/Bear/Judge) **austauschen** kann, ohne Gates neu zu schreiben — `gate_direction_consistency`
 + `build_order_plan` sind die Naht.
 
+> 🔁 **Phase-6-Edit (2026-06-16, Decision A — additiv, Code = Source of Truth):** Phase 6
+> (Modul 9) hat `executor.py` **additiv** um einen **keyword-only** `debate_runner:
+> Callable[[dict], Any] | None = None` erweitert. Naht **zwischen Gate 2 und Gate 3** in
+> `run()`: läuft ein Runner, wird sein Outcome **duck-typed** gelesen (`.decision`/`.direction`/
+> `.rationale`) — **kein** P6-Import, Phasen-Isolation gewahrt; `ABSTAIN` → `NO_TRADE`, sonst
+> wird `candidate["direction"]` in-memory (ggf. geflippt) gesetzt, alle Gates/VETOs/Sizing
+> **unverändert**. **Default `None` ⇒ P5 bit-identisch + AI-frei** (alle 130 Bestands-Tests
+> grün; +5 neue Naht-Regressionstests in `test_executor.py` → **135**). Das ist die in
+> Decision A erlaubte „minimale P5-Edit" — die Debatte bekommt **nie** Broker/Gate/VETO
+> (Decision J). Detail: `phase6_debate/` (Modul 9) + `docs/concepts/phase6_debate_concept.md`.
+
 ## Datei-/Modul-Übersicht (Soll, Konzept §"Modul-Plan")
 ```
 phase5_execution/

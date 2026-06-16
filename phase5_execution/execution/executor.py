@@ -7,9 +7,11 @@ human-confirm → write-ahead placement → monitoring. It writes **no** new bro
 gate, or VETO logic; every rule already lives in ``gates.py`` / ``sizing.py`` /
 ``vetos.py`` / ``order.py`` / ``monitor.py``. This is pure composition.
 
-**No AI here.** The only AI in the whole system is the lazy Phase-4
-``research_runner`` reached through Gate 2 (``gate_load_candidates``) when no fresh
-candidate is stored — injected, so this module never imports Phase 4.
+**No AI here.** Phase 5 itself contains no AI: the lazy Phase-4 ``research_runner``
+reached through Gate 2 (``gate_load_candidates``) when no fresh candidate is stored is
+injected, so this module never imports Phase 4. An optional Phase-6 ``debate_runner``
+(Decision A) may likewise be injected between Gate 2 and Gate 3; it too is duck-typed
+and never imported here, and it defaults to ``None`` (no debate → Phase 5 unchanged).
 
 Result vocabulary (documented in :mod:`execution.models`):
 
@@ -74,6 +76,7 @@ class Executor:
         research_runner: Callable[[], list[dict[str, Any]]],
         confirm_fn: Callable[[OrderPlan], bool],
         *,
+        debate_runner: Callable[[dict[str, Any]], Any] | None = None,
         now_fn: Callable[[], datetime] = datetime.now,
         sleep_fn: Callable[[float], None] = time.sleep,
     ) -> None:
@@ -90,6 +93,14 @@ class Executor:
                 injected so Phase 4 stays out of this module.
             confirm_fn: human-confirm predicate (``ig_bot`` stdin prompt; ``--yes`` →
                 ``lambda _p: True``; tests: a stub).
+            debate_runner: optional Phase-6 Bull/Bear/Judge hook, injected between Gate 2
+                and Gate 3 (Decision A). ``None`` (the default) → no debate, so Phase 5
+                stays **AI-free and bit-identical**. When present it is called with the
+                Gate-2 candidate and returns a duck-typed debate outcome (read here as
+                ``.decision`` / ``.direction`` / ``.rationale`` — **no Phase-6 import**;
+                phase isolation): ``ABSTAIN`` → ``NO_TRADE``; ``TRADE`` → the candidate's
+                direction is enriched in-memory (possibly reversed). The runner never
+                receives the broker or any gate/VETO — it cannot bypass one (Decision J).
             now_fn / sleep_fn: injected clock / sleep for deterministic tests.
         """
         self.broker = broker
@@ -99,6 +110,7 @@ class Executor:
         self.config = config
         self.research_runner = research_runner
         self.confirm_fn = confirm_fn
+        self.debate_runner = debate_runner
         self.now_fn = now_fn
         self.sleep_fn = sleep_fn
 
@@ -150,6 +162,26 @@ class Executor:
         )
         if not g2.ok or candidate is None:
             return self._no_trade(g2.gate, g2.reason)
+
+        # 4.5) Phase-6 debate seam (Decision A) — between Gate 2 and Gate 3. When no
+        # runner is injected this is skipped entirely (Phase 5 stays AI-free). The
+        # outcome is read duck-typed (no Phase-6 import): ABSTAIN → NO_TRADE; TRADE →
+        # enrich the candidate's direction in-memory (the Judge may reverse the seed,
+        # Decision B). Every downstream gate/VETO then reads the resolved direction.
+        if self.debate_runner is not None:
+            try:
+                outcome = self.debate_runner(candidate)
+            except Exception as exc:  # noqa: BLE001 — defense: the debate is contractually
+                # fail-closed (Decision J), but a throwing runner must never crash the
+                # cycle either → treat it as a clean NO_TRADE, never "trade anyway".
+                return self._no_trade("debate", f"debate_runner failed: {exc}")
+            if getattr(outcome, "decision", "TRADE") == "ABSTAIN":
+                return self._no_trade(
+                    "debate", getattr(outcome, "rationale", "") or "abstain"
+                )
+            direction = getattr(outcome, "direction", None)
+            if direction:
+                candidate = {**candidate, "direction": direction}
 
         # 5) Gate 3 + Gate 5 — share one fresh open-positions snapshot.
         positions_env = self.broker.get_open_positions()

@@ -117,10 +117,10 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 | `debate/budget.py` | Call-/Token-/Wall-Clock-Caps + kumulatives Metering, fail-closed | ✅ Modul 5 |
 | `debate/debate.py` | Orchestrator: Runden-Loop, Early-Stop, Kompression, fail-closed (Kern) | ✅ Modul 6 |
 | `debate/audit.py` | `debate_log.json` (vorwärtskompatibles Schema) | ✅ Modul 7 |
-| `debate/credentials.py` | reuse Phase-1 `get_credential("anthropic_api_key")` | ⏳ Modul 8 |
-| `scripts/wiring.py` · `smoke_test.py` · `live_test.py` | `build_debate` + `debate_runner`-Factory; Operator-Live | ⏳ Modul 8 |
+| `debate/credentials.py` | reuse Phase-1 `get_credential("anthropic_api_key")` | ✅ Modul 8 |
+| `scripts/wiring.py` · `smoke_test.py` · `live_test.py` | `build_debate` + `debate_runner`-Factory; Operator-Live | ✅ Modul 8 |
 | `tests/test_packaging.py` | Editable-Install-Smoke (`import debate`) | ✅ |
-| P5 `executor.py`-Edit + Regression | `debate_runner`-Naht + ≥4 neue Executor-Tests | ⏳ Modul 9 |
+| P5 `executor.py`-Edit + Regression | `debate_runner`-Naht + ≥4 neue Executor-Tests | ✅ Modul 9 |
 
 ## Offene [VERIFY] (vor dem Bauen gegen echten Code / SDK prüfen)
 1. ~~**`anthropic`-SDK block-level `cache_control` auf `system`**~~ ✅ **RESOLVED
@@ -153,6 +153,100 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 - Operator-`live_test.py`: Debatte im vollen Executor gegen IG Demo, sauberes Ende
   (TRADE→open/close **oder** ABSTAIN→NO_TRADE), `debate_log.json` entsteht, `usage_report`
   zeigt **Cache-Reads > 0**. `exit 0`.
+
+---
+
+## Session stopped — 2026-06-16 (Module 9 + 8 zusammen — P5-Naht + Wiring/Scripts/Credentials)
+
+### Warum 9 + 8 in EINER Session (dokumentierte Ausnahme zum Ein-Modul-Rhythmus)
+Modul 8 (`live_test.py`) fährt die Debatte **im vollen P5-Executor** — das geht erst, wenn der
+Executor einen `debate_runner` akzeptiert (Modul-9-Naht). Die beiden sind also **hart gekoppelt**;
+8 allein ließe `live_test` eine ganze Session lang gestrandet. Darum diese Session: erst Modul 9
+(die testbare Naht), dann Modul 8 (Wiring + Scripts + Credentials). **Operator-Freigabe** dieser
+Ausnahme erteilt (2026-06-16). Präzedenz: P5 baute Steps 9+10 aus demselben Kopplungsgrund zusammen.
+
+### Completed — Modul 9 (P5-Naht, **Decision A**, additiv)
+- **`phase5_execution/execution/executor.py`** — neuer **keyword-only** Ctor-Arg
+  `debate_runner: Callable[[dict], Any] | None = None` (nach `*`, neben `now_fn`/`sleep_fn`).
+  Naht **zwischen Gate 2 und Gate 3** (Schritt „4.5"): `outcome = debate_runner(candidate)`;
+  `getattr(outcome,"decision")=="ABSTAIN"` → `_no_trade("debate", rationale)`; sonst
+  `candidate = {**candidate, "direction": outcome.direction}` (in-memory, ggf. **geflippt**,
+  Decision B). **Duck-typed gelesen** (`.decision`/`.direction`/`.rationale`) — **kein** P6-Import,
+  Phasen-Isolation gewahrt. `None` (Default) → Naht übersprungen → **P5 bit-identisch + AI-frei**
+  (alle 130 P5-Tests unverändert, keine Testdatei angefasst außer den 4 neuen).
+- **`tests/test_executor.py`** — **+5 Tests** (jetzt 13): Flip (BUY-Seed + TRADE/SELL → Order ist
+  **SELL**), ABSTAIN → NO_TRADE (`"debate"` im detail, **kein** `open_position`, Gate 3 nie
+  erreicht), TRADE same-dir → öffnet normal, `debate_runner=None` → Baseline. Lokaler
+  `_DebateOutcome`-Stand-in (SimpleNamespace-artig) → **kein** P6-Import in der P5-Suite.
+
+### Completed — Modul 8 (alles in `phase6_debate/`)
+- **`debate/credentials.py`** — Keyring-Shim, **verbatim gespiegelt** von
+  `research/credentials.py` (Phase-1 `get_credential("anthropic_api_key")`, `__all__`,
+  `parents[2]`-Bootstrap). Die eine dokumentierte Phasen-Ausnahme (Hard Rule 1). **Nicht** von
+  Unit-Tests importiert.
+- **`scripts/wiring.py`** — `build_debate(broker, *, debate_config=None, with_audit=True)` baut den
+  **geteilten** `research.LLMClient` mit **`cache_system=True`** (Key aus Keyring-Shim,
+  `token_meter_path` → `data/state/llm_usage.json`, Pricing aus `ResearchConfig`) + bindet den
+  **Modul-7-Audit-Callable** `lambda o,c: write_debate(o,c,"…/debate_log.json")` → `Debate`.
+  `make_debate_runner(broker)` = lazy `debate_runner`-Factory (baut die Debatte **einmal**, teilt
+  den Broker). `build_executor(config, *, confirm_fn, …)` baut den P5-`Executor` **direkt aus dem
+  installierten `execution`-Paket** (löst die **`scripts.wiring`-Namenskollision** P4/P5/P6 — genau
+  wie P5 die P4-Kollision löste), teilt **einen** Broker zwischen Executor + Debatte, `research_runner`
+  = No-Op (`_no_research`, Live-Pfad nutzt **geseedeten** Candidate), `debate_runner` injiziert,
+  tz-aware `now_fn`.
+- **`scripts/smoke_test.py`** — eine **echte** Debatte über den geseedeten Candidate, **dry**
+  (kein Executor, `with_audit=False` → **kein** `debate_log`-Write). Lädt den Candidate aus
+  `StateManager.load_candidates()` (Operator seedet vorher via P5 `seed_candidate.py`), connectet
+  den Broker (Context-Builder braucht frische Preise), druckt Transkript + `token_summary`
+  (inkl. Cache-Reads) → stderr, Outcome-JSON → stdout.
+- **`scripts/live_test.py`** — Operator-Gate: Debatte **im vollen Executor** (P6-`build_executor`,
+  auto-confirm, `max_hold=1`/`poll=10s`). Wiederverwendet `execution.ig_bot.make_confirm_fn`/
+  `result_to_dict` (installiertes Paket, **keine** `scripts`-Kollision). Asserts: sauberes Ende
+  (kein ABORT); **wenn die Debatte lief** (Gate 1 ok + frischer Seed) → neuer `debate_log.json`-
+  Record **und** `cache_read_input_tokens > 0` (Caching-Beweis); sonst die Debatte-Proofs sauber
+  übersprungen (immer noch valider exit 0). `RESULT: N/M` → stderr, JSON → stdout.
+- **Keine P6-Unit-Tests** für Scripts/Credentials (konsistent mit P4/P5 — Scripts werden nicht
+  collected). P6-Unit-Zahl bleibt **70**.
+
+### Verifiziert
+- `pytest phase5_execution/tests -q` → **135** (130 + 5 Naht-Regression). `pytest phase6_debate/tests
+  -q` → **70** (unverändert). `pytest phase4_research/tests -q` → **88** (unverändert).
+- Hygiene-grep clean (Prosa „request/invocation" statt „call"); `py_compile` der 4 Dateien OK;
+  `import scripts.wiring` (aus `phase6_debate/`) löst **ohne** Netz/Keyring; `smoke/live --help` exit 0.
+- **Committet als NICHT-live-getestete Baseline** (Module 8+9, dieser Commit = HEAD von
+  `phase6-debate`; Hard-Regel `4abd8b3` befolgt: Note + Modul-8/9-Zeilen (✅) + P5-/Concept-
+  Annotationen im selben Commit). ⚠ **Bewusst als sauberer Rollback-Punkt getaggt:**
+  **`phase6-pre-live-test`** markiert den Stand „Code-complete, **noch nicht** live-verifiziert"
+  — exakt vor dem ersten Operator-Live-Lauf. Falls der Live-Pfad debuggt werden muss, ist
+  `git checkout phase6-pre-live-test` der definierte saubere Ausgangszustand (Muster wie
+  `phase4-pre-schema-fix`). Die konkrete Commit-SHA: `git rev-list -n1 phase6-pre-live-test`.
+
+### scripts.wiring-Kollision [VERIFY] — **RESOLVED**
+P6-`live_test` importiert P6-`scripts.wiring.build_executor`; das baut den Executor **selbst** aus
+`execution.*` (nie P5-`scripts.wiring`). `ig_bot`-Helfer kommen aus dem `execution`-Paket (kein
+`scripts`-Name) → keine Kollision. Einziger geteilter Broker zwischen Executor + Debatte.
+
+### Next — Operator-Live-Gate (User führt aus; Claude macht Code + gemockte Tests)
+1. `bash scripts/dev_install.sh` (installiert P1–P6 editable).
+2. **Im Handelsfenster** (09:00–17:30 Europe/Berlin), **mit** dem aktuellen `get_ohlcv`-net-return:
+   `python phase5_execution/scripts/seed_candidate.py --direction SELL` (TTL 30 min!).
+3. `python phase6_debate/scripts/smoke_test.py` (dry — Transkript + Cache-Reads sichtbar).
+4. `python phase6_debate/scripts/live_test.py` → erwartet sauberes Ende, neuer `debate_log.json`-
+   Record, **Cache-Reads > 0**, `exit 0`. Danach Phase-6 ✅ live-verifiziert flippen (Top-Level-Doku).
+- Bei grünem Gate: **Phase 6 ist code-complete** — nur noch der Operator-Lauf + Doku-Flip offen.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase6-debate`**. Module 1–7 committet (Modul 7 = HEAD vor dieser Session); **Module 8+9
+  noch nicht** — Working Tree: `phase5_execution/execution/executor.py` + `…/tests/test_executor.py`
+  (Modul 9) **und** `phase6_debate/debate/credentials.py` + `phase6_debate/scripts/{wiring,smoke_test,
+  live_test}.py` + diese Note + P5-/Concept-Annotationen (Modul 8).
+- **Modul 9 editiert eine P5-Datei** — das ist **Decision A** (P6-Scope: „minimale P5-Edit erlaubt"),
+  nicht Scope-Bruch. Default `None` hält P5 bit-identisch. In `phase5_execution/CLAUDE.md` dateiert
+  vermerkt (wie Modul 4 seine P4-Edits in der P4-`CLAUDE.md`).
+- `build_debate(with_audit=False)` ist der **einzige** Weg, eine Debatte **ohne** `debate_log`-Write
+  zu fahren (smoke). Der Live-Pfad/`make_debate_runner` schreibt immer.
+- **`live_test` braucht einen frischen Seed** im Fenster, sonst überspringt es die Debatte-Proofs
+  (Gate 1 / kein Candidate) — das ist **kein** Fehler, nur „Debatte lief diesen Zyklus nicht".
 
 ---
 

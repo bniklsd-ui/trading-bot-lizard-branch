@@ -100,6 +100,7 @@ def _build(
     *,
     confirm_fn: Callable[[OrderPlan], bool] = _yes,
     runner: _Runner | None = None,
+    debate_runner: Callable[[dict[str, Any]], Any] | None = None,
     now_fn: Callable[[], datetime] | None = None,
     config: ExecutionConfig | None = None,
     db: FakeDB | None = None,
@@ -113,6 +114,7 @@ def _build(
         config or ExecutionConfig(),
         runner,
         confirm_fn,
+        debate_runner=debate_runner,
         now_fn=now_fn or _in_window(),
         sleep_fn=lambda _s: None,
     )
@@ -300,3 +302,127 @@ def test_reconcile_conflict_aborts(
 
     assert result.status == "ABORT"
     assert broker.open_position_calls == []
+
+
+# --- 9–12) Phase-6 debate seam (Decision A) -------------------------------
+#
+# The seam sits between Gate 2 and Gate 3. The outcome is read duck-typed, so the
+# tests use a tiny local stand-in (no Phase-6 import — the P5 suite stays isolated).
+
+
+class _DebateOutcome:
+    """Duck-typed stand-in for the Phase-6 ``DebateOutcome`` (the seam reads attrs)."""
+
+    def __init__(self, decision: str, direction: str | None, rationale: str = "") -> None:
+        self.decision = decision
+        self.direction = direction
+        self.rationale = rationale
+
+
+class _DebateRunner:
+    """Recording ``debate_runner`` — captures the candidate it saw, returns a fixed outcome."""
+
+    def __init__(self, outcome: _DebateOutcome) -> None:
+        self.outcome = outcome
+        self.seen: list[dict[str, Any]] = []
+
+    def __call__(self, candidate: dict[str, Any]) -> _DebateOutcome:
+        self.seen.append(candidate)
+        return self.outcome
+
+
+def _full_path_broker() -> FakeBroker:
+    """A broker wired for the full open→present→gone path (default rising bars)."""
+    return FakeBroker(
+        account_env=_account(1500.0),
+        positions_sequence=[
+            _positions(),                  # Gate 3 + Gate 5
+            _positions(),                  # VETO 4
+            _positions(_open_position()),  # monitor poll 1: present
+            _positions(),                  # monitor poll 2: gone
+        ],
+    )
+
+
+def test_debate_flip_reverses_order_direction(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A BUY seed + TRADE/SELL debate verdict → the placed order is SELL (Decision B flip)."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    debate = _DebateRunner(_DebateOutcome("TRADE", "SELL"))
+    executor, _ = _build(broker, state, exec_state, debate_runner=debate)
+
+    result = executor.run()
+
+    assert result.status == "CLOSED_BY_BROKER"
+    assert debate.seen and debate.seen[0]["direction"] == "BUY"  # saw the seed
+    assert len(broker.open_position_calls) == 1
+    assert broker.open_position_calls[0]["direction"] == "SELL"  # flipped reached the order
+
+
+def test_debate_abstain_blocks_order(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A debate ABSTAIN → NO_TRADE before Gate 3, no order placed (fail-closed, Decision J)."""
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    debate = _DebateRunner(_DebateOutcome("ABSTAIN", None, rationale="bears won"))
+    executor, _ = _build(broker, state, exec_state, debate_runner=debate)
+
+    result = executor.run()
+
+    assert result.status == "NO_TRADE"
+    assert "debate" in result.detail and "bears won" in result.detail
+    assert broker.open_position_calls == []
+    assert broker.get_open_positions_calls == 0  # Gate 3 never reached
+
+
+def test_debate_trade_same_direction_opens_normally(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A TRADE verdict keeping the seed direction proceeds exactly like the baseline."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    debate = _DebateRunner(_DebateOutcome("TRADE", "BUY"))
+    executor, _ = _build(broker, state, exec_state, debate_runner=debate)
+
+    result = executor.run()
+
+    assert result.status == "CLOSED_BY_BROKER"
+    assert len(broker.open_position_calls) == 1
+    assert broker.open_position_calls[0]["direction"] == "BUY"
+
+
+def test_no_debate_runner_is_bit_identical_passthrough(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """``debate_runner=None`` (the default) → the seam is skipped; baseline behaviour."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    executor, _ = _build(broker, state, exec_state)  # no debate_runner
+
+    result = executor.run()
+
+    assert result.status == "CLOSED_BY_BROKER"
+    assert broker.open_position_calls[0]["direction"] == "BUY"
+
+
+def test_debate_runner_raising_fails_closed_no_order(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A throwing debate_runner never crashes the cycle → NO_TRADE, no order (Decision J defense)."""
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+
+    def boom(_candidate: dict[str, Any]) -> Any:
+        raise RuntimeError("debate infra exploded")
+
+    executor, _ = _build(broker, state, exec_state, debate_runner=boom)
+
+    result = executor.run()
+
+    assert result.status == "NO_TRADE"
+    assert "debate" in result.detail
+    assert broker.open_position_calls == []
+    assert broker.get_open_positions_calls == 0  # Gate 3 never reached

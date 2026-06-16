@@ -451,6 +451,25 @@ Minimale Edit in `phase5_execution/execution/executor.py`:
   (d) `debate_runner` wirft (sollte nie, aber Defense) → fail-closed (`ABORT`/`NO_TRADE`), **keine** Order.
 - **Volle P4-Suite erneut grün** (additive `cache_system`/Meter-Edits, Default-Verhalten unverändert).
 
+> 📝 **Reconciliation 2026-06-16 (Module 9 + 8 zusammen gebaut; Code = Source of Truth):**
+> - **Module 8 + 9 in EINER Session** (Operator-Freigabe): `live_test.py` (§8) fährt die Debatte
+>   im vollen Executor und **braucht** die §9-Naht — die beiden sind gekoppelt (wie P5 Steps 9+10).
+> - **Default ist `None`, nicht `_passthrough_debate`:** der neue keyword-only Arg ist
+>   `debate_runner: Callable[[dict], Any] | None = None`. `None` → Naht **komplett übersprungen**
+>   (kein Passthrough-Objekt nötig) → P5 bit-identisch + **kein P6-Import** im Executor. Das ist
+>   sauberer als ein Passthrough-Default, der `DebateOutcome` aus P6 importieren müsste (bricht die
+>   Phasen-Isolation). Das Outcome wird **duck-typed** gelesen (`.decision`/`.direction`/`.rationale`).
+> - **In-memory enrichment** setzt nur `candidate["direction"]` (das `"debate":{…}`-Sub-Dict aus dem
+>   Stub oben wird **nicht** gesetzt — die Gates lesen es nicht; der volle Verlauf liegt im Audit
+>   `debate_log.json`, Modul 7). Naht sitzt zwischen Gate 2 und Gate 3 (Schritt „4.5").
+> - **Test (d) erfüllt:** ein werfender `debate_runner` wird im Seam mit `try/except` zu
+>   **`NO_TRADE`** gewandelt (Decision J: Fehler → fail-closed, nie Exception, nie „trotzdem
+>   traden"). 5 neue Tests statt 4 → `test_executor.py` **13**, volle P5-Suite **135**.
+> - **`scripts.wiring`-Kollision (§8):** P6-`build_executor` baut den Executor **direkt aus
+>   `execution.*`** (nie P5-`scripts.wiring`) — wie P5 die P4-Kollision löste; ein **geteilter**
+>   Broker für Executor + Debatte; `research_runner` = No-Op (Live nutzt geseedeten Candidate).
+>   `smoke_test` fährt dry via `build_debate(with_audit=False)` (kein `debate_log`-Write).
+
 ### 10. `README.md` · `requirements.txt` · `CLAUDE.md`
 
 > 📝 **Korrektur 2026-06-12:** `CLAUDE.md` **und** `requirements.txt` werden **up-front im
