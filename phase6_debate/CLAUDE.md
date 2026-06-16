@@ -116,7 +116,7 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 | `debate/llm_caching.py` | additiver `cache_control`-Wrapper um `research.LLMClient` + Meter-Erweiterung | ✅ Modul 4 |
 | `debate/budget.py` | Call-/Token-/Wall-Clock-Caps + kumulatives Metering, fail-closed | ✅ Modul 5 |
 | `debate/debate.py` | Orchestrator: Runden-Loop, Early-Stop, Kompression, fail-closed (Kern) | ✅ Modul 6 |
-| `debate/audit.py` | `debate_log.json` (vorwärtskompatibles Schema) | ⏳ Modul 7 |
+| `debate/audit.py` | `debate_log.json` (vorwärtskompatibles Schema) | ✅ Modul 7 |
 | `debate/credentials.py` | reuse Phase-1 `get_credential("anthropic_api_key")` | ⏳ Modul 8 |
 | `scripts/wiring.py` · `smoke_test.py` · `live_test.py` | `build_debate` + `debate_runner`-Factory; Operator-Live | ⏳ Modul 8 |
 | `tests/test_packaging.py` | Editable-Install-Smoke (`import debate`) | ✅ |
@@ -153,6 +153,67 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 - Operator-`live_test.py`: Debatte im vollen Executor gegen IG Demo, sauberes Ende
   (TRADE→open/close **oder** ABSTAIN→NO_TRADE), `debate_log.json` entsteht, `usage_report`
   zeigt **Cache-Reads > 0**. `exit 0`.
+
+---
+
+## Session stopped — 2026-06-16 (Modul 7 — `debate/audit.py`, vorwärtskompatibler JSON-Audit)
+
+### Completed
+- **Modul 7 — `debate/audit.py` + `tests/test_audit.py`** ✅ (≥5 → **8 neue Tests**):
+  `write_debate(outcome: DebateOutcome, ctx: DebateContext, path: str | None) -> dict`.
+  Baut **einen** vorwärtskompatiblen Record (Concept §7) aus Outcome + Context und hängt ihn
+  **atomar** an `data/state/debate_log.json` an. **Schema** exakt §7:
+  `{ts, epic, seed_direction, final_decision, final_direction, confidence(advisory), rounds_used,
+  rationale, regime_snapshot{spread_pct, market_status, drift_at_pick, score_at_pick,
+  recent_bars_summary}, transcript[...], token_summary{6 keys}}`. **P9-Mapping als Modul-Docstring-
+  Tabelle** (`regime_snapshot`→`market_regime_snapshots`, `transcript`/`decision`/…→`decision_context`).
+- **Atomar (Decision I, §7):** `_load_log` (gespiegelt von `token_meter._load_log` — fehlend→`[]`,
+  korrupt/non-list→Warnung+frisch, nie Raise) → append → `tempfile.mkstemp` im **selben** Verzeichnis
+  → `json.dump` → `os.replace(tmp, path)` (bewusste Verbesserung gegenüber dem in-place-Write von
+  `token_meter`). Fehlgeschlagener Replace räumt das Temp-File ab; jeder `OSError` wird **geloggt +
+  geschluckt** (best-effort, der Audit bricht **nie** ein Ergebnis — der Orchestrator-Callable schluckt
+  zusätzlich obendrauf). `os.makedirs(..., exist_ok=True)` legt fehlende Pfade an.
+- **`path=None` → kein Write, Record zurück** (Dry/Unit-Pfad, exakt wie `token_meter.record`).
+- **`confidence` advisory:** wandert nur in den Record (Decision H), in **keine** Verzweigung. Transkript
+  via `outcome.to_dict()["transcript"]` (Tuple→list-Normalisierung schon in `models.py`).
+- **Isolation:** importiert nur `debate.models`/`debate.timeutil` + stdlib (`json`/`os`/`logging`/
+  `tempfile`/`typing`) — **kein** `anthropic`/`broker_wrapper`/`research` (laufzeit-geprüft: keins der
+  drei in `sys.modules` nach `import debate.audit`). Logging→stderr. Hygiene-grep clean.
+- **`.gitignore`:** `data/state/debate_log.json` ergänzt (dateierte §0-Reconciliation wie P3/P4/P5;
+  `git check-ignore` → IGNORED). **`debate/__init__.py` unverändert** — Zugriff via
+  `from debate.audit import write_debate` (wie `context_builder`/`prompts`/`budget`).
+- **Verifiziert:** `pytest phase6_debate/tests -q` → **70 passed** (62 + 8); Regression grün:
+  **P4 88** · **P5 130** (rein additiv im P6-Paket + 1 `.gitignore`-Zeile). **Committet** (dieser
+  Commit = HEAD von `phase6-debate`; Hard-Regel `4abd8b3` befolgt: Note + Modul-7-Zeile (✅) +
+  `.gitignore` im selben Commit. Eine self-referenzielle SHA ist im Commit nicht eintragbar →
+  konkrete SHA trägt der nächste Session-Block nach, wie die Vorgänger-Module).
+
+### Next
+- **Modul 8 — `scripts/wiring.py` + `smoke_test.py` + `live_test.py` + `debate/credentials.py`**
+  (Concept §8). `wiring.py`: baut den geteilten `research.LLMClient` (Keyring `anthropic_api_key`
+  via `debate/credentials.py`-Shim = Phase-1 `get_credential`), `token_meter_path` →
+  `data/state/llm_usage.json`, instanziiert `Debate(broker, llm, cfg, audit=...)` mit echtem Broker
+  + **Audit-Callable** `lambda o, c: write_debate(o, c, "data/state/debate_log.json")` (Modul 7 →
+  Callable-Adapter). Liefert die **Runner-Factory** `debate_runner = lambda cand: build_debate(cfg).run(cand)`
+  (lazy/DI, analog P5 `research_runner`). `smoke_test.py` = eine echte Debatte, dry (kein Executor/Save).
+  `live_test.py` = Operator-Lauf im vollen P5-Executor (Modul 9-Naht muss dafür existieren — Reihenfolge
+  prüfen: ggf. Modul 9 vor `live_test.py`).
+- **⚠ [VERIFY] vor Modul 8:** `scripts.wiring`-Namenskollision (P4/P5/P6 haben alle `scripts/wiring.py`).
+  P6-Wiring darf **nicht** versehentlich P4/P5-`scripts.wiring` importieren — Client/Debate selbst bauen,
+  Import-Pfad isolieren (war eine P5-Falle).
+
+### Offene Punkte / [VERIFY]
+- `scripts.wiring`-Namenskollision (Modul 8, s. o.). Sonst nichts offen.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase6-debate`**. Module 1–7 committet (Modul 6 `2330d7d`; **Modul 7 = HEAD**, SHA siehe
+  `git log -1`) — rein additiv: `debate/audit.py`, `tests/test_audit.py`, `.gitignore`, diese `CLAUDE.md`.
+- `write_debate` ist **kein** Top-Level-Export; Modul 8 bindet es als Audit-**Callable** `(o,c)->None`
+  an den Orchestrator (`Debate(..., audit=lambda o, c: write_debate(o, c, path))`).
+- Test-Helfer in `test_audit.py` sind lokal (`_make_outcome`/`_make_context`, Direkt-Konstruktion der
+  frozen Dataclasses) — **kein** conftest-Touch nötig (Modul 7 berührt keine geteilten Fixtures).
+- Clock-Freeze im Test via `monkeypatch.setattr(timeutil, "_utcnow", …)` (autouse-Fixture) → `ts`
+  deterministisch.
 
 ---
 

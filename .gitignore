@@ -108,6 +108,11 @@ data/state/llm_usage.json
 # same reconciliation Phase 3/4 did — only specific data/state/*.json files are
 # ignored above; this operational idempotency store wasn't covered, so add it.
 data/state/execution_state.json
+# Phase 6 debate audit log (Bull/Bear/Judge records, written at runtime by the
+# audit module). Added 2026-06-16 (Module 7): the same reconciliation P3/P4/P5
+# did — only specific data/state/*.json files are ignored above; this advisory
+# audit (DB stays read-only until Phase 7, Decision I) wasn't covered, add it.
+data/state/debate_log.json
 
 # --- Logs ---
 *.log
