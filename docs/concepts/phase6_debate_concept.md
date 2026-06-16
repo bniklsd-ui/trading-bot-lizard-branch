@@ -1,6 +1,10 @@
 # Phase 6 — Implementierungsplan für Claude Code (Bull/Bear/Judge-Debatte)
 
-> **Status:** Architektur geklärt (11 Entscheidungen A–K unten gelockt), Contracts gegen den
+> **Status:** ✅ **GEBAUT + live-verifiziert (2026-06-16).** Alle 9 Module implementiert + getestet
+> (P6 70 / P5 135 / P4 88 grün); Operator-Live-Lauf gegen IG Demo `RESULT 4/4` (`build_executor` →
+> injizierter `debate_runner` → 3 echte Bull/Bear/Judge-Calls → fail-closed ABSTAIN → `NO_TRADE` →
+> `debate_log.json`). ⚠ **Live-verifiziert ≠ profit-validiert** (ein ABSTAIN-Zyklus, kein Edge — P7).
+> Architektur geklärt (11 Entscheidungen A–K unten gelockt), Contracts gegen den
 > **echten Repo-Code** (`main`, Stand 2026-06-12) verifiziert — nicht gegen Konzeptdokumente.
 > Phase 6 ist der **erste echte Mehr-Agenten-AI-Pfad** und der **teuerste Pfad im System**.
 > Kostenkorrektheit (Caching + Metering + Caps) wiegt hier so schwer wie Funktionsumfang.

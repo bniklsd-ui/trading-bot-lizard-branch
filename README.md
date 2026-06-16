@@ -18,7 +18,7 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 3     | External Data (yFinance)            | ✅ Abgeschlossen (live-verifiziert, ^GDAXI)          |
 | 4     | research.py + LLM (`turbo_*` = legacy) | ✅ Abgeschlossen — live-**getestet** (Logik), noch nicht profit-validiert ¹ |
 | 5     | ig_bot.py Gates 1–5 + 4 VETOs + place/monitor/close | ✅ Abgeschlossen — live-**verifiziert** (Order-/Monitor-Pfad, Demo), noch nicht profit-validiert ² |
-| 6     | Bull/Bear/Judge Debate              | Nicht begonnen                                      |
+| 6     | Bull/Bear/Judge Debate              | ✅ Abgeschlossen — live-**verifiziert** (Debatte-Pfad, Demo), noch nicht profit-validiert ³ |
 | 7     | Reward/Punishment + Brain           | Nicht begonnen                                      |
 | 8     | Scheduler                           | Nicht begonnen                                      |
 | 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert)       |
@@ -36,6 +36,16 @@ eine echte IG-Demo-Order (ACCEPTED) und schloss sie per Time-Stop → `RESULT: 4
 (Gates → Sizing → 4 VETOs → place → monitor → close, end-to-end live, nicht nur in CI).
 **Die Profitabilität ist unbekannt** — nur ein Trade, kein Edge gemessen. Edge/Outcome-
 Anchoring ist Phase 7 + Live-Betrieb. Demo only, manueller Trigger (Scheduler = Phase 8).
+
+³ **Live-verifiziert ≠ profit-validiert.** Der Phase-6-Debatte-Pfad läuft nachweislich
+korrekt end-to-end: `phase6_debate/scripts/live_test.py` (IG Demo) fuhr die Debatte im
+vollen Executor → 3 echte Bull/Bear/Judge-Calls → fail-closed ABSTAIN → `NO_TRADE` →
+`debate_log.json` angehängt → `RESULT: 4/4 passed` (`build_executor` → injizierter
+`debate_runner` → Gate-2↔3-Naht, end-to-end live). **Die Profitabilität ist unbekannt** —
+ein ABSTAIN-Zyklus, keine echte Order durch die Debatte (der Order-/Monitor-Pfad selbst
+ist in Phase 5 bereits live bewiesen); Edge/Outcome-Anchoring ist Phase 7 + Live-Betrieb.
+AI **nur** für Bull/Bear-Argumente + Judge-Synthese; `confidence` gatet nichts. Demo only,
+manueller Trigger (Scheduler = Phase 8).
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)

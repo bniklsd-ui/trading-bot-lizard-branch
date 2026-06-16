@@ -7,10 +7,12 @@ SHORT (SELL), and a **Judge** synthesises the exchange into a final direction +
 `TRADE`/`ABSTAIN`. The Judge's direction is the *real* source and **may flip** the
 Phase-4 seed (BUY↔SELL). **Demo only, manual trigger — no scheduler (that is Phase 8).**
 
-> 🚧 **Status: scaffold + packaging (Step C) — 2026-06-12.** Concept is locked
-> (11 decisions A–K). The phase home, `CLAUDE.md` knowledge base and editable
-> install exist; module implementation (models → context → prompts → caching →
-> budget → debate → audit → scripts → executor seam) is the work ahead. See
+> ✅ **Status: code-complete + live-verified (debate path) — 2026-06-16.** All modules
+> (models → context → prompts → caching → budget → debate → audit → scripts → executor
+> seam) are built, tested, and the operator live run vs IG Demo proved the path
+> end-to-end (`build_executor` → injected `debate_runner` → 3 real Bull/Bear/Judge calls
+> → fail-closed ABSTAIN → `NO_TRADE` → `debate_log.json` appended). ⚠ **Live-verified ≠
+> profit-validated** — one cycle, one ABSTAIN, no edge measured (that's Phase 7). See
 > `CLAUDE.md` → the latest `## Session stopped` block for the exact current state.
 
 **AI boundary.** AI is used **only** for Bull/Bear arguments + Judge synthesis.

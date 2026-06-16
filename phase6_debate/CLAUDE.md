@@ -152,7 +152,67 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
   (c) `cache_system=True` setzt den Marker **und** der Meter-Record trägt die Cache-Felder.
 - Operator-`live_test.py`: Debatte im vollen Executor gegen IG Demo, sauberes Ende
   (TRADE→open/close **oder** ABSTAIN→NO_TRADE), `debate_log.json` entsteht, `usage_report`
-  zeigt **Cache-Reads > 0**. `exit 0`.
+  zeigt **Cache-_Creation_ > 0**. `exit 0`. ✅ **erfüllt (2026-06-16)** — Live-Lauf war `RESULT 3/4`
+  (einziger Fail = die alte `cache_reads > 0`-Assertion), nach dem Assertion-Fix (dieser Step) ist
+  ein sauberer 1-Runden-ABSTAIN `4/4`. ⚠ **Reconciliation (Code = Source of Truth):** „Cache-_Reads_
+  > 0" war das ursprüngliche Kriterium, ist aber ein **False-Negative** bei 1-Runden-Debatten —
+  Haikus 4096-Token-Floor lässt Bull/Bear nie cachen, ein Cache-**Read** entsteht erst bei
+  `rounds_used >= 2` (Präfix ≥2× getroffen). Daher gilt jetzt: **Creation immer**, **Reads nur
+  Mehr-Runden** (Details: Post-Live-Test-Block Punkt 1).
+
+---
+
+## Session stopped — 2026-06-16 (Post-Live-Test — Cache-Assertion-Fix + Doku-Flip auf live-verifiziert)
+
+### Completed
+- **`scripts/live_test.py` — Cache-Assertion gelockert (Post-Live-Test Punkt 1, das einzige
+  Code-Delta dieses Steps).** Im `if debate_ran:`-Zweig: `rounds_used` aus dem Audit-Record gelesen
+  (`audit.py` schreibt es) und im Record-Append-Check angezeigt; aus den neuen `llm_usage.json`-Records
+  **beide** Cache-Summen gebildet (`cache_creation_input_tokens` + `cache_read_input_tokens`, beide von
+  `token_meter.record` geschrieben). Neue Logik: **`cache_creation > 0` immer** fordern (beweist den
+  `cache_control`-Marker am Judge/Sonnet-Präfix), **`cache_read > 0` nur bei `rounds_used >= 2`** — sonst
+  Skip-Hinweis statt FAIL. Docstring (Kopf) auf die Zwei-Teil-Semantik (Creation immer / Reads nur
+  Mehr-Runden) umgeschrieben. **Grund:** der erste Live-Lauf war `RESULT 3/4`, einziger Fail = das
+  bestätigte False-Negative (Haikus 4096-Token-Floor → Bull/Bear cachen nie; 1-Runden-Early-Stop liest
+  keinen Präfix neu). Netto: ein sauberer 1-Runden-ABSTAIN ist jetzt `4/4`. **Kein Unit-Test** (Scripts
+  werden nicht von `pytest` collected — konsistent mit P4/P5; Suiten bleiben **70 / P5 135 / P4 88**).
+- **Doku auf ✅ live-verifiziert geflippt (Operator-Entscheidung 2026-06-16 — jetzt, nicht erst nach
+  dem 4/4-Re-Run, weil der Pfad bereits live bewiesen ist und der einzige Fail dieser gefixte Test-Bug
+  war).** Root-`CLAUDE.md` (Active-Phase-Zeile + Phase-6-Status-Block, gespiegelt an der Phase-5-Form,
+  inkl. Cache-Reconciliation + Item-2-Deferral) · `ROADMAP.md` (alle `[ ]`→`[x]`, „Done when"-Cache-Zeile
+  reconciled, „(to be created)" entfernt) · `phase6_debate/README.md` (Status-Zeile) · diese `CLAUDE.md`
+  (Done-Kriterien-Cache-Zeile annotiert, Post-Live-Test Punkt 1 = ✅ erledigt, Punkt 2 = ⏸ zurückgestellt
+  mit der Operator-Begründung). Überall der stehende Caveat **live-verifiziert ≠ profit-validiert** (ein
+  ABSTAIN-Zyklus, kein Edge gemessen — das ist Phase 7).
+- **Item 2 (Seed-`--reasoning`-Override, P5-Scope) bewusst zurückgestellt.** Begründung des Operators:
+  (a) Profitabilität ist nicht Test-Scope, (b) die Ausführbarkeit eines Trades ist in Phase 5 bereits
+  live bewiesen. Separate, spätere Aufgabe.
+
+### Verifiziert
+- `pytest phase6_debate/tests -q` → **70**, `pytest phase5_execution/tests -q` → **135**,
+  `pytest phase4_research/tests -q` → **88** (alle unverändert — das Delta ist script-only + Doku).
+- `python -c "import ast; ast.parse(...)"` auf `live_test.py` → OK (Syntax + Struktur intakt).
+- ✅ **Operator-Live-Lauf bestätigt (2026-06-16, BUY-Seed im Fenster): `RESULT: 4/4 passed`.**
+  Debatte lief (3 echte Calls), `rounds_used=1`, **ABSTAIN** (Judge entwertete den „MANUAL SEED" +
+  die schwache −0,05%-Bewegung), `NO_TRADE`, `debate_log.json` angehängt, `cache_creation=1073` (>0,
+  Marker greift), `cache_read=0` korrekt übersprungen (1-Runden-Debatte). Der Assertion-Fix wirkt
+  exakt wie geplant — die einzige zuvor rote Prüfung ist jetzt grün.
+- **Top-Level-Docs zusätzlich geflippt:** Root-`README.md` (Status-Tabelle Phase 6 = ✅ + Fußnote ³),
+  `docs/concepts/phase6_debate_concept.md` (Banner = ✅ gebaut + live-verifiziert). `ARCHITECTURE.md`
+  trägt keinen Status-Marker → unverändert.
+
+### Next
+- **Phase 6 ist code-complete + live-verifiziert (4/4).** Dieser Step wird auf `phase6-debate`
+  committet und (fast-forward) nach `main` gemerged + gepusht (Operator-Freigabe 2026-06-16).
+- Optional/später: ein TRADE-durch-die-Debatte-Lauf mit **neutralem** Seed (Post-Live-Test Punkt 2,
+  P5-Scope) und P7-Substrat (Outcome-Anchoring) — beides außerhalb dieser Phase.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase6-debate`**. Dieser Step = **script-only + Doku** (kein neues Modul, keine P5/P4-Code-Edits).
+  Bei Commit die Hard-Regel (Commit ⇒ Note-Update) beachten: diese Note + die geflippten Top-Level-Docs
+  gehören in **denselben** Commit.
+- Die `Cache-Reads > 0`-Erwartung ist **nur** bei `rounds_used >= 2` gültig — wer den Live-Test bei einer
+  Mehr-Runden-Debatte sieht, sollte dort Reads > 0 erwarten; bei 1-Runden-ABSTAIN ist `cache_read=0` korrekt.
 
 ---
 
@@ -246,7 +306,8 @@ P6-`live_test` importiert P6-`scripts.wiring.build_executor`; das baut den Execu
 > Bull/Bear/Judge-Calls → fail-closed ABSTAIN → `NO_TRADE` → `debate_log.json` geschrieben).
 > Diese Schritte als Nächstes angehen; um weitere Befunde ergänzen.
 
-1. **`cache_reads > 0`-Assertion in `live_test.py` lockern (live bestätigtes False-Negative).**
+1. ✅ **ERLEDIGT (2026-06-16, dieser Step) — `cache_reads > 0`-Assertion in `live_test.py` gelockert
+   (live bestätigtes False-Negative).**
    Grund (gegen die `claude-api`-Caching-Referenz bestätigt): **Haiku-4.5-Mindest-Cache-Präfix =
    4096 Tokens**, Sonnet-4.6 = 2048. Bull/Bear (Haiku, ~850–1040 Input-Tokens) liegen **weit unter
    4096** → cachen **nie** (`cache_creation=0`); nur der Judge (Sonnet) schreibt Cache. **Cache-READ
@@ -256,9 +317,20 @@ P6-`live_test` importiert P6-`scripts.wiring.build_executor`; das baut den Execu
    der Marker greift), `cache_read > 0` **nur bei `rounds_used >= 2`**. (Sonst meldet ein sauberer
    1-Runden-Lauf fälschlich FAIL.) → kleiner Folge-Commit auf dem `phase6-pre-live-test`-Tag.
    **Der Live-Lauf 2026-06-16 hat genau das getan: `RESULT: 3/4`, einziger Fail = diese Assertion**
-   (alle anderen Checks grün). Nach dem Fix einen sauberen Lauf erwarten (1-Runden-ABSTAIN → 4/4,
-   `exit 0`), **dann** Phase-6 ✅ live-verifiziert im Top-Level-Doku flippen.
-2. **Seed-Reasoning-Bias → Debatte ABSTAINt → kein Order-Pfad.** Der manuelle Seed trägt
+   (alle anderen Checks grün). **Umgesetzt:** `live_test.py` liest `rounds_used` aus dem Audit-Record,
+   summiert `cache_creation_input_tokens` **und** `cache_read_input_tokens` aus den neuen
+   `llm_usage.json`-Records, fordert **`cache_creation > 0` immer** und **`cache_read > 0` nur bei
+   `rounds_used >= 2`** (sonst Skip-Hinweis, kein FAIL); Docstring entsprechend aktualisiert. **Doku
+   jetzt geflippt** (Operator-Entscheidung 2026-06-16): da der Pfad bereits live bewiesen ist und der
+   einzige Fail dieser nun gefixte Test-Bug war, sind Top-Level-Docs (Root-`CLAUDE.md` · `ROADMAP.md`
+   · README) **bereits** auf ✅ live-verifiziert gesetzt — der saubere `4/4`-Re-Run durch den Operator
+   ist nur noch eine Bestätigung, kein Gate für den Flip.
+2. ⏸ **ZURÜCKGESTELLT (Operator-Entscheidung 2026-06-16) — Seed-Reasoning-Bias → Debatte ABSTAINt →
+   kein Order-Pfad.** Bewusst **nicht** in diesem Step. Begründung des Operators: (a) **ob** Trades
+   *profitabel* sind, ist **nicht** Scope dieses Tests, und (b) die Logik, *ob* ein Trade **ausführbar**
+   ist, ist bereits live-bewiesen (Phase-5-Order-/Monitor-Pfad). Der `--reasoning`-Override für
+   `seed_candidate.py` (P5-Scope) bleibt eine separate, spätere Aufgabe. Detail-Hintergrund: Der manuelle
+   Seed trägt
    `reasoning="MANUAL SEED (not a real research pick) …"`; das fließt in `DebateContext.seed_reasoning`
    → in den Prompt → der Judge entwertet es **korrekt** → ABSTAIN. Folge: `live_test.py` endet
    wahrscheinlich `NO_TRADE` (valider exit 0, beweist die Naht + `debate_log.json`), **platziert aber

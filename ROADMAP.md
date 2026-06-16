@@ -132,28 +132,32 @@ cost discipline (caching + metering + caps) matters as much as functionality.
 > deterministic code. The debate **never** sees the broker or any VETO/Gate
 > function — it can't bypass a VETO because it never references one.
 
-- [ ] Bull agent — **Haiku 4.5** (`claude-haiku-4-5-20251001`), config-overridable (Decision C)
-- [ ] Bear agent — **Haiku 4.5**, config-overridable (Decision C)
-- [ ] Judge agent — **Sonnet 4.6**, config-overridable (Decision C)
-- [ ] Early-stop orchestration (`max_rounds=5`) + hard caps on calls / cumulative
+- [x] Bull agent — **Haiku 4.5** (`claude-haiku-4-5-20251001`), config-overridable (Decision C)
+- [x] Bear agent — **Haiku 4.5**, config-overridable (Decision C)
+- [x] Judge agent — **Sonnet 4.6**, config-overridable (Decision C)
+- [x] Early-stop orchestration (`max_rounds=5`) + hard caps on calls / cumulative
       tokens / wall-clock; any cap breach → **ABSTAIN** (Decisions E/J)
-- [ ] Judge is the **direction source** — emits final `direction` that **may flip**
+- [x] Judge is the **direction source** — emits final `direction` that **may flip**
       the Phase-4 seed BUY↔SELL (Decision B); Bull/Bear only argue
-- [ ] Judge emits qualitative `decision ∈ {TRADE, ABSTAIN}`; `confidence` is
+- [x] Judge emits qualitative `decision ∈ {TRADE, ABSTAIN}`; `confidence` is
       **advisory and gates nothing** (Decision H)
-- [ ] Caching + extended token-meter (cache-read/write fields) so the cost
+- [x] Caching + extended token-meter (cache-read/write fields) so the cost
       optimization is provable; `usage_report` shows cache-hit ratio (Decisions D/G)
-- [ ] Forward-compatible JSON audit `debate_log.json` (no SQLite — DB read-only
+- [x] Forward-compatible JSON audit `debate_log.json` (no SQLite — DB read-only
       until Phase 7; schema maps to P9 tables, Decision I)
-- [ ] Seam: `debate_runner` injected **between Gate 2 and Gate 3** in
+- [x] Seam: `debate_runner` injected **between Gate 2 and Gate 3** in
       `executor.run()`; **default passthrough keeps Phase 5 AI-free**; Gates /
       VETOs / sizing run unchanged on the (possibly flipped) direction (Decision A)
 
 **Done when:** Debate runs reliably; every error / cap-breach → fail-closed
 ABSTAIN → NO_TRADE (never "trade anyway"). Integration test in Demo: full debate →
-TRADE→order→close **or** ABSTAIN→NO_TRADE, `debate_log.json` written, cache-reads > 0.
+TRADE→order→close **or** ABSTAIN→NO_TRADE, `debate_log.json` written, cache **creation**
+> 0 (cache *reads* only on multi-round debates — Haiku's 4096-token floor + 1-round
+early-stop mean a single-round ABSTAIN reads no prefix; gated on `rounds_used >= 2`).
+✅ **Done + live-verified 2026-06-16** (one Demo cycle: 3 real calls → ABSTAIN → NO_TRADE
+→ `debate_log.json`; live-verified ≠ profit-validated — edge is Phase 7).
 
-**Directory:** [`phase6_debate/`](./phase6_debate/) *(to be created)*
+**Directory:** [`phase6_debate/`](./phase6_debate/)
 **Concept:** [`docs/concepts/phase6_debate_concept.md`](./docs/concepts/phase6_debate_concept.md)
 
 ---

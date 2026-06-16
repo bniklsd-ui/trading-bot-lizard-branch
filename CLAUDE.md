@@ -77,13 +77,32 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 6 — Bull/Bear/Judge-Debatte (`phase6_debate/`): 🚧 in Arbeit, **Step 0**
-(Naming-Hygiene + Doc-Abgleich). Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close)
-bleibt ✅ abgeschlossen + live-verifiziert (Order-/Monitor-Pfad).
+**Active phase:** Phase 6 — Bull/Bear/Judge-Debatte (`phase6_debate/`): ✅ Code-complete +
+live-**verifiziert** (Debatte-Pfad), **noch nicht profit-validiert** (2026-06-16). Phase 5
+(ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen + live-verifiziert
+(Order-/Monitor-Pfad).
 
-**Phase 6 status:** 🚧 In Arbeit — Konzept **gelockt** (`docs/concepts/phase6_debate_concept.md`,
-11 Entscheidungen A–K, Contracts gegen echten Repo-Code 2026-06-12 verifiziert). Step 0 (diese
-Session): Naming-Hygiene + Doc-Abgleich (kein Code).
+**Phase 6 status:** ✅ Code-complete + live-**verifiziert** (Debatte-Pfad), **noch nicht
+profit-validiert** (2026-06-16)
+- ⚠ **Live-verifiziert ≠ profit-validiert** (gleiche Disziplin wie Phase 4/5): der Live-Lauf
+  (`phase6_debate/scripts/live_test.py` gegen IG Demo) bewies den **ganzen** Pfad end-to-end —
+  `build_executor` → injizierter `debate_runner` → **3 echte** Bull/Bear/Judge-Calls →
+  fail-closed **ABSTAIN** → `NO_TRADE` → `debate_log.json` angehängt (Modul-7-Audit auch live).
+  **Unbekannt** bleibt die Profitabilität: nur **ein** Zyklus, ein ABSTAIN, **keine** echte
+  Order durch die Debatte (der Order-/Monitor-Pfad selbst ist in Phase 5 bereits live bewiesen).
+  Edge/Outcome-Anchoring ist Phase 7.
+- **Cache-Assertion-Reconciliation (Code = Source of Truth):** Der erste Live-Lauf war
+  `RESULT 3/4` — einziger Fail = die `cache_reads > 0`-Assertion in `live_test.py`, ein
+  **bestätigtes False-Negative**. Haiku 4.5 cacht erst ab 4096-Token-Präfix → Bull/Bear (~850–
+  1040 Input-Tokens) cachen **nie**; nur der Judge (Sonnet, 2048-Floor) **schreibt** Cache. Ein
+  Cache-**Read** braucht denselben Präfix ≥2× → entsteht nur in **Mehr-Runden**-Debatten; ein
+  1-Runden-Early-Stop liest nichts neu. **Fix (dieser Step):** `cache_creation > 0` **immer**
+  fordern (beweist den `cache_control`-Marker), `cache_read > 0` **nur bei `rounds_used >= 2`** —
+  sonst false-FAILt ein sauberer 1-Runden-ABSTAIN. Caching-ROI/Modell-Split ist P7-Tuning.
+- **Deferred (P5-Scope, bewusst nicht in diesem Step):** ein `--reasoning`-Override für
+  `seed_candidate.py`, um die Debatte zu einem TRADE statt ABSTAIN zu treiben. Grund: (a) ob
+  Trades *profitabel* sind, ist **nicht** Scope dieses Tests, und (b) die Logik, *ob* ein Trade
+  ausführbar ist, ist bereits live-bewiesen (Phase-5-Order-/Monitor-Pfad).
 - **Erster Mehr-Agenten-AI-Pfad + teuerster Pfad im System** → Kostenkorrektheit (Caching +
   Metering + Caps) wiegt so schwer wie Funktionsumfang.
 - **AI-Grenze (Kernprinzip):** AI macht **nur** Bull/Bear-Argumente + Judge-Synthese. Kontextaufbau,

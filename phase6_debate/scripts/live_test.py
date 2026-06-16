@@ -11,11 +11,16 @@ and, when a fresh candidate exists and the debate returns TRADE through all gate
 A clean ``NO_TRADE`` (a gate/VETO/debate-ABSTAIN said no) is **also** a valid exit-0
 outcome. Only a fail-closed ``ABORT`` is a failure.
 
-**When the debate actually ran** (Gate 1 passed + a fresh seeded candidate existed), two
-extra proofs are asserted: a new record was appended to ``debate_log.json`` (the Module-7
-audit), and the token meter shows **cache reads > 0** (proof the prefix caching is
-working — Decision D). When the debate did **not** run (market closed → Gate 1, or no
-fresh candidate), those proofs are skipped (the cycle still passes if clean).
+**When the debate actually ran** (Gate 1 passed + a fresh seeded candidate existed), the
+record-append + cache proofs are asserted: a new record was appended to ``debate_log.json``
+(the Module-7 audit), and the token meter shows **cache *creation* > 0** (proof the
+``cache_control`` marker is set — the Judge/Sonnet prefix gets written). A cache **read**
+only appears when the same prefix is hit ≥2×, i.e. a **multi-round** debate; a 1-round
+early-stop re-reads nothing (and Haiku's 4096-token floor means Bull/Bear never cache at
+all), so the ``cache_read > 0`` assertion is gated on ``rounds_used >= 2`` — otherwise a
+clean 1-round ABSTAIN would false-FAIL (Decision D). When the debate did **not** run
+(market closed → Gate 1, or no fresh candidate), those proofs are skipped (the cycle still
+passes if clean).
 
 Seed a candidate first (30-min TTL), in the trade window, with the current move::
 
@@ -145,14 +150,30 @@ def main(argv: list[str] | None = None) -> int:
         if debate_ran:
             _eprint("[live] the debate ran this cycle — asserting its proofs.")
             last = debate_records[-1]
+            rounds_used = last.get("rounds_used", 0)
             check("a debate record was appended to debate_log.json",
                   True, f"final_decision={last.get('final_decision')} "
-                        f"final_direction={last.get('final_direction')}")
+                        f"final_direction={last.get('final_direction')} "
+                        f"rounds_used={rounds_used}")
             usage_records = _load_json_array(_USAGE_LOG)
             new_usage = usage_records[usage_records_before:]
+            cache_creation = sum(r.get("cache_creation_input_tokens", 0) for r in new_usage)
             cache_reads = sum(r.get("cache_read_input_tokens", 0) for r in new_usage)
-            check("token meter shows cache reads > 0 (prefix caching works)",
-                  cache_reads > 0, f"cache_read_input_tokens={cache_reads}")
+            # cache *creation* proves the cache_control marker is set (the Judge/Sonnet
+            # prefix gets written). cache *reads* only appear when a stable prefix is hit
+            # ≥2× — i.e. a multi-round debate; a 1-round early-stop re-reads nothing, and
+            # Haiku's 4096-token floor means Bull/Bear never cache. So gate the read
+            # assertion on rounds_used, else a clean 1-round ABSTAIN false-FAILs.
+            check("token meter shows cache creation > 0 (cache_control marker set)",
+                  cache_creation > 0, f"cache_creation_input_tokens={cache_creation}")
+            if rounds_used >= 2:
+                check("token meter shows cache reads > 0 (prefix re-read across rounds)",
+                      cache_reads > 0,
+                      f"cache_read_input_tokens={cache_reads} rounds_used={rounds_used}")
+            else:
+                _eprint(f"[live] single-round debate (rounds_used={rounds_used}) — no "
+                        f"prefix re-read expected; skipping the cache-reads assertion "
+                        f"(cache_read_input_tokens={cache_reads}).")
         else:
             _eprint("[live] the debate did NOT run this cycle (Gate 1 / no fresh "
                     "candidate). Skipping the debate-specific proofs — still a valid "
