@@ -78,9 +78,9 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 ## Current state
 
 **Active phase:** Phase 6 — Bull/Bear/Judge-Debatte (`phase6_debate/`): ✅ Code-complete +
-live-**verifiziert** (Debatte-Pfad), **noch nicht profit-validiert** (2026-06-16). Phase 5
-(ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen + live-verifiziert
-(Order-/Monitor-Pfad).
+live-**verifiziert** (Debatte-Pfad), **noch nicht profit-validiert** — **gemerged + gepusht nach
+`main`** (`49cda8a`, 2026-06-16). Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close)
+bleibt ✅ abgeschlossen + live-verifiziert (Order-/Monitor-Pfad).
 
 **Phase 6 status:** ✅ Code-complete + live-**verifiziert** (Debatte-Pfad), **noch nicht
 profit-validiert** (2026-06-16)

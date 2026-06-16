@@ -201,9 +201,16 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
   `docs/concepts/phase6_debate_concept.md` (Banner = ✅ gebaut + live-verifiziert). `ARCHITECTURE.md`
   trägt keinen Status-Marker → unverändert.
 
-### Next
-- **Phase 6 ist code-complete + live-verifiziert (4/4).** Dieser Step wird auf `phase6-debate`
-  committet und (fast-forward) nach `main` gemerged + gepusht (Operator-Freigabe 2026-06-16).
+### Gemerged + gepusht (2026-06-16) ✅
+- Dieser Step committet als **`49cda8a`** auf `phase6-debate`, dann **fast-forward nach `main`
+  gemerged** (`c8d5ba1..49cda8a`, keine Konflikte — `origin/main` war Ancestor) und **gepusht**:
+  `origin/main` = `49cda8a`, `origin/phase6-debate` = `49cda8a` (neu angelegt). Damit ist die
+  **gesamte Phase 6** (Module 1–9 + dieser Post-Live-Test-Step) auf `main` und remote. Operator-
+  Freigabe für Push+Merge erteilt (2026-06-16). _(Diese „pushed+merged"-Notiz selbst ist der
+  Folge-Commit obendrauf.)_
+- **Phase 6 ist code-complete + live-verifiziert (4/4), gemerged + gepusht.**
+
+### Next (außerhalb dieser Phase)
 - Optional/später: ein TRADE-durch-die-Debatte-Lauf mit **neutralem** Seed (Post-Live-Test Punkt 2,
   P5-Scope) und P7-Substrat (Outcome-Anchoring) — beides außerhalb dieser Phase.
 
