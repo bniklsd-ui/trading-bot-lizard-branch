@@ -232,8 +232,53 @@ P6-`live_test` importiert P6-`scripts.wiring.build_executor`; das baut den Execu
    `python phase5_execution/scripts/seed_candidate.py --direction SELL` (TTL 30 min!).
 3. `python phase6_debate/scripts/smoke_test.py` (dry — Transkript + Cache-Reads sichtbar).
 4. `python phase6_debate/scripts/live_test.py` → erwartet sauberes Ende, neuer `debate_log.json`-
-   Record, **Cache-Reads > 0**, `exit 0`. Danach Phase-6 ✅ live-verifiziert flippen (Top-Level-Doku).
+   Record, `exit 0`. ⚠ **Die `Cache-Reads > 0`-Assertion ist bei einer 1-Runden-Debatte ein
+   erwartetes False-Negative** — Details + Fix im Post-Live-Test-Block unten (Punkt 1). Danach
+   Phase-6 ✅ live-verifiziert flippen (Top-Level-Doku).
 - Bei grünem Gate: **Phase 6 ist code-complete** — nur noch der Operator-Lauf + Doku-Flip offen.
+
+### Post-Live-Test — Folge-Schritte (nächste Session)
+> Erkenntnisse aus **Smoke + Live** (2026-06-16). Smoke: echte LLM-Debatte über den SELL-Seed
+> (3 Calls, 1 Runde, Early-Stop, Verdict **ABSTAIN**, `cache_read=0`/`cache_write=1072`, ~$0.013).
+> **Live (`live_test.py`) ist GELAUFEN** → `RESULT: 3/4 passed`, **einziger Fail = die
+> `cache_reads > 0`-Assertion** (erwartetes False-Negative, s. Punkt 1+4). Der ganze P6-Pfad ist
+> damit **end-to-end live bewiesen** (build_executor → injizierter `debate_runner` → 3 echte
+> Bull/Bear/Judge-Calls → fail-closed ABSTAIN → `NO_TRADE` → `debate_log.json` geschrieben).
+> Diese Schritte als Nächstes angehen; um weitere Befunde ergänzen.
+
+1. **`cache_reads > 0`-Assertion in `live_test.py` lockern (live bestätigtes False-Negative).**
+   Grund (gegen die `claude-api`-Caching-Referenz bestätigt): **Haiku-4.5-Mindest-Cache-Präfix =
+   4096 Tokens**, Sonnet-4.6 = 2048. Bull/Bear (Haiku, ~850–1040 Input-Tokens) liegen **weit unter
+   4096** → cachen **nie** (`cache_creation=0`); nur der Judge (Sonnet) schreibt Cache. **Cache-READ
+   braucht denselben Präfix ≥2×** — bei Early-Stop in Runde 1 läuft jede Rolle genau **einmal** →
+   kein Re-Read → `cache_read=0`, auch beim Judge. Caching greift also erst bei **Mehr-Runden**-
+   Debatten. **Fix:** Assertion entkoppeln — `cache_creation > 0` **immer** fordern (beweist, dass
+   der Marker greift), `cache_read > 0` **nur bei `rounds_used >= 2`**. (Sonst meldet ein sauberer
+   1-Runden-Lauf fälschlich FAIL.) → kleiner Folge-Commit auf dem `phase6-pre-live-test`-Tag.
+   **Der Live-Lauf 2026-06-16 hat genau das getan: `RESULT: 3/4`, einziger Fail = diese Assertion**
+   (alle anderen Checks grün). Nach dem Fix einen sauberen Lauf erwarten (1-Runden-ABSTAIN → 4/4,
+   `exit 0`), **dann** Phase-6 ✅ live-verifiziert im Top-Level-Doku flippen.
+2. **Seed-Reasoning-Bias → Debatte ABSTAINt → kein Order-Pfad.** Der manuelle Seed trägt
+   `reasoning="MANUAL SEED (not a real research pick) …"`; das fließt in `DebateContext.seed_reasoning`
+   → in den Prompt → der Judge entwertet es **korrekt** → ABSTAIN. Folge: `live_test.py` endet
+   wahrscheinlich `NO_TRADE` (valider exit 0, beweist die Naht + `debate_log.json`), **platziert aber
+   keine Order**. Wer den Order-Pfad **durch** die Debatte live üben will: einen Candidate mit
+   **neutralem, plausiblem** `reasoning` seeden (nicht den self-defeating Default). Optional (P5-Scope,
+   separat): `phase5_execution/scripts/seed_candidate.py` einen `--reasoning`-Override / neutraleren
+   Default geben. (Der Order-/Monitor-Pfad selbst ist in P5 bereits live bewiesen — nicht blockierend.)
+3. **P7-Vorausnotizen (Outcome-Anchoring).** `debate_log.json` + advisory `confidence` sind genau das
+   P7-Substrat (Smoke erzeugte bereits die korrekte Record-Form). Kosten ~**$0.013/Runde** (×Runden).
+   Caching-ROI prüfen: durch Haikus 4096-Floor cachen Bull/Bear faktisch nie — mehr Hebel liegt in
+   **kurzen, stabilen Judge-Prompts** (Sonnet cacht) als im Versuch, die Haiku-Arguer zu cachen; ggf.
+   `cache_system`-Nutzen / Modell-Split neu bewerten (Decision C/D bleiben gelockt — das ist P7-Tuning).
+4. **Erster Live-Lauf — Ergebnis (2026-06-16).** `live_test.py` gegen IG Demo lief sauber:
+   `debate_runner` feuerte (3 echte Calls), Verdict **ABSTAIN** (Judge entwertete den als „MANUAL
+   SEED" markierten Seed + die schwache +0.102%-Bewegung — exakt wie im Smoke, s. Punkt 2),
+   Executor → `NO_TRADE`, **`debate_log.json`-Record angehängt** (`final_decision=ABSTAIN`,
+   `final_direction=None`) → Modul-7-Audit auch live bewiesen. `RESULT: 3/4` (nur die Cache-Assertion
+   rot, s. Punkt 1). **Kein** IG-Validierungsfehler (à la P5 `currencyCode`), **kein** Schema-/Prompt-
+   Edge, **keine** Exception — der Pfad ist funktional live korrekt. Platzhalter bleibt: weitere
+   Live-Befunde (besonders ein TRADE-durch-die-Debatte-Lauf mit neutralem Seed, Punkt 2) hier anhängen.
 
 ### Gotchas (für den Re-Entry)
 - Branch **`phase6-debate`**. Module 1–7 committet (Modul 7 = HEAD vor dieser Session); **Module 8+9
