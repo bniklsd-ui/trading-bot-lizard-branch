@@ -31,6 +31,7 @@ from reward.models import (
     RewardError,
     RewardResult,
 )
+from reward.scorer import Scorer
 
 __all__ = [
     "RewardConfig",
@@ -42,4 +43,5 @@ __all__ = [
     "RewardError",
     "PnLUnavailable",
     "compute_confidence",
+    "Scorer",
 ]

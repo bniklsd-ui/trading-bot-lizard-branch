@@ -77,15 +77,17 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Build begonnen
-(Step 3)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
-Exceptions, 21 Tests grün) ✅. **Reward-Logik** (Confidence/Scorer/Brain/Recorder/Seam) folgt in
-Steps 4–13 (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
+**Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Build läuft
+(Steps 3–5 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
+Exceptions) ✅, `reward/confidence.py` (Wilson-LB/Expectancy-R/SQN/N_min-Gate) ✅,
+`reward/scorer.py` (prozess-bewusstes Reward-Delta + Clamping) ✅ — **69 P7-Tests grün**. Die
+beiden ★-Mathe-Module (Confidence/Scorer) stehen; **Synthetic/Brain/Recorder/pnl_resolver/Seam**
+folgen in Steps 6–13 (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
 bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
 2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
 live-verifiziert (Order-/Monitor-Pfad).
 
-**Phase 7 status:** 🚧 Pre-Steps (Step 1) — Scope-Lock + Scaffold (2026-06-18)
+**Phase 7 status:** 🚧 Build läuft (Steps 3–5 ✅ — Reward-Mathe Confidence+Scorer komplett) (2026-06-18)
 - **Scope-Lock (schlankes Modell, Konzept Rev. 2026-06-16-b):** Phase 7 = **Reward-Score**
   (`reward_pts`, prozess-bewusst ab Tag 1) + **Freitext-Lessons** (`trade_lessons`) +
   **observe-only outcome-anchored Confidence**. **Keine VETO-Berührung.** Die volle
@@ -113,6 +115,17 @@ live-verifiziert (Order-/Monitor-Pfad).
   `ConfidenceReport`/`RewardResult`/`LessonResult`) + `RewardConfig` (§5-Defaults; `live_db_path`
   auf den **echten** P2-Pfad `data/trading_bot.sqlite` korrigiert) + Exceptions; **21 Tests grün**.
   Noch reine Typen — Confidence/Scorer/Brain-Logik kommt in Steps 4–13.
+- **Step 4 ✅ (2026-06-18):** `reward/confidence.py` — reine, deterministische Mathe (★):
+  `wilson_lower_bound` (klein-N-stabil, 1/1 ≈ 0.21 statt 1.0), `expectancy_r`, `system_quality_number`,
+  `compute_confidence` (**N < `n_min=10` → `INSUFFICIENT`, `confidence_value=None`**, gatet nichts —
+  Decision C). Sub-Metriken immer befüllt, wenn berechenbar. **+30 Tests** (51 gesamt).
+- **Step 5 ✅ (2026-06-18):** `reward/scorer.py` — prozess-bewusstes Reward-Delta (★, Decision B2/D):
+  `Scorer.score()` = gebremste **Outcome**-Komponente (`outcome_weight · clip(R, ±r_clip)`, `loss_asymmetry`
+  auf Verlusten) **+** **Prozess**-Komponente **unabhängig** vom Outcome (Clean-Exit vs. Time-Stop,
+  Tight-Spread-Bonus, schwaches additives Debate-Signal — **kein** Multiplikator), `total` auf
+  `±max_delta_per_trade` und `score_after` auf `[0,100]` geclampt. **+18 Tests** (69 gesamt). Reuse-Hinweis:
+  Magnituden sind v1/tunbar (Decision D); Tests pinnen *relative* Eigenschaften. **Sibling-Suiten grün +
+  unberührt** (P2 59 · P4 88 · P5 135 · P6 70).
 - Konzept: `docs/concepts/phase7_reward_concept.md` (voller Claude-Code-Plan, Step 0–13).
 
 **Phase 6 status:** ✅ Code-complete + live-**verifiziert** (Debatte-Pfad), **noch nicht

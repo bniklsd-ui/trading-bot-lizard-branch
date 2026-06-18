@@ -76,10 +76,10 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | Datei | Zweck | Status |
 |---|---|---|
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
-| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4)** | ✅ |
+| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4) + `Scorer` (Step 5)** | ✅ |
 | `reward/models.py` | `OpenedTrade`/`ClosedTrade`/`RewardConfig`/`ConfidenceReport`/`RewardResult`/`LessonResult` + Exceptions (types only) | ✅ Step 3 |
 | `reward/confidence.py` | Wilson-LB + Expectancy-R + SQN + N_min-Gating (reine Mathe) ★ | ✅ Step 4 |
-| `reward/scorer.py` | Prozess-bewusstes Reward-Delta + Clamping (B2/D) ★ | ⏳ Step 5 |
+| `reward/scorer.py` | Prozess-bewusstes Reward-Delta + Clamping (B2/D) ★ | ✅ Step 5 |
 | `reward/synthetic.py` | `SyntheticTradeGenerator` + harte Synthetik/Echt-Trennung (H) [→ Opus] | ⏳ Step 6 |
 | `reward/brain.py` | `reflect()`: Lesson-Extraktion, Haiku, best-effort, swappbar (E) [→ Opus] | ⏳ Step 7 |
 | `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened`/`on_trade_closed` orchestriert alles (A/J) | ⏳ Step 8 |
@@ -90,7 +90,8 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `execution/protocols.py`-Edit + `executor.py`-Edit (P5) + Regression | `RewardSink`-Protocol + Naht (Decision A) | ⏳ Step 10 |
 | `tests/{__init__,test_models,test_packaging}.py` | Step-3-Tests (21: Contracts/frozen/§5-Defaults/Exceptions + Editable-Install-Smoke) | ✅ Step 3 |
 | `tests/test_confidence.py` | Wilson/Expectancy/SQN/N_min-Gate + Anti-Pattern-Beweis + Monotonie (30 Fälle, Ziel ≥14) ★ | ✅ Step 4 |
-| `tests/test_{scorer,pnl_resolver,brain,recorder,synthetic,executor_seam}.py` | TDD je Modul (≥66 gesamt; Schwerpunkt scorer) | ⏳ Steps 5+ |
+| `tests/test_scorer.py` | Prozess-vs-Outcome-Trennung, Clamping, Symmetrie/Asymmetrie, R-Clip, schwaches Debate-Signal (18 Fälle, Ziel ≥12) ★ | ✅ Step 5 |
+| `tests/test_{pnl_resolver,brain,recorder,synthetic,executor_seam}.py` | TDD je Modul (≥66 gesamt) | ⏳ Steps 6+ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine Datei = eine
 Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging → stderr, `pytest` ohne
@@ -211,6 +212,63 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-18 (Step 5 — `reward/scorer.py` ★ process-aware scoring)
+
+### Completed
+- **`reward/scorer.py`** (pure deterministic math — **kein I/O, kein Netz, kein LLM**): `class
+  Scorer(cfg)` mit `score(*, r_multiple, status, spread_at_entry_pct, debate_confidence,
+  score_before) -> RewardResult`. Prozess-bewusstes Delta (Decision B2/D):
+  - `outcome_delta = outcome_weight · clip(r_multiple, ±r_clip) · asym` mit `asym=loss_asymmetry`
+    nur auf Verlusten (`clipped_r < 0`), sonst `1.0`.
+  - `process_delta = process_weight · (exit + entry + debate)`, **unabhängig** vom Outcome:
+    `exit = +clean_exit_bonus` (`CLOSED_BY_BROKER`) / `−clean_exit_bonus` (`TIME_STOP`) / `0` sonst;
+    `entry = +clean_exit_bonus` wenn `spread_at_entry_pct ≤ tight_spread_pct`; `debate =
+    (debate_confidence − 0.5)` bzw. `0` bei `None`.
+  - `total = clamp(outcome+process, ±max_delta_per_trade)`; `score_after = clamp(score_before+total,
+    score_min, score_max)`; `win_loss` aus `r_multiple` (>0 WIN / <0 LOSS / =0 BREAKEVEN);
+    `RewardResult.r_multiple` trägt den **rohen** (ungeclippten) Wert.
+- **Zwei bewusste v1-Modellierungs-Entscheidungen** (im Modul-Docstring dokumentiert, weil §5 dafür
+  **keinen** eigenen Knopf hat — Magnituden sind v1/tunbar, Decision D; nur die *relativen*
+  Eigenschaften sind load-bearing, wie beim Confidence-Combiner): (1) der **Clean-Entry**-Bonus
+  reused `clean_exit_bonus` als Prozess-Einheit; (2) das **Debate**-Signal ist `(conf − 0.5)` — max.
+  ±0.5 einer Einheit, also schwächer als die ±1-Einheit-Exit/Entry-Signale ⇒ „schwaches Prozess-
+  Signal, **kein** Multiplikator" (Konzept §6 Step 5), additiv und zentriert auf 0.5.
+- **`reward/__init__.py`** exportiert jetzt zusätzlich `Scorer` (Helper-Klasse bleibt auch unter
+  `reward.scorer` importierbar).
+
+### Verifiziert (gemockt — kein Netz, kein LLM)
+- `pytest phase7_reward/tests -v` → **69 passed** (21 Step-3 + 30 Step-4 + **18 neue Scorer-Fälle**,
+  Ziel war ≥12). Inkl. der geforderten Beweis-Tests: guter Outcome/sauberer Prozess **>** guter
+  Outcome/schlechter Prozess (gleiches R); Pech-Verlust am geplanten SL **>** sloppy-Verlust; `process_delta`
+  bewegt den Score bei `r_multiple=0` **unabhängig** vom Outcome; Clamping (Score nie <0/>100,
+  `|delta|`≤Cap); Symmetrie bei `loss_asymmetry=1.0`; R-Clip saturiert; Debate schwach + kein
+  Multiplikator (`outcome_delta` unverändert).
+- Import-Smoke gegen die Editable-Install: `from reward import Scorer` OK (clean 55.0 vs drift 50.5
+  bei identischem +1R → prozess-bewusst). **Sibling-Suiten grün + unberührt** (Step 5 fasst nur
+  Dateien in `phase7_reward/` + `__init__.py` an): **P2 59 · P4 88 · P5 135 · P6 70**.
+- **Keyring-Preflight (Operator-autorisiert, read-only, nach Maschinen-Migration):**
+  `store_credential.py --status` → **alle 4 `ig_demo_*` ✓, alle 4 Live-`ig_*` ✗** (erwartet — Live ist
+  bewusst ungeseedet), `anthropic_api_key` **✓** (für Step 7 Brain). **Secret-Service-Backend hat die
+  Migration überlebt; keine Neukonfiguration nötig** für Demo/Dev.
+
+### Next — **Step 6** (`reward/synthetic.py` + harte Synthetik/Echt-Trennung, Decision H) **[→ Opus]**
+- `SyntheticTradeGenerator`: klar gelabelte R-Multiple-Verteilungen (`synthetic=True`) für Confidence/
+  Scorer-Mathe-Tests. **Harte Orts-Trennung:** jeder synthetische Schreiber zielt **immer** auf
+  `synthetic_db_path` (Pfad-Guard — **nie** `live_db_path`); Demo-Trades laufen normal in `live_db_path`,
+  getaggt `account='demo'`, gesteuert via `include_demo_in_edge`. **≥8 Tests:** ein `synthetic=True`-
+  Schreibvorgang trifft den Live-Pfad **niemals** (Pfad-Guard ist die Grenze, nicht nur ein Flag).
+- Reihenfolge danach: Step 7 `brain.py` (Haiku `reflect()`, best-effort) **[→ Opus]**, dann 8–13.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. `pytest phase7_reward/tests -v` läuft direkt (editable-install). Bei
+  frischem venv: `bash scripts/dev_install.sh`.
+- **Decision-Treue:** Score/Confidence gaten **nichts** (Decision C/D) — wer in Step 6+ eine Schwelle
+  einbaut, die einen Trade/`risk_pct` beeinflusst → **stop**. `scorer.py` ist reine Mathe, stdlib-only.
+- Die exakten Scorer-Magnituden sind **v1** (am echten Profit zu tunen); Tests pinnen *relative*
+  Eigenschaften, nicht die konkreten Zahlen (außer wo die Arithmetik der Vertrag ist: Clamps, rohes R).
 
 ---
 
