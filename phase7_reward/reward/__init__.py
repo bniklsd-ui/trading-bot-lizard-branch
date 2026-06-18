@@ -9,9 +9,10 @@ fail-closed error handling — is deterministic code. The score's ``confidence``
 Instinct→VETO promotion is deferred to Phase 9 / concept §7b).
 
 Public exports grow per module (mirrors how the Phase-4 ``research`` and Phase-6
-``debate`` packages grew their ``__init__``). The scaffold (Step 2) exports
-nothing yet; ``RewardSink`` / ``RewardConfig`` / ``Scorer`` / ``Brain`` /
-``OpenedTrade`` / ``ClosedTrade`` / ``compute_confidence`` land with Steps 3+.
+``debate`` packages grew their ``__init__``). Step 3 adds the data contracts +
+config + exceptions; ``compute_confidence`` (Step 4), ``Scorer`` (Step 5),
+``Brain`` (Step 7) and ``RewardSink`` (Step 10) land later. Contract types are
+also importable directly from ``reward.models``.
 
 Full design + the locked decisions A–J:
 ``../docs/concepts/phase7_reward_concept.md``.
@@ -19,4 +20,24 @@ Full design + the locked decisions A–J:
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from reward.models import (
+    ClosedTrade,
+    ConfidenceReport,
+    LessonResult,
+    OpenedTrade,
+    PnLUnavailable,
+    RewardConfig,
+    RewardError,
+    RewardResult,
+)
+
+__all__ = [
+    "RewardConfig",
+    "OpenedTrade",
+    "ClosedTrade",
+    "ConfidenceReport",
+    "RewardResult",
+    "LessonResult",
+    "RewardError",
+    "PnLUnavailable",
+]

@@ -246,7 +246,7 @@ maschinenlesbares JSON**, `pytest` ohne Netz/echtes LLM, atomic commits.
 | `lesson_temperature` | `0.3` | E |
 | `lesson_timeout_s` | `20.0` | E — eigener Timeout, blockt den Close-Pfad nie hart |
 | `include_demo_in_edge` | `True` *(Demo-/Bootstrap-Phase)* | H — Demo-Trades **SIND** die Datenquelle, bis Profitabilität absehbar ist → `True`, damit der Loop end-to-end läuft und die Confidence überhaupt aus `INSUFFICIENT` herauskommt. **Caveat (ehrlich):** Demo-Fills/Spreads ≠ Live → Demo-Confidence ist **nicht** live-edge-validiert. Demo bleibt `account='demo'`-getaggt → bei Go-Live re-baselinen/ausschließbar. |
-| `live_db_path` | `"data/trading_bot.db"` | H — Live-Ziel |
+| `live_db_path` | `"data/trading_bot.sqlite"` ⟳ | H — Live-Ziel. ⟳ **2026-06-18 (Step 3, Code = Source of Truth):** der echte P2-DB-Name ist `data/trading_bot.sqlite` (P2-`CLAUDE.md`/`scripts/init_db.py`), **nicht** `…/trading_bot.db` — `RewardConfig.live_db_path` defaultet auf den echten `.sqlite`-Pfad. |
 | `synthetic_db_path` | `"data/synthetic_reward.db"` | H — Synthetik-Ziel (Backfill-Tool schreibt NUR hierhin) |
 
 ---

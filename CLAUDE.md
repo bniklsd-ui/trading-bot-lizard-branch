@@ -77,9 +77,10 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Pre-Steps in
-Arbeit** (Step 0/0b/1/2 — Housekeeping, Doku-Reconciliation, Verify-against-code, Paket-Scaffold).
-**Noch keine Reward-Logik** (Steps 3–13 = spätere TDD-Sessions). Phase 6 (Bull/Bear/Judge-Debatte)
+**Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Build begonnen
+(Step 3)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
+Exceptions, 21 Tests grün) ✅. **Reward-Logik** (Confidence/Scorer/Brain/Recorder/Seam) folgt in
+Steps 4–13 (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
 bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
 2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
 live-verifiziert (Order-/Monitor-Pfad).
@@ -107,7 +108,11 @@ live-verifiziert (Order-/Monitor-Pfad).
   geflippt + `longterm_pre_trade_check() VETO` nach **Phase 9f** verschoben (kein Instinct→VETO-
   Framing mehr in der Doku); Step 1 (Verify-against-code) = 7 Verträge gegen Live-Code gepinnt →
   in `phase7_reward/CLAUDE.md` unter `## Verifizierte Contracts`; Step 2 = Paket-Scaffold
-  (`phase7_reward/`, pkg `reward`). **Noch keine Reward-Logik, keine Tests** (Steps 3–13 folgen).
+  (`phase7_reward/`, pkg `reward`).
+- **Step 3 ✅ (2026-06-18):** `reward/models.py` — frozen Datentypen (`OpenedTrade`/`ClosedTrade`/
+  `ConfidenceReport`/`RewardResult`/`LessonResult`) + `RewardConfig` (§5-Defaults; `live_db_path`
+  auf den **echten** P2-Pfad `data/trading_bot.sqlite` korrigiert) + Exceptions; **21 Tests grün**.
+  Noch reine Typen — Confidence/Scorer/Brain-Logik kommt in Steps 4–13.
 - Konzept: `docs/concepts/phase7_reward_concept.md` (voller Claude-Code-Plan, Step 0–13).
 
 **Phase 6 status:** ✅ Code-complete + live-**verifiziert** (Debatte-Pfad), **noch nicht

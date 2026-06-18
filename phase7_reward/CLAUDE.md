@@ -76,8 +76,8 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | Datei | Zweck | Status |
 |---|---|---|
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
-| `reward/__init__.py` | Paket-Marker; Exports wachsen ab Step 3 | ✅ (leer) |
-| `reward/models.py` | `OpenedTrade`/`ClosedTrade`/`RewardConfig`/`ConfidenceReport`/`RewardResult`/`LessonResult` + Exceptions (types only) | ⏳ Step 3 |
+| `reward/__init__.py` | Paket-Marker; re-exportiert seit Step 3 die Contract-Typen + `RewardConfig` + Exceptions | ✅ |
+| `reward/models.py` | `OpenedTrade`/`ClosedTrade`/`RewardConfig`/`ConfidenceReport`/`RewardResult`/`LessonResult` + Exceptions (types only) | ✅ Step 3 |
 | `reward/confidence.py` | Wilson-LB + Expectancy-R + SQN + N_min-Gating (reine Mathe) ★ | ⏳ Step 4 |
 | `reward/scorer.py` | Prozess-bewusstes Reward-Delta + Clamping (B2/D) ★ | ⏳ Step 5 |
 | `reward/synthetic.py` | `SyntheticTradeGenerator` + harte Synthetik/Echt-Trennung (H) [→ Opus] | ⏳ Step 6 |
@@ -88,7 +88,8 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `migrations/002_phase7_reward.sql` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator-Entscheidung 2026-06-18, s. 1.7) | ⏳ Step 12 |
 | `scripts/wiring.py` · `backfill_synthetic.py` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⏳ Step 13 |
 | `execution/protocols.py`-Edit + `executor.py`-Edit (P5) + Regression | `RewardSink`-Protocol + Naht (Decision A) | ⏳ Step 10 |
-| `tests/test_*.py` | TDD je Modul (≥66 gesamt; Schwerpunkt confidence/scorer) | ⏳ Steps 3+ |
+| `tests/{__init__,test_models,test_packaging}.py` | Step-3-Tests (21: Contracts/frozen/§5-Defaults/Exceptions + Editable-Install-Smoke) | ✅ Step 3 |
+| `tests/test_{confidence,scorer,pnl_resolver,brain,recorder,synthetic,executor_seam}.py` | TDD je Modul (≥66 gesamt; Schwerpunkt confidence/scorer) | ⏳ Steps 4+ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine Datei = eine
 Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging → stderr, `pytest` ohne
@@ -209,6 +210,50 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-18 (Step 3 — `reward/models.py` data contracts)
+
+### Completed
+- **`reward/models.py`** (types only, keine Logik): frozen Dataclasses `OpenedTrade`, `ClosedTrade`,
+  `ConfidenceReport`, `RewardResult`, `LessonResult`, `RewardConfig` (alle §5-Defaults) + Exceptions
+  `RewardError` → `PnLUnavailable` (`code`-Class-Attr-Muster wie P5/P6). Feldsätze exakt aus Konzept
+  §6 Step 3 / §5. `initial_risk`-Formel im Feld-Docstring dokumentiert (`abs(intended_open_level −
+  stop_level) · size · point_value`) — der **Wert** wird vom Caller zur Open-Zeit berechnet (Step 10),
+  die Dataclass trägt ihn nur.
+- **⚠ Bewusste Konzept-Abweichung (Code = Source of Truth):** `RewardConfig.live_db_path` defaultet
+  auf den **echten** P2-Pfad `"data/trading_bot.sqlite"` (P2-`CLAUDE.md`/`init_db.py`), **nicht** auf
+  den Konzept-§5-String `"data/trading_bot.db"`. Konzept §5 mit dateierter Notiz annotiert.
+- **`reward/__init__.py`** re-exportiert jetzt die Step-3-Typen (`RewardConfig`, die 5 Dataclasses,
+  `RewardError`/`PnLUnavailable`) + `__all__` (wie P4/P6 ihr `__init__` pro Modul wachsen ließen).
+- **Tests** `tests/{__init__,test_models,test_packaging}.py` — **21 Tests grün**: §5-Defaults (inkl.
+  korrigierter `live_db_path`), Construct/Read-back, `FrozenInstanceError`, `ConfidenceReport`-
+  INSUFFICIENT trägt `confidence_value=None`, `LessonResult` ok/error-Form, Exception-Hierarchie +
+  distinkte Codes (`PnLUnavailable` als `RewardError` fangbar), Editable-Install-Smoke (`import reward`).
+
+### Verifiziert (gemockt — kein Netz, kein LLM)
+- `phase1_broker_wrapper/.venv/bin/python -m pip install -e phase7_reward` (P7 erstmals editable in den
+  Projekt-venv, in dem P1–P6 schon installiert sind), dann `pytest phase7_reward/tests -v` → **21 passed**.
+- `py_compile` der 4 Dateien OK; Hygiene-grep (`CALL`/`PUT`/`strike`/`otm`/`issuer`/`FLIP`/`turbo`/
+  `option_check`) **clean**. Sibling-Suiten unberührt (Step 3 fasst nur Dateien in `phase7_reward/` an).
+
+### Next — **Step 4** (`reward/confidence.py` ★ — reine Mathe, höchste Test-Priorität)
+- `wilson_lower_bound(successes, n, z=1.96) -> float|None` (n==0 → None), `expectancy_r(r_multiples)
+  -> float|None` ([] → None), `system_quality_number(r_multiples) -> float|None` (N<2 / stdev==0 →
+  None), `compute_confidence(r_multiples, wins, n, cfg) -> ConfidenceReport` (N<n_min → INSUFFICIENT,
+  `confidence_value=None`; sonst bounded combiner). **≥14 Tests** inkl. Anti-Pattern-Beweis (naive
+  1/1=100 % ist NICHT die Confidence) + Monotonie. Kein I/O, deterministisch. Exportiert
+  `compute_confidence` aus `reward/__init__.py`.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. P7 ist jetzt **editable-installiert** in `phase1_broker_wrapper/.venv`
+  (`reward 0.1.0`) → `pytest phase7_reward/tests -v` läuft direkt. Bei frischem venv: `bash
+  scripts/dev_install.sh`.
+- `models.py` ist **types-only** — `compute_confidence`/`Scorer`/`Brain`/`RewardSink` kommen erst in
+  Steps 4/5/7/10; bis dahin bleiben sie aus `__all__` raus.
+- `ConfidenceReport`-Optionals (`win_rate_*`/`expectancy_r`/`sqn`/`confidence_value`) sind `float|None`
+  — Step 4 füllt sie für den OK-Fall, lässt sie für n=0 / INSUFFICIENT auf `None`.
 
 ---
 
