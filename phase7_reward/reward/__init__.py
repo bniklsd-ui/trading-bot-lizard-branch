@@ -20,6 +20,7 @@ Full design + the locked decisions A–J:
 
 from __future__ import annotations
 
+from reward.confidence import compute_confidence
 from reward.models import (
     ClosedTrade,
     ConfidenceReport,
@@ -40,4 +41,5 @@ __all__ = [
     "LessonResult",
     "RewardError",
     "PnLUnavailable",
+    "compute_confidence",
 ]

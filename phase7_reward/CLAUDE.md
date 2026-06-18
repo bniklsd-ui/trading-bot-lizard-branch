@@ -76,9 +76,9 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | Datei | Zweck | Status |
 |---|---|---|
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
-| `reward/__init__.py` | Paket-Marker; re-exportiert seit Step 3 die Contract-Typen + `RewardConfig` + Exceptions | ✅ |
+| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4)** | ✅ |
 | `reward/models.py` | `OpenedTrade`/`ClosedTrade`/`RewardConfig`/`ConfidenceReport`/`RewardResult`/`LessonResult` + Exceptions (types only) | ✅ Step 3 |
-| `reward/confidence.py` | Wilson-LB + Expectancy-R + SQN + N_min-Gating (reine Mathe) ★ | ⏳ Step 4 |
+| `reward/confidence.py` | Wilson-LB + Expectancy-R + SQN + N_min-Gating (reine Mathe) ★ | ✅ Step 4 |
 | `reward/scorer.py` | Prozess-bewusstes Reward-Delta + Clamping (B2/D) ★ | ⏳ Step 5 |
 | `reward/synthetic.py` | `SyntheticTradeGenerator` + harte Synthetik/Echt-Trennung (H) [→ Opus] | ⏳ Step 6 |
 | `reward/brain.py` | `reflect()`: Lesson-Extraktion, Haiku, best-effort, swappbar (E) [→ Opus] | ⏳ Step 7 |
@@ -89,7 +89,8 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `scripts/wiring.py` · `backfill_synthetic.py` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⏳ Step 13 |
 | `execution/protocols.py`-Edit + `executor.py`-Edit (P5) + Regression | `RewardSink`-Protocol + Naht (Decision A) | ⏳ Step 10 |
 | `tests/{__init__,test_models,test_packaging}.py` | Step-3-Tests (21: Contracts/frozen/§5-Defaults/Exceptions + Editable-Install-Smoke) | ✅ Step 3 |
-| `tests/test_{confidence,scorer,pnl_resolver,brain,recorder,synthetic,executor_seam}.py` | TDD je Modul (≥66 gesamt; Schwerpunkt confidence/scorer) | ⏳ Steps 4+ |
+| `tests/test_confidence.py` | Wilson/Expectancy/SQN/N_min-Gate + Anti-Pattern-Beweis + Monotonie (30 Fälle, Ziel ≥14) ★ | ✅ Step 4 |
+| `tests/test_{scorer,pnl_resolver,brain,recorder,synthetic,executor_seam}.py` | TDD je Modul (≥66 gesamt; Schwerpunkt scorer) | ⏳ Steps 5+ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine Datei = eine
 Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging → stderr, `pytest` ohne
@@ -210,6 +211,55 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-18 (Step 4 — `reward/confidence.py` ★ pure confidence math)
+
+### Completed
+- **`reward/confidence.py`** (pure deterministic math — **kein I/O, kein Netz, kein LLM**):
+  - `wilson_lower_bound(successes, n, z=1.96) -> float|None` — Wilson-Score-Lower-Bound;
+    `n<=0 → None`; klein-N-stabil (1/1 ≈ 0.2065, **nicht** 1.0; 0 Wins → 0.0 als konservativer Floor).
+  - `expectancy_r(r_multiples) -> float|None` — Mittel der R-Multiples; `[] → None`.
+  - `system_quality_number(r_multiples) -> float|None` — `√N·mean/stdev` (Sample-stdev, ddof=1);
+    `N<2` oder stdev==0 → None (Nebenmetrik).
+  - `compute_confidence(r_multiples, wins, n, cfg) -> ConfidenceReport` — **N < cfg.n_min →
+    `INSUFFICIENT`, `confidence_value=None`** (gatet nichts); sonst `OK` mit gebremstem v1-Combiner
+    (`_combine_confidence`: 50/50 aus Wilson-LB ∈[0,1] und linear auf [0,1] gemapptem Expectancy via
+    `r_clip`, → [0,100]). Sub-Metriken (`win_rate_raw`/`wilson_lb`/`expectancy_r`/`sqn`) **immer**
+    befüllt, wenn berechenbar — **unabhängig** vom Gate (Logging-Größen). `n` aus dem Arg, **nicht**
+    aus `len(r_multiples)` (Caller besitzt die Edge-Set-Auswahl, inkl. `include_demo_in_edge`).
+- **`reward/__init__.py`** exportiert jetzt zusätzlich `compute_confidence` (Helper bleiben unter
+  `reward.confidence` importierbar).
+
+### Verifiziert (gemockt — kein Netz, kein LLM)
+- `pytest phase7_reward/tests -v` → **51 passed** (21 Step-3 + **30 neue Confidence-Fälle**, Ziel war
+  ≥14). Inkl. den geforderten Beweis-Tests: (a) **N=9 → INSUFFICIENT, `confidence_value=None`**;
+  (b) **Anti-Pattern: 1/1 = 100 % naive Rate ist NICHT die Confidence** (INSUFFICIENT); Wilson gegen
+  Lehrbuchwerte (7/10≈0.3968, 10/10≈0.7225, 0/10=0.0), Monotonie, LB ≤ Raw-Rate, SQN-Edge-Cases.
+- Import-Smoke gegen die Editable-Install: `from reward import compute_confidence` OK; 1/1 →
+  `INSUFFICIENT`/`None`, 6/10 → `OK`/conf≈43.30. Sibling-Suiten unberührt (Step 4 fasst nur Dateien
+  in `phase7_reward/` an + `__init__.py`).
+
+### Next — **Step 5** (`reward/scorer.py` ★ — Decision B2/D, ebenfalls reine Mathe, kein I/O)
+- `class Scorer(cfg)` mit `score(*, r_multiple, status, spread_at_entry_pct, debate_confidence,
+  score_before) -> RewardResult`. **Prozess-bewusstes Delta:** `outcome_delta` = `outcome_weight ·
+  clip(r_multiple, ±r_clip)` (mit `loss_asymmetry` auf Verluste); `process_delta` **unabhängig** vom
+  Outcome (+`clean_exit_bonus` bei `CLOSED_BY_BROKER`, Abzug bei `TIME_STOP`, +Bonus bei
+  `spread_at_entry_pct ≤ tight_spread_pct`; `debate_confidence` nur schwaches Prozess-Signal, **kein**
+  Multiplikator). `gesamt = clamp(outcome+process, ±max_delta_per_trade)`; `score_after =
+  clamp(score_before+gesamt, score_min, score_max)`; `win_loss` aus `r_multiple`. **≥12 Tests:**
+  guter Outcome/schlechter Prozess < guter Outcome/sauberer Prozess; Pech-Verlust am SL < sloppy-
+  Verlust; Clamping (nie <0/>100, `|delta|`≤Cap); Symmetrie bei `loss_asymmetry=1.0`; `process_delta`
+  differenziert (Anti-Outcome-only). Exportiert `Scorer` aus `reward/__init__.py`.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. `pytest phase7_reward/tests -v` läuft direkt (editable-install). Bei
+  frischem venv: `bash scripts/dev_install.sh`.
+- **Decision-Treue:** `confidence` gatet **nichts** — wer in Step 5+ eine Confidence-Schwelle einbaut
+  → **stop**. Der v1-Combiner ist observe-only; seine exakte Form ist **nicht** load-bearing — was
+  zählt, ist das `INSUFFICIENT`-Gate + die Sub-Metriken (so dokumentiert).
+- `confidence.py` ist **stdlib-only** (`math`/`statistics`) — bewusst kein numpy (no-extra-deps-Grain).
 
 ---
 
