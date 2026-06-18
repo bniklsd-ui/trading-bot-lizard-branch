@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reward"
+version = "0.1.0"
+description = "Phase 7 — Reward/Brain (process-aware score + free-text lessons + observe-only outcome-anchored confidence) for the DAX CFD trading bot."
+requires-python = ">=3.11"
+# Runtime dependency (anthropic) is NOT declared here: Phase 7 reuses the Phase-4
+# LLM stack (`research.LLMClient` / `research.token_meter` / pricing) as the
+# documented cross-phase exception (concept Decision F), so `anthropic` arrives
+# via the `research` editable install. Phase 7 also reuses the Phase-2 `Database`
+# CRUD (no new DB layer). This packaging metadata exists only to enable editable
+# installs (`pip install -e`) so `import reward` resolves at runtime without
+# sys.path hacks. The sibling `scripts` and `tests` directories are deliberately
+# excluded from the installed package by the include glob.
+#
+# Layout note: the importable package is `reward/` nested under this
+# `phase7_reward/` project dir, mirroring the established repo convention
+# (phase4_research/ -> research/, phase5_execution/ -> execution/,
+# phase6_debate/ -> debate/).
+
+[tool.setuptools.packages.find]
+include = ["reward*"]

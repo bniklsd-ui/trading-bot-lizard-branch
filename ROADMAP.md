@@ -162,21 +162,36 @@ early-stop mean a single-round ABSTAIN reads no prefix; gated on `rounds_used >=
 
 ---
 
-## Phase 7 — Reward/Punishment + Brain
+## Phase 7 — Reward/Brain (Score + Lessons + observe-only Confidence)
 
-**Goal:** The bot starts learning. Score updates, lessons extracted, fed back.
+> **Scope-lock (lean model):** Phase 7 = **Reward-Score** (`reward_pts`,
+> process-aware from day one) + **free-text Lessons** (`trade_lessons`) +
+> **observe-only outcome-anchored Confidence**. **No VETO touch.** The full
+> Instinct→VETO promotion ("ECC") is a separate, later step (Phase 9f / concept
+> §7b), gated on real outcomes — promoting rules on zero validated outcomes
+> would import risk back into the safety layer.
 
-- [ ] `record_outcome()` — WIN/LOSS scoring rules
-- [ ] Score → risk_level mapping (0–50 KONSERVATIV, 50–100 AGGRESSIV)
-- [ ] `reflect()` / `reflect_with_kl()` after every close
-- [ ] Lesson extraction → SQLite `trade_lessons`
-- [ ] `longterm_pre_trade_check()` VETO
-- [ ] Brain context injected into next Phase 4 research call
+**Goal:** The bot starts learning. Score updates, lessons extracted, fed back
+into the next research call.
+
+- [ ] `RewardSink` write-seam (`on_trade_opened` / `on_trade_closed`), default
+      `None` → Phase 5 bit-identical (Decision A)
+- [ ] Process-aware reward scoring (`reward_pts`: outcome + process delta,
+      clamped to [0,100], per-trade `|delta|` capped) → `score_after` (Decision B/D)
+- [ ] Score → risk_level mapping unchanged (binary `get_risk_level`, threshold 50)
+- [ ] Outcome-anchored Confidence `f(Wilson-LB(win_rate), expectancy_R, N)`,
+      N_min=10 → INSUFFICIENT; **observe-only — gates nothing** (Decision C)
+- [ ] `reflect()` after every close — Haiku lesson extraction → `trade_lessons`,
+      best-effort, decoupled from the close critical path (Decision E)
+- [ ] Lessons fed back: the research prompt already injects `get_recent_lessons`;
+      close the loop by writing lessons + `mark_lesson_used` (Decision I)
 
 **Done when:** After 5 demo trades, score updates correctly, lessons are
-stored, next research call uses them.
+stored, and the next research call uses them. ⚠ live-verified ≠ profit-validated
+(edge is later live running, not this phase).
 
-**Directory:** `phase7_brain/` *(to be created)*
+**Directory:** `phase7_reward/` *(package `reward`, to be created)*
+**Concept:** [`docs/concepts/phase7_reward_concept.md`](./docs/concepts/phase7_reward_concept.md)
 
 ---
 
@@ -222,6 +237,18 @@ trades within window, stops cleanly.
 
 ### 9e — Force Trigger Safeguard
 - [ ] Lock force trigger when daily PNL < 0
+
+### 9f — Instinct-Promotion (ECC) + Longterm VETO *(moved from Phase 7)*
+- [ ] AI extracts structured instincts (trigger / domain / confidence /
+      evidence_trade_ids) from Phase-7 `trade_lessons` + `reward_pts`
+- [ ] Code **validates** instincts against real outcomes; proven ones are
+      **promoted to deterministic rules** (`longterm_pre_trade_check()` VETO),
+      with prune→archive of refuted ones
+- [ ] Hard guardrail: a promotion to the VETO layer happens **only** via a
+      deterministic / human-gated step — a promoted rule becomes deterministic
+      code; the AI never sits inside VETO evaluation. Gated on real outcomes
+      (≫ `n_min`). See concept §7b — Phase 7 only builds the substrate
+      (`trade_lessons` + `reward_pts`), not the instinct system itself.
 
 **Done when:** All V2 changes operational, bot demonstrates improved learning
 signal (process-score divergence from outcome-score on bad-market days).

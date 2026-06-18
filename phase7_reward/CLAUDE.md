@@ -1,0 +1,268 @@
+# CLAUDE.md — Phase 7: Reward/Brain (`phase7_reward/`)
+
+> Die Phase, in der der Bot **lernt**: prozess-bewusster Reward-Score + Freitext-Lessons +
+> observe-only outcome-anchored Confidence. **Quelle der Wahrheit ist der Code, nicht dieses
+> Dokument.** Vollständiges Design + alle gelockten Entscheidungen (A–J) + Step 0–13:
+> `../docs/concepts/phase7_reward_concept.md`.
+
+## AI-Grenze (Projekt-Kernprinzip)
+„So wenig AI wie möglich, so viel AI wie nötig." **Phase 7 nutzt AI NUR für die Lesson-Extraktion**
+(`reflect()`, ein Haiku-Call, best-effort, vom Close-Critical-Path entkoppelt). **ALLES andere ist
+deterministischer Code:** Reward-Delta (Outcome + Prozess), Confidence-Mathe (Wilson-LB /
+Expectancy-R / SQN / N_min-Gating), P&L-Auflösung, Persistenz, Fehlerbehandlung. Wer hier ein LLM
+„scoren/gaten/vetoen" lassen will → **stop**, das ist Code. Brain extrahiert **nur Sprache →
+Erkenntnis**, **keine** Zahlen-/Score-Entscheidung.
+
+## Scope-Lock (schlankes Modell — Konzept Rev. 2026-06-16-b)
+P7 = **Reward-Score** (`reward_pts`, prozess-bewusst ab Tag 1) + **Freitext-Lessons**
+(`trade_lessons`) + **observe-only outcome-anchored Confidence**. **KEINE VETO-Berührung.** Die
+volle **Instinct→VETO-Promotion** („ECC": strukturierte Instincts → validiert → Promote zu VETO)
+ist ein **separater, späterer Step** (**Phase 9f** / Konzept §7b), gated auf reale Outcomes —
+Promotion auf null validierten Outcomes würde Risiko zurück in die Safety-Schicht importieren.
+P7 baut nur das **Substrat** (`trade_lessons` + `reward_pts`).
+
+## Harte Regeln (nicht verhandelbar)
+- **`confidence` ist observe-only und gatet NICHTS** (Decision C). N < `n_min=10` → `INSUFFICIENT`
+  (fließt in NICHTS). Moduliert in v1 **nicht** `risk_pct`. Wer eine Confidence-Schwelle einbaut →
+  **stop** (gleiches Anti-Pattern wie P6 Decision H).
+- **Alle P7-Writes sind best-effort, fail-closed** (Decision J): sie werfen **nie** in den
+  P5-Close-Pfad. Jeder Fehlschlag → **`logger.critical`** (bewusst nicht `error` — die Lernlogik
+  hebt sich ab), idempotenter Retry via `deal_id`. Der Trade bleibt am Broker geschlossen; Reward/
+  Lesson sind Buchhaltung/Lernen, **keine** Safety-Schicht.
+- **`reward_sink` bekommt strukturell NIE** den Broker als Schreib-/Order-Pfad, **nie** eine VETO-/
+  Gate-Funktion. Es liest den Broker höchstens read-only (`get_trade_history` für P&L). Es kann
+  **keinen** VETO umgehen, weil es keinen referenziert.
+- **Score auf [0,100] clampen** (P2 clampt **nicht**) **vor** dem Insert; Per-Trade-`|delta|` ≤
+  `max_delta_per_trade`. Binäres `get_risk_level` (Schwelle 50) bleibt **unverändert** — P7 schreibt
+  nur `score_after`.
+- **Reuse statt Neubau** (Decision F/G): `research.LLMClient` + `research.token_meter` (8-Feld,
+  cache-aware) wiederverwenden; Persistenz über die **P2-CRUD** (`insert_trade`/`update_trade_close`/
+  `insert_reward`/`insert_lesson`) — kein zweites Mess-System, keine neue DB-Schicht.
+- **Synthetik ≠ Demo ≠ Live** (Decision H): *synthetic* (generierte Testdaten) schreibt **immer**
+  `synthetic_db_path` (Pfad-Guard, nie `live_db_path`) + Tag `synthetic=True`; *demo* (echte
+  IG-Demo-Trades) läuft normal in `live_db_path`, getaggt `account='demo'`, zählt via
+  `include_demo_in_edge` (Default `True` in der Bootstrap-Phase) in die Edge-Metrik.
+- **`turbo_candidates.json` NICHT anfassen/umbenennen** (frozen P2/P5-Contract). Richtung ist
+  **BUY/SELL** only. Logging → **stderr**; stdout nur maschinenlesbares JSON. Atomic commits. Kein
+  Subtask „done" ohne grünes `pytest` (gemockt, **kein Netz, KEIN echtes LLM** in Unit-Tests).
+- **Commit ⇒ Note-Update (zwingend, auch auf direkte Anweisung).** Jeder Step-Abschluss-Commit
+  aktualisiert im **selben** Commit die Modul-/Status-Tabelle **und** den `## Session stopped`-Block.
+
+## Die gelockten Entscheidungen (A–J — Kurzform; Details: Konzept §0)
+| # | Thema | Festlegung |
+|---|---|---|
+| **Step 0** | Turbo-Cleanup | Nur frozen `turbo_candidates.json` bleibt; P7-Code führt **keine** neuen Turbo-Refs ein. Sonst No-Op. |
+| **A** | Write-Seam | Optionaler, duck-typed `reward_sink` (Protocol), default `None` → **P5 bit-identisch**. Zwei Methoden: `on_trade_opened` (Decision-Kontext) + `on_trade_closed` (Outcome+Reward+Lesson). Spiegelt `debate_runner`. |
+| **B** | Scoring | **Prozess-bewusst ab Tag 1 (B2)**, nicht outcome-only. Score-Delta = gebremste Outcome-Komponente **+** Prozess-Komponente aus realen Signalen. |
+| **C** | Confidence | `f(Wilson-LB(win_rate), expectancy_R, N)`; **N < n_min=10 → INSUFFICIENT** (fließt in nichts). SQN als Nebenmetrik. **v1 observe-only** — gatet keine Order, moduliert nicht `risk_pct`. |
+| **D** | Feedback-Stabilität | Binäres `get_risk_level` (Schwelle 50) **unverändert**; P7 schreibt nur `score_after`. Clamp [0,100], `|delta|` ≤ Cap, konservativ, am echten Profit getunt. |
+| **E** | Lesson-Extraktion | **Vom Close-Critical-Path entkoppelt:** Reward atomar schreiben, dann best-effort `reflect()`. Ein Haiku-Call, swappbare Schnittstelle (Batch/Scheduler später). **[→ Opus]** |
+| **F** | Reuse | `research.LLMClient`, `research.token_meter` (8-Feld), `credentials`-Shim wiederverwenden. Kein zweites Mess-System. |
+| **G** | Ownership/Migration | P7 besitzt `trade_outcomes`-Writes über **P2-CRUD**. **Eine** minimale P2-Berührung: Whitelist-Tuples + Migration `002` für `initial_risk`/`r_multiple` (Step 12). |
+| **H** | Bootstrap | Produktion **fail-safe-neutral** bis echte Outcomes. **Hart getrennte Orte** Synthetik vs. Echt (separater DB-Pfad + Tag), eigene Steps. **[→ Opus]** |
+| **I** | Loop-Closure | Lessons schreiben **+** sicherstellen, dass P4-Research sie via `get_recent_lessons` zieht (✅ **zieht es bereits** — s. Verifizierte Contracts 1.5; nur `mark_lesson_used` verdrahten). |
+| **J** | Fail-closed Writes | Alle P7-Writes best-effort, werfen nie in den P5-Close-Pfad. Fehlschlag ⇒ `logger.critical`, idempotenter Retry via `deal_id`. |
+
+## Die Naht (`reward_sink`, Decision A — spiegelt `debate_runner`)
+`Executor` bekommt einen optionalen keyword-only `reward_sink` (default `None` ⇒ P5 bit-identisch +
+AI-frei). **Zwei Callbacks** im `run()`-Pfad (Step 10):
+- **`on_trade_opened(opened)`** — nach `place_result.status == "OPEN"` und **vor** `monitor_position`.
+- **`on_trade_closed(closed)`** — `monitor_position`-Return in Variable fangen, **dann** Callback,
+  **dann** `return`. Beide Aufrufe in `try/except` → ein werfender Sink kippt den Zyklus **nie** (J).
+Der Sink referenziert **nie** Gate/VETO/Order-Pfad. (⚠ Implementierungs-Details, die der Live-Code
+diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
+
+## Modul-Struktur (neues Paket `phase7_reward/`, Paketname `reward`) — Status pro Step
+| Datei | Zweck | Status |
+|---|---|---|
+| `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
+| `reward/__init__.py` | Paket-Marker; Exports wachsen ab Step 3 | ✅ (leer) |
+| `reward/models.py` | `OpenedTrade`/`ClosedTrade`/`RewardConfig`/`ConfidenceReport`/`RewardResult`/`LessonResult` + Exceptions (types only) | ⏳ Step 3 |
+| `reward/confidence.py` | Wilson-LB + Expectancy-R + SQN + N_min-Gating (reine Mathe) ★ | ⏳ Step 4 |
+| `reward/scorer.py` | Prozess-bewusstes Reward-Delta + Clamping (B2/D) ★ | ⏳ Step 5 |
+| `reward/synthetic.py` | `SyntheticTradeGenerator` + harte Synthetik/Echt-Trennung (H) [→ Opus] | ⏳ Step 6 |
+| `reward/brain.py` | `reflect()`: Lesson-Extraktion, Haiku, best-effort, swappbar (E) [→ Opus] | ⏳ Step 7 |
+| `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened`/`on_trade_closed` orchestriert alles (A/J) | ⏳ Step 8 |
+| `reward/pnl_resolver.py` | `ClosedTrade` → (close_level, profit_loss, r_multiple) via `get_trade_history` (+ Fallback) | ⏳ Step 9 |
+| `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` | ⏳ Step 7/13 |
+| `migrations/002_phase7_reward.sql` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator-Entscheidung 2026-06-18, s. 1.7) | ⏳ Step 12 |
+| `scripts/wiring.py` · `backfill_synthetic.py` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⏳ Step 13 |
+| `execution/protocols.py`-Edit + `executor.py`-Edit (P5) + Regression | `RewardSink`-Protocol + Naht (Decision A) | ⏳ Step 10 |
+| `tests/test_*.py` | TDD je Modul (≥66 gesamt; Schwerpunkt confidence/scorer) | ⏳ Steps 3+ |
+
+Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine Datei = eine
+Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging → stderr, `pytest` ohne
+Netz/echtes LLM, atomic commits.
+
+## Config-Defaults (`RewardConfig` — v1, am echten Profit zu tunen; Konzept §5)
+| Feld | Default | Bezug |
+|---|---|---|
+| `n_min` | `10` | C — unter N_min keine belastbare Confidence (Wilson stabil ab ~n=10) |
+| `wilson_z` | `1.96` | C — 95 %-Niveau, Lower-Bound als konservativer Schätzer |
+| `point_value` | `1.0` | R-Multiple (DAX CFD 1 €/Punkt) |
+| `score_min` / `score_max` | `0.0` / `100.0` | D — Clamp-Bounds |
+| `max_delta_per_trade` | `5.0` | D — harter Cap auf `|outcome_delta + process_delta|` |
+| `outcome_weight` | `2.0` | D — Skala der Outcome-Komponente (× geclamptes R) |
+| `r_clip` | `3.0` | D — R-Multiple vor Scoring auf ±r_clip clippen (Tail-Schutz) |
+| `process_weight` | `1.5` | B2 — Skala der Prozess-Komponente |
+| `loss_asymmetry` | `1.0` | D — >1 ⇒ Verluste bewegen stärker; default symmetrisch |
+| `tight_spread_pct` | `0.05` | B2 — Spread ≤ → guter Entry-Zustand (Prozess-Plus) |
+| `clean_exit_bonus` | `1.0` | B2 — Exit via geplantem SL/TP (CLOSED_BY_BROKER) vs. Drift (TIME_STOP) |
+| `lesson_model` | `"claude-haiku-4-5-20251001"` | E/F — ✅ valid + gepreist (s. 1.4) |
+| `lesson_max_tokens` | `400` | E — eine knappe Lesson |
+| `lesson_temperature` | `0.3` | E |
+| `lesson_timeout_s` | `20.0` | E — eigener Timeout, blockt den Close-Pfad nie hart |
+| `include_demo_in_edge` | `True` (Bootstrap) | H — Demo-Trades SIND die Datenquelle; Demo-Confidence ist nicht live-edge-validiert (re-baselinen bei Go-Live) |
+| `live_db_path` | `"data/trading_bot.db"` | H — Live-Ziel (⚠ realer P2-Name s. 1.7-Notiz) |
+| `synthetic_db_path` | `"data/synthetic_reward.db"` | H — Synthetik-Ziel (Backfill-Tool schreibt NUR hierhin) |
+
+## Verifizierte Contracts (Step 1 — gegen Live-Code gepinnt, 2026-06-18)
+> Gepinnt gegen den Repo-Stand auf `main` (`49cda8a` + dieser Pre-Step). ⚠ = Befund, der vom
+> Konzept abweicht / es unter-spezifiziert und in einen späteren Build-Step einfließt.
+
+**(1.1) `get_trade_history`-Record-Shape — HÖCHSTE PRIORITÄT (`broker_wrapper/adapters/ig_adapter.py:555`):**
+- `get_trade_history(days=30) -> Envelope`; `.data = {"transactions": [Transaction.__dict__, …]}`.
+- `Transaction`-Felder (`broker_wrapper/models.py:117`): `transaction_id` (← IG `reference`), `epic`
+  (← IG **`instrumentName`** = Anzeigename, **nicht** der Epic-Code), `direction` (**hardcoded
+  `None`**), `size`, `open_level`, `close_level`, `profit_loss` (← `profitAndLoss`, Währungs-
+  Buchstabe gestrippt), `currency`, `open_date`, `close_date`, `transaction_type`.
+- ⚠ **KEIN `deal_id`, KEIN `deal_reference` im Record.** Das §9-Match „per deal_id/deal_reference"
+  ist **unmöglich** — Matching muss heuristisch sein (instrumentName + size + Datum/Level-Nähe). Der
+  **Level-basierte Fallback** im `pnl_resolver` (Step 9) ist damit der **primäre** Sicherungspfad,
+  **nicht** optional. Bestätigt den P1-README-Caveat „best-effort, cross-check against a known deal".
+
+**(1.2) `OrderPlan` / `OrderResult` / `place_order` (`execution/models.py`, `execution/order.py`, `ig_adapter.py`):**
+- `OrderPlan(epic, direction, size, stop_level, limit_level, deal_reference, currency)` — absolute
+  Level; **kein** Entry-/Open-Level-Feld.
+- `open_position` → `OrderResult` = `{deal_reference, deal_id, status, epic, direction, size, level,
+  reason, timestamp}`; `status ∈ {ACCEPTED, REJECTED, PENDING, UNKNOWN}`; `level` = echter Fill.
+- ⚠ `place_order` returnt `ExecutionResult(status, deal_id, plan, detail)` — **`level` geht
+  verloren**. Der echte Fill-Level wird nicht durchgereicht. `trade_outcomes.open_level` ist **NOT
+  NULL** → Step 10 muss `open_level`/`intended_open_level` aus dem Executor-`price_env`
+  rekonstruieren (oder aus `stop_level ± stop_distance_points` zurückrechnen). `initial_risk =
+  abs(intended_open_level − stop_level) · size · point_value`.
+
+**(1.3) Debate-Outcome + `debate_log.json` (`debate/models.py`, `debate/audit.py`):**
+- `DebateOutcome(decision, direction, confidence, rationale, rounds_used, transcript, token_summary)`
+  — Judge liefert `.decision`/`.direction`/`.confidence`/`.rationale`. ✓
+- `debate_log.json`-Record: `{ts, epic, seed_direction, final_decision, final_direction, confidence,
+  rounds_used, rationale, regime_snapshot{…}, transcript[…], token_summary{…}}`.
+- ⚠ **Kein `deal_id`/`deal_reference`/Zyklus-ID im Audit-Record → kein Join-Key zum Trade.** P7s
+  `debate_confidence` muss aus dem **in-memory** Outcome zur Open-Zeit kommen (Executor-Scope), nicht
+  aus dem Log rekonstruiert. Der Executor hält `outcome` aktuell **nicht** über den Enrichment-Block
+  hinaus (`executor.py:171-184`) → Step 10 fängt `getattr(outcome, "confidence", None)`, default
+  `None`, wenn keine Debatte lief.
+
+**(1.4) Research-Reuse-Fläche (`research/llm_client.py`, `research/token_meter.py`, `research/models.py`):**
+- `LLMClient(model, api_key, *, max_tokens, temperature, timeout_s, token_meter_path=None,
+  config=None, enable_thinking=False, cache_system=False)`; `ask_candidate(system, user, json_schema)
+  -> dict` (single-shot, 1 Retry). `token_meter.record(usage, model, config, path) -> dict` (8-Feld,
+  cache-aware). Beide direkt für `brain.py` reusen.
+- Default-Research-Modell = `claude-sonnet-4-6`; Pricing-Rows vorhanden: sonnet-4-6 (3/15), opus-4-8
+  (5/25), **haiku-4-5-20251001 (1/5)** → `lesson_model="claude-haiku-4-5-20251001"` ist valid +
+  gepreist.
+
+**(1.5) Loop-Closure (Decision I) = der „Ja"-Zweig:**
+- `research/context_builder.py:184` ruft bereits `db.get_recent_lessons(5)`; `research/prompt.py:215`
+  rendert sie (`_render_lessons`). **Der Research-Prompt zieht Lessons bereits.** Step 11 = reines
+  Schreiben, **keine** P4-Prompt-Änderung.
+- `db.mark_lesson_used` existiert, wird aber **nicht von Research gerufen** → die „mark used"-Seite
+  des Loops ist unverdrahtet (Step 11 verdrahtet sie; Test: eine P7-geschriebene Lesson taucht im
+  nächsten Research-Kontext auf).
+
+**(1.6) Protocol-Stil (`execution/protocols.py`):** `@runtime_checkable class XProtocol(Protocol)`,
+Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok` vor `.data`). Das
+`RewardSink`-Protocol (Step 10) spiegelt das exakt.
+
+**(1.7) P2-Contracts (`persistence/db.py`, `migrations/001_initial.sql`) — Konzept §3 bestätigt, mit einer Lücke:**
+- `_TRADE_COLUMNS` (19 Spalten; **kein `initial_risk`**, **kein `account`**), `_REWARD_COLUMNS`
+  (hat bereits `process_score_delta, veto_trigger_count, gate_fail_count, debate_confidence,
+  spread_at_entry_pct` → **B2 braucht KEINE Migration**; **kein `r_multiple`**), `_LESSON_COLUMNS`
+  (json: `market_context_json`, `embedding_json`). Methoden (`insert_trade`/`update_trade_close`/
+  `insert_reward`/`insert_lesson`/`get_current_score`/`get_risk_level(>50)`/`get_trade_by_deal_id`/
+  `get_open_trades`/`get_recent_*`/`mark_lesson_used`) verhalten sich exakt wie §3 behauptet.
+- `trade_outcomes` NOT NULL: `deal_id, epic, broker(dflt ig), direction, size, open_level, currency,
+  open_ts, status(dflt OPEN), session_date, created_at(dflt), updated_at(dflt)` → `on_trade_opened`
+  muss liefern: `deal_id, epic, direction, size, open_level, currency, open_ts, session_date`.
+- ✅ **GELÖST (Operator 2026-06-18): `account`-Spalte wird hinzugefügt.** `OpenedTrade.account
+  ("demo"|"live")` (Step 3) und die Demo-Edge-Query (`include_demo_in_edge`, Step 6) brauchen sie
+  persistiert. Das Konzept-§3/§12 spezifizierte Migration 002 nur mit `initial_risk` + `r_multiple` —
+  **Step 12 erweitert sie um `account TEXT`** und nimmt `"account"` in `_TRADE_COLUMNS` (Whitelist)
+  auf. Damit fließt der Demo/Live-Tag durch `insert_trade` → `trade_outcomes`. (Konzept §3/§12 mit
+  dieser dateierten Entscheidung annotiert.)
+- ⚠ **DB-Pfad-Diskrepanz:** der echte P2-Default ist `data/trading_bot.sqlite`
+  (`init_db.py`/P2-CLAUDE.md), das Konzept §5 schreibt `data/trading_bot.db` für `live_db_path`. In
+  Step 13 (`wiring.py`) den **echten** P2-Pfad nutzen, nicht den Konzept-String blind übernehmen.
+- Migration-Runner (`persistence/migrations.py`): `NNN_*.sql`, `_schema_version`-Tabelle, wendet
+  Versionen > current aufsteigend an, versions-gegated idempotent (`ADD COLUMN` selbst ist nicht
+  re-runbar, aber der Guard verhindert Re-Apply). `002_phase7_reward.sql` wird auto-angewandt.
+
+## Step 0 / Step 0b — Housekeeping-Ergebnisse (2026-06-18)
+- **Step 0 (Turbo-Cleanup) = dokumentierter No-Op.** `rg -i turbo` trifft nur den **frozen**
+  Contract `turbo_candidates.json` (P2 `state.py`, P5 Gate 2/`seed_candidate.py`) + dessen
+  dokumentierte Doku-Referenzen. Nichts umbenennen; das neue `phase7_reward/`-Paket führt **keine**
+  Turbo-Referenz ein.
+- **Step 0b (Codebase-Doku-Reconciliation) erledigt.** Kein Instinct→VETO-Framing in der Doku (der
+  einzige „ECC"-Treffer in `phase4_research_plan_konzept.md:21` ist **„ECE"** = Calibration Error, ein
+  False-Positive). **Eine echte Korrektur:** `ROADMAP.md` listete `longterm_pre_trade_check() VETO`
+  unter Phase 7 — das widersprach dem Scope-Lock; Phase-7-Bullets auf das schlanke Modell geflippt,
+  Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
+  (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
+  `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-18 (Step 1 — Pre-Steps: Housekeeping + Verify + Scaffold)
+
+### Completed
+- **Step 0 (Turbo-Cleanup):** dokumentierter No-Op (s. o.) — nur frozen `turbo_candidates.json`.
+- **Step 0b (Doku-Reconciliation):** `ROADMAP.md` Phase 7 auf das schlanke Modell geflippt +
+  `longterm_pre_trade_check() VETO` → neues **Phase 9f**; Root-`CLAUDE.md` „Current state" → Phase 7
+  (kanonische Aussage + Phase-7-Status-Block). Kein Instinct→VETO-Framing mehr in der Doku.
+- **Step 1 (Verify-against-code):** 7 Verträge gegen Live-Code gepinnt (s. `## Verifizierte
+  Contracts`), inkl. drei ⚠-Befunde, die spätere Build-Steps formen:
+  (1.1) `get_trade_history` hat **kein** deal_id → `pnl_resolver`-Match heuristisch + Level-Fallback
+  Pflicht (Step 9); (1.2/1.3) `place_order` droppt den Fill-`level` + Executor hält `outcome` nicht →
+  `open_level`/`debate_confidence` zur Open-Zeit aus `price_env`/in-memory-Outcome fangen (Step 10);
+  (1.7) **keine `account`-Spalte** → Migration-002-Scope-Entscheidung (Step 12) + DB-Pfad-Diskrepanz
+  (Konzept `…/trading_bot.db` vs. echter `…/trading_bot.sqlite`, Step 13).
+- **Step 2 (Scaffold):** `phase7_reward/` angelegt — `pyproject.toml` (pkg `reward`),
+  `requirements.txt` (dev `pytest`, anthropic via `research`-Reuse), `README.md`, diese `CLAUDE.md`,
+  `reward/__init__.py` (leer). `scripts/dev_install.sh` um `phase7_reward` (nach `phase6_debate`)
+  erweitert (P1→…→P7). **Keine Reward-Logik, keine Tests** — das ist bewusst Steps 3–13.
+
+### Verifiziert (gemockt / read-only — Live/Netz-Tests macht der Operator)
+- `python -c "import ast; ast.parse(...)"` auf `reward/__init__.py` OK (import-clean, keine Logik).
+- `rg -i "instinct|ECC|promote" --type md` → kein Instinct→VETO-Framing mehr; ROADMAP trägt keinen
+  Phase-7-VETO-Punkt mehr. `rg -i turbo` unverändert außer Doku (keine neue Turbo-Ref durch P7).
+- Bestands-Suiten unberührt (dieser Step schreibt **keine** Logik): P6 70 · P5 135 · P4 88 · P2 59.
+
+### Next — **Step 3** (`reward/models.py`, nur Typen, keine Logik) — Beginn der Reward-Logik (TDD)
+- `OpenedTrade` (am Open bekannt): `deal_reference, deal_id, epic, direction, size,
+  intended_open_level, stop_level, limit_level, currency, initial_risk, research_confidence,
+  debate_confidence|None, gate_path(dict), spread_at_entry_pct, score_at_open, session_date, open_ts,
+  account("demo"|"live")`. `ClosedTrade`: `deal_reference, deal_id, status("CLOSED_BY_BROKER"|
+  "TIME_STOP"), closed_at`. `ConfidenceReport`/`RewardResult`/`LessonResult`/`RewardConfig` (§5) +
+  Exceptions `RewardError`/`PnLUnavailable`. `initial_risk = abs(intended_open_level − stop_level) ·
+  size · point_value` dokumentieren. Danach **Step 4** `confidence.py` ★ (Wilson/Expectancy/SQN/
+  N_min, ≥14 Tests) — höchste Test-Priorität.
+- **Vor Step 9/10/12 die ⚠-Befunde 1.1/1.2/1.3/1.7 heranziehen** (sie sind der Grund, warum die
+  naive Konzept-Formulierung dort nicht 1:1 baubar ist).
+
+### Offene Punkte / [VERIFY] (für spätere Steps, jetzt nur dokumentiert)
+- **Step 12:** ✅ entschieden (Operator 2026-06-18) — Migration 002 fügt `initial_risk` + `r_multiple`
+  **+ `account TEXT`** hinzu; `_TRADE_COLUMNS += ("initial_risk", "account")`,
+  `_REWARD_COLUMNS += ("r_multiple",)`. Idempotenz über die Versions-Tabelle (s. 1.7).
+- **Step 13:** echter P2-DB-Pfad `data/trading_bot.sqlite` (nicht Konzept-`…/trading_bot.db`).
+- **Step 9:** `pnl_resolver` ohne deal_id — Match-Heuristik + Level-Fallback (defensiv, `[VERIFY]`
+  gegen einen echten geschlossenen Demo-Deal beim Operator-Live-Test).
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`** (abgezweigt von `phase6-debate`/`d306806`). Dieser Step = **Doku +
+  Scaffold** (kein Logik-Code, keine Tests), committet als ein atomarer Commit (SHA via `git log`).
+  Merge → `main` bleibt Operator-Entscheidung. Der `reward`-Editable-Install greift erst **nach**
+  `bash scripts/dev_install.sh` (Operator).
+- AI-Grenze einhalten: nur `reflect()` ist AI. Confidence/Scorer/pnl_resolver sind **reine** Mathe/
+  Code — kein LLM, keine Heuristik-Halluzination.
+- Decision-Treue: `confidence` gatet **nichts**, `reward_sink` default `None` muss P5 bit-identisch
+  lassen, alle Writes fail-closed (`logger.critical`, nie in den Close-Pfad werfen).

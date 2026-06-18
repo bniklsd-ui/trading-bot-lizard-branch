@@ -77,10 +77,38 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 6 — Bull/Bear/Judge-Debatte (`phase6_debate/`): ✅ Code-complete +
-live-**verifiziert** (Debatte-Pfad), **noch nicht profit-validiert** — **gemerged + gepusht nach
-`main`** (`49cda8a`, 2026-06-16). Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close)
-bleibt ✅ abgeschlossen + live-verifiziert (Order-/Monitor-Pfad).
+**Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Pre-Steps in
+Arbeit** (Step 0/0b/1/2 — Housekeeping, Doku-Reconciliation, Verify-against-code, Paket-Scaffold).
+**Noch keine Reward-Logik** (Steps 3–13 = spätere TDD-Sessions). Phase 6 (Bull/Bear/Judge-Debatte)
+bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
+2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
+live-verifiziert (Order-/Monitor-Pfad).
+
+**Phase 7 status:** 🚧 Pre-Steps (Step 1) — Scope-Lock + Scaffold (2026-06-18)
+- **Scope-Lock (schlankes Modell, Konzept Rev. 2026-06-16-b):** Phase 7 = **Reward-Score**
+  (`reward_pts`, prozess-bewusst ab Tag 1) + **Freitext-Lessons** (`trade_lessons`) +
+  **observe-only outcome-anchored Confidence**. **Keine VETO-Berührung.** Die volle
+  Instinct→VETO-Promotion („ECC") ist ein **separater, späterer Step** (Phase 9f / Konzept §7b),
+  gated auf reale Outcomes — Promotion auf null validierten Outcomes würde Risiko zurück in die
+  Safety-Schicht importieren.
+- **AI-Grenze (Kernprinzip):** AI macht in P7 **nur** die Lesson-Extraktion (`reflect()`, ein
+  Haiku-Call, best-effort). Scoring, Confidence-Mathe (Wilson-LB/Expectancy-R/N_min), Persistenz,
+  P&L-Auflösung, Fehlerbehandlung sind **deterministischer Code**. `confidence` ist **observe-only
+  und gatet NICHTS** (Decision C) — moduliert in v1 auch **nicht** `risk_pct`.
+- **Naht:** optionaler, duck-typed `reward_sink` (Protocol) im `Executor`, default `None` →
+  **P5 bit-identisch** (spiegelt das `debate_runner`-Muster). Zwei Methoden: `on_trade_opened`
+  (Decision-Kontext) + `on_trade_closed` (Outcome+Reward+Lesson). Alle P7-Writes **best-effort,
+  fail-closed** — werfen nie in den P5-Close-Pfad (Decision J: Fehler → `logger.critical`).
+- **Reuse (Decision F):** `research.LLMClient` + `research.token_meter` (8-Feld, cache-aware) +
+  `credentials`-Shim wiederverwendet — kein zweites Mess-/Client-System. DB-Writes über die
+  bestehende **P2-CRUD** (`insert_trade`/`update_trade_close`/`insert_reward`/`insert_lesson`).
+- **Stand (Step 1, dieser Step):** Step 0 (Turbo-grep) = **dokumentierter No-Op** (nur frozen
+  `turbo_candidates.json`); Step 0b (Doku-Reconciliation) = ROADMAP-Phase-7 auf das schlanke Modell
+  geflippt + `longterm_pre_trade_check() VETO` nach **Phase 9f** verschoben (kein Instinct→VETO-
+  Framing mehr in der Doku); Step 1 (Verify-against-code) = 7 Verträge gegen Live-Code gepinnt →
+  in `phase7_reward/CLAUDE.md` unter `## Verifizierte Contracts`; Step 2 = Paket-Scaffold
+  (`phase7_reward/`, pkg `reward`). **Noch keine Reward-Logik, keine Tests** (Steps 3–13 folgen).
+- Konzept: `docs/concepts/phase7_reward_concept.md` (voller Claude-Code-Plan, Step 0–13).
 
 **Phase 6 status:** ✅ Code-complete + live-**verifiziert** (Debatte-Pfad), **noch nicht
 profit-validiert** (2026-06-16)
