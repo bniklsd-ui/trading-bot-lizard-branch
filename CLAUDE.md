@@ -78,17 +78,19 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 ## Current state
 
 **Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Build läuft
-(Steps 3–6 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
+(Steps 3–7 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
 Exceptions) ✅, `reward/confidence.py` (Wilson-LB/Expectancy-R/SQN/N_min-Gate) ✅,
 `reward/scorer.py` (prozess-bewusstes Reward-Delta + Clamping) ✅, `reward/synthetic.py`
-(Generator + Pfad-Guard + Edge-Selector, harte Synthetik/Echt-Trennung) ✅ — **80 P7-Tests grün**.
-Die beiden ★-Mathe-Module + die Daten-Trennung stehen; **Brain/Recorder/pnl_resolver/Seam/Migration**
-folgen in Steps 7–13 (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
+(Generator + Pfad-Guard + Edge-Selector, harte Synthetik/Echt-Trennung) ✅, `reward/brain.py`
+(`reflect()` Lesson-Extraktion — **das einzige AI-Modul der Phase**, EIN Haiku-Call, best-effort,
+swappbares `LessonExtractor`-Protocol) ✅ — **92 P7-Tests grün**.
+Die beiden ★-Mathe-Module + die Daten-Trennung + die Lesson-AI stehen; **Recorder/pnl_resolver/Seam/Migration**
+folgen in Steps 8–13 (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
 bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
 2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
 live-verifiziert (Order-/Monitor-Pfad).
 
-**Phase 7 status:** 🚧 Build läuft (Steps 3–6 ✅ — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung) (2026-06-19)
+**Phase 7 status:** 🚧 Build läuft (Steps 3–7 ✅ — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI) (2026-06-19)
 - **Scope-Lock (schlankes Modell, Konzept Rev. 2026-06-16-b):** Phase 7 = **Reward-Score**
   (`reward_pts`, prozess-bewusst ab Tag 1) + **Freitext-Lessons** (`trade_lessons`) +
   **observe-only outcome-anchored Confidence**. **Keine VETO-Berührung.** Die volle
@@ -134,6 +136,15 @@ live-verifiziert (Order-/Monitor-Pfad).
   + Synthetik-Ausschluss → `(r_multiples, wins, n)` für `compute_confidence`). **Kein DB-Write** — der
   Schreiber ist Step 13 (`backfill_synthetic.py`), der den Guard konsumiert. **+11 Tests** (80 gesamt),
   inkl. §7(c)-Beweis „Synthetik-Write trifft Live-Pfad nie". Sibling-Suiten grün (P2 59 · P4 88 · P5 135 · P6 70).
+- **Step 7 ✅ (2026-06-19):** `reward/brain.py` — **das einzige AI-Modul der Phase** (Decision E). `Brain(llm_client,
+  cfg).reflect(closed, outcome, market_context) -> LessonResult` = **EIN** Haiku-Call über den wiederverwendeten
+  `research.LLMClient` (duck-typed, Phasen-Isolation), extrahiert **nur Sprache → eine knappe Lektion** (AI-Grenze:
+  keine Zahl/Score/Entscheidung). **Best-effort/fail-closed (J):** jede Exception → `LessonResult(ok=False)`, kein
+  Re-raise. `LessonExtractor`-Protocol = swappbare Schnittstelle (Batch/Scheduler später). **3 dokumentierte
+  Konzept↔Code-Reconciliations:** Signatur `Brain(llm_client, cfg)` statt `…, token_meter, …` (token_meter
+  **transitiv** über `ask_candidate`/`client.last_usage` reused — Doppel-Metering vermieden, spiegelt P6);
+  Brain-eigener Fehlschlag = `warning` (das `critical` aus J gehört in den Recorder/Step 8); `reward/credentials.py`
+  → Step 13. **+12 Tests** (92 gesamt). Sibling-Suiten grün + unberührt (P2 59 · P4 88 · P5 135 · P6 70).
 - Konzept: `docs/concepts/phase7_reward_concept.md` (voller Claude-Code-Plan, Step 0–13).
 
 **Phase 6 status:** ✅ Code-complete + live-**verifiziert** (Debatte-Pfad), **noch nicht

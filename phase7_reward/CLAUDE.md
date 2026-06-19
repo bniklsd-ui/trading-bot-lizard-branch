@@ -76,15 +76,15 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | Datei | Zweck | Status |
 |---|---|---|
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
-| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4) + `Scorer` (Step 5) + Synthetik-Surface (Step 6)** | ✅ |
+| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4) + `Scorer` (Step 5) + Synthetik-Surface (Step 6) + `Brain`/`LessonExtractor` (Step 7)** | ✅ |
 | `reward/models.py` | `OpenedTrade`/`ClosedTrade`/`RewardConfig`/`ConfidenceReport`/`RewardResult`/`LessonResult` + Exceptions (types only); **+ `SyntheticSafetyError` (Step 6)** | ✅ Step 3 (·6) |
 | `reward/confidence.py` | Wilson-LB + Expectancy-R + SQN + N_min-Gating (reine Mathe) ★ | ✅ Step 4 |
 | `reward/scorer.py` | Prozess-bewusstes Reward-Delta + Clamping (B2/D) ★ | ✅ Step 5 |
 | `reward/synthetic.py` | `SyntheticTradeGenerator` + Pfad-Guard + Edge-Selector (harte Synthetik/Echt-Trennung, H) [→ Opus] | ✅ Step 6 |
-| `reward/brain.py` | `reflect()`: Lesson-Extraktion, Haiku, best-effort, swappbar (E) [→ Opus] | ⏳ Step 7 |
+| `reward/brain.py` | `Brain.reflect()` + `LessonExtractor`-Protocol: Lesson-Extraktion, EIN Haiku-Call, best-effort, swappbar (E) [→ Opus] | ✅ Step 7 |
 | `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened`/`on_trade_closed` orchestriert alles (A/J) | ⏳ Step 8 |
 | `reward/pnl_resolver.py` | `ClosedTrade` → (close_level, profit_loss, r_multiple) via `get_trade_history` (+ Fallback) | ⏳ Step 9 |
-| `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` | ⏳ Step 7/13 |
+| `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` | ⏳ Step 13 (Wiring — bewusst nicht in Step 7, spiegelt P6) |
 | `migrations/002_phase7_reward.sql` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator-Entscheidung 2026-06-18, s. 1.7) | ⏳ Step 12 |
 | `scripts/wiring.py` · `backfill_synthetic.py` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⏳ Step 13 |
 | `execution/protocols.py`-Edit + `executor.py`-Edit (P5) + Regression | `RewardSink`-Protocol + Naht (Decision A) | ⏳ Step 10 |
@@ -92,7 +92,8 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `tests/test_confidence.py` | Wilson/Expectancy/SQN/N_min-Gate + Anti-Pattern-Beweis + Monotonie (30 Fälle, Ziel ≥14) ★ | ✅ Step 4 |
 | `tests/test_scorer.py` | Prozess-vs-Outcome-Trennung, Clamping, Symmetrie/Asymmetrie, R-Clip, schwaches Debate-Signal (18 Fälle, Ziel ≥12) ★ | ✅ Step 5 |
 | `tests/test_synthetic.py` | Generator-Determinismus/Labels, Pfad-Guard trifft Live-Pfad nie (+Aliasing), Edge-Selector Synthetik-Ausschluss + Demo-Toggle (11 Fälle, Ziel ≥8) | ✅ Step 6 |
-| `tests/test_{pnl_resolver,brain,recorder,executor_seam}.py` | TDD je Modul (≥66 gesamt) | ⏳ Steps 7+ |
+| `tests/conftest.py` + `tests/test_brain.py` | erster P7-Fake (`FakeLLM`); valide Lesson → `ok=True`-verbatim, Prompt trägt R/Status/Kontext, alle Fehlerpfade → `ok=False`/kein Raise, AI-Grenze, Protocol (12 Fälle, Ziel ≥8) | ✅ Step 7 |
+| `tests/test_{pnl_resolver,recorder,executor_seam}.py` | TDD je Modul (≥66 gesamt) | ⏳ Steps 8+ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine Datei = eine
 Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging → stderr, `pytest` ohne
@@ -213,6 +214,74 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-19 (Step 7 — `reward/brain.py` lesson extraction, the only AI) [→ Opus]
+
+### Completed
+- **`reward/brain.py`** — das **einzige AI-Modul der Phase** (Decision E). `class Brain(llm_client,
+  cfg)` mit `reflect(closed, outcome, market_context) -> LessonResult`: **EIN** Haiku-Call über den
+  wiederverwendeten `research.LLMClient` (duck-typed via lokalem `_LLMClientLike`-Protocol — **kein**
+  `research`-Import, Phasen-Isolation, exakt wie P6 `debate._LLMClientLike`). Baut `(system, user,
+  schema)` via `_build_lesson_prompt` (deutsch, AI-Grenze im System-Prompt: **eine** knappe Lektion,
+  **keine** Zahlen/Score/Risiko-Entscheidung; `_fmt`-Choke-Point `None → "n/a"`, nie gefälschte 0),
+  ruft `ask_candidate`, zieht `lesson_text` (leer/fehlt → Fehler).
+- **`LessonExtractor`-Protocol** (`@runtime_checkable`, eine Methode `reflect`) = die **swappbare**
+  Schnittstelle (Decision E) — der Step-8-Recorder bindet sich daran, nicht an `Brain`, damit ein
+  späterer Batch/Scheduler-Extractor ohne Reward-Code-Änderung andockt. `Brain` erfüllt es.
+- **Best-effort / fail-closed (Decision E/J):** der ganze `reflect`-Body in `try/except Exception` →
+  jede Exception (Malformed/leer/`LLMResponseError`/Timeout/beliebig) → `LessonResult(ok=False,
+  lesson_text=None, error=str(exc))`, **kein Re-raise, kein Crash**. `market_context` wird unverändert
+  durchgereicht (der Recorder persistiert es als `market_context_json`).
+- **`reward/__init__.py`** exportiert jetzt zusätzlich `Brain` + `LessonExtractor`.
+
+### Drei dokumentierte Konzept↔Code-Reconciliations (Code = Source of Truth — auch in Konzept §6 Step 7 dateiert)
+1. **Signatur `Brain(llm_client, cfg)`**, nicht `Brain(llm_client, token_meter, cfg)`: `ask_candidate`
+   **meter't bereits intern** (ruft `research.token_meter.record`, legt den Record auf
+   `client.last_usage`). Ein zweites `token_meter` würde **doppelt zählen** → `token_meter` wird
+   **transitiv über den Client** wiederverwendet (Decision F erfüllt), `Brain` liest `last_usage` nur
+   zur Beobachtung. Spiegelt P6 (`debate` liest `last_usage` statt neu zu metern).
+2. **Log-Level:** die *eigene* best-effort-LLM-Fehlschlag-Zeile des Brains ist `logger.warning` (eine
+   fehlende **optionale** Lesson, **kein** DB-Write) — das `logger.critical` aus Decision J gehört in
+   den **Recorder** (Step 8), wo die Writes passieren.
+3. **`reward/credentials.py` bleibt Step 13** (Wiring), nicht Step 7 → Step 7 ist unit-only, keyring-/
+   SDK-frei (spiegelt P6, das `debate/credentials.py` erst im Wiring-Modul ergänzte).
+
+### Verifiziert (gemockt — kein Netz, kein LLM)
+- `pytest phase7_reward/tests -v` → **92 passed** (80 + **12 neue Brain-Fälle**, Ziel ≥8). Inkl.: valide
+  Lesson → `ok=True`-verbatim + `market_context`-Echo; Prompt enthält R-Multiple (`-1.25`) + `TIME_STOP`
+  + Kontext-Key + ehrliches `volume_z_score: n/a`; alle Fehlerpfade (fehlender/leerer `lesson`-Key,
+  non-dict, `LLMResponseError`, `RuntimeError`, `TimeoutError`) → `ok=False`/kein Raise; Metering-Pfad
+  setzt `last_usage`; leerer `market_context` crasht nicht; `isinstance(brain, LessonExtractor)`.
+- **`tests/conftest.py`** neu (erster P7-Fake): scripted `FakeLLM` (gespiegelt an P6 — `answers`,
+  `last_usage`-Set pro Call, `raises_exc`, `seen_systems`/`seen_users`/`seen_schemas`) + lokaler
+  `LLMResponseError`-Stand-in + Factories `make_closed`/`make_reward`/`market_context`.
+- **Phasen-Isolation:** `import reward.brain` zieht **kein** `anthropic`/`research`/`broker_wrapper`/
+  `execution`/`persistence` (laufzeit-geprüft → NONE). Import-Smoke `from reward import Brain,
+  LessonExtractor` OK. **Sibling-Suiten grün + unberührt** (Step 7 fasst nur `phase7_reward/` an):
+  **P2 59 · P4 88 · P5 135 · P6 70**.
+
+### Next — **Step 8** (`reward/recorder.py` — die Orchestrierung, Decision A/J)
+- `class RewardSink(db, broker, scorer, brain, confidence_provider, cfg)` (erfüllt das in Step 10 zu
+  definierende `RewardSink`-Protocol). `on_trade_opened(opened)` → `db.insert_trade(OPEN-Record inkl.
+  gate_path, research_confidence, initial_risk, account, session_date, intended levels)`. `on_trade_closed(closed)`
+  → 1) `pnl_resolver.resolve` (Step 9), 2) `db.update_trade_close`, 3) `score_before = get_current_score()`
+  + `scorer.score`, 4) `db.insert_reward`, 5) `brain.reflect` best-effort → `db.insert_lesson`. **JEDER
+  Schritt einzeln gekapselt; Fehler → `logger.critical` + weiter (J)**; idempotenz via `deal_id` (zweites
+  `on_trade_closed` verdoppelt den Score nicht). ⚠ Step 8 braucht `pnl_resolver` (Step 9) — Reihenfolge
+  prüfen: ggf. 9 vor 8 bauen oder den Resolver in Step 8 injizieren/stubben (TDD).
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. `pytest phase7_reward/tests -v` läuft direkt (editable-install).
+- **AI-Grenze gewahrt:** `Brain` extrahiert **nur Sprache → Erkenntnis** — kein Score, keine Zahl. Wer
+  hier den LLM scoren/gaten lassen will → **stop** (das ist Code, Steps 4/5/8).
+- **Metering ist transitiv** (über `client.last_usage`) — wer in Step 8/13 ein zweites `token_meter`
+  einbaut, zählt doppelt. Der Brain-Timeout = der Transport-`timeout_s` des Clients (Wiring setzt ihn
+  aus `lesson_timeout_s`); kein separater Threading-Timeout.
+- `FakeLLM`/`LLMResponseError` liegen in `tests/conftest.py` (direkt importierbar:
+  `from tests.conftest import FakeLLM, LLMResponseError`); Brain fängt `Exception` breit → Tests müssen
+  die echte P4-Exception **nicht** importieren.
 
 ---
 

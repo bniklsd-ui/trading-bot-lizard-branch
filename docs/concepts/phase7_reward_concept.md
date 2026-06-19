@@ -349,6 +349,20 @@ class Brain:
 - **Tests (≥8):** FakeLLM liefert valide Lesson → `trade_lessons`-Record korrekt; Malformed-JSON/
   Timeout/Exception → `ok=False`, **kein Crash**; token_meter wird additiv befüllt; Prompt enthält
   R-Multiple + Status + market_context.
+- ⟳ **2026-06-19 (Step 7 gebaut — Code = Source of Truth, zwei dokumentierte Abweichungen):**
+  (1) **Signatur `Brain(llm_client, cfg)`**, nicht `Brain(llm_client, token_meter, cfg)`:
+  `research.LLMClient.ask_candidate` **meter't bereits intern** (ruft `research.token_meter.record`
+  und legt den Record auf `client.last_usage` ab). Ein zweites `token_meter` würde **doppelt
+  zählen** — also wird `token_meter` **transitiv über den Client** wiederverwendet (Decision F
+  erfüllt) und der Brain liest `last_usage` nur zur Beobachtung zurück. Spiegelt exakt, wie der
+  P6-`debate` `last_usage` liest statt neu zu metern. (2) **Log-Level:** die *eigene* best-effort-
+  LLM-Fehlschlag-Zeile des Brains ist `logger.warning` (eine fehlende **optionale** Lesson, **kein**
+  DB-Write, kein Daten-Integritätsfehler); das `logger.critical` aus Decision J gehört in den
+  **Recorder** (Step 8), wo die DB-*Writes* passieren. (3) Der `eigene Timeout` (§5
+  `lesson_timeout_s`) = der **Transport-Timeout** des Clients (von der Wiring, Step 13, gesetzt) —
+  kein separater Threading-Timeout; ein Timeout wird zur Exception → vom best-effort-Wrapper zu
+  `ok=False`. `reward/credentials.py` bleibt **Step 13** (Wiring), nicht Step 7 (spiegelt P6, das
+  `debate/credentials.py` erst im Wiring-Modul ergänzte) → Step 7 ist unit-only, keyring-/SDK-frei.
 
 ### Step 8 — `reward/recorder.py` (Decision A, J — die Orchestrierung)
 ```python

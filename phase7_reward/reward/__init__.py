@@ -11,8 +11,8 @@ Instinct→VETO promotion is deferred to Phase 9 / concept §7b).
 Public exports grow per module (mirrors how the Phase-4 ``research`` and Phase-6
 ``debate`` packages grew their ``__init__``). Step 3 adds the data contracts +
 config + exceptions; ``compute_confidence`` (Step 4), ``Scorer`` (Step 5),
-``Brain`` (Step 7) and ``RewardSink`` (Step 10) land later. Contract types are
-also importable directly from ``reward.models``.
+``Brain``/``LessonExtractor`` (Step 7) land here; ``RewardSink`` (Step 10) lands
+later. Contract types are also importable directly from ``reward.models``.
 
 Full design + the locked decisions A–J:
 ``../docs/concepts/phase7_reward_concept.md``.
@@ -20,6 +20,7 @@ Full design + the locked decisions A–J:
 
 from __future__ import annotations
 
+from reward.brain import Brain, LessonExtractor
 from reward.confidence import compute_confidence
 from reward.models import (
     ClosedTrade,
@@ -52,6 +53,8 @@ __all__ = [
     "SyntheticSafetyError",
     "compute_confidence",
     "Scorer",
+    "Brain",
+    "LessonExtractor",
     "SyntheticTrade",
     "SyntheticTradeGenerator",
     "guard_synthetic_path",
