@@ -18,7 +18,7 @@ from typing import Any, Callable
 
 import pytest
 
-from reward.models import ClosedTrade, OpenedTrade, RewardResult
+from reward.models import ClosedTrade, LessonResult, OpenedTrade, RewardResult
 
 # A representative successful-call usage record (the 8-field token_meter shape the
 # real client sets on ``last_usage``). FakeLLM copies it per call.
@@ -159,6 +159,115 @@ def make_tx(**overrides: Any) -> dict[str, Any]:
     }
     tx.update(overrides)
     return tx
+
+
+# ---------------------------------------------------------------------------
+# DB + brain fakes (Step 8 recorder orchestration)
+# ---------------------------------------------------------------------------
+
+
+class FakeDB:
+    """In-memory stand-in for the Phase-2 ``Database`` (records the CRUD the recorder makes).
+
+    Only the methods the recorder calls are implemented (``insert_trade`` /
+    ``update_trade_close`` / ``get_trade_by_deal_id`` / ``get_current_score`` /
+    ``insert_reward`` / ``insert_lesson``); each mirrors the real semantics (status
+    default OPEN, ``id`` PK on the row, ``get_current_score`` follows the latest
+    reward). ``fail_on`` injects a ``RuntimeError`` from the named method(s) so the
+    fail-closed (Decision J) paths can be exercised. Every call name is appended to
+    ``calls`` for assertions.
+    """
+
+    def __init__(self, *, fail_on: set[str] | None = None, start_score: float = 50.0) -> None:
+        self._fail_on = set(fail_on or ())
+        self._trades: dict[str, dict[str, Any]] = {}  # deal_id -> row
+        self._next_id = 1
+        self.score = start_score
+        self.rewards: list[tuple[int, dict[str, Any]]] = []
+        self.lessons: list[tuple[int, dict[str, Any]]] = []
+        self.closes: list[tuple[str, dict[str, Any]]] = []
+        self.calls: list[str] = []
+
+    def _maybe_fail(self, name: str) -> None:
+        self.calls.append(name)
+        if name in self._fail_on:
+            raise RuntimeError(f"injected failure in {name}")
+
+    def insert_trade(self, trade: dict[str, Any]) -> int:
+        self._maybe_fail("insert_trade")
+        tid = self._next_id
+        self._next_id += 1
+        row = dict(trade)
+        row.setdefault("status", "OPEN")
+        row["id"] = tid
+        self._trades[trade["deal_id"]] = row
+        return tid
+
+    def update_trade_close(self, deal_id: str, close_data: dict[str, Any]) -> bool:
+        self._maybe_fail("update_trade_close")
+        row = self._trades.get(deal_id)
+        if row is None:
+            return False
+        row["status"] = close_data.get("status", "CLOSED")
+        row["close_level"] = close_data.get("close_level")
+        row["profit_loss"] = close_data.get("profit_loss")
+        row["close_ts"] = close_data.get("close_ts")
+        self.closes.append((deal_id, dict(close_data)))
+        return True
+
+    def get_trade_by_deal_id(self, deal_id: str) -> dict[str, Any] | None:
+        self._maybe_fail("get_trade_by_deal_id")
+        row = self._trades.get(deal_id)
+        return dict(row) if row is not None else None
+
+    def get_current_score(self) -> float:
+        self._maybe_fail("get_current_score")
+        return self.score
+
+    def insert_reward(self, trade_id: int, reward: dict[str, Any]) -> int:
+        self._maybe_fail("insert_reward")
+        self.rewards.append((trade_id, dict(reward)))
+        if "score_after" in reward and reward["score_after"] is not None:
+            self.score = float(reward["score_after"])
+        return len(self.rewards)
+
+    def insert_lesson(self, trade_id: int, lesson: dict[str, Any]) -> int:
+        self._maybe_fail("insert_lesson")
+        self.lessons.append((trade_id, dict(lesson)))
+        return len(self.lessons)
+
+
+class FakeBrain:
+    """Scripted lesson extractor (the recorder's ``brain`` collaborator, Step 7 surface).
+
+    Returns ``result`` (default: a successful lesson echoing the passed
+    ``market_context``) from ``reflect``; ``raises_exc`` makes it raise (to prove the
+    recorder wraps the brain best-effort even though the real ``Brain`` never raises).
+    Records each call's ``(closed, outcome, market_context)`` in ``calls``.
+    """
+
+    def __init__(
+        self,
+        result: LessonResult | None = None,
+        *,
+        raises_exc: BaseException | None = None,
+    ) -> None:
+        self._result = result
+        self.raises_exc = raises_exc
+        self.calls: list[tuple[Any, Any, dict[str, Any]]] = []
+
+    def reflect(self, closed: Any, outcome: Any, market_context: dict[str, Any]) -> LessonResult:
+        self.calls.append((closed, outcome, market_context))
+        if self.raises_exc is not None:
+            raise self.raises_exc
+        if self._result is not None:
+            return self._result
+        return LessonResult(
+            lesson_text="cut losers faster on time-stops",
+            market_context=market_context,
+            ok=True,
+            error=None,
+        )
 
 
 @pytest.fixture

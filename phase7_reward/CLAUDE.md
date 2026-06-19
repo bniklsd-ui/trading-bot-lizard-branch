@@ -76,13 +76,13 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | Datei | Zweck | Status |
 |---|---|---|
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
-| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4) + `Scorer` (Step 5) + Synthetik-Surface (Step 6) + `Brain`/`LessonExtractor` (Step 7) + `resolve` (Step 9)** | ✅ |
+| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4) + `Scorer` (Step 5) + Synthetik-Surface (Step 6) + `Brain`/`LessonExtractor` (Step 7) + `resolve` (Step 9) + `RewardSink` (Step 8)** | ✅ |
 | `reward/models.py` | `OpenedTrade`/`ClosedTrade`/`RewardConfig`/`ConfidenceReport`/`RewardResult`/`LessonResult` + Exceptions (types only); **+ `SyntheticSafetyError` (Step 6)** | ✅ Step 3 (·6) |
 | `reward/confidence.py` | Wilson-LB + Expectancy-R + SQN + N_min-Gating (reine Mathe) ★ | ✅ Step 4 |
 | `reward/scorer.py` | Prozess-bewusstes Reward-Delta + Clamping (B2/D) ★ | ✅ Step 5 |
 | `reward/synthetic.py` | `SyntheticTradeGenerator` + Pfad-Guard + Edge-Selector (harte Synthetik/Echt-Trennung, H) [→ Opus] | ✅ Step 6 |
 | `reward/brain.py` | `Brain.reflect()` + `LessonExtractor`-Protocol: Lesson-Extraktion, EIN Haiku-Call, best-effort, swappbar (E) [→ Opus] | ✅ Step 7 |
-| `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened`/`on_trade_closed` orchestriert alles (A/J) | ⏳ Step 8 |
+| `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened` (insert+in-memory-Stash) / `on_trade_closed` (resolve→close→score→reward→best-effort-Lesson), fail-closed pro Schritt, idempotent via Status (A/J) | ✅ Step 8 |
 | `reward/pnl_resolver.py` | `resolve()` → (close_level, profit_loss, r_multiple) via **heuristischem** `get_trade_history`-Match (size+Level+Recency, **kein** deal_id); no-match → `PnLUnavailable` (fail-closed, kein Level-Approx) | ✅ Step 9 |
 | `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` | ⏳ Step 13 (Wiring — bewusst nicht in Step 7, spiegelt P6) |
 | `migrations/002_phase7_reward.sql` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator-Entscheidung 2026-06-18, s. 1.7) | ⏳ Step 12 |
@@ -94,7 +94,8 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `tests/test_synthetic.py` | Generator-Determinismus/Labels, Pfad-Guard trifft Live-Pfad nie (+Aliasing), Edge-Selector Synthetik-Ausschluss + Demo-Toggle (11 Fälle, Ziel ≥8) | ✅ Step 6 |
 | `tests/conftest.py` + `tests/test_brain.py` | erster P7-Fake (`FakeLLM`); valide Lesson → `ok=True`-verbatim, Prompt trägt R/Status/Kontext, alle Fehlerpfade → `ok=False`/kein Raise, AI-Grenze, Protocol (12 Fälle, Ziel ≥8) | ✅ Step 7 |
 | `tests/test_pnl_resolver.py` | exakter/mehrdeutiger Match (size+Level+Recency), BUY-Win/SELL-Loss-R-Vorzeichen, `initial_risk==0` defensiv, not-ok/no-match/unbrauchbar → `PnLUnavailable`, ignoriert epic/direction (12 Fälle, Ziel ≥8) | ✅ Step 9 |
-| `tests/test_{recorder,executor_seam}.py` | TDD je Modul (≥66 gesamt) | ⏳ Steps 8/10 |
+| `tests/test_recorder.py` | open→close schreibt alle 3 Tabellen + Delta-Mapping; PnLUnavailable→critical/kein Reward/Trade bleibt OPEN; Reward-Insert-Fehler→critical/Trade CLOSED; Lesson-Fehler→Reward bleibt; idempotenter Doppel-Close; no-Stash-Reconstruct; confidence_provider best-effort (14 Fälle, Ziel ≥10) | ✅ Step 8 |
+| `tests/test_executor_seam.py` | `reward_sink=None` → P5 bit-identisch; mit Sink → beide Callbacks (≥6) | ⏳ Step 10 |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine Datei = eine
 Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging → stderr, `pytest` ohne
@@ -215,6 +216,79 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-19 (Step 8 — `reward/recorder.py` orchestration; the linked-steps pair 9→8 is done)
+
+### Completed
+- **`reward/recorder.py`** — `class RewardSink(*, db, broker, scorer, brain, cfg, confidence_provider=None)`
+  (alle keyword-only). Die Naht-Impl für Step 10. Referenziert **keinen** Gate/VETO/Order-Pfad (kann
+  strukturell keinen VETO umgehen). **Jeder Persistenz-Schritt einzeln gekapselt → Fehler `logger.critical`
+  + weiter; ein äußerer Guard macht beide Callbacks total (werfen nie, Decision J).**
+  - **`on_trade_opened(opened)`** → `db.insert_trade(...)` (`intended_open_level`→`open_level`,
+    `initial_risk`/`account` für Migration 002) **+ In-Memory-Stash** `self._opened[deal_id] = opened`.
+  - **`on_trade_closed(closed)`** (retry-freundliche Reihenfolge): (0) Idempotenz-Guard via
+    `get_trade_by_deal_id`-Status (`!= OPEN` → skip; `None` → critical/return; liefert `trade_id`-PK) →
+    (1) `pnl_resolver.resolve(...)` **vor** dem Close (PnLUnavailable → critical, Trade bleibt OPEN, retry-bar) →
+    (2) `update_trade_close` → (3)/(4) `get_current_score` + `scorer.score` + `insert_reward`
+    (`outcome_delta`→`outcome_score_delta`, `process_delta`→`process_score_delta`, +`pnl_raw`/`r_multiple`/
+    `debate_confidence`/`spread_at_entry_pct`) → (5) best-effort `brain.reflect` → `insert_lesson`.
+- **Drei dokumentierte Konzept↔Code-Reconciliations (Code = Source of Truth, im Modul-Docstring + Konzept §6 Step 8 dateiert):**
+  1. **In-Memory-Stash zwingend:** `trade_outcomes` hat **keine** Spalten für `spread_at_entry_pct`/
+     `debate_confidence` (die liegen in `reward_pts`, erst am Close geschrieben) → der volle Prozess-Kontext
+     kann **nicht** über die DB von open→close laufen. Stash (gleiche Sink-Instanz, ein Zyklus) trägt ihn;
+     die DB-Zeile ist der durable Anker (`trade_id`-PK + OPEN/CLOSED-Status + kalter Minimal-Resolve-Kontext
+     beim Restart). **Kein Stash → Neutral-Defaults** (`_NO_STASH_SPREAD=1.0` = kein Entry-Bonus, debate=None);
+     die durablen Signale (R, Exit-Status) scoren normal.
+  2. **`confidence_provider` = optionaler, keyword-only Forward-Compat-Hook** (Konzept §8 hatte ihn positional).
+     **Observe-only:** keine Confidence-DB-Spalte → wird best-effort aufgerufen + geloggt, **nie** geschrieben,
+     **gatet nichts** (Decision C). `cfg` steht vor ihm in der Signatur.
+  3. **Idempotenz = OPEN/CLOSED-Status** (Decision J sanktioniert „Status ODER vorhandener Reward"):
+     zweiter Close eines CLOSED-Deals wird übersprungen → Score nie verdoppelt. **Residual-Edge** (ehrlich):
+     scheitert `insert_reward` **nach** erfolgreichem `update_trade_close`, ist der Trade CLOSED aber ungescored
+     und ein Retro-Retry skippt → Reward verloren (geloggt `critical`, manueller Fix); das ist die benignere
+     Seite vs. Doppel-Scoring (Konzept-Reihenfolge bewusst gewählt). `veto_trigger_count`/`gate_fail_count`
+     bleiben v1 NULL (nicht score-tragend).
+- **`reward/__init__.py`** exportiert jetzt zusätzlich `RewardSink`. **`tests/conftest.py`** ergänzt um
+  `FakeDB` (P2-CRUD-Recorder + `fail_on`-Injektion) und `FakeBrain` (scripted `reflect`, `raises_exc`).
+
+### Verifiziert (gemockt — kein Netz, kein LLM, kein echter Broker/DB)
+- `pytest phase7_reward/tests -v` → **118 passed** (104 + **14 neue Recorder-Fälle**, Ziel ≥10). Inkl. der
+  Beweis-Tests: open→close schreibt **alle 3** Tabellen mit korrektem Delta-Mapping; **PnLUnavailable →
+  `critical`, kein Reward, `update_trade_close` nicht erreicht → Trade bleibt OPEN** (retry-bar);
+  **Reward-Insert-Fehler → `critical`, Trade trotzdem CLOSED**; Lesson-Fehler (raise **und** ok=False) →
+  Reward bleibt; **idempotenter Doppel-Close verdoppelt den Score nicht** (1 Reward); unbekannter deal_id →
+  `critical`/kein Crash; **no-Stash-Reconstruct** (anderes Sink-Instanz schließt aus der DB-Zeile);
+  `confidence_provider` best-effort (aufgerufen + werfender Provider kippt den Close nicht);
+  `market_context` an den Brain trägt `r_multiple`/`status`/`direction`.
+- **Phasen-Isolation:** `import reward.recorder` / `from reward import RewardSink` zieht **kein**
+  `anthropic`/`research`/`broker_wrapper`/`execution`/`persistence`/`debate` (laufzeit-geprüft → NONE).
+  **Sibling-Suiten grün + unberührt** (Steps 8/9 fassen nur `phase7_reward/` + Konzept-`.md` an):
+  **P2 59 · P4 88 · P5 135 · P6 70**.
+
+### Next — **Step 10** (Executor-Naht verdrahten, Decision A) + **P5-Regression** — ⚠ **erste P5-Berührung**
+- `execution/protocols.py`: `RewardSink`-Protocol ergänzen (Stilvorlage = bestehende Protocols, Contract 1.6).
+- `execution/executor.py`: `Executor.__init__(..., *, debate_runner=None, reward_sink=None, …)`.
+  - Nach `place_result.status == "OPEN"` und **vor** `monitor_position`: `if self.reward_sink:
+    self.reward_sink.on_trade_opened(build_opened(...))` — `build_opened` rekonstruiert `intended_open_level`
+    aus `price_env` (BUY→ask/SELL→bid; Contract 1.2: `place_order` droppt den Fill-`level`), `initial_risk =
+    abs(intended_open_level − stop_level)·size·point_value`, `debate_confidence = getattr(outcome,
+    "confidence", None)` (Contract 1.3: Executor hält `outcome` nicht über den Enrichment-Block → ggf. fangen).
+  - `monitor_position`-Return in Variable fangen; **danach** `on_trade_closed(build_closed(result))`; dann `return`.
+  - **Beide Aufrufe in `try/except`** → ein werfender Sink kippt den Zyklus nie (J). `reward_sink=None` → P5 **bit-identisch**.
+- **Tests (≥6):** `reward_sink=None` → bestehende Executor-Tests grün; mit Sink → beide Callbacks mit
+  korrekten Payloads; werfender Sink → Zyklus liefert trotzdem sein `ExecutionResult`. **Pflicht-Regression P5 135 / P4 88 / P6 70.**
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. `pytest phase7_reward/tests -v` läuft direkt (editable-install).
+- **AI-Grenze:** der Recorder orchestriert nur; die **einzige** AI ist das delegierte `brain.reflect` (best-effort).
+  Wer hier scoren/gaten per LLM will → **stop** (das ist Scorer/Code).
+- **Step 10 ist die erste P5-Datei-Berührung** — Decision A verlangt `reward_sink=None` ⇒ P5 bit-identisch.
+  Spiegelt exakt das `debate_runner`-Default-Passthrough-Muster (Contract: `execution/executor.py`).
+- ⚠ **Migration 002 (Step 12) fehlt noch:** `initial_risk`/`account`/`r_multiple` werden vom Recorder
+  geschrieben, aber die P2-Whitelist verwirft sie still bis Step 12 → gegen die echte DB landen sie erst
+  nach Migration. Unit-Tests (`FakeDB`) prüfen sie schon voll.
 
 ---
 

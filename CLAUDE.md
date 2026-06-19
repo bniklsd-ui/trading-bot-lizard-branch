@@ -78,19 +78,21 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 ## Current state
 
 **Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Build läuft
-(Steps 3–7 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
+(Steps 3–9 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
 Exceptions) ✅, `reward/confidence.py` (Wilson-LB/Expectancy-R/SQN/N_min-Gate) ✅,
 `reward/scorer.py` (prozess-bewusstes Reward-Delta + Clamping) ✅, `reward/synthetic.py`
 (Generator + Pfad-Guard + Edge-Selector, harte Synthetik/Echt-Trennung) ✅, `reward/brain.py`
 (`reflect()` Lesson-Extraktion — **das einzige AI-Modul der Phase**, EIN Haiku-Call, best-effort,
-swappbares `LessonExtractor`-Protocol) ✅ — **92 P7-Tests grün**.
-Die beiden ★-Mathe-Module + die Daten-Trennung + die Lesson-AI stehen; **Recorder/pnl_resolver/Seam/Migration**
-folgen in Steps 8–13 (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
+swappbares `LessonExtractor`-Protocol) ✅, `reward/pnl_resolver.py` (heuristischer History-Match,
+no-match → `PnLUnavailable` fail-closed) ✅, `reward/recorder.py` (`RewardSink`: open→close→reward→
+Lesson orchestriert, fail-closed/idempotent) ✅ — **118 P7-Tests grün**.
+Reward-Mathe + Daten-Trennung + Lesson-AI + P&L-Auflösung + Orchestrierung stehen; **Seam (Step 10) +
+Loop-Closure (11) + Migration 002 (12) + Wiring/Operator-Scripts (13)** folgen (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
 bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
 2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
 live-verifiziert (Order-/Monitor-Pfad).
 
-**Phase 7 status:** 🚧 Build läuft (Steps 3–7 ✅ — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI) (2026-06-19)
+**Phase 7 status:** 🚧 Build läuft (Steps 3–9 ✅ — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI + pnl_resolver + Recorder-Orchestrierung) (2026-06-19)
 - **Scope-Lock (schlankes Modell, Konzept Rev. 2026-06-16-b):** Phase 7 = **Reward-Score**
   (`reward_pts`, prozess-bewusst ab Tag 1) + **Freitext-Lessons** (`trade_lessons`) +
   **observe-only outcome-anchored Confidence**. **Keine VETO-Berührung.** Die volle
@@ -145,6 +147,18 @@ live-verifiziert (Order-/Monitor-Pfad).
   **transitiv** über `ask_candidate`/`client.last_usage` reused — Doppel-Metering vermieden, spiegelt P6);
   Brain-eigener Fehlschlag = `warning` (das `critical` aus J gehört in den Recorder/Step 8); `reward/credentials.py`
   → Step 13. **+12 Tests** (92 gesamt). Sibling-Suiten grün + unberührt (P2 59 · P4 88 · P5 135 · P6 70).
+- **Step 9 ✅ (2026-06-19, vor Step 8 gebaut — löst die „linked steps"-Notiz auf):** `reward/pnl_resolver.py` —
+  `resolve(closed, broker, opened, cfg) -> (close_level, profit_loss, r_multiple)`, **deterministisch, kein AI**.
+  **Heuristischer** History-Match, weil der IG-Record **kein `deal_id`** trägt (Contract 1.1; `epic`=instrumentName,
+  `direction`=None) → harter size-Filter + open-level-Nähe + Recency-Tie-Break. Vorzeichen gratis (IG-`profit_loss`
+  trägt es). **Fallback = `PnLUnavailable` werfen** (Operator-Entscheidung), **nicht** aus Levels approximieren
+  (`ClosedTrade` hat kein `close_level` → würde Zahl erfinden) → idempotenter Retry via `deal_id`. **+12 Tests** (104 gesamt).
+- **Step 8 ✅ (2026-06-19):** `reward/recorder.py` — `RewardSink` (Naht-Impl für Step 10). `on_trade_opened`
+  (insert + **In-Memory-Stash**) / `on_trade_closed` (Guard→resolve→close→score→reward→best-effort-Lesson),
+  **jeder Schritt fail-closed `critical` (J), idempotent via OPEN/CLOSED-Status.** 3 Reconciliations: Stash
+  zwingend (`spread`/`debate_confidence` nicht in `trade_outcomes`); `confidence_provider` optional/keyword-only/
+  observe-only; `resolve` vor `update_trade_close` (PnLUnavailable lässt Trade OPEN/retry-bar). **+14 Tests** (118 gesamt).
+  Sibling-Suiten grün + unberührt (P2 59 · P4 88 · P5 135 · P6 70). **Erste P5-Berührung erst in Step 10.**
 - Konzept: `docs/concepts/phase7_reward_concept.md` (voller Claude-Code-Plan, Step 0–13).
 
 **Phase 6 status:** ✅ Code-complete + live-**verifiziert** (Debatte-Pfad), **noch nicht

@@ -386,6 +386,20 @@ class RewardSink:                       # erfüllt das (in protocols zu definier
   critical-log, Trade trotzdem CLOSED; Lesson-Fehler ⇒ Reward steht trotzdem; idempotenz: zweimaliges
   `on_trade_closed` für denselben `deal_id` verdoppelt den Score nicht (Guard via `get_trade_by_deal_id`-
   Status oder vorhandenem Reward).
+- ⟳ **2026-06-19 (Step 8 gebaut — Code = Source of Truth, drei dokumentierte Abweichungen):**
+  (1) **In-Memory-Stash zwingend:** `trade_outcomes` hat **keine** Spalten für `spread_at_entry_pct`/
+  `debate_confidence` (die liegen in `reward_pts`, erst am Close geschrieben) → der volle Prozess-Kontext
+  kann nicht über die DB von open→close laufen. `on_trade_opened` stasht daher die `OpenedTrade` in
+  `self._opened[deal_id]`; `on_trade_closed` liest sie zurück (gleiche Sink-Instanz, ein Executor-Zyklus).
+  Die DB-Zeile bleibt der durable Anker (`trade_id`-PK + Status + kalter Minimal-Resolve-Kontext beim
+  Restart; kein Stash → Neutral-Prozess-Defaults, durable Signale R/Exit scoren normal). (2) **`confidence_provider`**
+  wird **optional + keyword-only** (Konzept hatte ihn positional vor `cfg`): **observe-only** (keine
+  Confidence-DB-Spalte) → best-effort aufgerufen + geloggt, nie geschrieben, gatet nichts (Decision C);
+  `cfg` steht vor ihm. (3) **Idempotenz = OPEN/CLOSED-Status**; Reihenfolge `resolve` **vor**
+  `update_trade_close`, damit `PnLUnavailable` den Trade OPEN/retry-bar lässt. Residual-Edge (ehrlich):
+  `insert_reward`-Fehler **nach** dem Close → Trade CLOSED/ungescored, Retry skippt → Reward verloren
+  (geloggt `critical`) — die benignere Seite vs. Doppel-Scoring. `veto_trigger_count`/`gate_fail_count`
+  bleiben v1 NULL (nicht score-tragend).
 
 ### Step 9 — `reward/pnl_resolver.py` (P&L-Auflösung)
 ```python
