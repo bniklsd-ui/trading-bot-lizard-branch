@@ -4,16 +4,21 @@ Mocked, no network, no real LLM, no real credentials (project rule). Grows per
 module, mirroring the Phase-4/5/6 conftest rhythm. Steps 3–6 (models / confidence /
 scorer / synthetic) were pure math and needed no fakes; **Step 7 introduces the first
 P7 fake** — a scripted ``FakeLLM`` standing in for the shared ``research.LLMClient``
-(the brain's only collaborator) — plus tiny factories for the contract dataclasses.
+(the brain's only collaborator). **Steps 8–9 add the broker/DB fakes** — a scripted
+``FakeBroker`` (only ``get_trade_history`` is used, returning an Envelope-shaped
+object) and a ``FakeDB`` recording the Phase-2 CRUD calls — plus factories for the
+contract dataclasses (``make_closed`` / ``make_opened`` / ``make_reward``) and a
+``make_tx`` history-row builder.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Callable
 
 import pytest
 
-from reward.models import ClosedTrade, RewardResult
+from reward.models import ClosedTrade, OpenedTrade, RewardResult
 
 # A representative successful-call usage record (the 8-field token_meter shape the
 # real client sets on ``last_usage``). FakeLLM copies it per call.
@@ -87,6 +92,104 @@ class LLMResponseError(Exception):
     never need to import the real Phase-4 exception — a same-named local one drives
     the exhausted-retry path without crossing the phase boundary.
     """
+
+
+# ---------------------------------------------------------------------------
+# Envelope / broker fakes (Steps 8–9) — duck-typed ``.ok`` / ``.data`` only
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FakeEnvelope:
+    """Minimal stand-in for ``broker_wrapper.envelope.Envelope`` (``.ok`` / ``.data``).
+
+    The reward layer only ever reads ``.ok`` (guard) then ``.data`` (contract 1.6) —
+    it never imports the real Envelope (phase isolation).
+    """
+
+    ok: bool
+    data: Any | None = None
+
+
+class FakeBroker:
+    """Scripted broker stand-in — only ``get_trade_history`` is exercised (Step 9).
+
+    ``transactions`` is the list of ``Transaction.__dict__``-shaped history rows the
+    next call returns (use ``make_tx``). ``ok=False`` returns a not-ok envelope (the
+    ``pnl_resolver`` must treat that as unavailable). The reward sink is **never**
+    handed an order/close path — this fake deliberately exposes nothing but read-only
+    history (Decision: the sink can never bypass a VETO because it references none).
+    """
+
+    def __init__(
+        self, transactions: list[dict[str, Any]] | None = None, *, ok: bool = True
+    ) -> None:
+        self._transactions = list(transactions or [])
+        self._ok = ok
+        self.history_calls = 0
+        self.last_days: int | None = None
+
+    def get_trade_history(self, days: int = 30) -> FakeEnvelope:
+        self.history_calls += 1
+        self.last_days = days
+        if not self._ok:
+            return FakeEnvelope(ok=False, data=None)
+        return FakeEnvelope(ok=True, data={"transactions": list(self._transactions)})
+
+
+def make_tx(**overrides: Any) -> dict[str, Any]:
+    """Build one ``get_trade_history`` row (the ``Transaction.__dict__`` shape, 1.1).
+
+    Defaults to a +30pt winning DAX deal. Note the deliberately *unhelpful* match
+    keys the resolver must ignore: ``epic`` is the **instrumentName** (display name,
+    not the epic code) and ``direction`` is **hardcoded None**.
+    """
+    tx: dict[str, Any] = {
+        "transaction_id": "REF-1",
+        "epic": "Germany 40 Cash",  # instrumentName, NOT the epic code
+        "direction": None,  # IG hardcodes this to None
+        "size": 1.0,
+        "open_level": 18000.0,
+        "close_level": 18030.0,
+        "profit_loss": 30.0,
+        "currency": "EUR",
+        "open_date": "2026-06-19T13:00:00",
+        "close_date": "2026-06-19T15:30:00",
+        "transaction_type": "DEAL",
+    }
+    tx.update(overrides)
+    return tx
+
+
+@pytest.fixture
+def make_opened() -> Callable[..., OpenedTrade]:
+    """Factory for an :class:`OpenedTrade` (overridable fields)."""
+
+    def _make(**overrides: Any) -> OpenedTrade:
+        fields: dict[str, Any] = {
+            "deal_reference": "bot-abc123",
+            "deal_id": "DIAAAAXQ6CSGTA5",
+            "epic": "IX.D.DAX.IFMM.IP",
+            "direction": "BUY",
+            "size": 1.0,
+            "intended_open_level": 18000.0,
+            "stop_level": 17970.0,
+            "limit_level": 18045.0,
+            "currency": "EUR",
+            "initial_risk": 30.0,
+            "research_confidence": 0.7,
+            "debate_confidence": 0.62,
+            "gate_path": {"gate1": True, "gate2": True},
+            "spread_at_entry_pct": 0.03,
+            "score_at_open": 50.0,
+            "session_date": "2026-06-19",
+            "open_ts": "2026-06-19T13:00:00.000Z",
+            "account": "demo",
+        }
+        fields.update(overrides)
+        return OpenedTrade(**fields)
+
+    return _make
 
 
 @pytest.fixture

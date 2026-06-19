@@ -33,6 +33,7 @@ from reward.models import (
     RewardResult,
     SyntheticSafetyError,
 )
+from reward.pnl_resolver import resolve
 from reward.scorer import Scorer
 from reward.synthetic import (
     SyntheticTrade,
@@ -53,6 +54,7 @@ __all__ = [
     "SyntheticSafetyError",
     "compute_confidence",
     "Scorer",
+    "resolve",
     "Brain",
     "LessonExtractor",
     "SyntheticTrade",

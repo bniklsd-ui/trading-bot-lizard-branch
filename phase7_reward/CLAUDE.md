@@ -76,14 +76,14 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | Datei | Zweck | Status |
 |---|---|---|
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
-| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4) + `Scorer` (Step 5) + Synthetik-Surface (Step 6) + `Brain`/`LessonExtractor` (Step 7)** | ✅ |
+| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4) + `Scorer` (Step 5) + Synthetik-Surface (Step 6) + `Brain`/`LessonExtractor` (Step 7) + `resolve` (Step 9)** | ✅ |
 | `reward/models.py` | `OpenedTrade`/`ClosedTrade`/`RewardConfig`/`ConfidenceReport`/`RewardResult`/`LessonResult` + Exceptions (types only); **+ `SyntheticSafetyError` (Step 6)** | ✅ Step 3 (·6) |
 | `reward/confidence.py` | Wilson-LB + Expectancy-R + SQN + N_min-Gating (reine Mathe) ★ | ✅ Step 4 |
 | `reward/scorer.py` | Prozess-bewusstes Reward-Delta + Clamping (B2/D) ★ | ✅ Step 5 |
 | `reward/synthetic.py` | `SyntheticTradeGenerator` + Pfad-Guard + Edge-Selector (harte Synthetik/Echt-Trennung, H) [→ Opus] | ✅ Step 6 |
 | `reward/brain.py` | `Brain.reflect()` + `LessonExtractor`-Protocol: Lesson-Extraktion, EIN Haiku-Call, best-effort, swappbar (E) [→ Opus] | ✅ Step 7 |
 | `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened`/`on_trade_closed` orchestriert alles (A/J) | ⏳ Step 8 |
-| `reward/pnl_resolver.py` | `ClosedTrade` → (close_level, profit_loss, r_multiple) via `get_trade_history` (+ Fallback) | ⏳ Step 9 |
+| `reward/pnl_resolver.py` | `resolve()` → (close_level, profit_loss, r_multiple) via **heuristischem** `get_trade_history`-Match (size+Level+Recency, **kein** deal_id); no-match → `PnLUnavailable` (fail-closed, kein Level-Approx) | ✅ Step 9 |
 | `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` | ⏳ Step 13 (Wiring — bewusst nicht in Step 7, spiegelt P6) |
 | `migrations/002_phase7_reward.sql` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator-Entscheidung 2026-06-18, s. 1.7) | ⏳ Step 12 |
 | `scripts/wiring.py` · `backfill_synthetic.py` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⏳ Step 13 |
@@ -93,7 +93,8 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `tests/test_scorer.py` | Prozess-vs-Outcome-Trennung, Clamping, Symmetrie/Asymmetrie, R-Clip, schwaches Debate-Signal (18 Fälle, Ziel ≥12) ★ | ✅ Step 5 |
 | `tests/test_synthetic.py` | Generator-Determinismus/Labels, Pfad-Guard trifft Live-Pfad nie (+Aliasing), Edge-Selector Synthetik-Ausschluss + Demo-Toggle (11 Fälle, Ziel ≥8) | ✅ Step 6 |
 | `tests/conftest.py` + `tests/test_brain.py` | erster P7-Fake (`FakeLLM`); valide Lesson → `ok=True`-verbatim, Prompt trägt R/Status/Kontext, alle Fehlerpfade → `ok=False`/kein Raise, AI-Grenze, Protocol (12 Fälle, Ziel ≥8) | ✅ Step 7 |
-| `tests/test_{pnl_resolver,recorder,executor_seam}.py` | TDD je Modul (≥66 gesamt) | ⏳ Steps 8+ |
+| `tests/test_pnl_resolver.py` | exakter/mehrdeutiger Match (size+Level+Recency), BUY-Win/SELL-Loss-R-Vorzeichen, `initial_risk==0` defensiv, not-ok/no-match/unbrauchbar → `PnLUnavailable`, ignoriert epic/direction (12 Fälle, Ziel ≥8) | ✅ Step 9 |
+| `tests/test_{recorder,executor_seam}.py` | TDD je Modul (≥66 gesamt) | ⏳ Steps 8/10 |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine Datei = eine
 Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging → stderr, `pytest` ohne
@@ -214,6 +215,72 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-19 (Step 9 — `reward/pnl_resolver.py`; built **before** Step 8 to resolve the linked-steps note)
+
+### Build-order decision (the „current+next step are linked" note, resolved)
+- The Step-7 block flagged: *„Step 8 braucht `pnl_resolver` (Step 9) — ggf. 9 vor 8 bauen oder im
+  Recorder stubben."* Step 8s `on_trade_closed` ruft `resolve()` als **ersten** Schritt → den Recorder
+  zuerst zu bauen würde den Resolver stubben. **Entscheidung (Operator-bestätigt): 9 vor 8.** Step 8
+  konsumiert den **echten** Resolver über einen `FakeBroker` (kein Stub). Konzept-konform (Done-Kriterien
+  sind reihenfolge-agnostisch). Beide Steps in **einer** Session, **zwei** atomare Commits.
+
+### Completed
+- **`reward/pnl_resolver.py`** — `resolve(closed, broker, opened, cfg) -> (close_level, profit_loss,
+  r_multiple)`. **Deterministisch, kein AI, kein DB-Write.** Heuristischer History-Match, weil der
+  IG-Record **kein `deal_id`** trägt (1.1): `epic` = **instrumentName** (Anzeigename, nicht der
+  Epic-Code), `direction` = **hardcoded None** → beide als Match-Key unbrauchbar. Match = **harter
+  size-Filter** + **open-level-Nähe** zu `opened.intended_open_level`, Tie-Break = **Recency** (jüngstes
+  `close_date`; via Pre-Sort + `min`). `r_multiple = profit_loss / opened.initial_risk`; `initial_risk==0`
+  → `0.0` (defensiv, **kein** ZeroDivision, raised nicht). `opened` ist **duck-typed** (nur `.size`/
+  `.intended_open_level`/`.initial_risk`) → der Recorder kann einen Minimal-Kontext aus der DB-Zeile reichen.
+- **Fallback = fail-closed (Decision J, Operator 2026-06-19):** kein brauchbarer Match (IG-Lag) oder
+  not-ok-Envelope → **`PnLUnavailable`**. Das Konzept-§9-Level-Approx (`profit_loss ≈ (close_level −
+  open_level)·…`) ist **nicht baubar** — `ClosedTrade` trägt **kein `close_level`** → würde eine Zahl
+  erfinden. Stattdessen idempotenter Retry via `deal_id` (Recorder loggt `critical`, Trade bleibt am
+  Broker geschlossen). Da der einzige Erfolgspfad ein echter History-Match ist, braucht v1 **keinen**
+  `pnl_source`-Tag (die „approximated"-Provenienz entfällt).
+- **`reward/__init__.py`** exportiert jetzt zusätzlich `resolve`. **`tests/conftest.py`** ergänzt um
+  `FakeEnvelope`/`FakeBroker` (nur `get_trade_history`, duck-typed `.ok`/`.data`), `make_tx`
+  (Transaction-`__dict__`-Shape mit den **unbrauchbaren** Keys epic=instrumentName/direction=None) und
+  `make_opened` (OpenedTrade-Factory).
+
+### Verifiziert (gemockt — kein Netz, kein LLM, kein echter Broker)
+- `pytest phase7_reward/tests -v` → **104 passed** (92 + **12 neue Resolver-Fälle**, Ziel ≥8). Inkl.
+  exakter Single-Match; Disambiguierung per Level-Nähe; Recency-Tie-Break; BUY-Win → +R / SELL-Loss → −R
+  (kein Vorzeichen-Flip nötig, IG-`profit_loss` trägt das Vorzeichen); `initial_risk==0` → r=0.0/kein
+  Raise; not-ok-Envelope/leere History/no-size-match/unbrauchbares (pl=None) → `PnLUnavailable`;
+  **Match ignoriert epic/direction** (beweist heuristisch, nicht deal-id).
+- **Phasen-Isolation:** `import reward.pnl_resolver` zieht **kein** `anthropic`/`research`/`broker_wrapper`/
+  `execution`/`persistence`/`debate` (laufzeit-geprüft → NONE). Import-Smoke `from reward import resolve`
+  OK (`is reward.pnl_resolver.resolve`).
+
+### Next — **Step 8** (`reward/recorder.py` — die Orchestrierung, Decision A/J) — **jetzt unblocked**
+- `class RewardSink(db, broker, scorer, brain, *, confidence_provider=None, cfg)`. `on_trade_opened` →
+  `db.insert_trade(...)` **+ in-memory-Stash** `self._opened[deal_id] = opened`. ⚠ **Warum Stash:**
+  `trade_outcomes` hat **keine** Spalten für `spread_at_entry_pct`/`debate_confidence`/`stop_level`/
+  `limit_level` (die liegen in `reward_pts`, erst am Close geschrieben) → der volle Prozess-Kontext muss
+  **in-memory** von open→close getragen werden (gleiche RewardSink-Instanz, ein Executor-Zyklus). Die
+  DB-Zeile (`get_trade_by_deal_id`) liefert nur `trade_id`-PK + Idempotenz-Status.
+- `on_trade_closed(closed)` (Konzept-Reihenfolge, retry-freundlich): (0) Idempotenz-Guard via
+  `get_trade_by_deal_id`-Status (`!= "OPEN"` → skip; None → critical/return) → (1) `resolve(...)` (wirft
+  `PnLUnavailable` **vor** `update_trade_close` → Trade bleibt OPEN, retry-bar) → (2) `update_trade_close`
+  → (3) `score_before = get_current_score()`; `scorer.score(...)` mit Stash-Prozess-Signalen → (4)
+  `insert_reward(trade_id, {outcome_score_delta, process_score_delta, score_after, win_loss, pnl_raw,
+  r_multiple, debate_confidence, spread_at_entry_pct})` → (5) `brain.reflect(...)` best-effort →
+  `insert_lesson(...)`. **JEDER Schritt einzeln gekapselt; Fehler → `logger.critical` + weiter (J).**
+- ⚠ `r_multiple`/`initial_risk`/`account` fehlen bis Migration 002 (Step 12); P2-`_insert` verwirft
+  unbekannte Keys still → das Schreiben ist gegen die echte DB harmlos und gegen `FakeDB` voll geprüft.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. `pytest phase7_reward/tests -v` läuft direkt (editable-install).
+- **AI-Grenze:** `pnl_resolver` ist **reine Mathe** — kein LLM, keine Heuristik-Halluzination (eine
+  deterministische, dokumentierte Match-Regel). Wer hier einen LLM „den Trade matchen" lässt → **stop**.
+- **Fallback ist Raise, nicht Erfinden:** wer in Step 8/9 eine Level-Approx-Zahl in den Reward schreibt →
+  **stop** (Operator-Entscheidung: lieber `PnLUnavailable` + idempotenter Retry als eine erfundene P&L).
+- `FakeBroker`/`make_tx`/`make_opened` liegen in `tests/conftest.py`.
 
 ---
 

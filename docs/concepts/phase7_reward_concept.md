@@ -399,6 +399,19 @@ def resolve(closed: ClosedTrade, broker, opened: OpenedTrade, cfg) -> tuple[floa
 - **Tests (≥8):** exakter History-Match; Fallback-Pfad setzt Flag; R-Multiple-Vorzeichen für BUY/SELL
   korrekt; `initial_risk==0` → defensiv (kein ZeroDivision, BREAKEVEN/None).
 - `[VERIFY]` Step 1.1 liefert die History-Feldnamen.
+- ⟳ **2026-06-19 (Step 9 gebaut — Code = Source of Truth, zwei dokumentierte Abweichungen):**
+  (1) **Match ist heuristisch, nicht per `deal_id`/`deal_reference`:** der IG-History-Record trägt
+  **keinen** deal_id/deal_reference (verifizierter Contract 1.1); `epic` = **instrumentName**
+  (Anzeigename ≠ Epic-Code), `direction` = **hardcoded None**. → Match = harter `size`-Filter +
+  `open_level`-Nähe zu `opened.intended_open_level`, Tie-Break = Recency (jüngstes `close_date`).
+  Vorzeichen kommt gratis: IG-`profit_loss` trägt es bereits → kein per-Direction-Flip.
+  (2) **Fallback = `PnLUnavailable` werfen, NICHT aus Levels approximieren** (Operator-Entscheidung):
+  ein `ClosedTrade` trägt **kein `close_level`** → die skizzierte Approximation
+  `profit_loss ≈ (close_level − open_level)·…` würde eine Zahl **erfinden**. Stattdessen no-match/not-ok
+  → `PnLUnavailable` (fail-closed), idempotenter Retry via `deal_id`, sobald die History aufholt. Da
+  der einzige Erfolgspfad ein echter History-Match ist, braucht v1 **keinen** `pnl_source`-Tag; die
+  Rückgabe bleibt das §9-`tuple[float, float, float]`. `opened` wird **duck-typed** (nur `.size`/
+  `.intended_open_level`/`.initial_risk`).
 
 ### Step 10 — Executor-Naht verdrahten (Decision A) + **P5-Regression**
 - `execution/protocols.py`: `RewardSink`-Protocol ergänzen (Stilvorlage = bestehende Protocols).
