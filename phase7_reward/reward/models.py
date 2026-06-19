@@ -60,6 +60,23 @@ class PnLUnavailable(RewardError):
     code = "PNL_UNAVAILABLE"
 
 
+class SyntheticSafetyError(RewardError):
+    """A synthetic write was about to target the **live** database (Decision H).
+
+    Raised by ``synthetic.guard_synthetic_path`` (Step 6) when a synthetic-data
+    write path resolves to the same file as ``RewardConfig.live_db_path``. The hard
+    location split ("Grenze = der DB-Pfad") is the boundary: synthetic data lives in
+    ``synthetic_db_path`` and **never** in the live store, so it can never enter the
+    live edge metric. Unlike the bookkeeping errors above this is a **safety guard**
+    — it is raised eagerly (before any DB is opened), not swallowed.
+
+    ⚠ Step-6 addition: the concept §6 Step 3 exception list named only ``RewardError``
+    /``PnLUnavailable``; this guard exception was added when ``synthetic.py`` landed.
+    """
+
+    code = "SYNTHETIC_SAFETY"
+
+
 # ---------------------------------------------------------------------------
 # OpenedTrade — decision context captured at open (-> trade_outcomes row)
 # ---------------------------------------------------------------------------

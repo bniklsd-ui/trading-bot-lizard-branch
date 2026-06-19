@@ -78,16 +78,17 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 ## Current state
 
 **Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Build läuft
-(Steps 3–5 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
+(Steps 3–6 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
 Exceptions) ✅, `reward/confidence.py` (Wilson-LB/Expectancy-R/SQN/N_min-Gate) ✅,
-`reward/scorer.py` (prozess-bewusstes Reward-Delta + Clamping) ✅ — **69 P7-Tests grün**. Die
-beiden ★-Mathe-Module (Confidence/Scorer) stehen; **Synthetic/Brain/Recorder/pnl_resolver/Seam**
-folgen in Steps 6–13 (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
+`reward/scorer.py` (prozess-bewusstes Reward-Delta + Clamping) ✅, `reward/synthetic.py`
+(Generator + Pfad-Guard + Edge-Selector, harte Synthetik/Echt-Trennung) ✅ — **80 P7-Tests grün**.
+Die beiden ★-Mathe-Module + die Daten-Trennung stehen; **Brain/Recorder/pnl_resolver/Seam/Migration**
+folgen in Steps 7–13 (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
 bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
 2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
 live-verifiziert (Order-/Monitor-Pfad).
 
-**Phase 7 status:** 🚧 Build läuft (Steps 3–5 ✅ — Reward-Mathe Confidence+Scorer komplett) (2026-06-18)
+**Phase 7 status:** 🚧 Build läuft (Steps 3–6 ✅ — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung) (2026-06-19)
 - **Scope-Lock (schlankes Modell, Konzept Rev. 2026-06-16-b):** Phase 7 = **Reward-Score**
   (`reward_pts`, prozess-bewusst ab Tag 1) + **Freitext-Lessons** (`trade_lessons`) +
   **observe-only outcome-anchored Confidence**. **Keine VETO-Berührung.** Die volle
@@ -126,6 +127,13 @@ live-verifiziert (Order-/Monitor-Pfad).
   `±max_delta_per_trade` und `score_after` auf `[0,100]` geclampt. **+18 Tests** (69 gesamt). Reuse-Hinweis:
   Magnituden sind v1/tunbar (Decision D); Tests pinnen *relative* Eigenschaften. **Sibling-Suiten grün +
   unberührt** (P2 59 · P4 88 · P5 135 · P6 70).
+- **Step 6 ✅ (2026-06-19):** `reward/synthetic.py` — pure Library für die harte Synthetik/Echt-Trennung
+  (Decision H): `SyntheticTradeGenerator` (seed-reproduzierbare R-Multiple-Verteilungen),
+  `guard_synthetic_path()` (wirft `SyntheticSafetyError`, wenn ein Synthetik-Write den `live_db_path`
+  treffen würde — realpath-Vergleich; **Grenze = der DB-Pfad**), `select_edge_set()` (`include_demo_in_edge`
+  + Synthetik-Ausschluss → `(r_multiples, wins, n)` für `compute_confidence`). **Kein DB-Write** — der
+  Schreiber ist Step 13 (`backfill_synthetic.py`), der den Guard konsumiert. **+11 Tests** (80 gesamt),
+  inkl. §7(c)-Beweis „Synthetik-Write trifft Live-Pfad nie". Sibling-Suiten grün (P2 59 · P4 88 · P5 135 · P6 70).
 - Konzept: `docs/concepts/phase7_reward_concept.md` (voller Claude-Code-Plan, Step 0–13).
 
 **Phase 6 status:** ✅ Code-complete + live-**verifiziert** (Debatte-Pfad), **noch nicht

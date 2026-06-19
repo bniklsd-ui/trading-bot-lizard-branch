@@ -76,11 +76,11 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | Datei | Zweck | Status |
 |---|---|---|
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
-| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4) + `Scorer` (Step 5)** | ✅ |
-| `reward/models.py` | `OpenedTrade`/`ClosedTrade`/`RewardConfig`/`ConfidenceReport`/`RewardResult`/`LessonResult` + Exceptions (types only) | ✅ Step 3 |
+| `reward/__init__.py` | Paket-Marker; re-exportiert die Contract-Typen + `RewardConfig` + Exceptions (Step 3) **+ `compute_confidence` (Step 4) + `Scorer` (Step 5) + Synthetik-Surface (Step 6)** | ✅ |
+| `reward/models.py` | `OpenedTrade`/`ClosedTrade`/`RewardConfig`/`ConfidenceReport`/`RewardResult`/`LessonResult` + Exceptions (types only); **+ `SyntheticSafetyError` (Step 6)** | ✅ Step 3 (·6) |
 | `reward/confidence.py` | Wilson-LB + Expectancy-R + SQN + N_min-Gating (reine Mathe) ★ | ✅ Step 4 |
 | `reward/scorer.py` | Prozess-bewusstes Reward-Delta + Clamping (B2/D) ★ | ✅ Step 5 |
-| `reward/synthetic.py` | `SyntheticTradeGenerator` + harte Synthetik/Echt-Trennung (H) [→ Opus] | ⏳ Step 6 |
+| `reward/synthetic.py` | `SyntheticTradeGenerator` + Pfad-Guard + Edge-Selector (harte Synthetik/Echt-Trennung, H) [→ Opus] | ✅ Step 6 |
 | `reward/brain.py` | `reflect()`: Lesson-Extraktion, Haiku, best-effort, swappbar (E) [→ Opus] | ⏳ Step 7 |
 | `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened`/`on_trade_closed` orchestriert alles (A/J) | ⏳ Step 8 |
 | `reward/pnl_resolver.py` | `ClosedTrade` → (close_level, profit_loss, r_multiple) via `get_trade_history` (+ Fallback) | ⏳ Step 9 |
@@ -91,7 +91,8 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `tests/{__init__,test_models,test_packaging}.py` | Step-3-Tests (21: Contracts/frozen/§5-Defaults/Exceptions + Editable-Install-Smoke) | ✅ Step 3 |
 | `tests/test_confidence.py` | Wilson/Expectancy/SQN/N_min-Gate + Anti-Pattern-Beweis + Monotonie (30 Fälle, Ziel ≥14) ★ | ✅ Step 4 |
 | `tests/test_scorer.py` | Prozess-vs-Outcome-Trennung, Clamping, Symmetrie/Asymmetrie, R-Clip, schwaches Debate-Signal (18 Fälle, Ziel ≥12) ★ | ✅ Step 5 |
-| `tests/test_{pnl_resolver,brain,recorder,synthetic,executor_seam}.py` | TDD je Modul (≥66 gesamt) | ⏳ Steps 6+ |
+| `tests/test_synthetic.py` | Generator-Determinismus/Labels, Pfad-Guard trifft Live-Pfad nie (+Aliasing), Edge-Selector Synthetik-Ausschluss + Demo-Toggle (11 Fälle, Ziel ≥8) | ✅ Step 6 |
+| `tests/test_{pnl_resolver,brain,recorder,executor_seam}.py` | TDD je Modul (≥66 gesamt) | ⏳ Steps 7+ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine Datei = eine
 Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging → stderr, `pytest` ohne
@@ -212,6 +213,64 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-19 (Step 6 — `reward/synthetic.py` synthetic/live separation)
+
+### Completed
+- **`reward/synthetic.py`** (pure deterministic Library — **kein DB-Write, kein Netz, kein LLM**;
+  Decision H). Drei Teile:
+  - **`SyntheticTradeGenerator(seed)`** → `generate(n, *, win_rate, win_r=1.5, loss_r=-1.0, jitter=0,
+    account="synthetic") -> list[SyntheticTrade]`. Reproduzierbar via `random.Random(seed)`; jeder
+    Trade `synthetic=True`; `win_loss` aus dem **finalen** R-Vorzeichen. `edge_inputs(trades)`
+    (staticmethod) → `(r_multiples, wins, n)` direkt für `compute_confidence`.
+  - **`guard_synthetic_path(target, cfg) -> str`** = DIE Grenze. Resolved `target` und
+    `cfg.live_db_path` via `Path.resolve()` und wirft `SyntheticSafetyError`, wenn sie dieselbe Datei
+    sind (fängt Relativ-vs-Absolut-Aliasing). Jeder synthetische Schreiber ruft das **vor** dem Öffnen
+    einer DB → strukturell unmöglich, Synthetik in die Live-DB zu schreiben. (Konzept §7 (c)-Beweis.)
+  - **`select_edge_set(records, cfg) -> (r_multiples, wins, n)`** = die `include_demo_in_edge`-Regel:
+    `synthetic`-getaggte raus (immer), `account=='demo'` raus außer `include_demo_in_edge`, `'live'`
+    immer rein. Nimmt `SyntheticTrade` **oder** Mapping-Rows (forward-compat für den DB-Provider in
+    Step 8). `wins` = strikt positive R (Breakeven ist **kein** Win).
+- **`reward/models.py`** ergänzt um **`SyntheticSafetyError(RewardError)`** (`code="SYNTHETIC_SAFETY"`,
+  Class-Attr-Muster wie P5/P6). ⚠ Step-6-Erweiterung der Exception-Liste (Konzept §6 Step 3 nannte nur
+  `RewardError`/`PnLUnavailable`) — im models-Docstring annotiert.
+- **`reward/__init__.py`** exportiert jetzt zusätzlich `SyntheticTrade`, `SyntheticTradeGenerator`,
+  `guard_synthetic_path`, `select_edge_set`, `SyntheticSafetyError`.
+- **Arbeitsteilung (gepinnt, Konzept §Step 13):** der **echte** Synthetik-DB-*Schreiber* ist das
+  Step-13-Operator-CLI `backfill_synthetic.py` (schreibt NUR `synthetic_db_path`, bricht ab bei ==
+  `live_db_path`) — es **konsumiert** `guard_synthetic_path`. Step 6 bleibt deshalb **pure Library**
+  (wie `confidence.py`/`scorer.py`) und hängt **nicht** an den `account`/`r_multiple`-Spalten, die
+  erst Migration 002 (Step 12) bringt.
+
+### Verifiziert (gemockt — kein Netz, kein LLM)
+- `pytest phase7_reward/tests -v` → **80 passed** (69 + **11 neue Synthetik-Fälle**, Ziel ≥8). Inkl.
+  Generator-Determinismus (gleicher Seed → identische R), `win_rate≈wins/n`, **Guard wirft auf dem
+  Live-Pfad** + Aliasing-Beweis (relativ vs. absolut), Edge-Selector schließt Synthetik **immer** aus
+  und togglet Demo via `include_demo_in_edge`.
+- Import-Smoke: `from reward import SyntheticTradeGenerator, guard_synthetic_path, select_edge_set,
+  SyntheticSafetyError` OK; `guard_synthetic_path(cfg.live_db_path, cfg)` wirft (`code=SYNTHETIC_SAFETY`);
+  gen(12)→`compute_confidence` = `OK`. **Sibling-Suiten grün + unberührt** (Step 6 fasst nur
+  `phase7_reward/` an): **P2 59 · P4 88 · P5 135 · P6 70**.
+
+### Next — **Step 7** (`reward/brain.py` — Lesson-Extraktion, EIN Haiku-Call, best-effort) **[→ Opus]**
+- `class Brain(llm_client, token_meter, cfg)` mit `reflect(closed, outcome, market_context) ->
+  LessonResult`. **Reuse** `research.LLMClient` + `research.token_meter` (Decision F; `lesson_model=
+  "claude-haiku-4-5-20251001"`, eigener Timeout `lesson_timeout_s`). **Best-effort/fail-closed (J):**
+  jede Exception (Malformed-JSON/Timeout/…) → `LessonResult(ok=False, error=…)`, **kein Re-raise, kein
+  Crash**. Swappbares `LessonExtractor`-Protokoll (Batch/Scheduler später). **≥8 Tests mit FakeLLM**
+  (valide Lesson → korrekter `trade_lessons`-Record-Shape; Fehlerpfade → `ok=False`; `token_meter`
+  additiv; Prompt enthält R-Multiple + Status + market_context). **Erstes AI-Modul der Phase** —
+  AI-Grenze: Brain extrahiert **nur Sprache → Erkenntnis**, **keine** Zahlen/Score-Entscheidung.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. `pytest phase7_reward/tests -v` läuft direkt (editable-install).
+- **Decision-Treue:** Grenze Synthetik↔Live ist der **DB-Pfad** (`guard_synthetic_path`), nicht nur das
+  Flag; `synthetic=True` ist Defense-in-Depth. Synthetik fließt **nie** in die Edge-Metrik.
+- Step 6 schreibt **bewusst keine** DB — der Schreiber ist Step 13. Wer hier `Database(...)` öffnet,
+  greift Step 13/12 vor (account/r_multiple-Spalten fehlen noch).
+- `synthetic.py` ist stdlib-only (`random`/`pathlib`); kein numpy, keine echte LLM-/DB-Abhängigkeit.
 
 ---
 

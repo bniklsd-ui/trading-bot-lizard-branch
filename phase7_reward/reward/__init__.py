@@ -30,8 +30,15 @@ from reward.models import (
     RewardConfig,
     RewardError,
     RewardResult,
+    SyntheticSafetyError,
 )
 from reward.scorer import Scorer
+from reward.synthetic import (
+    SyntheticTrade,
+    SyntheticTradeGenerator,
+    guard_synthetic_path,
+    select_edge_set,
+)
 
 __all__ = [
     "RewardConfig",
@@ -42,6 +49,11 @@ __all__ = [
     "LessonResult",
     "RewardError",
     "PnLUnavailable",
+    "SyntheticSafetyError",
     "compute_confidence",
     "Scorer",
+    "SyntheticTrade",
+    "SyntheticTradeGenerator",
+    "guard_synthetic_path",
+    "select_edge_set",
 ]
