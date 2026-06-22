@@ -29,12 +29,12 @@ def test_get_version_zero_on_empty_db(tmp_path):
     assert migrations._get_schema_version(conn) == 0
 
 
-def test_fresh_db_reaches_version_1(tmp_path):
+def test_fresh_db_reaches_version_2(tmp_path):
     conn = sqlite3.connect(str(tmp_path / "x.sqlite"))
     conn.row_factory = sqlite3.Row
     version = migrations.run_migrations(conn, MIGRATIONS_DIR)
-    assert version == 1
-    assert migrations._get_schema_version(conn) == 1
+    assert version == 2  # 001_initial + 002_phase7_reward
+    assert migrations._get_schema_version(conn) == 2
 
 
 def test_all_tables_created(tmp_path):
@@ -69,16 +69,17 @@ def test_rerun_is_noop(tmp_path):
     migrations.run_migrations(conn, MIGRATIONS_DIR)
     # Second run must not raise and must not advance the version.
     version = migrations.run_migrations(conn, MIGRATIONS_DIR)
-    assert version == 1
-    # Exactly one version row recorded.
+    assert version == 2
+    # One version row per applied migration (001 + 002), and no more on rerun.
     count = conn.execute("SELECT COUNT(*) FROM _schema_version").fetchone()[0]
-    assert count == 1
+    assert count == 2
 
 
 def test_find_pending_respects_current(tmp_path):
     pending = migrations._find_pending(MIGRATIONS_DIR, current=0)
-    assert [v for v, _ in pending] == [1]
-    assert migrations._find_pending(MIGRATIONS_DIR, current=1) == []
+    assert [v for v, _ in pending] == [1, 2]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=1)] == [2]
+    assert migrations._find_pending(MIGRATIONS_DIR, current=2) == []
 
 
 def test_database_run_migrations_seeds_defaults(db):
@@ -91,6 +92,20 @@ def test_database_run_migrations_seeds_defaults(db):
 def test_database_run_migrations_idempotent(tmp_path):
     path = str(tmp_path / "x.sqlite")
     d = Database(path)
-    assert d.run_migrations() == 1
-    assert d.run_migrations() == 1  # no error, no change
+    assert d.run_migrations() == 2
+    assert d.run_migrations() == 2  # no error, no change
     d.close()
+
+
+def test_phase7_columns_present(tmp_path):
+    """Migration 002 adds the Phase-7 reward columns to the schema."""
+    conn = sqlite3.connect(str(tmp_path / "x.sqlite"))
+    conn.row_factory = sqlite3.Row
+    migrations.run_migrations(conn, MIGRATIONS_DIR)
+
+    def _columns(table: str) -> set[str]:
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return {r["name"] for r in rows}
+
+    assert {"initial_risk", "account"}.issubset(_columns("trade_outcomes"))
+    assert "r_multiple" in _columns("reward_pts")

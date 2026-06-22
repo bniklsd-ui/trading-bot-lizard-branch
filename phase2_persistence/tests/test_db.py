@@ -80,12 +80,30 @@ def test_gate_path_dict_is_json_serialized(db, base_trade):
     assert json.loads(trade["gate_path"]) == {"gate1": True, "gate2": False}
 
 
+def test_insert_trade_persists_initial_risk_and_account(db, base_trade):
+    # Migration 002 + whitelist: the Phase-7 reward keys must round-trip.
+    db.insert_trade({**base_trade, "initial_risk": 30.0, "account": "demo"})
+    trade = db.get_trade_by_deal_id("DEAL1")
+    assert trade["initial_risk"] == 30.0
+    assert trade["account"] == "demo"
+
+
 # -- reward_pts -------------------------------------------------------------
 
 def test_insert_reward_returns_id(db, base_trade):
     tid = db.insert_trade(base_trade)
     rid = db.insert_reward(tid, {"score_after": 55.0, "win_loss": "WIN"})
     assert rid >= 1
+
+
+def test_insert_reward_persists_r_multiple(db, base_trade):
+    # Migration 002 + whitelist: the Phase-7 r_multiple must round-trip.
+    tid = db.insert_trade(base_trade)
+    db.insert_reward(tid, {"score_after": 55.0, "win_loss": "WIN", "r_multiple": 2.5})
+    row = db.conn.execute(
+        "SELECT r_multiple FROM reward_pts WHERE trade_id = ?", (tid,)
+    ).fetchone()
+    assert row["r_multiple"] == 2.5
 
 
 def test_get_current_score_default_when_no_rewards(db):

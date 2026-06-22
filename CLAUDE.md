@@ -78,7 +78,7 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 ## Current state
 
 **Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Build läuft
-(Steps 3–11 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
+(Steps 3–12 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
 Exceptions) ✅, `reward/confidence.py` (Wilson-LB/Expectancy-R/SQN/N_min-Gate) ✅,
 `reward/scorer.py` (prozess-bewusstes Reward-Delta + Clamping) ✅, `reward/synthetic.py`
 (Generator + Pfad-Guard + Edge-Selector, harte Synthetik/Echt-Trennung) ✅, `reward/brain.py`
@@ -91,13 +91,26 @@ verdrahtet — `Executor` bekam einen keyword-only `reward_sink=None` (default �
 `on_trade_opened`/`on_trade_closed` um `monitor_position`, beide guarded (J), `build_opened`/`build_closed`
 mit lazy `reward.models`-Import (**P5 135 → 142**, P7 118/P4 88/P6 70 unberührt). **Loop-Closure (Step 11) ✅**
 — `mark_lesson_used` in P4-`research.py` verdrahtet (nach erfolgreichem LLM-Call, best-effort; erster
-DB-Write aus Research, **P4 88 → 94**). **Migration 002 (12) + Wiring/Operator-Scripts (13)** folgen
-(strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
+DB-Write aus Research, **P4 88 → 94**). **Migration 002 (Step 12) ✅** — `phase2_persistence/migrations/
+002_phase7_reward.sql` (`initial_risk`/`account`/`r_multiple`) + P2-Whitelist-Erweiterung (`db.py`); die
+vom Recorder/Seam bereits geschriebenen Felder landen jetzt gegen die echte DB (**P2 59 → 62**, frische
+DB = Schema-Version 2). Nur noch **Wiring/Operator-Scripts (Step 13)** offen (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
 bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
 2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
 live-verifiziert (Order-/Monitor-Pfad).
 
-**Phase 7 status:** 🚧 Build läuft (Steps 3–11 ✅ — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI + pnl_resolver + Recorder-Orchestrierung + **Executor-Seam + Loop-Closure verdrahtet**) (2026-06-22)
+**Phase 7 status:** 🚧 Build läuft (Steps 3–12 ✅ — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI + pnl_resolver + Recorder-Orchestrierung + **Executor-Seam + Loop-Closure + Migration 002 verdrahtet**) (2026-06-22)
+- **Step 12 ✅ (2026-06-22):** Migration `002` + minimale P2-Berührung (Decision G) — **zweite, vom
+  Konzept sanktionierte P2-Berührung** (nach Step 11s P4-Touch). `phase2_persistence/migrations/
+  002_phase7_reward.sql` (additiv, version 2): `ADD COLUMN trade_outcomes.initial_risk REAL` +
+  `trade_outcomes.account TEXT` + `reward_pts.r_multiple REAL`. `persistence/db.py`:
+  `_TRADE_COLUMNS += ("initial_risk", "account")` + `_REWARD_COLUMNS += ("r_multiple",)` (Whitelist —
+  **keine** Logik-Änderung). Damit landen die von `Scorer`/`RewardSink`/`build_opened` **bereits
+  geschriebenen** Felder gegen die echte DB statt still verworfen zu werden. **Reconciliation (Code=SoT):**
+  die Datei liegt in `phase2_persistence/migrations/` (was der Runner als einziges Dir scannt:
+  `db.py:75`/`schema.py:14`), **nicht** im Konzept-§4-Pfad `phase7_reward/migrations/`; frische DB =
+  Version 2 → vier versions-asserting P2-Tests v1→v2 nachgezogen + 1 Spalten-Beweis + 2 Round-Trip-Beweise
+  → **P2 59 → 62**. Regression unberührt: P7 118 · P4 94 · P5 142 · P6 70.
 - **Step 11 ✅ (2026-06-22):** Loop-Closure (Decision I) — `mark_lesson_used` in P4-`research/research.py`
   verdrahtet (vom P7-Konzept §6 Step 11 verlangte P4-Berührung). Die „read→prompt"-Hälfte war schon da
   (Contract 1.5: `build_context` zieht `get_recent_lessons(5)`, `prompt._render_lessons` rendert);

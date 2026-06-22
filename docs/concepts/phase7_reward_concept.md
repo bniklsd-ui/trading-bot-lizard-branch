@@ -489,6 +489,18 @@ def resolve(closed: ClosedTrade, broker, opened: OpenedTrade, cfg) -> tuple[floa
   **`account TEXT`** hinzu (oben), und die Whitelist nimmt `"account"` mit auf. Hinweis: `ADD COLUMN`
   ist in SQLite nicht selbst idempotent — die Idempotenz kommt aus der `_schema_version`-Tabelle
   (Runner wendet Version 2 nur einmal an).
+- ⟳ **2026-06-22 (Step 12 gebaut — Code = Source of Truth, zwei dokumentierte Abweichungen):**
+  (1) **Die Migrations-Datei liegt in `phase2_persistence/migrations/002_phase7_reward.sql`, NICHT
+  `phase7_reward/migrations/`** (wie der §4-Modulbaum listet): der Runner (`persistence/migrations.py`)
+  und `Database.run_migrations()` scannen **nur** `schema.MIGRATIONS_DIR = phase2_persistence/migrations/`
+  (`db.py:75`, `schema.py:14`). Anderswo abgelegt würde `init_db.py`/`Database.run_migrations()` sie nie
+  finden + eine frische DB hätte die Spalten nicht; deckt sich mit der P2-Regel „DDL lebt nur in
+  `migrations/*.sql`". (Operator-bestätigt: phase2-Dir + Tests fixen, statt den Runner multi-dir-fähig
+  zu machen.) (2) **P2-Test-Folge:** eine frische DB erreicht jetzt **Version 2** → die **vier**
+  versions-asserting Tests in `test_migrations.py` wurden v1→v2 nachgezogen (nicht nur drei: auch
+  `test_database_run_migrations_idempotent`); zusätzlich +1 Spalten-Beweis (`test_phase7_columns_present`)
+  und +2 Round-Trip-Beweise in `test_db.py` → **P2 59 → 62** (das „59" ist historisch; der Anstieg ist
+  neue Coverage für diese Änderung, keine Regression). Regression unberührt: P7 118 · P4 94 · P5 142 · P6 70.
 
 ### Step 13 — `wiring.py` + Operator-Scripts
 - `wiring.py`: baut `RewardSink` mit echten P1-Broker / P2-`Database` / reused `research.LLMClient` +

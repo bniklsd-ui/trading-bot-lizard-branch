@@ -85,7 +85,7 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened` (insert+in-memory-Stash) / `on_trade_closed` (resolve→close→score→reward→best-effort-Lesson), fail-closed pro Schritt, idempotent via Status (A/J) | ✅ Step 8 |
 | `reward/pnl_resolver.py` | `resolve()` → (close_level, profit_loss, r_multiple) via **heuristischem** `get_trade_history`-Match (size+Level+Recency, **kein** deal_id); no-match → `PnLUnavailable` (fail-closed, kein Level-Approx) | ✅ Step 9 |
 | `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` | ⏳ Step 13 (Wiring — bewusst nicht in Step 7, spiegelt P6) |
-| `migrations/002_phase7_reward.sql` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator-Entscheidung 2026-06-18, s. 1.7) | ⏳ Step 12 |
+| `002_phase7_reward.sql` — **liegt in `phase2_persistence/migrations/`** (Code=SoT, s. Step-12-Block), **nicht** `phase7_reward/migrations/` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator 2026-06-18, s. 1.7) + Whitelist-Erweiterung `persistence/db.py` (`_TRADE_COLUMNS`/`_REWARD_COLUMNS`) | ✅ Step 12 |
 | `scripts/wiring.py` · `backfill_synthetic.py` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⏳ Step 13 |
 | `execution/protocols.py`-Edit + `executor.py`-Edit (P5) + Regression | `RewardSink`-Protocol + Naht (Decision A) — keyword-only `reward_sink=None` ⇒ P5 bit-identisch; `on_trade_opened`/`on_trade_closed` um `monitor_position`, beide guarded (J); `build_opened`/`build_closed` mit **lazy** `reward.models`-Import | ✅ Step 10 |
 | `tests/{__init__,test_models,test_packaging}.py` | Step-3-Tests (21: Contracts/frozen/§5-Defaults/Exceptions + Editable-Install-Smoke) | ✅ Step 3 |
@@ -120,7 +120,7 @@ Netz/echtes LLM, atomic commits.
 | `lesson_temperature` | `0.3` | E |
 | `lesson_timeout_s` | `20.0` | E — eigener Timeout, blockt den Close-Pfad nie hart |
 | `include_demo_in_edge` | `True` (Bootstrap) | H — Demo-Trades SIND die Datenquelle; Demo-Confidence ist nicht live-edge-validiert (re-baselinen bei Go-Live) |
-| `live_db_path` | `"data/trading_bot.db"` | H — Live-Ziel (⚠ realer P2-Name s. 1.7-Notiz) |
+| `live_db_path` | `"data/trading_bot.sqlite"` | H — Live-Ziel; **echter** P2-Pfad (`reward/models.py:347`; Konzept-§5-String `.db` war stale, s. 1.7) |
 | `synthetic_db_path` | `"data/synthetic_reward.db"` | H — Synthetik-Ziel (Backfill-Tool schreibt NUR hierhin) |
 
 ## Verifizierte Contracts (Step 1 — gegen Live-Code gepinnt, 2026-06-18)
@@ -195,10 +195,10 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
 - `trade_outcomes` NOT NULL: `deal_id, epic, broker(dflt ig), direction, size, open_level, currency,
   open_ts, status(dflt OPEN), session_date, created_at(dflt), updated_at(dflt)` → `on_trade_opened`
   muss liefern: `deal_id, epic, direction, size, open_level, currency, open_ts, session_date`.
-- ✅ **GELÖST (Operator 2026-06-18): `account`-Spalte wird hinzugefügt.** `OpenedTrade.account
+- ✅ **ERLEDIGT (Step 12, 2026-06-22): `account`-Spalte hinzugefügt.** `OpenedTrade.account
   ("demo"|"live")` (Step 3) und die Demo-Edge-Query (`include_demo_in_edge`, Step 6) brauchen sie
   persistiert. Das Konzept-§3/§12 spezifizierte Migration 002 nur mit `initial_risk` + `r_multiple` —
-  **Step 12 erweitert sie um `account TEXT`** und nimmt `"account"` in `_TRADE_COLUMNS` (Whitelist)
+  **Step 12 erweiterte sie um `account TEXT`** und nahm `"account"` in `_TRADE_COLUMNS` (Whitelist)
   auf. Damit fließt der Demo/Live-Tag durch `insert_trade` → `trade_outcomes`. (Konzept §3/§12 mit
   dieser dateierten Entscheidung annotiert.)
 - ⚠ **DB-Pfad-Diskrepanz:** der echte P2-Default ist `data/trading_bot.sqlite`
@@ -207,6 +207,11 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
 - Migration-Runner (`persistence/migrations.py`): `NNN_*.sql`, `_schema_version`-Tabelle, wendet
   Versionen > current aufsteigend an, versions-gegated idempotent (`ADD COLUMN` selbst ist nicht
   re-runbar, aber der Guard verhindert Re-Apply). `002_phase7_reward.sql` wird auto-angewandt.
+  ✅ **Step 12: bestätigt.** Der Runner scannt **nur** `schema.MIGRATIONS_DIR =
+  phase2_persistence/migrations/` (`db.py:75`, `schema.py:14`) → `002` liegt **dort** (nicht im
+  Konzept-§4-Pfad `phase7_reward/migrations/`), sonst fände `init_db.py`/`Database.run_migrations()`
+  sie nie. Frische DB erreicht jetzt **Version 2**; die vier versions-asserting P2-Tests wurden v1→v2
+  nachgezogen (+1 Spalten-Beweis, +2 Round-Trip-Beweise → **P2 59 → 62**).
 
 ## Step 0 / Step 0b — Housekeeping-Ergebnisse (2026-06-18)
 - **Step 0 (Turbo-Cleanup) = dokumentierter No-Op.** `rg -i turbo` trifft nur den **frozen**
@@ -220,6 +225,60 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-22 (Step 12 — Migration `002` + minimale P2-Whitelist-Berührung, Decision G)
+
+### Completed
+- **`phase2_persistence/migrations/002_phase7_reward.sql`** (NEU) — additive, version 2:
+  `ADD COLUMN trade_outcomes.initial_risk REAL` + `trade_outcomes.account TEXT` +
+  `reward_pts.r_multiple REAL`. Damit landen die Felder, die `Scorer`/`RewardSink`/`build_opened`
+  bereits **schreiben**, gegen die echte DB (vorher von der P2-Whitelist still verworfen).
+- **`phase2_persistence/persistence/db.py`** (einzige Logik-nahe P2-Berührung, **keine** Logik-Änderung):
+  `_TRADE_COLUMNS += ("initial_risk", "account")` und `_REWARD_COLUMNS += ("r_multiple",)`. `_insert`
+  schneidet weiterhin per Whitelist — die vom Reward-Layer gesendeten Keys werden jetzt persistiert.
+- **`phase2_persistence/tests/test_migrations.py`** — vier versions-asserting Tests v1→v2 nachgezogen
+  (`test_fresh_db_reaches_version_2`, `test_rerun_is_noop` → Version 2 + 2 `_schema_version`-Zeilen,
+  `test_find_pending_respects_current` → `[1,2]`/`[2]`/`[]`, `test_database_run_migrations_idempotent`
+  → 2) + **neu** `test_phase7_columns_present` (PRAGMA-Beweis, dass 002 die Spalten anlegt).
+- **`phase2_persistence/tests/test_db.py`** — **+2 Round-Trip-Beweise**:
+  `test_insert_trade_persists_initial_risk_and_account` + `test_insert_reward_persists_r_multiple`
+  (gegen die migrierte `db`-Fixture → Migration **und** Whitelist zusammen bewiesen).
+
+### Reconciliation (Code = Source of Truth — Konzept §4/§6 Step 12 dateiert)
+- **Migrations-Datei liegt in `phase2_persistence/migrations/`, NICHT `phase7_reward/migrations/`**
+  (wie Konzept §4 listet). Grund: der Runner (`persistence/migrations.py`) und
+  `Database.run_migrations()` scannen **nur** `schema.MIGRATIONS_DIR = phase2_persistence/migrations/`
+  (`db.py:75`, `schema.py:14`). Anderswo abgelegt würde `init_db.py` sie nie anwenden + eine frische
+  DB hätte die Spalten nicht. Deckt sich mit der P2-Regel „DDL lebt **nur** in `migrations/*.sql`".
+  (Operator-bestätigt: phase2-Dir + 3/4 Tests fixen, statt den Runner multi-dir-fähig zu machen.)
+- **Idempotenz von 002:** `ADD COLUMN` ist in SQLite nicht selbst `IF NOT EXISTS` → die Re-Apply-Sperre
+  kommt aus der `_schema_version`-Tabelle (Version 2 wird genau einmal angewandt; Re-Run = No-Op).
+  Die Crash-mid-script-Recovery-Kante ist **bestehendes** Runner-Verhalten — außerhalb Step-12-Scope.
+
+### Verifiziert (gemockt — kein Netz, kein LLM, Temp-/Local-SQLite)
+- `pytest phase2_persistence/tests -q` → **62 passed** (59 + 3 neue). **Regression grün + unberührt:**
+  **P7 118 · P4 94 · P5 142 · P6 70.** (Nur P2 änderte Verhalten; alle anderen Suiten nutzen
+  Fakes/Temp-DBs und importieren nichts Betroffenes.)
+- Safety-Grep vorab bestätigte: `test_migrations.py` ist der **einzige** versions-asserting Ort; die
+  `run_migrations`-Caller in `init_db.py`/`live_test.py` asserten **keine** feste Versionsnummer.
+
+### Next — **Step 13** (`wiring.py` + Operator-Scripts) — getrennt zu planen
+- `reward/credentials.py` (dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")`,
+  spiegelt P4/P6), `scripts/wiring.py` (baut `RewardSink` mit echtem P1-Broker / P2-`Database` /
+  reused `research.LLMClient` (Haiku) + verdrahtet `reward_sink` in eine Composition — spiegelt P6s
+  eigenes `build_executor`, **keine** P5-`ig_bot.py`-Änderung), `scripts/backfill_synthetic.py` [→ Opus]
+  (harter Guard gegen `live_db_path`), `scripts/smoke_test.py` (ein echter Haiku-`reflect()`, DRY),
+  `scripts/live_test.py` (voller open→close→reward→lesson gegen IG-Demo). **Smoke/Live = Operator-Lauf.**
+- Beim Wiring den **echten** P2-Pfad `data/trading_bot.sqlite` nutzen (config-Tabelle oben + `models.py:347`).
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. Step 12 ist eine **P2**-Berührung (vom Konzept Decision G verlangt) — die
+  Tests laufen in der **P2**-Suite (`pytest phase2_persistence/tests`); **P2 ist jetzt 62, nicht 59.**
+- **AI-Grenze gewahrt:** Migration + Whitelist sind reines Schema/Code — kein LLM.
+- ⚠ Eine **stale** Dev-/Runtime-DB (gitignored `data/trading_bot.sqlite`) auf Version 1 bekommt 002 beim
+  nächsten `init_db.py`/`Database.run_migrations()` **automatisch** (idempotent). Kein manueller Eingriff.
 
 ---
 

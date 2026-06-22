@@ -28,11 +28,13 @@ _TRADE_COLUMNS = (
     "open_level", "close_level", "currency", "open_ts", "close_ts",
     "hold_duration_min", "profit_loss", "status", "research_confidence",
     "gate_path", "session_date", "created_at", "updated_at",
+    "initial_risk", "account",  # migration 002 (Phase 7)
 )
 _REWARD_COLUMNS = (
     "trade_id", "outcome_score_delta", "score_after", "win_loss", "pnl_raw",
     "process_score_delta", "veto_trigger_count", "gate_fail_count",
     "debate_confidence", "spread_at_entry_pct", "calculated_at",
+    "r_multiple",  # migration 002 (Phase 7)
 )
 _LESSON_COLUMNS = (
     "trade_id", "lesson_text", "market_context_json", "relevance_score",
