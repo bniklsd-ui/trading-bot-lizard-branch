@@ -461,6 +461,17 @@ def resolve(closed: ClosedTrade, broker, opened: OpenedTrade, cfg) -> tuple[floa
     geschriebene Lesson taucht im nächsten Research-Kontext auf.
   - **Nein** → kleine P4-Erweiterung: Lessons-Block in den Prompt injizieren + `mark_lesson_used`
     buchen (separater, klar gekennzeichneter Sub-Step; **P4-Tests** danach grün).
+- ⟳ **2026-06-22 (Step 11 gebaut — Code = Source of Truth):** Es ist der **„Ja"-Zweig** (Contract 1.5
+  bestätigt: `context_builder.py:184` zieht `get_recent_lessons(5)`, `prompt.py:_render_lessons` rendert
+  sie) → **keine** P4-Prompt-Änderung. Verdrahtet wurde **nur** die „mark used"-Hälfte in
+  `research/research.py`: `_DBLike` += `mark_lesson_used`, best-effort `_mark_lessons_used(context.recent_lessons)`
+  **nach** erfolgreichem `ask_candidate` (vor der Validierung — der semantisch korrekte „used in research"-
+  Punkt; **nicht** in `build_context`, das würde bei Pre-LLM-Abstains over-counten, und **nicht** in der
+  reinen `prompt.py`). Fehlende `id` → skip; werfendes `mark_lesson_used` → `log.warning` + weiter (Bookkeeping
+  bricht den Zyklus nie). **Erster DB-Write aus P4-Research** — benigner `used_in_research`-Increment, kein
+  Trade/Outcome-Write. **+6 Tests → P4 88 → 94**; P7 118 · P5 142 · P6 70 · P2 59 unberührt. (Der Test „eine
+  P7-geschriebene Lesson taucht im nächsten Research-Kontext auf" ist strukturell schon durch die
+  context_builder-/prompt-Tests gedeckt; der neue Beweis ist die `mark_lesson_used`-Verdrahtung.)
 
 ### Step 12 — Migration `002` + minimale P2-Berührung (Decision G)
 - `migrations/002_phase7_reward.sql` (additiv, idempotent):

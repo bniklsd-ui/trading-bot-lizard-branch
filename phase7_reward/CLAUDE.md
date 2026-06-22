@@ -60,7 +60,7 @@ P7 baut nur das **Substrat** (`trade_lessons` + `reward_pts`).
 | **F** | Reuse | `research.LLMClient`, `research.token_meter` (8-Feld), `credentials`-Shim wiederverwenden. Kein zweites Mess-System. |
 | **G** | Ownership/Migration | P7 besitzt `trade_outcomes`-Writes über **P2-CRUD**. **Eine** minimale P2-Berührung: Whitelist-Tuples + Migration `002` für `initial_risk`/`r_multiple` (Step 12). |
 | **H** | Bootstrap | Produktion **fail-safe-neutral** bis echte Outcomes. **Hart getrennte Orte** Synthetik vs. Echt (separater DB-Pfad + Tag), eigene Steps. **[→ Opus]** |
-| **I** | Loop-Closure | Lessons schreiben **+** sicherstellen, dass P4-Research sie via `get_recent_lessons` zieht (✅ **zieht es bereits** — s. Verifizierte Contracts 1.5; nur `mark_lesson_used` verdrahten). |
+| **I** | Loop-Closure | Lessons schreiben **+** sicherstellen, dass P4-Research sie via `get_recent_lessons` zieht (✅ **zieht es bereits** — Contract 1.5). **✅ Step 11 (2026-06-22): `mark_lesson_used` in `research.py` verdrahtet** (nach erfolgreichem LLM-Call, best-effort). |
 | **J** | Fail-closed Writes | Alle P7-Writes best-effort, werfen nie in den P5-Close-Pfad. Fehlschlag ⇒ `logger.critical`, idempotenter Retry via `deal_id`. |
 
 ## Die Naht (`reward_sink`, Decision A — spiegelt `debate_runner`)
@@ -173,9 +173,13 @@ Netz/echtes LLM, atomic commits.
 - `research/context_builder.py:184` ruft bereits `db.get_recent_lessons(5)`; `research/prompt.py:215`
   rendert sie (`_render_lessons`). **Der Research-Prompt zieht Lessons bereits.** Step 11 = reines
   Schreiben, **keine** P4-Prompt-Änderung.
-- `db.mark_lesson_used` existiert, wird aber **nicht von Research gerufen** → die „mark used"-Seite
-  des Loops ist unverdrahtet (Step 11 verdrahtet sie; Test: eine P7-geschriebene Lesson taucht im
-  nächsten Research-Kontext auf).
+- ✅ **GELÖST (Step 11, 2026-06-22):** `db.mark_lesson_used` existierte, wurde aber **nicht von
+  Research gerufen** → die „mark used"-Seite war unverdrahtet. **Step 11 verdrahtet sie** in
+  `research/research.py`: `_DBLike` um `mark_lesson_used` erweitert + best-effort `_mark_lessons_used`
+  **nach** dem erfolgreichen `ask_candidate` (vor der Validierung) → markiert alle in den Prompt
+  gerenderten `context.recent_lessons` als genutzt; die Pre-LLM-Abbrüche (Preflight/leeres Universum/
+  LLM-Fehler) markieren **nichts** (kein Over-Counting). **Erster DB-Write aus P4-Research** — ein
+  benigner `used_in_research`-Increment, **kein** Trade/Outcome-Write, VETO-Schicht unberührt.
 
 **(1.6) Protocol-Stil (`execution/protocols.py`):** `@runtime_checkable class XProtocol(Protocol)`,
 Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok` vor `.data`). Das
@@ -216,6 +220,57 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-22 (Step 11 — Loop-Closure: `mark_lesson_used` in P4-Research verdrahtet)
+
+### Completed
+- **`phase4_research/research/research.py`** (Phase-4-Edit, vom Konzept §6 Step 11 / Decision I
+  **explizit verlangt**): die „read→prompt"-Hälfte des Loops war bereits verdrahtet (Contract 1.5 —
+  `build_context` zieht `get_recent_lessons(5)`, `prompt._render_lessons` rendert sie); **Step 11
+  verdrahtet die fehlende „mark used"-Hälfte.**
+  - `_DBLike`-Protocol um `mark_lesson_used(lesson_id)` erweitert (+ Docstring: Research macht jetzt
+    **einen** Bookkeeping-Write, die Loop-Closure — **kein** Trade/Outcome-Write).
+  - Neuer best-effort Helper `_mark_lessons_used(lessons)`: iteriert die Lessons, skippt fehlende `id`,
+    `mark_lesson_used` pro Lesson in `try/except` → **`log.warning` + weiter** (Bookkeeping darf den
+    Zyklus / die No-Trade-Entscheidung **nie** brechen).
+  - Aufruf **direkt nach** erfolgreichem `ask_candidate` (vor der Validierung) — der semantisch
+    korrekte „used in research"-Punkt (das Modell hat den Prompt mit den Lessons **beantwortet**). Die
+    Pre-LLM-Abbrüche (Preflight/leeres Universum/LLM-Fehler) returnen davor → **kein** Mark.
+- **`phase4_research/tests/conftest.py`** — `FakeDB` um `mark_lesson_used` (recording via `marked_used`)
+  + `mark_raises`-Injektion erweitert (additiv; Bestands-Tests unberührt).
+- **`phase4_research/tests/test_research.py`** — **+6 Loop-Closure-Tests** (Ziel ≥4): PASS markiert
+  `[1,2]`; Abstain-Antwort markiert (LLM erreicht); leeres Universum / Session-Health-Fail / LLM-Fehler
+  markieren **nichts**; Lesson ohne `id` wird geskippt; werfendes `mark_lesson_used` bricht den
+  PASS-Zyklus **nicht** (Pick trotzdem gespeichert).
+
+### Reconciliation (Code = Source of Truth — Konzept §6 Step 11 dateiert)
+- **Placement: nach erfolgreichem `ask_candidate`, vor der Validierung** — **nicht** in `build_context`
+  (würde bei Pre-LLM-Abstains over-counten) und **nicht** in der reinen `prompt.py` (keine Seiteneffekte/
+  kein DB). Best-effort/`warning` (P4 ist nicht die Safety-Schicht; P7s `critical` gilt für die
+  Outcome-/Reward-Writes). **Erster DB-Write aus P4-Research** — konzept-sanktioniert (Decision I).
+
+### Verifiziert (gemockt — kein Netz, kein LLM)
+- `pytest phase4_research/tests -q` → **94 passed** (88 + 6; `test_validator.py` bleibt 18). **Regression
+  grün + unberührt:** **P7 118 · P5 142 · P6 70 · P2 59** (P2 bestätigt den `mark_lesson_used`/
+  `get_recent_lessons`-Contract via `test_db.py` — unverändert).
+
+### Next — **Step 12** (Migration `002` + minimale P2-Berührung, Decision G)
+- `migrations/002_phase7_reward.sql` (additiv, idempotent über die `_schema_version`-Tabelle):
+  `ALTER TABLE trade_outcomes ADD COLUMN initial_risk REAL;` + `… ADD COLUMN account TEXT;` +
+  `ALTER TABLE reward_pts ADD COLUMN r_multiple REAL;`. `persistence/db.py`: **nur**
+  `_TRADE_COLUMNS += ("initial_risk", "account")` + `_REWARD_COLUMNS += ("r_multiple",)`
+  (Whitelist-Erweiterung — keine Logik-Änderung). **P2-Tests (59) danach grün.** Damit landen die vom
+  Recorder/Seam bereits geschriebenen Felder (heute still verworfen) gegen die echte DB. Danach Step 13
+  (Wiring + Operator-Scripts).
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. Step 11 ist eine **P4**-Datei-Berührung (vom P7-Konzept verlangt) —
+  die Tests laufen in der **P4**-Suite (`pytest phase4_research/tests`).
+- **AI-Grenze gewahrt:** `mark_lesson_used` ist deterministisches Bookkeeping (Increment + Timestamp),
+  kein LLM. Wer hier den LLM „entscheiden" lässt, welche Lesson genutzt wurde → **stop** (alle
+  gerenderten Lessons sind genutzt — Code-Regel).
 
 ---
 

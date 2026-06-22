@@ -171,7 +171,9 @@ class FakeDB:
 
     Each accessor returns its configured value; ``get_recent_trades`` /
     ``get_recent_lessons`` record the requested ``n`` so a test can assert the
-    8/5 limits.
+    8/5 limits. ``mark_lesson_used`` records the ids it was called with so the
+    loop-closure tests (Step 11) can assert which lessons were marked; set
+    ``mark_raises`` to exercise the best-effort path.
     """
 
     def __init__(
@@ -181,13 +183,16 @@ class FakeDB:
         lessons: list[dict[str, Any]] | None = None,
         score: float = 55.0,
         risk_level: str = "AGGRESSIV",
+        mark_raises: bool = False,
     ) -> None:
         self._trades = trades if trades is not None else []
         self._lessons = lessons if lessons is not None else []
         self._score = score
         self._risk_level = risk_level
+        self._mark_raises = mark_raises
         self.trade_n: list[int] = []
         self.lesson_n: list[int] = []
+        self.marked_used: list[int] = []
 
     def get_recent_trades(self, n: int = 8) -> list[dict[str, Any]]:
         self.trade_n.append(n)
@@ -202,6 +207,11 @@ class FakeDB:
 
     def get_risk_level(self) -> str:
         return self._risk_level
+
+    def mark_lesson_used(self, lesson_id: int) -> None:
+        if self._mark_raises:
+            raise RuntimeError("simulated mark_lesson_used fault")
+        self.marked_used.append(lesson_id)
 
 
 class _FakeBrainContext:

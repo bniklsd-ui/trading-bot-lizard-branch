@@ -18,6 +18,19 @@ is kicked off in the browser concept session, not here.
 > evaluated, so the bot's edge is **unknown** and out of scope here. Trade execution
 > is Phase 5; profitability is anchored to outcomes only in Phase 7 + live running.
 
+> 🔁 **Phase-7 additive edit (2026-06-22, Decision I / Phase-7 Step 11 — loop-closure,
+> code = source of truth):** the Phase-7 concept (§6 Step 11) demanded the one missing half
+> of the learning loop be wired **here**. The read→prompt half was already in place
+> (`context_builder` pulls `get_recent_lessons(5)`; `prompt._render_lessons` renders them);
+> Step 11 adds the **mark-used** write-back: `research.py`'s `_DBLike` gained
+> `mark_lesson_used`, and a best-effort `_mark_lessons_used(context.recent_lessons)` runs
+> **after a successful `ask_candidate`** (before validation) — so the pre-LLM aborts never
+> over-count. This is the **first DB write from research** (otherwise read-only here): a
+> benign `used_in_research` increment, **not** a trade/outcome write, VETO/safety layer
+> untouched. Failures log a `warning` and never break the cycle. Default research behaviour
+> is otherwise unchanged (+6 tests → **88 → 94**; `FakeDB` gained a recording
+> `mark_lesson_used`). Detail: `phase7_reward/` + `docs/concepts/phase7_reward_concept.md` §6 Step 11.
+
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which
 candidate?"). Everything else is plain code:

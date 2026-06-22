@@ -315,3 +315,86 @@ def test_run_valid_pick_is_accepted_and_persisted_to_contract() -> None:
     # the AI was asked exactly once, and a real reasoning string survived.
     assert len(llm.calls) == 1
     assert saved_dict["reasoning"] == pick["reasoning"]
+
+
+# --------------------------------------------------------------------------- #
+# 9. Loop-closure (Phase-7 Step 11, Decision I) — mark_lesson_used             #
+# --------------------------------------------------------------------------- #
+#
+# The lessons pulled into the context (and rendered into the prompt) are marked
+# "used in research" — but only after the model has actually answered, so the
+# pre-LLM aborts never over-count. These prove the wiring + the best-effort guards.
+
+
+def _lessons(*ids: int) -> list[dict[str, Any]]:
+    """Build recent-lesson rows the way ``get_recent_lessons`` returns them (incl. id)."""
+    return [{"id": i, "lesson_text": f"lesson {i}"} for i in ids]
+
+
+def test_run_marks_context_lessons_used_after_pass() -> None:
+    """A PASS run marks every lesson rendered into the prompt as used (loop-closure)."""
+    db = FakeDB(score=55.0, lessons=_lessons(1, 2))
+    research, _, _, _ = _research(db=db, llm=FakeLLM(raw=_buy_raw()))
+
+    research.run()
+
+    assert db.marked_used == [1, 2]
+
+
+def test_run_marks_lessons_used_on_abstain_answer() -> None:
+    """A model abstain still consumed the lessons → they are marked used."""
+    db = FakeDB(score=55.0, lessons=_lessons(7))
+    research, _, _, _ = _research(
+        db=db, llm=FakeLLM(raw={"abstain": True, "reasoning": "no setup"})
+    )
+
+    research.run()
+
+    assert db.marked_used == [7]  # the LLM was asked → lessons were used
+
+
+def test_run_does_not_mark_lessons_when_llm_not_reached() -> None:
+    """Pre-LLM aborts (empty universe, session-health) mark nothing — no consumption."""
+    # empty universe (info probe drops the epic) → never reach the AI step.
+    db1 = FakeDB(score=55.0, lessons=_lessons(1, 2))
+    research1, _, llm1, _ = _research(broker=FakeBroker(currency="USD"), db=db1)
+    research1.run()
+    assert llm1.calls == [] and db1.marked_used == []
+
+    # session-health fail → abort before context/prompt/LLM.
+    db2 = FakeDB(score=55.0, lessons=_lessons(1, 2))
+    research2, _, llm2, _ = _research(broker=FakeBroker(account_ok=False), db=db2)
+    research2.run()
+    assert llm2.calls == [] and db2.marked_used == []
+
+
+def test_run_does_not_mark_lessons_on_llm_error() -> None:
+    """An LLM error returns before the mark step (mark is *after* a successful answer)."""
+    db = FakeDB(score=55.0, lessons=_lessons(3))
+    research, _, _, _ = _research(db=db, llm=FakeLLM(raises=LLMResponseError("boom")))
+
+    research.run()
+
+    assert db.marked_used == []  # ask_candidate raised → mark never runs
+
+
+def test_run_skips_lessons_without_id() -> None:
+    """A lesson row lacking an ``id`` is skipped (no crash); others still marked."""
+    db = FakeDB(score=55.0, lessons=[{"lesson_text": "no id"}, {"id": 5, "lesson_text": "ok"}])
+    research, _, _, _ = _research(db=db, llm=FakeLLM(raw=_buy_raw()))
+
+    research.run()
+
+    assert db.marked_used == [5]
+
+
+def test_run_mark_lesson_used_failure_does_not_break_cycle() -> None:
+    """A throwing ``mark_lesson_used`` is best-effort → the PASS cycle still completes."""
+    db = FakeDB(score=55.0, lessons=_lessons(1), mark_raises=True)
+    research, state, _, _ = _research(db=db, llm=FakeLLM(raw=_buy_raw()))
+
+    result = research.run()
+
+    assert len(result) == 1                       # the pick was still saved + returned
+    assert state.saved == [[result[0].to_dict()]]  # one-save invariant intact
+    assert db.marked_used == []                    # the mark raised before recording

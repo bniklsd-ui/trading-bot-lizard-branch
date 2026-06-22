@@ -62,12 +62,21 @@ class _BrokerLike(Protocol):
 
 
 class _DBLike(Protocol):
-    """Phase-2 ``Database`` surface needed by ``build_context`` (recent reads)."""
+    """Phase-2 ``Database`` surface: the recent reads + the one loop-closure write.
+
+    Research is read-mostly, but it makes **one** bookkeeping write —
+    ``mark_lesson_used`` — after the LLM has consumed the lessons rendered into the
+    prompt (Decision I / Phase-7 Step 11). That closes the learning loop: a lesson
+    written by the Phase-7 recorder is pulled into the next research prompt and its
+    ``used_in_research`` count / ``last_used_ts`` are updated. It is **not** a
+    trade/outcome write and never touches the VETO/safety layer.
+    """
 
     def get_recent_trades(self, n: int = 8) -> list[dict[str, Any]]: ...
     def get_recent_lessons(self, n: int = 5) -> list[dict[str, Any]]: ...
     def get_current_score(self) -> float: ...
     def get_risk_level(self) -> str: ...
+    def mark_lesson_used(self, lesson_id: int) -> None: ...
 
 
 class _StateLike(Protocol):
@@ -167,6 +176,11 @@ class Research:
         except LLMResponseError as exc:
             return self._abstain(f"LLM error: {exc}")
 
+        # 5b. Loop-closure (Decision I / Phase-7 Step 11): the lessons in the prompt
+        # the model just answered are now "used in research". Mark them here — after a
+        # successful answer, so the pre-LLM aborts above never over-count. Best-effort.
+        self._mark_lessons_used(context.recent_lessons)
+
         # 6. Independent hallucination guard + live-spread recheck.
         drift = (context.brain_context or {}).get("drift_pct")
         vr = validate_candidate(
@@ -233,6 +247,22 @@ class Research:
                 f"anchor {anchor_epic!r} not TRADEABLE "
                 f"(market_status={data.get('market_status')!r})"
             )
+
+    def _mark_lessons_used(self, lessons: list[dict[str, Any]]) -> None:
+        """Mark each lesson rendered into the prompt as used (loop-closure, Decision I).
+
+        Best-effort: a missing ``id`` is skipped and a ``mark_lesson_used`` failure is
+        logged (warning) and swallowed — this is learning bookkeeping, **not** the trade
+        decision, so it must never break the research cycle / no-trade outcome.
+        """
+        for lesson in lessons:
+            lid = lesson.get("id")
+            if lid is None:
+                continue
+            try:
+                self.db.mark_lesson_used(lid)
+            except Exception as exc:  # noqa: BLE001 - bookkeeping must not break the cycle
+                log.warning("mark_lesson_used failed for lesson id=%s: %s", lid, exc)
 
     def _abstain(self, reason: str) -> list[Candidate]:
         """Persist the empty candidate list and return it (the no-trade path)."""
