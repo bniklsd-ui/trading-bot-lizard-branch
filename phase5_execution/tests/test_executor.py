@@ -101,6 +101,7 @@ def _build(
     confirm_fn: Callable[[OrderPlan], bool] = _yes,
     runner: _Runner | None = None,
     debate_runner: Callable[[dict[str, Any]], Any] | None = None,
+    reward_sink: Any | None = None,
     now_fn: Callable[[], datetime] | None = None,
     config: ExecutionConfig | None = None,
     db: FakeDB | None = None,
@@ -115,6 +116,7 @@ def _build(
         runner,
         confirm_fn,
         debate_runner=debate_runner,
+        reward_sink=reward_sink,
         now_fn=now_fn or _in_window(),
         sleep_fn=lambda _s: None,
     )
@@ -313,10 +315,17 @@ def test_reconcile_conflict_aborts(
 class _DebateOutcome:
     """Duck-typed stand-in for the Phase-6 ``DebateOutcome`` (the seam reads attrs)."""
 
-    def __init__(self, decision: str, direction: str | None, rationale: str = "") -> None:
+    def __init__(
+        self,
+        decision: str,
+        direction: str | None,
+        rationale: str = "",
+        confidence: float | None = None,
+    ) -> None:
         self.decision = decision
         self.direction = direction
         self.rationale = rationale
+        self.confidence = confidence
 
 
 class _DebateRunner:
@@ -426,3 +435,181 @@ def test_debate_runner_raising_fails_closed_no_order(
     assert "debate" in result.detail
     assert broker.open_position_calls == []
     assert broker.get_open_positions_calls == 0  # Gate 3 never reached
+
+
+# --- 13–19) Phase-7 reward-sink seam (Decision A) -------------------------
+#
+# The seam wraps the place→monitor block: on_trade_opened fires after the position is
+# confirmed OPEN (before monitoring) and on_trade_closed after a real close. Like the
+# debate seam, the sink is read duck-typed, so the tests use a tiny recording stand-in —
+# but here the executor *builds* the payload, so these assert the built OpenedTrade /
+# ClosedTrade snapshots (the real ``reward.models`` contracts, via the lazy import).
+#
+# Placement reconciliation (code = source of truth): concept §4 listed these in
+# ``phase7_reward/tests/test_executor_seam.py``, but the Executor + its fakes live here and
+# the structurally identical debate-seam tests are right above — cross-test-package fake
+# reuse is infeasible, so the seam is tested where it lives (mirroring the debate precedent).
+
+
+class _RecordingSink:
+    """Duck-typed ``RewardSink`` stand-in — records the payloads it is handed.
+
+    ``raise_on_open`` / ``raise_on_close`` make the respective callback throw, to prove
+    the executor guards it (a raising sink never crashes the cycle — Decision J).
+    """
+
+    def __init__(self, *, raise_on_open: bool = False, raise_on_close: bool = False) -> None:
+        self.opened: list[Any] = []
+        self.closed: list[Any] = []
+        self._raise_on_open = raise_on_open
+        self._raise_on_close = raise_on_close
+
+    def on_trade_opened(self, opened: Any) -> None:
+        self.opened.append(opened)
+        if self._raise_on_open:
+            raise RuntimeError("sink on_trade_opened boom")
+
+    def on_trade_closed(self, closed: Any) -> None:
+        self.closed.append(closed)
+        if self._raise_on_close:
+            raise RuntimeError("sink on_trade_closed boom")
+
+
+def test_reward_sink_none_is_bit_identical_passthrough(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """``reward_sink=None`` (the default) → the seam is skipped; baseline behaviour."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    executor, _ = _build(broker, state, exec_state)  # no reward_sink
+
+    result = executor.run()
+
+    assert result.status == "CLOSED_BY_BROKER"
+    assert len(broker.open_position_calls) == 1
+
+
+def test_reward_sink_fires_both_callbacks_with_built_snapshots(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """Full BUY path → on_trade_opened once + on_trade_closed once, with correct payloads."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    sink = _RecordingSink()
+    executor, _ = _build(broker, state, exec_state, reward_sink=sink)
+
+    result = executor.run()
+
+    assert result.status == "CLOSED_BY_BROKER"
+    assert len(sink.opened) == 1 and len(sink.closed) == 1
+
+    opened = sink.opened[0]
+    assert opened.deal_id == DEAL_ID
+    assert opened.direction == "BUY"
+    assert opened.intended_open_level == 18000.0            # BUY → ask (price_env default)
+    assert opened.stop_level == 17970.0                     # ask - 30 (build_order_plan)
+    assert opened.size == 1.0                               # 2% of 1500 / 30pt
+    assert opened.initial_risk == 30.0                      # |18000-17970| * 1.0 * 1.0
+    assert opened.spread_at_entry_pct == 0.03
+    assert opened.research_confidence == 70.0               # candidate llm_confidence
+    assert opened.debate_confidence is None                 # no debate ran
+    assert opened.score_at_open == 50.0                     # FakeDB default
+    assert opened.account == "demo"
+    assert opened.deal_reference.startswith("bot-")
+
+    closed = sink.closed[0]
+    assert closed.status == "CLOSED_BY_BROKER"
+    assert closed.deal_id == DEAL_ID
+    assert closed.deal_reference == opened.deal_reference   # links back to the open
+
+
+def test_reward_sink_open_payload_reflects_debate_flip(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A BUY seed flipped to SELL by the debate → opened payload is SELL, entry = bid."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    debate = _DebateRunner(_DebateOutcome("TRADE", "SELL", confidence=0.82))
+    sink = _RecordingSink()
+    executor, _ = _build(broker, state, exec_state, debate_runner=debate, reward_sink=sink)
+
+    result = executor.run()
+
+    assert result.status == "CLOSED_BY_BROKER"
+    opened = sink.opened[0]
+    assert opened.direction == "SELL"
+    assert opened.intended_open_level == 17999.0            # SELL → bid (price_env default)
+    assert opened.debate_confidence == 0.82                 # captured from the in-memory outcome
+
+
+def test_reward_sink_close_payload_on_time_stop(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A time-stop close also fires on_trade_closed, carrying status TIME_STOP."""
+    broker = FakeBroker(
+        account_env=_account(1500.0),
+        positions_sequence=[
+            _positions(),                  # Gate 3 + Gate 5
+            _positions(),                  # VETO 4
+            _positions(_open_position()),  # monitor poll 1: still present → time-stop fires
+        ],
+    )
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    sink = _RecordingSink()
+    executor, _ = _build(
+        broker, state, exec_state, reward_sink=sink,
+        config=ExecutionConfig(max_hold_minutes=0),  # held_too_long immediately
+    )
+
+    result = executor.run()
+
+    assert result.status == "TIME_STOP"
+    assert len(sink.opened) == 1 and len(sink.closed) == 1
+    assert sink.closed[0].status == "TIME_STOP"
+    assert broker.close_position_calls == [DEAL_ID]
+
+
+def test_reward_sink_not_fired_when_no_order(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A NO_TRADE path (abstain) places no order → neither callback fires."""
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[])  # abstain
+    sink = _RecordingSink()
+    executor, _ = _build(broker, state, exec_state, reward_sink=sink)
+
+    result = executor.run()
+
+    assert result.status == "NO_TRADE"
+    assert sink.opened == [] and sink.closed == []
+
+
+def test_reward_sink_open_raising_does_not_crash_cycle(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A throwing on_trade_opened is swallowed → the cycle still completes (Decision J)."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    sink = _RecordingSink(raise_on_open=True)
+    executor, _ = _build(broker, state, exec_state, reward_sink=sink)
+
+    result = executor.run()
+
+    assert result.status == "CLOSED_BY_BROKER"   # cycle unaffected
+    assert len(broker.open_position_calls) == 1
+    assert len(sink.closed) == 1                  # close seam still fires
+
+
+def test_reward_sink_close_raising_does_not_crash_cycle(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A throwing on_trade_closed is swallowed → the cycle still returns its result (J)."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    sink = _RecordingSink(raise_on_close=True)
+    executor, _ = _build(broker, state, exec_state, reward_sink=sink)
+
+    result = executor.run()
+
+    assert result.status == "CLOSED_BY_BROKER"
+    assert len(sink.opened) == 1 and len(sink.closed) == 1

@@ -87,7 +87,7 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` | ⏳ Step 13 (Wiring — bewusst nicht in Step 7, spiegelt P6) |
 | `migrations/002_phase7_reward.sql` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator-Entscheidung 2026-06-18, s. 1.7) | ⏳ Step 12 |
 | `scripts/wiring.py` · `backfill_synthetic.py` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⏳ Step 13 |
-| `execution/protocols.py`-Edit + `executor.py`-Edit (P5) + Regression | `RewardSink`-Protocol + Naht (Decision A) | ⏳ Step 10 |
+| `execution/protocols.py`-Edit + `executor.py`-Edit (P5) + Regression | `RewardSink`-Protocol + Naht (Decision A) — keyword-only `reward_sink=None` ⇒ P5 bit-identisch; `on_trade_opened`/`on_trade_closed` um `monitor_position`, beide guarded (J); `build_opened`/`build_closed` mit **lazy** `reward.models`-Import | ✅ Step 10 |
 | `tests/{__init__,test_models,test_packaging}.py` | Step-3-Tests (21: Contracts/frozen/§5-Defaults/Exceptions + Editable-Install-Smoke) | ✅ Step 3 |
 | `tests/test_confidence.py` | Wilson/Expectancy/SQN/N_min-Gate + Anti-Pattern-Beweis + Monotonie (30 Fälle, Ziel ≥14) ★ | ✅ Step 4 |
 | `tests/test_scorer.py` | Prozess-vs-Outcome-Trennung, Clamping, Symmetrie/Asymmetrie, R-Clip, schwaches Debate-Signal (18 Fälle, Ziel ≥12) ★ | ✅ Step 5 |
@@ -95,7 +95,7 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `tests/conftest.py` + `tests/test_brain.py` | erster P7-Fake (`FakeLLM`); valide Lesson → `ok=True`-verbatim, Prompt trägt R/Status/Kontext, alle Fehlerpfade → `ok=False`/kein Raise, AI-Grenze, Protocol (12 Fälle, Ziel ≥8) | ✅ Step 7 |
 | `tests/test_pnl_resolver.py` | exakter/mehrdeutiger Match (size+Level+Recency), BUY-Win/SELL-Loss-R-Vorzeichen, `initial_risk==0` defensiv, not-ok/no-match/unbrauchbar → `PnLUnavailable`, ignoriert epic/direction (12 Fälle, Ziel ≥8) | ✅ Step 9 |
 | `tests/test_recorder.py` | open→close schreibt alle 3 Tabellen + Delta-Mapping; PnLUnavailable→critical/kein Reward/Trade bleibt OPEN; Reward-Insert-Fehler→critical/Trade CLOSED; Lesson-Fehler→Reward bleibt; idempotenter Doppel-Close; no-Stash-Reconstruct; confidence_provider best-effort (14 Fälle, Ziel ≥10) | ✅ Step 8 |
-| `tests/test_executor_seam.py` | `reward_sink=None` → P5 bit-identisch; mit Sink → beide Callbacks (≥6) | ⏳ Step 10 |
+| `tests/test_executor_seam.py` → **verlegt nach** `phase5_execution/tests/test_executor.py` | `reward_sink=None` → P5 bit-identisch; mit Sink → beide Callbacks + gebaute Snapshots; Debate-Flip; TIME_STOP; NO_TRADE feuert nicht; werfender Sink kippt den Zyklus nicht (7 Fälle, Ziel ≥6). **Placement-Reconciliation:** Executor + Fakes leben in P5, cross-test-package-Fake-Reuse ist nicht baubar → getestet, wo die Naht lebt (spiegelt den Debate-Seam-Präzedenzfall) | ✅ Step 10 |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine Datei = eine
 Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging → stderr, `pytest` ohne
@@ -216,6 +216,73 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-22 (Step 10 — Executor-Naht verdrahtet; **erste P5-Berührung**)
+
+### Completed
+- **`execution/protocols.py`** — neues `@runtime_checkable class RewardSink(Protocol)` (Stilvorlage =
+  bestehende Protocols, Contract 1.6). Zwei Methoden `on_trade_opened(opened: Any)` /
+  `on_trade_closed(closed: Any)` — Payloads **`Any`** (duck-typed → **kein** `reward`-Import in P5).
+- **`execution/executor.py`** — additiver, **keyword-only** `reward_sink: Any | None = None` (default
+  `None` ⇒ **P5 bit-identisch + AI-frei**, spiegelt `debate_runner`). `outcome` auf **Run-Scope**
+  gehoben (`outcome: Any = None` vor dem Debate-Block) → die Open-Naht liest `getattr(outcome,
+  "confidence", None)` ob mit/ohne Debatte (Contract 1.3). Im place/monitor-Block: `_notify_opened(...)`
+  **nach** `place_result.status == "OPEN"` und **vor** `monitor_position`; `monitor_position`-Return
+  gefangen → `_notify_closed(result)` → `return`. **Beide `_notify_*` guarded** (`try/except Exception`
+  → `logger.critical`, kein Re-raise, Decision J); `_notify_closed` feuert **nur** bei `status ∈
+  {CLOSED_BY_BROKER, TIME_STOP}` (OPEN/ABORT = kein settled Close → Reconcile-Sache).
+- **`build_opened`/`build_closed`** = Modul-Helper, die die Executor-Locals in die P7-Contracts
+  (`OpenedTrade`/`ClosedTrade`) übersetzen. `intended_open_level` aus `price_env` rekonstruiert
+  (BUY→ask/SELL→bid, exakt wie `build_order_plan` — `place_order` droppt den Fill-`level`, Contract 1.2);
+  `initial_risk = |entry − stop|·size·point_value`.
+- **`phase5_execution/tests/test_executor.py`** — **+7 Seam-Tests** (Ziel ≥6) + `_RecordingSink`;
+  `FakeDB` um `get_current_score` (DbProtocol-vollständig) ergänzt, `_DebateOutcome` um `confidence`,
+  `_build` um `reward_sink`.
+
+### Drei dokumentierte Konzept↔Code-Reconciliations (Code = Source of Truth — auch Konzept §6 Step 10 dateiert)
+1. **Lazy `reward.models`-Import** *innerhalb* von `build_opened`/`build_closed` (nicht Modul-Top) →
+   `executor.py`-Modul-Imports bleiben `execution.* + stdlib`; ein sink-freier Lauf zieht **kein**
+   `reward` (laufzeit-bewiesen: `import execution.executor` → kein `reward`/`anthropic` in `sys.modules`).
+   Spiegelt `ig_bot.py`s lazy `scripts.wiring`-Import. Die Contracts sind die Single-Source-of-Truth-
+   Payload-Form (stdlib-only Dataclasses, dependency-light) — kein lokales Re-Modellieren der ~18 Felder.
+2. **`point_value=1.0` + `account="demo"` als v1-Konstanten:** `ExecutionConfig` hat **kein**
+   `point_value` (DAX 1 €/pt; `sizing.py` hardcodet 1.0 ebenso) → `build_opened` nutzt dieselbe
+   Konstante. `account` ist in der Bootstrap-Phase fest `"demo"` (einziger getesteter Pfad; Go-Live
+   ist fern + gated) — der **durable** Demo/Live-Tag gehört in die Wiring-Schicht (Step 13, kennt
+   `broker_name`) und kann dort gehärtet/überschrieben werden.
+3. **Test-Placement:** Konzept §4 listete `phase7_reward/tests/test_executor_seam.py`; die Tests leben
+   stattdessen in `phase5_execution/tests/test_executor.py` (wo Executor + Fakes liegen, neben dem
+   strukturgleichen Debate-Seam). Cross-test-package-Fake-Reuse ist nicht baubar → getestet, wo die
+   Naht lebt. Der P7-Suite-Count (118) bleibt; die Naht-Regression sitzt in P5 (135 → **142**).
+
+### Verifiziert (gemockt — kein Netz, kein LLM, keine echte Order)
+- `pytest phase5_execution/tests -q` → **142 passed** (135 + 7 Seam). **Regression grün + unberührt:**
+  **P7 118 · P4 88 · P6 70.** Inkl. Beweis-Tests: `reward_sink=None` bit-identisch; voller BUY-Pfad →
+  beide Callbacks **einmal** mit korrekten Snapshots (`intended_open_level==ask 18000`, `initial_risk==30.0`,
+  `account=="demo"`, `debate_confidence is None`); Debate-Flip → `direction=="SELL"`/entry==bid/
+  `debate_confidence==0.82`; TIME_STOP-Close feuert `on_trade_closed` mit `status=="TIME_STOP"`;
+  NO_TRADE/Abstain feuert **keinen** Callback; werfender `on_trade_opened`/`on_trade_closed` kippt den
+  Zyklus **nicht** (`CLOSED_BY_BROKER` returnt trotzdem, Decision J).
+- **Phasen-Isolation:** `import execution.executor` zieht **kein** `reward`/`anthropic` (laufzeit-geprüft).
+
+### Next — **Step 11** (Loop-Closure, Decision I)
+- Contract 1.5: `research/context_builder.py` zieht Lessons **bereits** (`get_recent_lessons(5)`) +
+  `research/prompt.py` rendert sie → **kein** P4-Prompt-Change nötig. Offen: `db.mark_lesson_used`
+  wird **nicht** von Research gerufen → die „mark used"-Seite ist unverdrahtet. Step 11 = `mark_lesson_used`
+  verdrahten (kleiner, klar gekennzeichneter P4-Sub-Step) + Test: eine P7-geschriebene Lesson taucht im
+  nächsten Research-Kontext auf, P4-Tests danach grün. **Danach** Step 12 (Migration 002 + P2-Whitelist),
+  Step 13 (Wiring + Operator-Scripts — wo `account` seine durable Demo/Live-Quelle bekommt).
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. P5-Seam-Tests laufen in der **P5**-Suite (`pytest phase5_execution/tests`),
+  nicht der P7-Suite. `phase1_broker_wrapper/.venv/bin/python -m pytest …`.
+- ⚠ **Migration 002 (Step 12) fehlt noch:** `build_opened` schreibt `initial_risk`/`account` (und der
+  Recorder `r_multiple`), aber die P2-Whitelist **verwirft sie still** bis Step 12 → gegen die echte DB
+  landen sie erst nach Migration. Unit-Tests (FakeDB / gebaute Snapshots) prüfen sie schon voll.
+- **AI-Grenze gewahrt:** die Naht ist **passiv** — sie reicht nur Snapshots; sie bekommt **nie** Broker-
+  Write/Gate/VETO (kann strukturell keinen VETO umgehen). Der Sink ist default `None` (P5 AI-frei).
 
 ---
 

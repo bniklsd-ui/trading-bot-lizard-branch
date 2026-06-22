@@ -95,3 +95,25 @@ class StateProtocol(Protocol):
     def clear_candidates(self) -> None: ...
 
     def load_bot_config(self) -> dict[str, Any]: ...
+
+
+@runtime_checkable
+class RewardSink(Protocol):
+    """Optional Phase-7 outcome/reward hook (Decision A) — injected, default ``None``.
+
+    The executor calls these two passive callbacks around a trade's lifecycle:
+    ``on_trade_opened`` after ``place_order`` confirms OPEN (before monitoring) and
+    ``on_trade_closed`` after the monitor returns a real close. Both receive a
+    duck-typed snapshot payload (``reward.models.OpenedTrade`` / ``ClosedTrade`` at
+    runtime — declared ``Any`` here so Phase 5 imports nothing from ``reward``).
+
+    The sink is handed **only** snapshots — never the broker write path, a Gate, or a
+    VETO — so it structurally cannot bypass one (Decision J). When no sink is injected
+    (the default) the seam is skipped entirely and Phase 5 is bit-identical + AI-free.
+    Implementations must be fail-closed: a raising callback never crashes the cycle
+    (the executor guards both calls).
+    """
+
+    def on_trade_opened(self, opened: Any) -> None: ...
+
+    def on_trade_closed(self, closed: Any) -> None: ...

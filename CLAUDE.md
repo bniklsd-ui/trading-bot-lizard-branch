@@ -78,7 +78,7 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 ## Current state
 
 **Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Build läuft
-(Steps 3–9 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
+(Steps 3–10 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
 Exceptions) ✅, `reward/confidence.py` (Wilson-LB/Expectancy-R/SQN/N_min-Gate) ✅,
 `reward/scorer.py` (prozess-bewusstes Reward-Delta + Clamping) ✅, `reward/synthetic.py`
 (Generator + Pfad-Guard + Edge-Selector, harte Synthetik/Echt-Trennung) ✅, `reward/brain.py`
@@ -86,13 +86,28 @@ Exceptions) ✅, `reward/confidence.py` (Wilson-LB/Expectancy-R/SQN/N_min-Gate) 
 swappbares `LessonExtractor`-Protocol) ✅, `reward/pnl_resolver.py` (heuristischer History-Match,
 no-match → `PnLUnavailable` fail-closed) ✅, `reward/recorder.py` (`RewardSink`: open→close→reward→
 Lesson orchestriert, fail-closed/idempotent) ✅ — **118 P7-Tests grün**.
-Reward-Mathe + Daten-Trennung + Lesson-AI + P&L-Auflösung + Orchestrierung stehen; **Seam (Step 10) +
-Loop-Closure (11) + Migration 002 (12) + Wiring/Operator-Scripts (13)** folgen (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
+Reward-Mathe + Daten-Trennung + Lesson-AI + P&L-Auflösung + Orchestrierung stehen; **Seam (Step 10) ✅**
+verdrahtet — `Executor` bekam einen keyword-only `reward_sink=None` (default ⇒ P5 bit-identisch + AI-frei),
+`on_trade_opened`/`on_trade_closed` um `monitor_position`, beide guarded (J), `build_opened`/`build_closed`
+mit lazy `reward.models`-Import (**P5 135 → 142**, P7 118/P4 88/P6 70 unberührt). **Loop-Closure (11) +
+Migration 002 (12) + Wiring/Operator-Scripts (13)** folgen (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
 bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
 2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
 live-verifiziert (Order-/Monitor-Pfad).
 
-**Phase 7 status:** 🚧 Build läuft (Steps 3–9 ✅ — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI + pnl_resolver + Recorder-Orchestrierung) (2026-06-19)
+**Phase 7 status:** 🚧 Build läuft (Steps 3–10 ✅ — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI + pnl_resolver + Recorder-Orchestrierung + **Executor-Seam verdrahtet**) (2026-06-22)
+- **Step 10 ✅ (2026-06-22):** Executor-Naht (Decision A) verdrahtet — **erste P5-Berührung**.
+  `execution/protocols.py` bekam ein duck-typed `RewardSink`-Protocol; `execution/executor.py` einen
+  additiven **keyword-only** `reward_sink: Any | None = None` (default `None` ⇒ **P5 bit-identisch +
+  AI-frei**, spiegelt `debate_runner`). `on_trade_opened` nach `place_result.status == "OPEN"` (vor
+  `monitor_position`), `on_trade_closed` nach dem Monitor-Return (nur `CLOSED_BY_BROKER`/`TIME_STOP`) —
+  **beide guarded** (`logger.critical`, kein Re-raise, Decision J). `build_opened`/`build_closed`
+  übersetzen Executor-Locals in die P7-Contracts; `intended_open_level` aus `price_env` rekonstruiert
+  (Contract 1.2: `place_order` droppt den Fill-`level`); **lazy** `reward.models`-Import → P5-Modul-Imports
+  bleiben `execution.* + stdlib`. **3 Reconciliations:** lazy Import; `point_value=1.0`/`account="demo"`
+  v1-Konstanten (durabler Tag = Wiring/Step 13); Seam-Tests in `phase5_execution/tests/test_executor.py`
+  (wo Executor+Fakes leben), **nicht** `phase7_reward/tests/test_executor_seam.py`. **+7 Seam-Tests →
+  P5 135 → 142; P7 118 · P4 88 · P6 70 unberührt.**
 - **Scope-Lock (schlankes Modell, Konzept Rev. 2026-06-16-b):** Phase 7 = **Reward-Score**
   (`reward_pts`, prozess-bewusst ab Tag 1) + **Freitext-Lessons** (`trade_lessons`) +
   **observe-only outcome-anchored Confidence**. **Keine VETO-Berührung.** Die volle

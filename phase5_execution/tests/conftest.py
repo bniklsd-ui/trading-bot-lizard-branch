@@ -148,20 +148,28 @@ class FakeState:
 
 
 class FakeDB:
-    """Configurable stand-in for ``Database`` (Gate 4 surface only).
+    """Configurable stand-in for ``Database`` (read-only ``DbProtocol`` surface).
 
     Exposes ``get_risk_level()`` returning a settable ``"AGGRESSIV"`` /
-    ``"KONSERVATIV"`` value (Decision F). ``Database`` is read-only in Phase 5,
-    so this fake has no write surface.
+    ``"KONSERVATIV"`` value (Decision F) and ``get_current_score()`` returning a
+    settable score (read by the Phase-7 open seam for ``score_at_open``; default
+    50.0 = the P2 neutral score). ``Database`` is read-only in Phase 5, so this fake
+    has no write surface.
     """
 
-    def __init__(self, *, risk_level: str = "KONSERVATIV") -> None:
+    def __init__(self, *, risk_level: str = "KONSERVATIV", score: float = 50.0) -> None:
         self.risk_level = risk_level
+        self.score = score
         self.risk_level_calls = 0
+        self.score_calls = 0
 
     def get_risk_level(self) -> str:
         self.risk_level_calls += 1
         return self.risk_level
+
+    def get_current_score(self) -> float:
+        self.score_calls += 1
+        return self.score
 
 
 # --- Step 5 (vetos) -------------------------------------------------------

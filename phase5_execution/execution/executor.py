@@ -77,6 +77,7 @@ class Executor:
         confirm_fn: Callable[[OrderPlan], bool],
         *,
         debate_runner: Callable[[dict[str, Any]], Any] | None = None,
+        reward_sink: Any | None = None,
         now_fn: Callable[[], datetime] = datetime.now,
         sleep_fn: Callable[[float], None] = time.sleep,
     ) -> None:
@@ -101,6 +102,15 @@ class Executor:
                 phase isolation): ``ABSTAIN`` → ``NO_TRADE``; ``TRADE`` → the candidate's
                 direction is enriched in-memory (possibly reversed). The runner never
                 receives the broker or any gate/VETO — it cannot bypass one (Decision J).
+            reward_sink: optional Phase-7 outcome/reward hook (Decision A), injected with
+                the same DI pattern. ``None`` (the default) → the seam is skipped and
+                Phase 5 stays **bit-identical and AI-free**. When present it is called
+                ``on_trade_opened`` after a position opens (before monitoring) and
+                ``on_trade_closed`` after the monitor returns a real close — both with a
+                duck-typed snapshot (no Phase-7 import here; phase isolation). It is a
+                **passive** consumer of snapshots: it never receives the broker write
+                path, a Gate, or a VETO, so it cannot bypass one. Both calls are guarded
+                — a raising sink is logged ``critical`` and never crashes the cycle (J).
             now_fn / sleep_fn: injected clock / sleep for deterministic tests.
         """
         self.broker = broker
@@ -111,6 +121,7 @@ class Executor:
         self.research_runner = research_runner
         self.confirm_fn = confirm_fn
         self.debate_runner = debate_runner
+        self.reward_sink = reward_sink
         self.now_fn = now_fn
         self.sleep_fn = sleep_fn
 
@@ -168,6 +179,9 @@ class Executor:
         # outcome is read duck-typed (no Phase-6 import): ABSTAIN → NO_TRADE; TRADE →
         # enrich the candidate's direction in-memory (the Judge may reverse the seed,
         # Decision B). Every downstream gate/VETO then reads the resolved direction.
+        # ``outcome`` is hoisted to run-scope (default None) so the Phase-7 open seam can
+        # read the Judge confidence whether or not a debate ran (verified-contract 1.3).
+        outcome: Any = None
         if self.debate_runner is not None:
             try:
                 outcome = self.debate_runner(candidate)
@@ -227,7 +241,11 @@ class Executor:
                 self.broker, self.exec_state, plan, self.config, sleep_fn=self.sleep_fn
             )
             if place_result.status == "OPEN":
-                return monitor_position(
+                # Phase-7 open seam (Decision A): record the decision context after the
+                # position is confirmed OPEN and **before** monitoring. Guarded — a
+                # raising sink never disturbs the order/monitor path (Decision J).
+                self._notify_opened(candidate, plan, place_result, price_env, outcome, now)
+                result = monitor_position(
                     self.broker,
                     self.exec_state,
                     plan,
@@ -236,9 +254,54 @@ class Executor:
                     now_fn=self.now_fn,
                     sleep_fn=self.sleep_fn,
                 )
+                # Phase-7 close seam: fire on a real close, then return the cycle result.
+                self._notify_closed(result)
+                return result
             return place_result
         except (ExecutionAbort, ReconcileConflict) as exc:
             return self._abort(str(exc), plan=plan)
+
+    # -- Phase-7 reward seam (Decision A/J) ---------------------------------
+
+    def _notify_opened(
+        self,
+        candidate: dict[str, Any],
+        plan: OrderPlan,
+        place_result: ExecutionResult,
+        price_env: Any,
+        outcome: Any,
+        now: datetime,
+    ) -> None:
+        """Fire ``reward_sink.on_trade_opened`` with the open decision context.
+
+        No-op when no sink is injected (Phase 5 bit-identical). Fail-closed: a failure
+        building or delivering the snapshot is logged ``critical`` and never raised — the
+        order/monitor path is unaffected (Decision J).
+        """
+        if self.reward_sink is None:
+            return
+        try:
+            opened = build_opened(
+                candidate, plan, place_result, price_env, outcome,
+                score_at_open=self.db.get_current_score(), now=now,
+            )
+            self.reward_sink.on_trade_opened(opened)
+        except Exception as exc:  # noqa: BLE001 - the sink must never kill the cycle (J)
+            logger.critical("reward_sink.on_trade_opened failed: %s", exc)
+
+    def _notify_closed(self, result: ExecutionResult) -> None:
+        """Fire ``reward_sink.on_trade_closed`` after a real close (broker SL/TP or time-stop).
+
+        No-op when no sink is injected, or when the cycle did not end in a real close
+        (only ``CLOSED_BY_BROKER`` / ``TIME_STOP`` carry a settled outcome — an OPEN /
+        ABORT result is left for the next cycle's reconcile). Fail-closed (Decision J).
+        """
+        if self.reward_sink is None or result.status not in ("CLOSED_BY_BROKER", "TIME_STOP"):
+            return
+        try:
+            self.reward_sink.on_trade_closed(build_closed(result, now=self.now_fn()))
+        except Exception as exc:  # noqa: BLE001 - the sink must never kill the cycle (J)
+            logger.critical("reward_sink.on_trade_closed failed: %s", exc)
 
     # -- internals ----------------------------------------------------------
 
@@ -268,3 +331,87 @@ class Executor:
                 "session health unverifiable, failing closed"
             )
         return account_env
+
+
+# -- Phase-7 snapshot builders (lazy reward import; verified-contracts 1.2/1.3) ----
+#
+# These translate the executor's in-flight locals into the Phase-7 ``OpenedTrade`` /
+# ``ClosedTrade`` data contracts. ``reward.models`` is imported **lazily inside** each
+# helper so the module-level imports stay ``execution.* + stdlib`` and a sink-free run
+# (``reward_sink=None``) never pulls in ``reward`` — mirroring how ``ig_bot.py`` lazily
+# imports ``scripts.wiring``. The contracts are stdlib-only frozen dataclasses (no
+# anthropic/broker/db deps), used here purely as the single-source-of-truth payload shape.
+
+# DAX cash CFD = 1 € / point. ``ExecutionConfig`` has no ``point_value`` field — ``sizing.py``
+# likewise hardcodes 1.0 — so the reconstructed initial risk uses the same constant (v1).
+_POINT_VALUE = 1.0
+
+
+def build_opened(
+    candidate: dict[str, Any],
+    plan: OrderPlan,
+    place_result: ExecutionResult,
+    price_env: Any,
+    outcome: Any,
+    *,
+    score_at_open: float,
+    now: datetime,
+) -> Any:
+    """Build the ``OpenedTrade`` decision-context snapshot captured the moment a trade opens.
+
+    ``place_order`` drops the real fill ``level`` (verified-contract 1.2), so the intended
+    entry is reconstructed from the fresh ``price_env`` exactly as ``build_order_plan`` did
+    (BUY → ask / SELL → bid), and ``initial_risk`` is ``|entry - stop| * size * point_value``.
+    ``debate_confidence`` comes from the in-memory ``outcome`` (``None`` when no debate ran,
+    verified-contract 1.3). ``account`` is the bootstrap-phase ``"demo"`` constant — the
+    durable demo/live source is the wiring layer (Step 13), which knows the broker name.
+    """
+    from reward.models import OpenedTrade  # lazy: keep execution.* + stdlib at module scope
+
+    data = price_env.data or {}
+    if plan.direction == "BUY":
+        entry = data.get("ask") if data.get("ask") is not None else data.get("bid")
+    else:  # SELL
+        entry = data.get("bid") if data.get("bid") is not None else data.get("ask")
+    intended_open_level = float(entry)
+    initial_risk = abs(intended_open_level - plan.stop_level) * plan.size * _POINT_VALUE
+
+    return OpenedTrade(
+        deal_reference=plan.deal_reference,
+        deal_id=place_result.deal_id or "",
+        epic=plan.epic,
+        direction=plan.direction,
+        size=plan.size,
+        intended_open_level=intended_open_level,
+        stop_level=plan.stop_level,
+        limit_level=plan.limit_level,
+        currency=plan.currency,
+        initial_risk=initial_risk,
+        research_confidence=candidate.get("llm_confidence"),
+        debate_confidence=getattr(outcome, "confidence", None),
+        gate_path={
+            "gates": "1,2,3,4,5 pass",
+            "debate": getattr(outcome, "decision", None),
+        },
+        spread_at_entry_pct=data.get("spread_pct"),
+        score_at_open=score_at_open,
+        session_date=now.strftime("%Y-%m-%d"),
+        open_ts=now.isoformat(),
+        account="demo",  # bootstrap phase; wiring (Step 13) owns the durable demo/live tag
+    )
+
+
+def build_closed(result: ExecutionResult, *, now: datetime) -> Any:
+    """Build the minimal ``ClosedTrade`` close fact from the monitor's ``ExecutionResult``.
+
+    Carries no P&L / close level on purpose (the monitor returns none, verified-contract
+    1.2) — ``pnl_resolver`` resolves those later from ``get_trade_history``.
+    """
+    from reward.models import ClosedTrade  # lazy: keep execution.* + stdlib at module scope
+
+    return ClosedTrade(
+        deal_reference=result.plan.deal_reference if result.plan is not None else "",
+        deal_id=result.deal_id or "",
+        status=result.status,
+        closed_at=now.isoformat(),
+    )

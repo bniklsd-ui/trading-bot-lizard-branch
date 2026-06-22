@@ -439,6 +439,20 @@ def resolve(closed: ClosedTrade, broker, opened: OpenedTrade, cfg) -> tuple[floa
   mit Sink → beide Callbacks mit korrekten Payloads gefeuert; werfender Sink ⇒ Zyklus liefert trotzdem
   sein normales `ExecutionResult`.
 - **Pflicht-Regression:** `pytest` für **P5 (135) / P4 (88) / P6 (70)** erneut grün.
+- ⟳ **2026-06-22 (Step 10 gebaut — Code = Source of Truth, drei dokumentierte Abweichungen):**
+  (1) **`build_opened`/`build_closed` importieren `reward.models` LAZY** (innerhalb der Helper), damit
+  `executor.py`s Modul-Imports `execution.* + stdlib` bleiben und ein sink-freier Lauf **kein** `reward`
+  zieht (laufzeit-bewiesen). Spiegelt `ig_bot.py`s lazy `scripts.wiring`-Import; die Contracts
+  (`OpenedTrade`/`ClosedTrade`, stdlib-only Dataclasses) sind die Single-Source-of-Truth-Payload-Form
+  statt eines lokalen Re-Modellierens. (2) **`point_value=1.0` + `account="demo"` als v1-Konstanten:**
+  `ExecutionConfig` hat **kein** `point_value` (DAX 1 €/pt; `sizing.py` hardcodet 1.0 ebenso); `account`
+  ist in der Bootstrap-Phase fest `"demo"` (der **durable** Demo/Live-Tag gehört in die Wiring-Schicht,
+  Step 13, die `broker_name` kennt). (3) **Test-Placement:** die Seam-Tests liegen in
+  `phase5_execution/tests/test_executor.py` (wo Executor + Fakes leben, neben dem strukturgleichen
+  Debate-Seam), **nicht** in `phase7_reward/tests/test_executor_seam.py` (§4) — cross-test-package-Fake-
+  Reuse ist nicht baubar. **Regression: P5 135 → 142** (+7 Seam-Tests); P7 118 · P4 88 · P6 70 unberührt.
+  Zusätzlich: `outcome` auf Run-Scope gehoben (Contract 1.3); `_notify_closed` feuert nur bei
+  `CLOSED_BY_BROKER`/`TIME_STOP`; `FakeDB` um `get_current_score` (DbProtocol-vollständig) ergänzt.
 
 ### Step 11 — Loop-Closure (Decision I)
 - `[VERIFY]` (Step 1.5): zieht `research/prompt.py`/`context_builder.py` heute schon

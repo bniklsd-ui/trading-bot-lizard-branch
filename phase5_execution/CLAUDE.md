@@ -100,6 +100,18 @@ Hand-off „Candidate → Gates → Order" so bauen, dass P6 die Richtungs-/Size
 > Decision A erlaubte „minimale P5-Edit" — die Debatte bekommt **nie** Broker/Gate/VETO
 > (Decision J). Detail: `phase6_debate/` (Modul 9) + `docs/concepts/phase6_debate_concept.md`.
 
+> 🔁 **Phase-7-Edit (2026-06-22, Decision A — additiv, Code = Source of Truth):** Phase 7
+> (Reward, Step 10) hat `executor.py` **additiv** um einen **keyword-only** `reward_sink: Any |
+> None = None` erweitert (`protocols.py`: neues duck-typed `RewardSink`-Protocol). Naht **um den
+> place/monitor-Block**: nach `place_result.status == "OPEN"` (vor `monitor_position`)
+> `on_trade_opened`, nach dem Monitor-Return `on_trade_closed` (nur bei `CLOSED_BY_BROKER`/
+> `TIME_STOP`) — **beide guarded** (`try/except` → `logger.critical`, kein Re-raise). Der Sink ist
+> **passiv**: er bekommt nur Snapshots, **nie** Broker-Write/Gate/VETO → kann strukturell keinen
+> VETO umgehen (Decision J). `build_opened`/`build_closed` importieren `reward.models` **lazy** →
+> P5-Modul-Imports bleiben `execution.* + stdlib`. **Default `None` ⇒ P5 bit-identisch + AI-frei**
+> (135 → **142**, +7 Seam-Tests in `test_executor.py`; `FakeDB` um `get_current_score` ergänzt).
+> Detail: `phase7_reward/` + `docs/concepts/phase7_reward_concept.md` §6 Step 10.
+
 ## Datei-/Modul-Übersicht (Soll, Konzept §"Modul-Plan")
 ```
 phase5_execution/
