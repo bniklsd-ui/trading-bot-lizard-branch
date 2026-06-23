@@ -509,6 +509,22 @@ def resolve(closed: ClosedTrade, broker, opened: OpenedTrade, cfg) -> tuple[floa
   **harter Guard**: bricht ab, wenn der Zielpfad == `live_db_path`. Nie auto-live.
 - `smoke_test.py`: ein echter Haiku-`reflect()`-Lauf, DRY. `live_test.py`: voller
   open→close→reward→lesson gegen IG-Demo (kleine Size), hart asserted, `exit 0` (Operator, nicht CI).
+- ⟳ **2026-06-23 (Step 13 gebaut — Code = Source of Truth, vier dokumentierte Reconciliations):**
+  (1) **`wiring.py` spiegelt P6, statt in `ig_bot.py` zu injizieren** (die §13-Alternative): P7 baut ein
+  **eigenes** `build_executor` direkt aus dem installierten `execution`-Paket (löst die
+  `scripts.wiring`-Kollision P4/P5/P6/P7) und injiziert `reward_sink=` — **keine** P5-Datei-Berührung,
+  Phasen-Isolation gewahrt. Drei Entry-Points: `build_reward_sink(broker, db, …)`, `build_brain(…)`
+  (smoke), `build_executor(config, *, confirm_fn, …)`. `token_meter` wird **transitiv** über den reused
+  `LLMClient` reused (kein zweites Mess-System — wie Brain/Step 7). (2) **Reward-Live-Pfad debatte-frei**
+  (einzige AI = die Lesson-Haiku; `debate_confidence=None`) — billiger/deterministischer Live-Gate;
+  Debatte ist orthogonal (später additiv via P6-`debate_runner`). (3) **`live_test.py`:** harte Proofs =
+  `trade_outcomes`(CLOSED) + `reward_pts`; die `trade_lessons`-Zeile ist **best-effort** (Decision E/J) →
+  Info-Zeile, nicht FAIL-gegated. (4) **Keine neuen Unit-Tests** (Scripts + Shim operator-run, nicht
+  collected — konsistent P4/P5/P6; der testbare Synthetik-Kern ist in Steps 4/6 gedeckt, inkl.
+  §7(c)-Beweis). `backfill_synthetic.py` ruft `guard_synthetic_path` als **ersten** Schritt (vor jedem
+  DB-Open) → exit 2 + kein Write, wenn Ziel == `live_db_path` (end-to-end gegen Temp-DB verifiziert).
+  **Regression:** P7 118 · P2 62 · P4 94 · P5 142 · P6 70. **Phase 7 ist code-complete (Steps 0–13);
+  offen ist nur der Operator-Live-Lauf + Doku-Flip auf „live-verifiziert" + Merge.**
 
 ---
 

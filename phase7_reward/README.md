@@ -9,13 +9,14 @@ nothing in v1. Those lessons feed back into the next Phase-4 research call (the
 research prompt already injects `get_recent_lessons`). **Demo only, manual trigger —
 no scheduler (that is Phase 8).**
 
-> 🚧 **Status: pre-steps in progress (Step 1) — 2026-06-18.** This session does the
-> housekeeping/verification + package scaffold only (Step 0 turbo No-Op, Step 0b doc
-> reconciliation, Step 1 verify-against-code, Step 2 scaffold). **No reward logic yet**
-> — Steps 3–13 (models → confidence → scorer → synthetic → brain → recorder →
-> pnl_resolver → executor seam → loop-closure → migration → wiring) are later TDD
-> sessions. See `CLAUDE.md` → `## Verifizierte Contracts` and the latest
-> `## Session stopped` block for the exact current state.
+> ✅ **Status: code-complete (Steps 0–13) — 2026-06-23.** Reward math (confidence +
+> process-aware scorer), synthetic/live separation, lesson AI (`Brain.reflect`),
+> P&L resolution, recorder orchestration, the `reward_sink` executor seam, loop-closure
+> (`mark_lesson_used`), migration 002, and the wiring + operator scripts are all built
+> (**118 P7 unit tests**; regression P2 62 · P4 94 · P5 142 · P6 70 green). **Open:**
+> only the operator live run (`scripts/live_test.py` against IG Demo) + the doc flip to
+> "live-verified" + the merge to `main`. ⚠ **code-complete ≠ live-verified ≠
+> profit-validated.** See `CLAUDE.md` → the latest `## Session stopped` block.
 
 **AI boundary.** AI is used **only** for the lesson-extraction `reflect()` (one
 Haiku call, best-effort, decoupled from the close critical path). Everything else —
@@ -54,11 +55,21 @@ pytest phase7_reward/tests -v       # (tests land with the reward-logic steps)
 This is the same composition root used by Phase 5/6; it now installs Phase 7 after
 Phase 4/5/6 (Phase 7 reuses Phase 4's LLM stack and Phase 2's `Database`).
 
-## Run
+## Run (operator gate — Demo only, manual trigger)
 
-The smoke / live scripts (`scripts/smoke_test.py`, `scripts/live_test.py`) land with
-the later build steps. The live test (operator-run, **Demo only**) will drive a full
-open→close→reward→lesson cycle against IG Demo and assert a `trade_outcomes` +
-`reward_pts` + `trade_lessons` row was written. ⚠ **live-verified ≠ profit-validated.**
+```bash
+python phase2_persistence/scripts/init_db.py            # applies migration 002 (reward columns)
+python phase5_execution/scripts/seed_candidate.py --direction SELL   # in window, with the move; TTL 30 min
+python phase7_reward/scripts/smoke_test.py              # one real Haiku reflect(), DRY (no DB write)
+python phase7_reward/scripts/live_test.py               # full open→close→reward→lesson vs IG Demo
+```
 
-Logs go to **stderr**; **stdout** carries only machine-readable JSON.
+`live_test.py` drives a full cycle against IG Demo and, when an order placed+closed,
+hard-asserts a CLOSED `trade_outcomes` row + a `reward_pts` row for the deal (the
+`trade_lessons` row is best-effort — the only AI — and reported, not gated). A clean
+`NO_TRADE`/abstain is a valid exit-0. ⚠ **code-complete ≠ live-verified ≠
+profit-validated.**
+
+`scripts/backfill_synthetic.py` populates a **separate** synthetic DB for the
+confidence math — it calls `guard_synthetic_path` first and refuses (exit 2) to write
+to the live DB. Logs go to **stderr**; **stdout** carries only machine-readable JSON.

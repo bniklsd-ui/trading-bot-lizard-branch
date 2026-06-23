@@ -84,9 +84,9 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `reward/brain.py` | `Brain.reflect()` + `LessonExtractor`-Protocol: Lesson-Extraktion, EIN Haiku-Call, best-effort, swappbar (E) [→ Opus] | ✅ Step 7 |
 | `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened` (insert+in-memory-Stash) / `on_trade_closed` (resolve→close→score→reward→best-effort-Lesson), fail-closed pro Schritt, idempotent via Status (A/J) | ✅ Step 8 |
 | `reward/pnl_resolver.py` | `resolve()` → (close_level, profit_loss, r_multiple) via **heuristischem** `get_trade_history`-Match (size+Level+Recency, **kein** deal_id); no-match → `PnLUnavailable` (fail-closed, kein Level-Approx) | ✅ Step 9 |
-| `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` | ⏳ Step 13 (Wiring — bewusst nicht in Step 7, spiegelt P6) |
+| `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` (verbatim P4/P6-Spiegel, `parents[2]`-Bootstrap) | ✅ Step 13 |
 | `002_phase7_reward.sql` — **liegt in `phase2_persistence/migrations/`** (Code=SoT, s. Step-12-Block), **nicht** `phase7_reward/migrations/` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator 2026-06-18, s. 1.7) + Whitelist-Erweiterung `persistence/db.py` (`_TRADE_COLUMNS`/`_REWARD_COLUMNS`) | ✅ Step 12 |
-| `scripts/wiring.py` · `backfill_synthetic.py` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⏳ Step 13 |
+| `scripts/wiring.py` (`build_reward_sink`/`build_brain`/`build_executor`, spiegelt P6 — Executor direkt aus `execution`, `reward_sink` injiziert, **keine** P5-Edit) · `backfill_synthetic.py` (guard-first, nie live) · `smoke_test.py` (1× echter Haiku-`reflect`, DRY) · `live_test.py` (voller open→close→reward→lesson) | Composition + Operator-Tools | ✅ Step 13 |
 | `execution/protocols.py`-Edit + `executor.py`-Edit (P5) + Regression | `RewardSink`-Protocol + Naht (Decision A) — keyword-only `reward_sink=None` ⇒ P5 bit-identisch; `on_trade_opened`/`on_trade_closed` um `monitor_position`, beide guarded (J); `build_opened`/`build_closed` mit **lazy** `reward.models`-Import | ✅ Step 10 |
 | `tests/{__init__,test_models,test_packaging}.py` | Step-3-Tests (21: Contracts/frozen/§5-Defaults/Exceptions + Editable-Install-Smoke) | ✅ Step 3 |
 | `tests/test_confidence.py` | Wilson/Expectancy/SQN/N_min-Gate + Anti-Pattern-Beweis + Monotonie (30 Fälle, Ziel ≥14) ★ | ✅ Step 4 |
@@ -225,6 +225,88 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-23 (Step 13 — Wiring + Credentials-Shim + Operator-Scripts) → **Phase 7 code-complete**
+
+### Completed (alles additiv in `phase7_reward/`, **keine** Cross-Phase-Code-Edit)
+- **`reward/credentials.py`** — Keyring-Shim, **verbatim** gespiegelt von `debate/credentials.py`/
+  `research/credentials.py` (`parents[2]`-Bootstrap auf `phase1_broker_wrapper`, re-exportiert
+  `get_credential("anthropic_api_key")`, `__all__`). Die eine dokumentierte Phasen-Ausnahme
+  (Decision F / Hard Rule 1). **Nicht** von Unit-Tests importiert.
+- **`scripts/wiring.py`** — die Composition (spiegelt P6-Wiring): `build_reward_sink(broker, db, *,
+  reward_config=None)` (Scorer(cfg) + reused `research.LLMClient` Haiku aus `cfg.lesson_*` +
+  Brain(llm,cfg) → `RewardSink(db=…, broker=…, scorer=…, brain=…, cfg=…)`), `build_brain(*,
+  reward_config=None)` (Standalone für smoke), `build_executor(config, *, confirm_fn,
+  broker_name="ig_demo", reward_config=None)` baut den P5-`Executor` **direkt aus dem installierten
+  `execution`-Paket** (löst die `scripts.wiring`-Namenskollision P4/P5/P6/P7), teilt **einen** Broker,
+  `research_runner=_no_research` (seeded-candidate Live-Pfad), **`reward_sink=` injiziert**, tz-aware
+  `now_fn`. **Keine P5-`ig_bot.py`-Edit** (Phasen-Isolation; P6-Präzedenz). Reward-Live-Pfad ist
+  **debatte-frei** (einzige AI = die Lesson-Haiku; `debate_confidence=None`, vom Scorer behandelt).
+- **`scripts/smoke_test.py`** — ein **echter** Haiku-`reflect()` über einen handgebauten `ClosedTrade`
+  + `RewardResult` + `market_context`, **DRY** (kein DB-Write, kein Executor). Lesson + `last_usage`
+  → stderr, `LessonResult`-JSON → stdout; exit 0 bei `ok`, sonst 1.
+- **`scripts/live_test.py`** — voller open→close→reward→lesson gegen IG-Demo (spiegelt P6-`live_test`):
+  `build_executor(reward_sink injiziert)`, short-hold (`max_hold=1`/`poll=10s`), reuse
+  `execution.ig_bot.make_confirm_fn`/`result_to_dict`. Bei platziertem+geschlossenem Order **harte**
+  Checks gegen `data/trading_bot.sqlite`: `trade_outcomes`-Zeile CLOSED + `reward_pts`-Zeile; die
+  `trade_lessons`-Zeile ist **best-effort** (einzige AI, Decision E/J) → nur Info-Zeile, **nicht**
+  hart gegated. `NO_TRADE`/Abstain = valider exit 0 (Reward-Proofs übersprungen). Reuse P5
+  `seed_candidate.py` (kein neues Seed-Tool).
+- **`scripts/backfill_synthetic.py`** [→ Opus] — Operator-Tool. **`guard_synthetic_path(db_path, cfg)`
+  ist der ERSTE ausführbare Schritt** (vor jedem DB-Open) → `SyntheticSafetyError` + exit 2, wenn das
+  Ziel == `live_db_path`. Sonst: `SyntheticTradeGenerator` → `Database(target)` + `run_migrations()` →
+  je Trade eine CLOSED `trade_outcomes`-Zeile (`account='synthetic'`, `initial_risk=1.0`) + eine via
+  `Scorer.score(...)` bepunktete `reward_pts`-Zeile; danach `compute_confidence`-Summary (observe-only).
+  stdout=Summary-JSON, stderr=Fortschritt + Guard-Bestätigung.
+
+### Reconciliation (Code = Source of Truth — Konzept §6 Step 13 dateiert)
+- **Wiring spiegelt P6, nicht „inject in ig_bot.py":** Konzept §13 erlaubte „… (oder an `ig_bot.py`-
+  Composition)". Gewählt: P7 baut ein **eigenes** `build_executor` (wie P6), **keine** P5-Datei-Berührung
+  → Phasen-Isolation gewahrt, P5 bit-identisch.
+- **Reward-Live-Pfad debatte-frei** (bewusst): das Konzept verlangt „voller open→close→reward→lesson",
+  **nicht** Debatte. Debatte ist orthogonal (später additiv via P6-`debate_runner` injizierbar) → der
+  Live-Gate bleibt billig/deterministisch (eine AI-Zeile statt vier).
+- **`trade_lessons` im live_test = Info, nicht hart-gegated:** die Lesson ist best-effort (Decision E/J;
+  ein flaky Haiku-Call darf den Close nie brechen) → `trade_outcomes`(CLOSED) + `reward_pts` sind die
+  harten Proofs, die Lesson wird gemeldet. Konzept-§7-Done-Kriterium „erzeugt eine Lesson-Zeile" gilt
+  in der Praxis (gesunder Lauf schreibt sie), ist aber nicht als FAIL gegatet.
+- **Keine neuen Unit-Tests** (Scripts + Shim sind operator-run, nicht von `pytest` collected — konsistent
+  P4/P5/P6); der testbare Kern der Synthetik-Trennung (`guard_synthetic_path`/`select_edge_set`/
+  `compute_confidence`) ist bereits in Steps 4/6 gedeckt (inkl. §7(c)-Beweis „Synthetik trifft Live nie").
+
+### Verifiziert (gemockt/lokal — kein Netz; Live-Lauf = Operator)
+- `py_compile` aller 5 Dateien OK. `import reward.credentials` **offline** (re-exportiert `get_credential`),
+  `import scripts.wiring` **offline** (alle 3 Entry-Points, **kein** Netz/Keyring — alle Cross-Phase-Imports
+  lazy in den Funktionskörpern). `--help` aller 3 CLIs exit 0.
+- **`backfill_synthetic.py` end-to-end gegen Temp-DB gelaufen** (lokaler SQLite-Write, **kein Netz**):
+  `--n 12 --win-rate 0.6 --seed 7` → 12 `trade_outcomes` + 12 `reward_pts`, **Migration-002-Spalten
+  befüllt** (`account='synthetic'`, `initial_risk=1.0`, `r_multiple=1.5`), `confidence=OK`, exit 0.
+  **Guard-Refusal** (`--db-path data/trading_bot.sqlite`) → `REFUSED` + exit 2, **kein** Write.
+- **Regression grün + unberührt:** **P7 118 · P2 62 · P4 94 · P5 142 · P6 70** (Step 13 ist rein additiv
+  im P7-Paket, **keine** Cross-Phase-Code-Edit).
+
+### Next — Operator (User führt aus; Claude macht Code + gemockte/lokale Tests)
+1. `bash scripts/dev_install.sh` (installiert P1–P7 editable).
+2. `python phase2_persistence/scripts/init_db.py` (wendet Migration 002 an — die Reward-Spalten).
+3. **Im Handelsfenster** (09:00–17:30 Europe/Berlin), **mit** dem aktuellen `get_ohlcv`-net-return:
+   `python phase5_execution/scripts/seed_candidate.py --direction SELL` (TTL 30 min!).
+4. `python phase7_reward/scripts/smoke_test.py` (DRY — ein echter Haiku-`reflect`, sichtbare Lesson + Kosten).
+5. `python phase7_reward/scripts/live_test.py` → erwartet open→Time-Stop-close → `trade_outcomes`+`reward_pts`
+   (+ best-effort `trade_lessons`), `exit 0`. **Dann** Doku auf ✅ live-verifiziert flippen + Merge `phase7-reward`
+   → `main` (beides Operator-Entscheidung). ⚠ **code-complete ≠ live-verifiziert ≠ profit-validiert.**
+- Optional: `python phase7_reward/scripts/backfill_synthetic.py --n 40 --win-rate 0.55 --seed 7` (NUR
+  synthetischer Pfad — Guard schützt die Live-DB).
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. **Phase 7 ist code-complete** (Steps 0–13); offen ist **nur** der Operator-
+  Live-Lauf + der Doku-Flip auf „live-verifiziert" + der Merge nach `main`.
+- **AI-Grenze gewahrt:** die einzige AI im ganzen Paket bleibt `Brain.reflect` (ein Haiku-Call, best-effort).
+  Wiring/Scripts sind reine Komposition. Wer hier scoren/gaten/vetoen per LLM will → **stop**.
+- **`reward.credentials`/`scripts.wiring` lesen den Keyring erst beim Aufruf von `build_*`** (nicht beim
+  Import) → `pytest`/`--help` bleiben offline. Der Anthropic-Key wird beim `build_reward_sink`/`build_brain`
+  gelesen; der SDK-Call feuert erst in `reflect`.
 
 ---
 

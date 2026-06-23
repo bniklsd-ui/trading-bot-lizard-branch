@@ -19,7 +19,7 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 4     | research.py + LLM (`turbo_*` = legacy) | ✅ Abgeschlossen — live-**getestet** (Logik), noch nicht profit-validiert ¹ |
 | 5     | ig_bot.py Gates 1–5 + 4 VETOs + place/monitor/close | ✅ Abgeschlossen — live-**verifiziert** (Order-/Monitor-Pfad, Demo), noch nicht profit-validiert ² |
 | 6     | Bull/Bear/Judge Debate              | ✅ Abgeschlossen — live-**verifiziert** (Debatte-Pfad, Demo), noch nicht profit-validiert ³ |
-| 7     | Reward/Punishment + Brain           | Nicht begonnen                                      |
+| 7     | Reward/Punishment + Brain           | 🚧 code-complete (Steps 0–13) — 118 Unit-Tests; offen: Operator-Live-Lauf (`live_test.py`, Demo) + Merge ⁴ |
 | 8     | Scheduler                           | Nicht begonnen                                      |
 | 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert)       |
 
@@ -46,6 +46,15 @@ ein ABSTAIN-Zyklus, keine echte Order durch die Debatte (der Order-/Monitor-Pfad
 ist in Phase 5 bereits live bewiesen); Edge/Outcome-Anchoring ist Phase 7 + Live-Betrieb.
 AI **nur** für Bull/Bear-Argumente + Judge-Synthese; `confidence` gatet nichts. Demo only,
 manueller Trigger (Scheduler = Phase 8).
+
+⁴ **code-complete ≠ live-verifiziert ≠ profit-validiert.** Phase 7 (Reward/Brain) ist
+**code-complete** (Steps 0–13, 2026-06-23): prozess-bewusster Reward-Score + Freitext-Lessons
++ observe-only Confidence + `reward_sink`-Executor-Naht + Migration 002 + Wiring/Operator-Scripts;
+**118 P7-Unit-Tests** grün (Regression P2 62 · P4 94 · P5 142 · P6 70). AI **nur** für die
+Lesson-Extraktion (`reflect()`, ein Haiku-Call, best-effort); Confidence ist **observe-only und
+gatet nichts** (keine VETO-Berührung — Instinct→VETO ist Phase 9f). **Offen:** der Operator-Lauf
+`phase7_reward/scripts/live_test.py` gegen IG Demo (voller open→close→reward→lesson) + der Merge
+nach `main`. Demo only, manueller Trigger.
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)

@@ -174,23 +174,25 @@ early-stop mean a single-round ABSTAIN reads no prefix; gated on `rounds_used >=
 **Goal:** The bot starts learning. Score updates, lessons extracted, fed back
 into the next research call.
 
-- [ ] `RewardSink` write-seam (`on_trade_opened` / `on_trade_closed`), default
+- [x] `RewardSink` write-seam (`on_trade_opened` / `on_trade_closed`), default
       `None` → Phase 5 bit-identical (Decision A)
-- [ ] Process-aware reward scoring (`reward_pts`: outcome + process delta,
+- [x] Process-aware reward scoring (`reward_pts`: outcome + process delta,
       clamped to [0,100], per-trade `|delta|` capped) → `score_after` (Decision B/D)
-- [ ] Score → risk_level mapping unchanged (binary `get_risk_level`, threshold 50)
-- [ ] Outcome-anchored Confidence `f(Wilson-LB(win_rate), expectancy_R, N)`,
+- [x] Score → risk_level mapping unchanged (binary `get_risk_level`, threshold 50)
+- [x] Outcome-anchored Confidence `f(Wilson-LB(win_rate), expectancy_R, N)`,
       N_min=10 → INSUFFICIENT; **observe-only — gates nothing** (Decision C)
-- [ ] `reflect()` after every close — Haiku lesson extraction → `trade_lessons`,
+- [x] `reflect()` after every close — Haiku lesson extraction → `trade_lessons`,
       best-effort, decoupled from the close critical path (Decision E)
-- [ ] Lessons fed back: the research prompt already injects `get_recent_lessons`;
+- [x] Lessons fed back: the research prompt already injects `get_recent_lessons`;
       close the loop by writing lessons + `mark_lesson_used` (Decision I)
 
 **Done when:** After 5 demo trades, score updates correctly, lessons are
-stored, and the next research call uses them. ⚠ live-verified ≠ profit-validated
-(edge is later live running, not this phase).
+stored, and the next research call uses them. ✅ **code-complete (Steps 0–13,
+2026-06-23)** — 118 P7 unit tests + migration 002 + wiring/operator scripts;
+**open:** the operator `live_test.py` run vs IG Demo + the merge to `main`.
+⚠ code-complete ≠ live-verified ≠ profit-validated (edge is later live running).
 
-**Directory:** `phase7_reward/` *(package `reward`, to be created)*
+**Directory:** `phase7_reward/` *(package `reward`)*
 **Concept:** [`docs/concepts/phase7_reward_concept.md`](./docs/concepts/phase7_reward_concept.md)
 
 ---

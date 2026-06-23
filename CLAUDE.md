@@ -77,8 +77,8 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): 🚧 **Build läuft
-(Steps 3–12 ✅)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
+**Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): ✅ **code-complete
+(Steps 0–13)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
 Exceptions) ✅, `reward/confidence.py` (Wilson-LB/Expectancy-R/SQN/N_min-Gate) ✅,
 `reward/scorer.py` (prozess-bewusstes Reward-Delta + Clamping) ✅, `reward/synthetic.py`
 (Generator + Pfad-Guard + Edge-Selector, harte Synthetik/Echt-Trennung) ✅, `reward/brain.py`
@@ -94,12 +94,30 @@ mit lazy `reward.models`-Import (**P5 135 → 142**, P7 118/P4 88/P6 70 unberüh
 DB-Write aus Research, **P4 88 → 94**). **Migration 002 (Step 12) ✅** — `phase2_persistence/migrations/
 002_phase7_reward.sql` (`initial_risk`/`account`/`r_multiple`) + P2-Whitelist-Erweiterung (`db.py`); die
 vom Recorder/Seam bereits geschriebenen Felder landen jetzt gegen die echte DB (**P2 59 → 62**, frische
-DB = Schema-Version 2). Nur noch **Wiring/Operator-Scripts (Step 13)** offen (strikt TDD). Phase 6 (Bull/Bear/Judge-Debatte)
+DB = Schema-Version 2). **Wiring/Operator-Scripts (Step 13) ✅** — `reward/credentials.py`-Shim +
+`scripts/wiring.py` (`build_reward_sink`/`build_brain`/`build_executor`, spiegelt P6 — Executor direkt
+aus `execution`, `reward_sink` injiziert, **keine** P5-Edit) + `smoke_test.py`/`live_test.py`/
+`backfill_synthetic.py` (guard-first). **Phase 7 ist damit code-complete (Steps 0–13)**; offen ist
+**nur** der Operator-Live-Lauf (`live_test.py` gegen IG Demo) + Doku-Flip auf „live-verifiziert" + Merge
+nach `main`. ⚠ **code-complete ≠ live-verifiziert ≠ profit-validiert.** Phase 6 (Bull/Bear/Judge-Debatte)
 bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
 2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
 live-verifiziert (Order-/Monitor-Pfad).
 
-**Phase 7 status:** 🚧 Build läuft (Steps 3–12 ✅ — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI + pnl_resolver + Recorder-Orchestrierung + **Executor-Seam + Loop-Closure + Migration 002 verdrahtet**) (2026-06-22)
+**Phase 7 status:** ✅ code-complete (Steps 0–13) — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI + pnl_resolver + Recorder-Orchestrierung + Executor-Seam + Loop-Closure + Migration 002 + **Wiring/Operator-Scripts**; offen ist **nur** der Operator-Live-Lauf + Doku-Flip + Merge (⚠ **code-complete ≠ live-verifiziert ≠ profit-validiert**) (2026-06-23)
+- **Step 13 ✅ (2026-06-23):** Wiring + Credentials-Shim + Operator-Scripts — **schließt den Phase-7-Build**.
+  `reward/credentials.py` (verbatim P4/P6-Shim → `get_credential("anthropic_api_key")`), `scripts/wiring.py`
+  (`build_reward_sink`/`build_brain`/`build_executor`, **spiegelt P6**: Executor direkt aus dem installierten
+  `execution`-Paket, **einen** Broker geteilt, `reward_sink=` injiziert, `research_runner=_no_research` —
+  **keine** P5-`ig_bot.py`-Edit, Phasen-Isolation), `scripts/smoke_test.py` (1× echter Haiku-`reflect`, DRY),
+  `scripts/live_test.py` (voller open→close→reward→lesson gegen IG-Demo; harte Proofs `trade_outcomes`(CLOSED)+
+  `reward_pts`, Lesson best-effort/Info), `scripts/backfill_synthetic.py` [→ Opus] (**guard-first** — `guard_
+  synthetic_path` vor jedem DB-Open → exit 2 wenn Ziel == live, nie auto-live). Reward-Live-Pfad **debatte-frei**
+  (einzige AI = die Lesson-Haiku). **Keine neuen Unit-Tests** (Scripts+Shim operator-run, nicht collected —
+  konsistent P4/P5/P6; Synthetik-Kern in Steps 4/6 gedeckt). Verifiziert: alle 5 `py_compile`, offline-Imports
+  (`reward.credentials`/`scripts.wiring`), `--help` exit 0, **`backfill_synthetic` end-to-end gegen Temp-DB**
+  (12+12 Zeilen, Migration-002-Spalten befüllt, exit 0) + **Guard-Refusal exit 2**. Regression unberührt:
+  **P7 118 · P2 62 · P4 94 · P5 142 · P6 70**.
 - **Step 12 ✅ (2026-06-22):** Migration `002` + minimale P2-Berührung (Decision G) — **zweite, vom
   Konzept sanktionierte P2-Berührung** (nach Step 11s P4-Touch). `phase2_persistence/migrations/
   002_phase7_reward.sql` (additiv, version 2): `ADD COLUMN trade_outcomes.initial_risk REAL` +
