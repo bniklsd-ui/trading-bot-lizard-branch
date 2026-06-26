@@ -122,9 +122,17 @@ class FakeBroker:
     """
 
     def __init__(
-        self, transactions: list[dict[str, Any]] | None = None, *, ok: bool = True
+        self,
+        transactions: list[dict[str, Any]] | None = None,
+        *,
+        ok: bool = True,
+        responses: list[list[dict[str, Any]]] | None = None,
     ) -> None:
         self._transactions = list(transactions or [])
+        # ``responses`` scripts a *different* row set per successive call (the last is
+        # repeated) — used to simulate IG history lag clearing between the in-cycle close
+        # and a later reconcile (e.g. ``[[], [make_tx()]]`` = empty, then a match).
+        self._responses = [list(r) for r in responses] if responses is not None else None
         self._ok = ok
         self.history_calls = 0
         self.last_days: int | None = None
@@ -134,7 +142,12 @@ class FakeBroker:
         self.last_days = days
         if not self._ok:
             return FakeEnvelope(ok=False, data=None)
-        return FakeEnvelope(ok=True, data={"transactions": list(self._transactions)})
+        if self._responses is not None:
+            idx = min(self.history_calls - 1, len(self._responses) - 1)
+            txs = list(self._responses[idx])
+        else:
+            txs = list(self._transactions)
+        return FakeEnvelope(ok=True, data={"transactions": txs})
 
 
 def make_tx(**overrides: Any) -> dict[str, Any]:
@@ -219,6 +232,10 @@ class FakeDB:
         self._maybe_fail("get_trade_by_deal_id")
         row = self._trades.get(deal_id)
         return dict(row) if row is not None else None
+
+    def get_open_trades(self) -> list[dict[str, Any]]:
+        self._maybe_fail("get_open_trades")
+        return [dict(r) for r in self._trades.values() if r.get("status") == "OPEN"]
 
     def get_current_score(self) -> float:
         self._maybe_fail("get_current_score")

@@ -82,11 +82,11 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `reward/scorer.py` | Prozess-bewusstes Reward-Delta + Clamping (B2/D) ★ | ✅ Step 5 |
 | `reward/synthetic.py` | `SyntheticTradeGenerator` + Pfad-Guard + Edge-Selector (harte Synthetik/Echt-Trennung, H) [→ Opus] | ✅ Step 6 |
 | `reward/brain.py` | `Brain.reflect()` + `LessonExtractor`-Protocol: Lesson-Extraktion, EIN Haiku-Call, best-effort, swappbar (E) [→ Opus] | ✅ Step 7 |
-| `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened` (insert+in-memory-Stash) / `on_trade_closed` (resolve→close→score→reward→best-effort-Lesson), fail-closed pro Schritt, idempotent via Status (A/J) | ✅ Step 8 |
-| `reward/pnl_resolver.py` | `resolve()` → (close_level, profit_loss, r_multiple) via **heuristischem** `get_trade_history`-Match (size+Level+Recency, **kein** deal_id); no-match → `PnLUnavailable` (fail-closed, kein Level-Approx) | ✅ Step 9 |
+| `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened` (insert+in-memory-Stash) / `on_trade_closed` (resolve→close→score→reward→best-effort-Lesson), fail-closed pro Schritt, idempotent via Status (A/J) **+ `reconcile_open_trades` (Live-Debug 2026-06-23): idempotenter Retry für noch-OPEN-Trades bei IG-History-Lag** | ✅ Step 8 (·13b) |
+| `reward/pnl_resolver.py` | `resolve()` → (close_level, profit_loss, r_multiple). **Bevorzugt lag-frei den Close-Confirm** (`closed.profit_loss` → direkt; `closed.close_level`+Richtung → aus Levels; Step 13c); **sonst** heuristischer `get_trade_history`-Match (**Size-Betrag**+Level+Recency, **kein** deal_id; Size magnituden-basiert weil IG SELL negativ signt). no-match → `PnLUnavailable` | ✅ Step 9 (·13b·13c) |
 | `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` (verbatim P4/P6-Spiegel, `parents[2]`-Bootstrap) | ✅ Step 13 |
 | `002_phase7_reward.sql` — **liegt in `phase2_persistence/migrations/`** (Code=SoT, s. Step-12-Block), **nicht** `phase7_reward/migrations/` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator 2026-06-18, s. 1.7) + Whitelist-Erweiterung `persistence/db.py` (`_TRADE_COLUMNS`/`_REWARD_COLUMNS`) | ✅ Step 12 |
-| `scripts/wiring.py` (`build_reward_sink`/`build_brain`/`build_executor`, spiegelt P6 — Executor direkt aus `execution`, `reward_sink` injiziert, **keine** P5-Edit) · `backfill_synthetic.py` (guard-first, nie live) · `smoke_test.py` (1× echter Haiku-`reflect`, DRY) · `live_test.py` (voller open→close→reward→lesson) | Composition + Operator-Tools | ✅ Step 13 |
+| `scripts/wiring.py` (`build_reward_sink`/`build_brain`/`build_executor`, spiegelt P6 — Executor direkt aus `execution`, `reward_sink` injiziert, **keine** P5-Edit) · `backfill_synthetic.py` (guard-first, nie live) · `smoke_test.py` (1× echter Haiku-`reflect`, DRY) · `live_test.py` (voller open→close→reward→lesson **+ reconcile-Retry bei IG-Lag**) · `inspect_history.py` (**read-only** History-Dump, Live-Debug 2026-06-23) | Composition + Operator-Tools | ✅ Step 13 (·13b) |
 | `execution/protocols.py`-Edit + `executor.py`-Edit (P5) + Regression | `RewardSink`-Protocol + Naht (Decision A) — keyword-only `reward_sink=None` ⇒ P5 bit-identisch; `on_trade_opened`/`on_trade_closed` um `monitor_position`, beide guarded (J); `build_opened`/`build_closed` mit **lazy** `reward.models`-Import | ✅ Step 10 |
 | `tests/{__init__,test_models,test_packaging}.py` | Step-3-Tests (21: Contracts/frozen/§5-Defaults/Exceptions + Editable-Install-Smoke) | ✅ Step 3 |
 | `tests/test_confidence.py` | Wilson/Expectancy/SQN/N_min-Gate + Anti-Pattern-Beweis + Monotonie (30 Fälle, Ziel ≥14) ★ | ✅ Step 4 |
@@ -137,17 +137,34 @@ Netz/echtes LLM, atomic commits.
   ist **unmöglich** — Matching muss heuristisch sein (instrumentName + size + Datum/Level-Nähe). Der
   **Level-basierte Fallback** im `pnl_resolver` (Step 9) ist damit der **primäre** Sicherungspfad,
   **nicht** optional. Bestätigt den P1-README-Caveat „best-effort, cross-check against a known deal".
+- ⚠ **`size` ist VORZEICHENBEHAFTET (Live-Debug 2026-06-23).** IG liefert in `/history/transactions`
+  ein `size` mit Vorzeichen (`-19.8` für SELL); `_parse_transaction` reicht es als **negativen Float**
+  durch (`ig_adapter.py:863`, **kein** Sign-Handling). `OpenedTrade.size` ist immer unsigned → der
+  `pnl_resolver`-Size-Filter vergleicht **Beträge** (`abs(abs(tx_size) − abs(size))`); ein exakter
+  Vergleich verwarf **jeden SELL für immer** (erster Reward-Live-Lauf, deal `DIAAAAXTGBTEYAC`,
+  size 19.8 → „no usable history row"). Fix sitzt **defensiv im P7-Resolver** (Phasen-Isolation); der
+  „korrektere" Ort (Sign-Normalisierung im P1-Adapter) ist **bewusst zurückgestellt** — eine
+  Cross-Phase-Berührung der live-verifizierten, gemergten P1 ist nicht nötig. **Operator-Flag:** wenn
+  P1 je angefasst wird, dort `size` normalisieren und diese Resolver-Defensive prüfen.
 
 **(1.2) `OrderPlan` / `OrderResult` / `place_order` (`execution/models.py`, `execution/order.py`, `ig_adapter.py`):**
 - `OrderPlan(epic, direction, size, stop_level, limit_level, deal_reference, currency)` — absolute
   Level; **kein** Entry-/Open-Level-Feld.
 - `open_position` → `OrderResult` = `{deal_reference, deal_id, status, epic, direction, size, level,
   reason, timestamp}`; `status ∈ {ACCEPTED, REJECTED, PENDING, UNKNOWN}`; `level` = echter Fill.
-- ⚠ `place_order` returnt `ExecutionResult(status, deal_id, plan, detail)` — **`level` geht
+- ⚠ `place_order` returnt `ExecutionResult(status, deal_id, plan, detail)` — **der OPEN-`level` geht
   verloren**. Der echte Fill-Level wird nicht durchgereicht. `trade_outcomes.open_level` ist **NOT
   NULL** → Step 10 muss `open_level`/`intended_open_level` aus dem Executor-`price_env`
   rekonstruieren (oder aus `stop_level ± stop_distance_points` zurückrechnen). `initial_risk =
   abs(intended_open_level − stop_level) · size · point_value`.
+- ✅ **GEÄNDERT (2026-06-23, Step 13c — cross-phase, user-authorized): der CLOSE-Level/-P&L wird
+  jetzt DURCHGEREICHT.** Ursprünglich trug `monitor_position`/`ExecutionResult` **kein**
+  `profit_loss`/`close_level` → P7 löste P&L nur über `get_trade_history` auf. **Befund:** IG-Demo
+  bucht Transaktionen erst nach Settlement (intraday 0 Zeilen) → History intraday unbrauchbar.
+  **Fix:** `close_position` (P1) pollt jetzt den Close-Confirm → `ExecutionResult.close_level`/
+  `profit_loss` (P5, **nur TIME_STOP**) → `ClosedTrade.close_level`/`profit_loss` (P7) → der
+  `pnl_resolver` **bevorzugt** diese lag-freie Quelle vor der History (die bleibt Fallback für
+  `CLOSED_BY_BROKER`/Confirm-Timeout/Cold-Reconcile).
 
 **(1.3) Debate-Outcome + `debate_log.json` (`debate/models.py`, `debate/audit.py`):**
 - `DebateOutcome(decision, direction, confidence, rationale, rounds_used, transcript, token_summary)`
@@ -225,6 +242,134 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   Instinct→VETO nach **Phase 9f** verschoben. Root-`CLAUDE.md` „Current state" auf Phase 7 geflippt
   (kanonische Aussage + Phase-7-Status-Block). `ARCHITECTURE.md`/`README.md`/
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
+
+---
+
+## Session stopped — 2026-06-23 (Step 13c — lag-free P&L from the close confirm, **cross-phase**)
+
+> Auslöser: nach Step 13b lief `live_test` erneut `3/5` — diesmal **nicht** signed-size, sondern
+> `inspect_history.py` bewies, dass **IG-Demo Transaktionen erst nach Settlement bucht**:
+> `get_trade_history(days=1)` = **0 Zeilen** intraday; die einzige `days=30`-Zeile ist ein 11 Tage
+> alter, gesettelter Deal (Vorzeichen `size=-19.9` bestätigte zusätzlich den 13b-Fix). Kein
+> Reconcile-Fenster in Sekunden/Minuten gewinnt das Rennen → die History ist **intraday unbrauchbar**
+> als P&L-Quelle. **User-Entscheidung (explizites „specific yes" für cross-phase):** P&L aus dem
+> **Close-Deal-Confirm** auflösen (sofort verfügbar), nicht aus der History.
+
+### Completed (cross-phase — P1 + P5 + P7, mit dated Notes in JEDER berührten `.md`)
+- **P1 `ig_adapter.close_position`** — pollt jetzt den Close-Confirm: DELETE-`dealReference` fangen →
+  `_poll_confirms` (derselbe Helper wie `open_position` für den Fill-`level`) → `close_level` +
+  realisiertes `profit`/`profitCurrency` **additiv** in `.data`. **Best-effort + safe:** Confirm-Poll
+  in `try/except`, der Close bleibt **ok-returning für jeden akzeptierten DELETE** (Confirm-Fehler/
+  -Timeout → `None`-Felder, **nie** ein Error-Envelope) ⇒ P5-Close/Abort-Verhalten unverändert.
+  +3 Tests → **P1 49 → 52**.
+- **P5 `ExecutionResult`** +`close_level`/+`profit_loss` (Defaults `None`); **`monitor.py`** liest im
+  **TIME_STOP**-Zweig `close_env.data` (CLOSED_BY_BROKER bleibt `None`). **Additiv, P5 bit-identisch.**
+  +4 Tests (`test_monitor.py` +2, `test_executor.py` +2 build_closed) → **P5 142 → 146**.
+- **P7** `ClosedTrade` +`close_level`/+`profit_loss`; `build_closed` (Naht in `executor.py`) füllt sie;
+  **`pnl_resolver.resolve` Präferenz-Reihenfolge:** (1) `closed.profit_loss` → direkt (exakt, IG-
+  realisierte P&L), (2) `closed.close_level`+Richtung → `(close−open)·size·point_value·sign`
+  (kleine Approx: Open-Seite = `intended_open_level`), (3) sonst der bestehende History-Match
+  (CLOSED_BY_BROKER/Confirm-Timeout/Cold-Reconcile). `_OpenCtx` +`direction` (für Branch 2 im
+  Cold-Pfad). +4 Tests (resolver +3, recorder +1) → **P7 124 → 128**.
+
+### Reconciliation (Code = Source of Truth)
+- **Contract 1.2 aktualisiert:** „monitor trägt KEIN profit_loss/close_level" gilt **nur noch** für
+  `CLOSED_BY_BROKER`; der bot-eigene TIME_STOP-Close reicht jetzt die realisierte P&L durch.
+- **Branch 2 ist eine kleine Approximation** (Open-Seite = intended, nicht der echte Open-Fill — den
+  droppt `place_order`, Contract 1.2). Exakt nur, wenn IG `profit` im Close-Confirm liefert (Branch 1).
+  ✅ **RESOLVED am Live-Lauf (2026-06-26): Branch 1 feuerte** — IG liefert `profit` im Close-Confirm
+  (`profit_loss=-41.16` vs. die Level-Rechnung ≈ -21.56; die Differenz **ist** der Spread, den nur die
+  realisierte P&L erfasst → Branch 1 ist sogar genauer als Branch 2). Der Open-Fill-Folge-Step ist
+  damit **nicht** nötig.
+- **13b bleibt komplementär:** der magnituden-Size-Match + `reconcile_open_trades` sind weiterhin der
+  Fallback-Pfad (CLOSED_BY_BROKER / Confirm-Timeout), der die (verzögerte) History nutzt.
+
+### Verifiziert (gemockt/lokal — kein Netz; Live = Operator)
+- **Regression grün:** **P1 52 · P2 62 · P4 94 · P5 146 · P6 70 · P7 128.** Alle Edits additiv (Defaults
+  halten P1/P5 bit-identisch).
+
+### ✅ Live-verifiziert (2026-06-26) — `live_test.py` 5/5
+- **Operator-Lauf bestanden:** SELL-Seed (mit der Abwärtsbewegung) → Order ACCEPTED
+  (`deal_id=DIAAAAXUYTL77A3`, size 19.6, open 24771.3) → Time-Stop-Close → der **Close-Confirm**
+  lieferte close 24772.4 + `profit_loss=-41.16` → **in-cycle resolve gelang** (kein History-Fallback,
+  kein Reconcile nötig) → `trade_outcomes` CLOSED + `reward_pts` (1) + `trade_lessons` (1, echte Haiku)
+  → **`RESULT: 5/5`**, exit 0. Damit ist der **ganze** Reward-Loop end-to-end live bewiesen
+  (place → monitor → close-confirm-P&L → score → reward → lesson). ⚠ **live-verifiziert ≠
+  profit-validiert** — ein Trade beweist den Pfad, nicht die Edge.
+- **Zwei Vorläufer-NO_TRADEs** (SELL-in-rally 06-23, BUY-in-drop 06-26) waren **korrekte** Momentum-
+  VETOs (Seed gegen die Bewegung) — kein Bug. Lehre: in Richtung des `get_ohlcv`-net-return seeden.
+- Die zwei stale OPEN-Deals (`DIAAAAXTGBTEYAC`/`DIAAAAXTGMAF2A9` aus den Debug-Läufen) bleiben als
+  Demo-Daten stehen (oder via unscoped `reconcile_open_trades()` aufräumbar, sobald IG sie bucht).
+- **Doku auf ✅ live-verifiziert geflippt + Merge `phase7-reward` → `main`** in **diesem** Commit
+  (Operator-Freigabe 2026-06-26).
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. Step 13c ist **cross-phase** (P1+P5+P7) auf explizite User-Freigabe;
+  jede berührte Phase hat eine dated Note (P1/P5 `CLAUDE.md` 🔁-Block, hier, Konzept §9, root CLAUDE.md).
+- **AI-Grenze gewahrt:** close_position-Confirm, ExecutionResult-Felder, Resolver-Branches sind reiner Code.
+- **`close_position` darf NIE wegen eines Confirm-Fehlers erroren** — der Confirm ist best-effort-Enrichment;
+  ein akzeptierter DELETE bleibt ok (sonst kippt P5 in einen `ExecutionAbort`).
+
+---
+
+## Session stopped — 2026-06-23 (Step 13b — Reward-Live-Debug: signed-size fix + reconcile/retry)
+
+> Auslöser: der **erste** Operator-Reward-Live-Lauf (`live_test.py`) war **`RESULT: 3/5`** — Order
+> platziert + per Time-Stop geschlossen (deal `DIAAAAXTGBTEYAC`, SELL, size 19.8), aber
+> `trade_outcomes` blieb **OPEN** und **kein `reward_pts`**. Einzige Ursache: `pnl_resolver.resolve()`
+> warf `PnLUnavailable` (Branch „candidates empty" → `get_trade_history` lieferte Transaktionen, aber
+> keine matchte size=19.8). Zwei mit dem einen Datenpunkt konsistente Ursachen — der Fix deckt **beide**.
+
+### Completed (alles in `phase7_reward/` — **keine** Cross-Phase-Code-Edit)
+- **`reward/pnl_resolver.py` — magnituden-basierter Size-Match.** Filter `abs(float(tx_size) − size)` →
+  `abs(abs(float(tx_size)) − abs(size))`. **Grund:** IG signt das History-`size` (`-19.8` für SELL;
+  `_parse_transaction` reicht es als negativen Float durch) → ein exakter Vergleich verwarf **jeden SELL
+  für immer**, unabhängig von Lag. `opened.size` ist immer unsigned; positive Sizes bleiben unverändert
+  (der Fix kann nur helfen). Modul-Docstring um den Befund erweitert. Der saubere Ort (P1-Adapter)
+  bleibt **bewusst zurückgestellt** (Phasen-Isolation; nur dokumentiert, s. Contract 1.1).
+- **`reward/recorder.py` — `reconcile_open_trades(deal_ids=None)` (die „spätere Pass").** IG-History kann
+  einen frisch geschlossenen Deal Sekunden–Minuten verzögern → in-cycle `resolve` darf legitim
+  `PnLUnavailable` werfen + den Trade OPEN lassen. Der neue Reconcile fährt den Close für noch-OPEN-Zeilen
+  erneut: **exakter retained `ClosedTrade`** (`self._pending_close`, gleicher Prozess — behält den echten
+  Exit-Status) **oder** Minimal-Rekonstruktion aus der DB-Zeile (Restart; Exit-Typ unbekannt → konservativ
+  `"TIME_STOP"`). Delegiert an das geguardete `on_trade_closed` → **idempotent** über den OPEN/CLOSED-Status
+  (kein Doppel-Scoring). `_pending_close` wird nach dem Close-Fakt gepoppt (kein Leak).
+- **`scripts/live_test.py` — Reconcile-Retry vor den Asserts.** Bei `PLACED→TIME_STOP` und noch-OPEN-Zeile:
+  `executor.reward_sink.reconcile_open_trades([deal_id])` in einer beschränkten Schleife
+  (`--reconcile-attempts` default 3 × `--reconcile-wait` default 20 s) bis CLOSED oder Attempts erschöpft,
+  **dann** die harten `trade_outcomes`(CLOSED)+`reward_pts`-Checks. Fortschritt → stderr.
+- **`scripts/inspect_history.py` (NEU, read-only).** Dumpt `get_trade_history(days)`-Rohtransaktionen (v. a.
+  das echte `size`-Vorzeichen + ob der Close erscheint) + die OPEN-`trade_outcomes`. **Pure read** — kein
+  Order/Close/DB-Write. Entscheidet Lag vs. signed-size am Live-Record. Operator-Tool.
+- **Tests (gemockt):** `test_pnl_resolver.py` +1 (negative `size=-19.8` matcht `opened.size=19.8`);
+  `test_recorder.py` +5 (Reconcile löst nach Lag auf; reused retained Status; idempotent; cold-Rekonstruktion
+  → TIME_STOP; scoped auf deal_ids lässt andere OPEN). `conftest.py`: `FakeBroker(responses=[…])`
+  (Lag-Sequenz) + `FakeDB.get_open_trades`.
+
+### Verifiziert (gemockt/lokal — kein Netz; der Live-Re-Run ist Operator)
+- `pytest phase7_reward/tests -q` → **124 passed** (118 + 6). `py_compile` + `--help` (live_test,
+  inspect_history) exit 0; `import reward.recorder` offline (hat `reconcile_open_trades`).
+- **Regression grün + unberührt:** **P2 62 · P4 94 · P5 142 · P6 70** (Step 13b ist rein additiv im
+  P7-Paket — **kein** P1/P2/P4/P5-Code berührt).
+
+### Next — Operator (User führt aus; Claude macht Code + gemockte/lokale Tests)
+1. (read-only, jederzeit) `python phase7_reward/scripts/inspect_history.py` → echtes `size`-Vorzeichen +
+   ob `DIAAAAXTGBTEYAC` inzwischen in der History steht (bestätigt, welche Ursache aktiv war).
+2. **Im Handelsfenster** neu seeden (`seed_candidate.py --direction SELL`, TTL 30 min) →
+   `python phase7_reward/scripts/live_test.py` → erwartet open→Time-Stop→(Reconcile-Retry)→
+   `trade_outcomes` CLOSED + `reward_pts` → **`RESULT: 5/5`**, exit 0. **Dann** Doku auf ✅ live-verifiziert
+   flippen + Merge `phase7-reward` → `main`. ⚠ **code-complete ≠ live-verifiziert ≠ profit-validiert.**
+- Housekeeping: die **stale** OPEN-Zeile `DIAAAAXTGBTEYAC` lässt sich per unscoped
+  `reconcile_open_trades()` aufräumen (History hat aufgeholt + Size-Fix matcht sie) oder als Demo-Daten
+  stehen lassen — Operator-Entscheidung.
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. Step 13b ist **kein neuer Build-Step**, sondern der Live-Debug-Fix nach dem
+  ersten Reward-Live-Lauf — Phase 7 bleibt code-complete, **offen ist der saubere 5/5-Re-Run + Doku-Flip + Merge**.
+- **AI-Grenze gewahrt:** Resolver/Reconcile/inspect sind **reine Mathe/Code** — kein LLM. Die einzige AI im
+  Paket bleibt `Brain.reflect`.
+- **Der Fix sitzt im P7-Resolver, nicht in P1.** Wer das IG-`size`-Vorzeichen im P1-Adapter „sauberer"
+  normalisieren will: zulässig, aber Cross-Phase — erst mit Operator absprechen (P1 ist live-verifiziert + gemergt).
 
 ---
 

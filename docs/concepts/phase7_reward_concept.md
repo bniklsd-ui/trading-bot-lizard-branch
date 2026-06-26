@@ -426,6 +426,32 @@ def resolve(closed: ClosedTrade, broker, opened: OpenedTrade, cfg) -> tuple[floa
   der einzige Erfolgspfad ein echter History-Match ist, braucht v1 **keinen** `pnl_source`-Tag; die
   Rückgabe bleibt das §9-`tuple[float, float, float]`. `opened` wird **duck-typed** (nur `.size`/
   `.intended_open_level`/`.initial_risk`).
+- ⟳ **2026-06-23 (Live-Debug — zwei Befunde aus dem ersten Reward-Live-Lauf, deal `DIAAAAXTGBTEYAC`):**
+  (3) **Size-Filter ist magnituden-basiert, nicht exakt-vorzeichenbehaftet:** IG's
+  `/history/transactions` liefert `size` als **vorzeichenbehafteten** String (`-19.8` für SELL);
+  `ig_adapter._parse_transaction` reicht ihn als negativen Float durch. Ein exakter Vergleich
+  (`abs(tx_size − opened.size)`) verwarf **jeden SELL für immer** (der Live-Lauf scheiterte mit „no
+  usable history row … size=19.8"). Fix: Vergleich der **Beträge** (`abs(abs(tx_size) − abs(size))`).
+  Die Richtung kommt weiterhin gratis aus IG's `profit_loss`. Der saubere Fix-Ort (Sign-Normalisierung
+  im P1-Adapter) ist bewusst **zurückgestellt** (Phasen-Isolation) — die P7-Resolver-Defensive reicht.
+  (4) **„Idempotenter Retry via deal_id" hat jetzt einen Trigger:** der `RewardSink.reconcile_open_trades`
+  (Recorder, §8) ist die im §9 versprochene „spätere Pass" — er fährt den Close für noch-OPEN-Zeilen
+  erneut (exakter retained `ClosedTrade` im selben Prozess, sonst Minimal-Rekonstruktion aus der Zeile),
+  idempotent über den OPEN/CLOSED-Status. `live_test.py` ruft ihn nach kurzem Warten (IG-History-Lag),
+  ein späterer Phase-8-Scheduler ebenso.
+- ⟳ **2026-06-23 (Step 13c — Close-Confirm = NEUE PRIMÄRQUELLE, cross-phase, user-authorized):**
+  Der `inspect_history`-Befund (IG-Demo bucht `get_trade_history` erst nach Settlement → intraday
+  0 Zeilen) macht die History intraday **unbrauchbar**. Daher löst der Resolver P&L jetzt **bevorzugt
+  lag-frei** aus dem **Close-Deal-Confirm** auf: `close_position` (P1) pollt `_poll_confirms` →
+  `close_level`+`profit` → `ExecutionResult` (P5, nur TIME_STOP) → `ClosedTrade.close_level`/
+  `profit_loss` (P7). `resolve`-Reihenfolge: (1) `closed.profit_loss` direkt; (2) `closed.close_level`
+  +Richtung → `(close−open)·size·point_value·sign`; (3) History-Match als **Fallback**
+  (CLOSED_BY_BROKER/Confirm-Timeout/Cold-Reconcile). Das ist genau die in der ursprünglichen §9-Skizze
+  gesuchte Level-basierte Auflösung — jetzt mit dem **echten** Close-Level statt einer Erfindung
+  (der `ClosedTrade` trägt ihn nun). Regression: P1 52 · P5 146 · P7 128.
+  ✅ **Live-verifiziert (2026-06-26):** `live_test.py` 5/5 — der TIME_STOP-Close trug die Confirm-P&L
+  (`profit_loss=-41.16`, Branch 1: IG liefert `profit`) → in-cycle resolve gelang → `reward_pts` +
+  `trade_lessons` geschrieben. Damit ist die lag-freie Auflösung end-to-end live bewiesen.
 
 ### Step 10 — Executor-Naht verdrahten (Decision A) + **P5-Regression**
 - `execution/protocols.py`: `RewardSink`-Protocol ergänzen (Stilvorlage = bestehende Protocols).

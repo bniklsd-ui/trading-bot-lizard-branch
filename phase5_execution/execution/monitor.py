@@ -131,11 +131,17 @@ def monitor_position(
                 )
             exec_state.mark_closed(ref)
             logger.info("%s closed by time-stop (%s)", ref, trigger)
+            # The close confirm carries the realised close level + P&L (best-effort —
+            # may be None if IG's confirm lagged). Phase 7 resolves P&L from these
+            # lag-free instead of from settlement-delayed transaction history.
+            close_data = getattr(close_env, "data", None) or {}
             return ExecutionResult(
                 status="TIME_STOP",
                 deal_id=deal_id,
                 plan=plan,
                 detail=f"time-stop ({trigger})",
+                close_level=close_data.get("close_level"),
+                profit_loss=close_data.get("profit_loss"),
             )
 
         sleep_fn(config.poll_interval_s)

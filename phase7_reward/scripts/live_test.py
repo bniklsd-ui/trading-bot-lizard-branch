@@ -44,6 +44,7 @@ import argparse
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -91,10 +92,45 @@ def _count(db: Any, sql: str, params: tuple) -> int:
     return int(db.conn.execute(sql, params).fetchone()[0])
 
 
+def _reconcile_until_closed(
+    db: Any, sink: Any, deal_id: str, *, attempts: int, wait_s: float
+) -> None:
+    """Drive the idempotent reconcile retry until the trade closes (or attempts run out).
+
+    IG's transaction history can lag a just-closed deal by seconds–minutes, so the
+    in-cycle ``on_trade_closed`` may have fail-closed on ``PnLUnavailable`` and left the
+    trade OPEN (by design — retry-able via ``deal_id``). This exercises that documented
+    "later pass": wait for history to catch up, then call
+    ``RewardSink.reconcile_open_trades([deal_id])``, which is idempotent (the OPEN/CLOSED
+    status guard never double-scores). No-op if the in-cycle close already resolved.
+    """
+    for i in range(1, attempts + 1):
+        row = db.get_trade_by_deal_id(deal_id)
+        if row is None or row.get("status") != "OPEN":
+            return  # resolved in-cycle (or row gone) — nothing to reconcile
+        if sink is None:
+            _eprint("[live] executor has no reward sink — cannot reconcile")
+            return
+        _eprint(f"[live] trade still OPEN (IG history lag?) — waiting {wait_s:g}s then "
+                f"reconcile attempt {i}/{attempts} …")
+        time.sleep(wait_s)
+        resolved = sink.reconcile_open_trades([deal_id])
+        if deal_id in resolved:
+            _eprint(f"[live] reconcile resolved deal_id={deal_id} on attempt {i}.")
+            return
+    _eprint(f"[live] deal_id={deal_id} still unresolved after {attempts} reconcile "
+            "attempt(s) — IG history may still be lagging; the reward asserts below will "
+            "fail. Re-run, or reconcile again later.")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--broker", default="ig_demo", help="broker id (default: ig_demo)")
     parser.add_argument("--verbose", action="store_true", help="DEBUG logging")
+    parser.add_argument("--reconcile-attempts", type=int, default=3,
+                        help="reconcile retries if IG history lags the close (default: 3)")
+    parser.add_argument("--reconcile-wait", type=float, default=20.0,
+                        help="seconds to wait before each reconcile attempt (default: 20)")
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -144,6 +180,13 @@ def main(argv: list[str] | None = None) -> int:
 
             db = Database(str(_DB_PATH))
             try:
+                # If the in-cycle resolve fail-closed on IG history lag, the trade is
+                # still OPEN — drive the documented idempotent retry before asserting.
+                if result.deal_id:
+                    _reconcile_until_closed(
+                        db, executor.reward_sink, result.deal_id,
+                        attempts=args.reconcile_attempts, wait_s=args.reconcile_wait,
+                    )
                 trade = db.get_trade_by_deal_id(result.deal_id) if result.deal_id else None
                 check("trade_outcomes row exists and is CLOSED",
                       bool(trade) and trade.get("status") == "CLOSED",

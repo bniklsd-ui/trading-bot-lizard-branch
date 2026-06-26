@@ -9,14 +9,17 @@ nothing in v1. Those lessons feed back into the next Phase-4 research call (the
 research prompt already injects `get_recent_lessons`). **Demo only, manual trigger —
 no scheduler (that is Phase 8).**
 
-> ✅ **Status: code-complete (Steps 0–13) — 2026-06-23.** Reward math (confidence +
-> process-aware scorer), synthetic/live separation, lesson AI (`Brain.reflect`),
-> P&L resolution, recorder orchestration, the `reward_sink` executor seam, loop-closure
+> ✅ **Status: live-verified (2026-06-26).** Reward math (confidence + process-aware
+> scorer), synthetic/live separation, lesson AI (`Brain.reflect`), P&L resolution,
+> recorder orchestration, the `reward_sink` executor seam, loop-closure
 > (`mark_lesson_used`), migration 002, and the wiring + operator scripts are all built
-> (**118 P7 unit tests**; regression P2 62 · P4 94 · P5 142 · P6 70 green). **Open:**
-> only the operator live run (`scripts/live_test.py` against IG Demo) + the doc flip to
-> "live-verified" + the merge to `main`. ⚠ **code-complete ≠ live-verified ≠
-> profit-validated.** See `CLAUDE.md` → the latest `## Session stopped` block.
+> (**128 P7 unit tests**; regression P1 52 · P2 62 · P4 94 · P5 146 · P6 70 green).
+> `scripts/live_test.py` ran **5/5** against IG Demo: a SELL was placed → time-stop
+> close → `trade_outcomes` CLOSED + `reward_pts` + `trade_lessons` written, with P&L
+> resolved **lag-free from the close deal confirmation** (live-debug 13b/13c — IG demo
+> books `get_trade_history` only after settlement, so the close confirm is the intraday
+> P&L source). ⚠ **live-verified ≠ profit-validated** (only one trade; edge is later
+> live running). See `CLAUDE.md` → the latest `## Session stopped` block.
 
 **AI boundary.** AI is used **only** for the lesson-extraction `reflect()` (one
 Haiku call, best-effort, decoupled from the close critical path). Everything else —

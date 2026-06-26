@@ -246,3 +246,112 @@ def test_raising_confidence_provider_does_not_break_close(make_opened, make_clos
     sink.on_trade_opened(make_opened())
     sink.on_trade_closed(make_closed())  # must not raise
     assert len(db.rewards) == 1  # the reward still got written
+
+
+# --- close-confirm P&L (lag-free; preferred over transaction history) ----------
+
+
+def test_close_confirm_pnl_resolves_without_history(make_opened, make_closed):
+    """A close carrying realised P&L writes reward_pts without touching get_trade_history."""
+    db = FakeDB()
+    broker = FakeBroker([])  # empty history would fail-close if the resolver reached it
+    sink = _sink(db, broker=broker)
+    opened = make_opened(size=19.6, intended_open_level=24968.9, initial_risk=588.0)
+    sink.on_trade_opened(opened)
+
+    sink.on_trade_closed(make_closed(status="TIME_STOP", close_level=24990.0, profit_loss=42.0))
+
+    assert broker.history_calls == 0
+    assert len(db.closes) == 1
+    assert len(db.rewards) == 1
+    _, reward = db.rewards[0]
+    assert reward["pnl_raw"] == pytest.approx(42.0)
+
+
+# --- reconcile_open_trades (the idempotent "later pass" for IG history lag) ----
+
+
+def test_reconcile_resolves_after_history_catches_up(make_opened, make_closed):
+    """In-cycle resolve fail-closed (empty history) → trade stays OPEN; the reconcile
+    pass (history now populated) closes + scores it."""
+    db = FakeDB()
+    broker = FakeBroker(responses=[[], [make_tx()]])  # empty in-cycle, match on reconcile
+    sink = _sink(db, broker=broker)
+    opened = make_opened()
+    sink.on_trade_opened(opened)
+
+    sink.on_trade_closed(make_closed())  # in-cycle: PnLUnavailable → stays OPEN
+    assert db.closes == []
+    assert db.get_trade_by_deal_id(opened.deal_id)["status"] == "OPEN"
+
+    resolved = sink.reconcile_open_trades([opened.deal_id])
+
+    assert resolved == [opened.deal_id]
+    assert db.get_trade_by_deal_id(opened.deal_id)["status"] == "CLOSED"
+    assert len(db.rewards) == 1
+
+
+def test_reconcile_reuses_retained_closed_trade_status(make_opened, make_closed):
+    """The retained (exact) ClosedTrade — with its true CLOSED_BY_BROKER exit status —
+    is reused on reconcile, not a TIME_STOP reconstruction."""
+    db = FakeDB()
+    brain = FakeBrain()
+    broker = FakeBroker(responses=[[], [make_tx()]])
+    sink = _sink(db, broker=broker, brain=brain)
+    sink.on_trade_opened(make_opened())
+    sink.on_trade_closed(make_closed(status="CLOSED_BY_BROKER"))  # in-cycle fails
+
+    sink.reconcile_open_trades()
+
+    assert brain.calls  # reflect ran on the reconcile pass
+    _, _, market_context = brain.calls[-1]
+    assert market_context["status"] == "CLOSED_BY_BROKER"
+
+
+def test_reconcile_is_idempotent(make_opened, make_closed):
+    """A second reconcile after the trade is CLOSED is a no-op (no double score)."""
+    db = FakeDB()
+    broker = FakeBroker(responses=[[], [make_tx()]])
+    sink = _sink(db, broker=broker)
+    sink.on_trade_opened(make_opened())
+    sink.on_trade_closed(make_closed())
+
+    sink.reconcile_open_trades()
+    assert len(db.rewards) == 1
+    score_after_first = db.get_current_score()
+
+    second = sink.reconcile_open_trades()  # nothing OPEN left
+    assert second == []
+    assert len(db.rewards) == 1  # not doubled
+    assert db.get_current_score() == score_after_first
+
+
+def test_reconcile_cold_reconstructs_from_row(make_opened):
+    """A fresh sink (restart: no stash, no pending close) reconstructs a minimal
+    ClosedTrade from the persisted row — defaulting the exit type to TIME_STOP."""
+    db = FakeDB()
+    _sink(db).on_trade_opened(make_opened())  # opened by a now-gone sink instance
+
+    brain = FakeBrain()
+    closer = _sink(db, broker=FakeBroker([make_tx()]), brain=brain)
+    resolved = closer.reconcile_open_trades()
+
+    assert resolved == [make_opened().deal_id]
+    assert db.get_trade_by_deal_id(make_opened().deal_id)["status"] == "CLOSED"
+    assert len(db.rewards) == 1
+    _, _, market_context = brain.calls[-1]
+    assert market_context["status"] == "TIME_STOP"  # conservative cold default
+
+
+def test_reconcile_scoped_to_deal_ids_leaves_others_open(make_opened):
+    """Passing deal_ids confines the reconcile (live_test targets only its own deal)."""
+    db = FakeDB()
+    sink = _sink(db, broker=FakeBroker([make_tx()]))
+    sink.on_trade_opened(make_opened(deal_id="DEAL-A", deal_reference="ref-a"))
+    sink.on_trade_opened(make_opened(deal_id="DEAL-B", deal_reference="ref-b"))
+
+    resolved = sink.reconcile_open_trades(["DEAL-A"])
+
+    assert resolved == ["DEAL-A"]
+    assert db.get_trade_by_deal_id("DEAL-A")["status"] == "CLOSED"
+    assert db.get_trade_by_deal_id("DEAL-B")["status"] == "OPEN"

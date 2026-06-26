@@ -76,3 +76,9 @@ class ExecutionResult:
     deal_id: str | None
     plan: OrderPlan | None
     detail: str
+    # The realised close, surfaced from the close deal confirmation on a bot-issued
+    # ``TIME_STOP`` close (Phase-7 lag-free P&L, 2026-06-23). ``None`` on every other
+    # path (NO_TRADE / ABORT / CLOSED_BY_BROKER), where there is no bot close confirm —
+    # Phase 7 then falls back to (deferred) transaction history.
+    close_level: float | None = None
+    profit_loss: float | None = None

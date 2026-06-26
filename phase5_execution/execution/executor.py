@@ -404,8 +404,10 @@ def build_opened(
 def build_closed(result: ExecutionResult, *, now: datetime) -> Any:
     """Build the minimal ``ClosedTrade`` close fact from the monitor's ``ExecutionResult``.
 
-    Carries no P&L / close level on purpose (the monitor returns none, verified-contract
-    1.2) — ``pnl_resolver`` resolves those later from ``get_trade_history``.
+    Carries the realised ``close_level`` / ``profit_loss`` when the monitor surfaced them
+    from the close deal confirmation (TIME_STOP path, 2026-06-23) — the lag-free P&L
+    source. They are ``None`` on a ``CLOSED_BY_BROKER`` close, where ``pnl_resolver``
+    falls back to ``get_trade_history``.
     """
     from reward.models import ClosedTrade  # lazy: keep execution.* + stdlib at module scope
 
@@ -414,4 +416,6 @@ def build_closed(result: ExecutionResult, *, now: datetime) -> Any:
         deal_id=result.deal_id or "",
         status=result.status,
         closed_at=now.isoformat(),
+        close_level=result.close_level,
+        profit_loss=result.profit_loss,
     )

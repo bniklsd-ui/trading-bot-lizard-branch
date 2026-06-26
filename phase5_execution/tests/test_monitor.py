@@ -147,6 +147,47 @@ def test_max_hold_triggers_time_stop_close(
     assert broker.close_position_calls == [DEAL_ID]
 
 
+# --- time-stop: close-confirm P&L enrichment (Phase-7 lag-free, 2026-06-23) --
+
+
+def test_time_stop_surfaces_close_confirm_pnl(
+    exec_state: ExecutionState, open_plan: OrderPlan
+) -> None:
+    """The realised close level + P&L from the close confirm ride the TIME_STOP result."""
+    broker = FakeBroker(
+        positions_env=_present_env(),
+        close_env=_FakeEnv(ok=True, data={
+            "deal_id": DEAL_ID, "status": "submitted",
+            "close_level": 24990.0, "profit_loss": 42.0,
+        }),
+    )
+    result = monitor_position(
+        broker, exec_state, open_plan, DEAL_ID, ExecutionConfig(),
+        now_fn=_Clock(_at(10, 0), _at(14, 0)),  # max_hold (4 h)
+        sleep_fn=lambda _s: None,
+    )
+
+    assert result.status == "TIME_STOP"
+    assert result.close_level == 24990.0
+    assert result.profit_loss == pytest.approx(42.0)
+
+
+def test_time_stop_without_close_pnl_is_none(
+    exec_state: ExecutionState, open_plan: OrderPlan
+) -> None:
+    """A close_env lacking the enrichment keys → close_level/profit_loss None (history fallback)."""
+    broker = FakeBroker(positions_env=_present_env())  # default close_env has no P&L keys
+    result = monitor_position(
+        broker, exec_state, open_plan, DEAL_ID, ExecutionConfig(),
+        now_fn=_Clock(_at(10, 0), _at(14, 0)),
+        sleep_fn=lambda _s: None,
+    )
+
+    assert result.status == "TIME_STOP"
+    assert result.close_level is None
+    assert result.profit_loss is None
+
+
 # --- time-stop close failure ----------------------------------------------
 
 

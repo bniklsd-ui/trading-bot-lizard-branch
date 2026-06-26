@@ -683,14 +683,44 @@ class IGAdapter(BrokerAdapter):
                     "orderType": "MARKET",
                 }
                 # IG uses POST with _method: DELETE header for close.
-                self._request(
+                close_resp = self._request(
                     "POST", "/positions/otc", version="1", auth=True,
                     json_body=body,
                     extra_headers={"_method": "DELETE"},
                 )
+                # Enrich (best-effort) with the realised close from the deal confirm.
+                # The DELETE returns only a dealReference; GET /confirms/{ref} carries
+                # the actual close `level` and (for a closing deal) the realised
+                # `profit`. This is the lag-free P&L source Phase 7 resolves against —
+                # IG demo only books /history/transactions after settlement, so the
+                # transaction-history path is unusable intraday (see Phase-7 notes).
+                # The close itself already succeeded; any confirm failure/timeout must
+                # NOT turn an accepted close into an error envelope.
+                close_ref = close_resp.get("dealReference") if isinstance(close_resp, dict) else None
+                close_level: float | None = None
+                close_profit: float | None = None
+                profit_currency: str | None = None
+                if close_ref:
+                    try:
+                        confirm = self._poll_confirms(close_ref)
+                        close_level = _safe_float(confirm.get("level"))
+                        close_profit = _safe_float(_strip_currency(confirm.get("profit")))
+                        profit_currency = confirm.get("profitCurrency")
+                    except Exception:  # noqa: BLE001 - enrichment is best-effort
+                        log.warning(
+                            "close_position: confirm lookup failed for ref=%s "
+                            "(close accepted; P&L resolves later)", close_ref,
+                        )
                 return ok_envelope(
                     broker=self.name, method="close_position",
-                    data={"deal_id": deal_id, "status": "submitted"},
+                    data={
+                        "deal_id": deal_id,
+                        "status": "submitted",
+                        "close_level": close_level,
+                        "profit_loss": close_profit,
+                        "profit_currency": profit_currency,
+                        "close_deal_reference": close_ref,
+                    },
                     latency_ms=t.ms,
                 )
             except BrokerError as e:

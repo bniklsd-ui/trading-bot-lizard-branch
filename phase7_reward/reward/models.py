@@ -154,11 +154,13 @@ class OpenedTrade:
 class ClosedTrade:
     """The minimal fact that a monitored position has ended (Decision A).
 
-    Carries no P&L or close level on purpose: ``monitor_position`` does not return
-    them (verified-contract 1.2). ``pnl_resolver`` (Step 9) resolves
-    ``(close_level, profit_loss, r_multiple)`` from ``broker.get_trade_history``
-    keyed off this trade — heuristically, since the history record has **no**
-    ``deal_id`` (verified-contract 1.1), with a level-based fallback.
+    For a bot-issued ``TIME_STOP`` close, the realised close level + P&L ride along
+    from the close deal confirmation (P5 ``monitor_position`` → ``ExecutionResult``,
+    2026-06-23) — this is the **lag-free** P&L source the resolver prefers, because IG
+    demo only books ``get_trade_history`` after settlement (unusable intraday). They are
+    ``None`` on a broker-side ``CLOSED_BY_BROKER`` close (no bot close confirm) and on a
+    cold reconcile; ``pnl_resolver`` then falls back to the heuristic
+    ``get_trade_history`` match (verified-contract 1.1, no ``deal_id``).
 
     Attributes:
         deal_reference: the bot's idempotency key (links back to the OpenedTrade).
@@ -166,12 +168,16 @@ class ClosedTrade:
         status: ``"CLOSED_BY_BROKER"`` (broker SL/TP filled) or ``"TIME_STOP"``
             (monitor squared off / max-hold) — the exit-quality process signal (B2).
         closed_at: ISO 8601 UTC close timestamp.
+        close_level: realised close fill from the close confirm, or ``None``.
+        profit_loss: realised P&L from the close confirm, or ``None``.
     """
 
     deal_reference: str
     deal_id: str
     status: str  # "CLOSED_BY_BROKER" | "TIME_STOP"
     closed_at: str
+    close_level: float | None = None
+    profit_loss: float | None = None
 
 
 # ---------------------------------------------------------------------------

@@ -77,8 +77,10 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): ✅ **code-complete
-(Steps 0–13)** — Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
+**Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): ✅ **live-verifiziert
+(2026-06-26)** — `live_test.py` lief **5/5** gegen IG Demo (SELL → Time-Stop-Close → Close-Confirm-P&L
+`-41.16` → `trade_outcomes` CLOSED + `reward_pts` + `trade_lessons`), **gemerged nach `main`**;
+Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
 Exceptions) ✅, `reward/confidence.py` (Wilson-LB/Expectancy-R/SQN/N_min-Gate) ✅,
 `reward/scorer.py` (prozess-bewusstes Reward-Delta + Clamping) ✅, `reward/synthetic.py`
 (Generator + Pfad-Guard + Edge-Selector, harte Synthetik/Echt-Trennung) ✅, `reward/brain.py`
@@ -97,14 +99,31 @@ vom Recorder/Seam bereits geschriebenen Felder landen jetzt gegen die echte DB (
 DB = Schema-Version 2). **Wiring/Operator-Scripts (Step 13) ✅** — `reward/credentials.py`-Shim +
 `scripts/wiring.py` (`build_reward_sink`/`build_brain`/`build_executor`, spiegelt P6 — Executor direkt
 aus `execution`, `reward_sink` injiziert, **keine** P5-Edit) + `smoke_test.py`/`live_test.py`/
-`backfill_synthetic.py` (guard-first). **Phase 7 ist damit code-complete (Steps 0–13)**; offen ist
-**nur** der Operator-Live-Lauf (`live_test.py` gegen IG Demo) + Doku-Flip auf „live-verifiziert" + Merge
-nach `main`. ⚠ **code-complete ≠ live-verifiziert ≠ profit-validiert.** Phase 6 (Bull/Bear/Judge-Debatte)
+`backfill_synthetic.py` (guard-first). **Phase 7 ist live-verifiziert (2026-06-26, `live_test.py` 5/5)
++ gemerged nach `main`** — der Reward-Loop läuft end-to-end live (place → monitor → lag-freie
+Close-Confirm-P&L → score → reward → lesson). ⚠ **live-verifiziert ≠ profit-validiert** (ein Trade
+beweist den Pfad, nicht die Edge). Phase 6 (Bull/Bear/Judge-Debatte)
 bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
 2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
 live-verifiziert (Order-/Monitor-Pfad).
 
-**Phase 7 status:** ✅ code-complete (Steps 0–13) — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI + pnl_resolver + Recorder-Orchestrierung + Executor-Seam + Loop-Closure + Migration 002 + **Wiring/Operator-Scripts**; offen ist **nur** der Operator-Live-Lauf + Doku-Flip + Merge (⚠ **code-complete ≠ live-verifiziert ≠ profit-validiert**) (2026-06-23)
+**Phase 7 status:** ✅ **live-verifiziert (2026-06-26) + gemerged nach `main`** — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI + pnl_resolver + Recorder-Orchestrierung + Executor-Seam + Loop-Closure + Migration 002 + Wiring/Operator-Scripts + signed-size-Fix + reconcile/retry + **lag-freie Close-Confirm-P&L (cross-phase P1+P5+P7)**. `live_test.py` 5/5 (SELL → Time-Stop → Confirm-P&L `-41.16` → CLOSED + `reward_pts` + `trade_lessons`); **128 P7-Tests** (Regression P1 52 · P2 62 · P4 94 · P5 146 · P6 70). ⚠ **live-verifiziert ≠ profit-validiert** (2026-06-26)
+- **Live-verifiziert ✅ (2026-06-26):** `live_test.py` → **5/5**. SELL `DIAAAAXUYTL77A3` (size 19.6, open 24771.3) → Time-Stop-Close → **Close-Confirm** lieferte close 24772.4 + `profit_loss=-41.16` → in-cycle resolve gelang (Branch 1: IG liefert `profit`; die Differenz zur Level-Rechnung = der Spread) → `trade_outcomes` CLOSED + `reward_pts` + echte Haiku-`trade_lessons`. Der ganze Loop ist damit end-to-end live bewiesen. Doku-Flip + Merge nach `main` in diesem Commit.
+- **Step 13c ✅ (2026-06-23) — lag-freie P&L aus dem Close-Confirm (cross-phase, user-authorized "specific yes").**
+  `inspect_history.py` bewies: **IG-Demo bucht `get_trade_history` erst nach Settlement** (intraday 0 Zeilen) →
+  die History ist intraday als P&L-Quelle unbrauchbar. Fix: `close_position` (P1) pollt jetzt den Close-Confirm
+  (`close_level`+`profit`), `monitor_position`→`ExecutionResult` (P5, nur TIME_STOP) reicht sie durch, und der
+  `pnl_resolver` (P7) **bevorzugt** sie vor der History (die bleibt Fallback für CLOSED_BY_BROKER/Confirm-Timeout).
+  Alle Edits **additiv** (Defaults ⇒ P1/P5 bit-identisch); dated Notes in **jeder** berührten `.md`. Regression:
+  **P1 52 · P2 62 · P4 94 · P5 146 · P6 70 · P7 128.**
+- **Step 13b ✅ (2026-06-23) — Reward-Live-Debug nach dem ersten `live_test`-Lauf (`RESULT 3/5`).** Einzige
+  Ursache: `pnl_resolver` warf `PnLUnavailable` (kein Size-Match für die SELL size 19.8). Fix deckt **beide**
+  konsistenten Ursachen: (1) **magnituden-basierter Size-Match** (`abs(abs(tx_size)−abs(size))`) — IG signt
+  das History-`size` negativ für SELL → ein exakter Vergleich verwarf jeden SELL für immer (Fix **defensiv
+  im P7-Resolver**, P1-Sign-Normalisierung bewusst zurückgestellt); (2) **`RewardSink.reconcile_open_trades`**
+  = idempotenter Retry für noch-OPEN-Trades bei IG-History-Lag, von `live_test.py` nach kurzem Warten
+  getrieben. **+ read-only `scripts/inspect_history.py`** (History-Dump zum Bestätigen der Ursache). **+6
+  P7-Tests (118→124)**, Regression unberührt (**P2 62 · P4 94 · P5 142 · P6 70**). **Keine** Cross-Phase-Edit.
 - **Step 13 ✅ (2026-06-23):** Wiring + Credentials-Shim + Operator-Scripts — **schließt den Phase-7-Build**.
   `reward/credentials.py` (verbatim P4/P6-Shim → `get_credential("anthropic_api_key")`), `scripts/wiring.py`
   (`build_reward_sink`/`build_brain`/`build_executor`, **spiegelt P6**: Executor direkt aus dem installierten

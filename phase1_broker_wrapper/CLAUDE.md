@@ -35,6 +35,21 @@ re-validate via `scripts/test_lightstreamer.py` during market hours.
 `get_stream(adapter)` in `factory.py` — creates a configured `IGLightstreamerClient`
 from a connected `IGAdapter`.
 
+> 🔁 **Phase-7-Edit (2026-06-23, cross-phase — user-authorized "specific yes"):**
+> `IGAdapter.close_position` now **polls the close deal confirmation** for the realised
+> close. The DELETE returns only a `dealReference`; we capture it, call
+> `_poll_confirms(close_ref)` (the same helper `open_position` uses for the fill `level`),
+> and surface `close_level` + realised `profit`/`profitCurrency` additively in the envelope
+> `data` (`{deal_id, status, close_level, profit_loss, profit_currency, close_deal_reference}`).
+> **Why:** Phase 7 needs P&L at close time, but IG demo only books `/history/transactions`
+> **after settlement** (verified 2026-06-23: `get_trade_history(days=1)` returns 0 rows
+> intraday) — so the transaction-history path is unusable for same-session reward. The close
+> confirm is the lag-free source. **Best-effort + safe:** the confirm poll is wrapped in
+> `try/except` and the close stays **ok-returning for any accepted DELETE** (a confirm
+> failure/timeout → `None` fields, never an error envelope) → P5's existing close/abort
+> behaviour is unchanged. +3 mocked tests in `tests/test_ig_adapter.py` (P1 49 → **52**).
+> Detail: `phase7_reward/` + `docs/concepts/phase7_reward_concept.md` §9.
+
 ## Confirmed instrument (live-verified on demo)
 Epic: `IX.D.DAX.IFMM.IP` · type: INDICES · currency: EUR
 min_deal_size: 0.5 · lot_size: 1.0 €/point · spread ~1.8 pts

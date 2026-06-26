@@ -28,6 +28,16 @@ leaves the trade OPEN and retry-able) → ``update_trade_close`` → score → `
 (Decision J sanctions "Guard via status OR existing reward"): a second close for an
 already-CLOSED deal is skipped, so the score is never doubled.
 
+**The "later pass" — ``reconcile_open_trades`` (live-debug 2026-06-23).** IG's
+transaction history can lag a just-closed deal by seconds–minutes, so the in-cycle
+``resolve`` can legitimately raise ``PnLUnavailable`` and leave the trade OPEN. The
+design promises an idempotent retry "via ``deal_id`` on a later pass"; that pass is
+:meth:`reconcile_open_trades`, which re-runs the close for every still-OPEN row (reusing
+the exact retained ``ClosedTrade`` within one process, or reconstructing a minimal one
+from the persisted row after a restart). It re-uses the same OPEN/CLOSED status guard,
+so it never double-scores. The operator ``live_test`` (and a future Phase-8 scheduler)
+calls it after a short wait; the in-cycle close stays the fast path.
+
 Reconciliations vs concept §8 (code = source of truth): ``confidence_provider`` is an
 **optional, keyword-only** forward-compat hook (it is observe-only — there is no
 confidence DB column, so it is invoked + logged, never written, never gates); and
@@ -41,6 +51,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from reward import pnl_resolver
@@ -59,11 +70,13 @@ _DEFAULT_RELEVANCE = 1.0
 
 @dataclass(frozen=True)
 class _OpenCtx:
-    """Minimal duck-typed open context the resolver needs (``.size`` / levels / risk)."""
+    """Minimal duck-typed open context the resolver needs (``.size`` / levels / risk /
+    ``.direction`` for the level-based P&L branch)."""
 
     size: float
     intended_open_level: float
     initial_risk: float
+    direction: str | None = None
 
 
 class RewardSink:
@@ -102,6 +115,10 @@ class RewardSink:
         self.cfg = cfg
         self.confidence_provider = confidence_provider
         self._opened: dict[str, OpenedTrade] = {}
+        # Retain the exact ClosedTrade per deal so a later reconcile (after IG history
+        # lag clears) retries the *same* close — with its true exit status — not a
+        # reconstructed guess. Dropped once the trade reaches CLOSED.
+        self._pending_close: dict[str, ClosedTrade] = {}
 
     # -- open ---------------------------------------------------------------
 
@@ -150,12 +167,72 @@ class RewardSink:
         Total (never raises — Decision J). See the module docstring for the step order
         and the idempotency contract.
         """
+        # Retain for an idempotent later retry (reconcile_open_trades) if the in-cycle
+        # resolve can't reach the broker history yet (IG lag). Dropped once CLOSED.
+        self._pending_close[closed.deal_id] = closed
         try:
             self._on_trade_closed(closed)
         except Exception as exc:  # noqa: BLE001 - the sink must never kill the cycle (J)
             logger.critical(
                 "reward: on_trade_closed crashed for deal_id=%s: %s", closed.deal_id, exc
             )
+
+    def reconcile_open_trades(self, deal_ids: list[str] | None = None) -> list[str]:
+        """Re-attempt the close for still-OPEN trades (the idempotent "later pass").
+
+        The in-cycle ``on_trade_closed`` can leave a trade OPEN when ``resolve`` raises
+        ``PnLUnavailable`` (IG history lag). This re-runs the close for each OPEN row —
+        reusing the exact retained :class:`~reward.models.ClosedTrade` when this same
+        sink instance saw the close (the common case: live_test / a long-running
+        scheduler), or reconstructing a minimal one from the persisted row when the
+        in-memory state is cold (after a restart). It delegates to the guarded
+        ``on_trade_closed``, so the OPEN/CLOSED status guard makes it **idempotent** —
+        a now-resolvable trade closes + scores exactly once; a second pass is a no-op.
+
+        Best-effort/total: a listing failure logs ``critical`` and returns (never raises,
+        Decision J).
+
+        Args:
+            deal_ids: if given, only reconcile these deals (e.g. live_test targets just
+                the trade it placed, leaving unrelated stale rows untouched); otherwise
+                reconcile every OPEN row.
+
+        Returns:
+            The deal_ids that reached a non-OPEN status on this pass.
+        """
+        try:
+            rows = self.db.get_open_trades()
+        except Exception as exc:  # noqa: BLE001 - never raise into the caller (J)
+            logger.critical("reward: reconcile could not list open trades: %s", exc)
+            return []
+
+        resolved: list[str] = []
+        for row in rows:
+            deal_id = row.get("deal_id")
+            if not deal_id or (deal_ids is not None and deal_id not in deal_ids):
+                continue
+            closed = self._pending_close.get(deal_id) or self._reconstruct_closed(row)
+            self.on_trade_closed(closed)  # guarded + idempotent via status
+            after = self.db.get_trade_by_deal_id(deal_id)
+            if after is not None and after.get("status") not in (None, "OPEN"):
+                resolved.append(deal_id)
+        return resolved
+
+    @staticmethod
+    def _reconstruct_closed(row: dict[str, Any]) -> ClosedTrade:
+        """Rebuild a minimal ``ClosedTrade`` from a persisted OPEN row (cold reconcile).
+
+        Used only when no in-memory pending close exists (e.g. a restart). The exit
+        *type* is not persisted, so default to the conservative ``"TIME_STOP"`` (the
+        drift exit earns no clean-exit process bonus); the durable signals (R-multiple,
+        the resolved close fact) still score normally from ``get_trade_history``.
+        """
+        return ClosedTrade(
+            deal_reference=row.get("deal_reference") or "",
+            deal_id=row.get("deal_id"),
+            status="TIME_STOP",
+            closed_at=row.get("updated_at") or datetime.now(timezone.utc).isoformat(),
+        )
 
     def _on_trade_closed(self, closed: ClosedTrade) -> None:
         deal_id = closed.deal_id
@@ -170,6 +247,7 @@ class RewardSink:
         status = row.get("status")
         if status not in (None, "OPEN"):
             logger.debug("reward: deal_id=%s already processed (status=%s) — skip", deal_id, status)
+            self._pending_close.pop(deal_id, None)
             return
         trade_id = row.get("id")
         opened = self._opened.get(deal_id)
@@ -179,6 +257,7 @@ class RewardSink:
             size=float(row.get("size") or 0.0),
             intended_open_level=float(row.get("open_level") or 0.0),
             initial_risk=float(row.get("initial_risk") or 0.0),
+            direction=row.get("direction"),
         )
         try:
             close_level, profit_loss, r_multiple = pnl_resolver.resolve(
@@ -208,6 +287,9 @@ class RewardSink:
                 deal_id, exc,
             )
             return
+
+        # The close fact is durable now → no resolve-retry is owed for this deal.
+        self._pending_close.pop(deal_id, None)
 
         # (3)+(4) score and write the reward.
         spread = opened.spread_at_entry_pct if opened is not None else _NO_STASH_SPREAD

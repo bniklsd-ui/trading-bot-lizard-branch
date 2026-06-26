@@ -613,3 +613,40 @@ def test_reward_sink_close_raising_does_not_crash_cycle(
 
     assert result.status == "CLOSED_BY_BROKER"
     assert len(sink.opened) == 1 and len(sink.closed) == 1
+
+
+def test_build_closed_carries_close_confirm_pnl(
+    make_order_plan: Callable[..., OrderPlan]
+) -> None:
+    """build_closed threads the monitor's realised close_level/profit_loss onto the
+    ClosedTrade (the Phase-7 lag-free P&L path, 2026-06-23)."""
+    from execution.executor import build_closed
+    from execution.models import ExecutionResult
+
+    plan = make_order_plan()
+    result = ExecutionResult(
+        status="TIME_STOP", deal_id="D1", plan=plan, detail="time-stop (max_hold)",
+        close_level=24990.0, profit_loss=42.0,
+    )
+    closed = build_closed(result, now=datetime(2026, 6, 23, 14, 0))
+
+    assert closed.status == "TIME_STOP"
+    assert closed.deal_id == "D1"
+    assert closed.close_level == 24990.0
+    assert closed.profit_loss == 42.0
+
+
+def test_build_closed_defaults_none_without_confirm(
+    make_order_plan: Callable[..., OrderPlan]
+) -> None:
+    """A close with no confirm enrichment (e.g. CLOSED_BY_BROKER) → None P&L (history fallback)."""
+    from execution.executor import build_closed
+    from execution.models import ExecutionResult
+
+    result = ExecutionResult(
+        status="CLOSED_BY_BROKER", deal_id="D2", plan=make_order_plan(), detail="SL/TP",
+    )
+    closed = build_closed(result, now=datetime(2026, 6, 23, 14, 0))
+
+    assert closed.close_level is None
+    assert closed.profit_loss is None

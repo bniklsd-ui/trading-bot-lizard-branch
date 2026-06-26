@@ -153,3 +153,60 @@ def test_raises_pnl_unavailable_carries_code(make_closed, make_opened):
         assert exc.code == "PNL_UNAVAILABLE"
     else:  # pragma: no cover - the call above must raise
         pytest.fail("expected PnLUnavailable")
+
+
+def test_close_confirm_profit_is_used_directly_no_broker_call(make_closed, make_opened):
+    """A ClosedTrade carrying realised profit_loss resolves lag-free — no history call
+    (the IG-demo transaction ledger only books after settlement, 2026-06-23)."""
+    opened = make_opened(size=19.6, intended_open_level=24968.9, initial_risk=588.0)
+    closed = make_closed(status="TIME_STOP", close_level=24990.0, profit_loss=42.0)
+    broker = FakeBroker([])  # empty history would raise PnLUnavailable if reached
+
+    close_level, profit_loss, r = resolve(closed, broker, opened, CFG)
+
+    assert close_level == 24990.0
+    assert profit_loss == pytest.approx(42.0)
+    assert r == pytest.approx(42.0 / 588.0)
+    assert broker.history_calls == 0
+
+
+def test_close_level_without_profit_computes_from_levels_buy(make_closed, make_opened):
+    """close_level present, no profit → P&L = (close-open)·size·point_value (+ for BUY)."""
+    opened = make_opened(direction="BUY", size=2.0, intended_open_level=24000.0, initial_risk=60.0)
+    closed = make_closed(close_level=24015.0, profit_loss=None)
+    broker = FakeBroker([])
+
+    close_level, profit_loss, r = resolve(closed, broker, opened, CFG)
+
+    assert close_level == 24015.0
+    assert profit_loss == pytest.approx((24015.0 - 24000.0) * 2.0 * CFG.point_value)  # +30
+    assert r == pytest.approx(0.5)
+    assert broker.history_calls == 0
+
+
+def test_close_level_without_profit_sell_direction_sign(make_closed, make_opened):
+    """SELL gains as price falls → the sign comes from direction, not the level delta."""
+    opened = make_opened(direction="SELL", size=1.0, intended_open_level=24000.0, initial_risk=30.0)
+    closed = make_closed(close_level=23970.0, profit_loss=None)
+
+    _, profit_loss, r = resolve(closed, FakeBroker([]), opened, CFG)
+
+    assert profit_loss == pytest.approx(30.0)  # (24000-23970)*1*1
+    assert r == pytest.approx(1.0)
+
+
+def test_signed_history_size_matches_by_magnitude(make_closed, make_opened):
+    """IG signs the history ``size`` (``-19.8`` for a SELL); the magnitude match still
+    finds it. A signed compare silently rejected every SELL forever (live-debug
+    2026-06-23, deal DIAAAAXTGBTEYAC). ``OpenedTrade.size`` stays unsigned."""
+    opened = make_opened(direction="SELL", size=19.8, intended_open_level=24874.9,
+                         initial_risk=594.0)
+    broker = FakeBroker([
+        make_tx(size=-19.8, open_level=24874.9, close_level=24904.9, profit_loss=-99.0),
+    ])
+
+    close_level, profit_loss, r = resolve(make_closed(status="TIME_STOP"), broker, opened, CFG)
+
+    assert close_level == 24904.9
+    assert profit_loss == -99.0  # sign carried by IG's profit_loss, not by size
+    assert r == pytest.approx(-99.0 / 594.0)

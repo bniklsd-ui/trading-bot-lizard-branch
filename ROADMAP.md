@@ -187,10 +187,12 @@ into the next research call.
       close the loop by writing lessons + `mark_lesson_used` (Decision I)
 
 **Done when:** After 5 demo trades, score updates correctly, lessons are
-stored, and the next research call uses them. ✅ **code-complete (Steps 0–13,
-2026-06-23)** — 118 P7 unit tests + migration 002 + wiring/operator scripts;
-**open:** the operator `live_test.py` run vs IG Demo + the merge to `main`.
-⚠ code-complete ≠ live-verified ≠ profit-validated (edge is later live running).
+stored, and the next research call uses them. ✅ **live-verified (2026-06-26)** —
+`live_test.py` → **5/5** against IG Demo: SELL placed → time-stop close →
+`trade_outcomes` CLOSED + `reward_pts` + `trade_lessons` written, with P&L
+resolved **lag-free from the close confirmation** (Steps 0–13 + live-debug
+13b/13c; 128 P7 unit tests). ⚠ live-verified ≠ profit-validated (edge is later
+live running).
 
 **Directory:** `phase7_reward/` *(package `reward`)*
 **Concept:** [`docs/concepts/phase7_reward_concept.md`](./docs/concepts/phase7_reward_concept.md)

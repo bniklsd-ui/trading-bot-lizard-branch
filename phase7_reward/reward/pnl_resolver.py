@@ -14,6 +14,17 @@ nor direction can key the match. What *is* reliable is ``size`` (a hard filter) 
 ``open_level`` (a proximity discriminator against the intended entry), tie-broken by
 recency — the just-closed trade is the most recent matching row.
 
+**Why the size filter is magnitude-based (live-debug 2026-06-23).** IG's
+``/history/transactions`` returns ``size`` as a **signed** string (``"-19.8"`` for a
+SELL, ``"+19.8"`` for a BUY); ``ig_adapter._parse_transaction`` passes it through
+verbatim (``broker_wrapper/adapters/ig_adapter.py``). ``OpenedTrade.size`` is always
+the **unsigned** deal quantity, so the filter compares **magnitudes**
+(``abs(abs(tx_size) - abs(opened.size))``) — an exact signed compare silently rejected
+every SELL forever (the first reward live run, deal ``DIAAAAXTGBTEYAC`` size ``19.8``,
+hit exactly this). The direction is recovered for free anyway: IG's ``profit_loss``
+already carries the correct sign. (The cleaner fix — normalising the sign in the P1
+adapter — is deferred to keep this phase-isolated; see contract 1.1.)
+
 **Fallback = fail-closed (Decision J, operator decision 2026-06-19).** The concept §9
 sketched a level-approximation fallback (``profit_loss ≈ (close_level - open_level)·…``),
 but a ``ClosedTrade`` carries **no ``close_level``** to approximate from, so that path
@@ -60,28 +71,72 @@ def _normalise_ts(value: Any) -> str:
     return value.rstrip("Z")[:19]
 
 
+def _r_multiple(profit_loss: float, initial_risk: float) -> float:
+    """``R = profit_loss / initial_risk``; an ``initial_risk == 0`` resolves to ``0.0``
+    (defensive — no ``ZeroDivisionError``)."""
+    return (profit_loss / initial_risk) if initial_risk != 0 else 0.0
+
+
 def resolve(closed: Any, broker: Any, opened: Any, cfg: RewardConfig) -> tuple[float, float, float]:
     """Resolve ``(close_level, profit_loss, r_multiple)`` for a closed trade.
 
+    **Preference order (lag-free first, 2026-06-23).** IG demo only books
+    ``get_trade_history`` after settlement, so it is unusable intraday. When the close
+    deal confirmation gave us the realised close (the bot-issued ``TIME_STOP`` path,
+    carried on the :class:`~reward.models.ClosedTrade`), we use it directly and never
+    touch the broker:
+
+    1. ``closed.profit_loss`` present → use it verbatim (IG's realised P&L); the close
+       level is ``closed.close_level`` or, absent that, the intended open level.
+    2. ``closed.close_level`` present (+ a known direction) → compute
+       ``(close − open) · size · point_value · sign`` (a small approximation: the open
+       side uses ``intended_open_level``, exact only if IG also returned ``profit``).
+    3. otherwise (``CLOSED_BY_BROKER``, a confirm timeout, or a cold reconcile) → the
+       heuristic ``get_trade_history`` magnitude match below.
+
     Args:
-        closed: the :class:`~reward.models.ClosedTrade` (its ``closed_at`` is advisory
-            context; the heuristic does not need it beyond recency ordering).
+        closed: the :class:`~reward.models.ClosedTrade` (``close_level`` / ``profit_loss``
+            preferred when present; ``closed_at`` is advisory recency context).
         broker: a read-only broker exposing ``get_trade_history(days) -> Envelope``.
             The reward layer is **never** handed an order/close path.
-        opened: duck-typed open context — only ``.size``, ``.intended_open_level`` and
-            ``.initial_risk`` are read.
-        cfg: the reward config (reserved for future tunables; v1 uses module constants).
+        opened: duck-typed open context — ``.size``, ``.intended_open_level``,
+            ``.initial_risk`` and (for branch 2) ``.direction`` are read.
+        cfg: the reward config (``point_value`` is used by branch 2).
 
     Returns:
         ``(close_level, profit_loss, r_multiple)``. ``r_multiple = profit_loss /
-        initial_risk``; an ``initial_risk == 0`` is handled defensively as ``0.0``
-        (no ``ZeroDivisionError``) — the match is still valid.
+        initial_risk``; an ``initial_risk == 0`` is handled defensively as ``0.0``.
 
     Raises:
         PnLUnavailable: the history envelope was not ok, or no usable row matched the
-            open context (size within tolerance, with a non-null ``profit_loss`` and
-            ``close_level``). Fail-closed — never fabricates a P&L.
+            open context. Fail-closed — never fabricates a P&L.
     """
+    initial_risk = float(opened.initial_risk)
+
+    # (1)/(2) Lag-free resolution from the close deal confirmation (preferred).
+    direct_pl = getattr(closed, "profit_loss", None)
+    direct_level = getattr(closed, "close_level", None)
+    if direct_pl is not None:
+        close_level = float(direct_level) if direct_level is not None else float(opened.intended_open_level)
+        profit_loss = float(direct_pl)
+        logger.debug("pnl_resolver: using close-confirm P&L for deal_id=%s pl=%s",
+                     getattr(closed, "deal_id", "?"), profit_loss)
+        return close_level, profit_loss, _r_multiple(profit_loss, initial_risk)
+    if direct_level is not None:
+        direction = getattr(opened, "direction", None)
+        sign = 1.0 if direction == "BUY" else -1.0 if direction == "SELL" else None
+        if sign is not None:
+            close_level = float(direct_level)
+            profit_loss = (
+                (close_level - float(opened.intended_open_level))
+                * float(opened.size) * float(cfg.point_value) * sign
+            )
+            logger.debug("pnl_resolver: computed P&L from close level for deal_id=%s pl=%s",
+                         getattr(closed, "deal_id", "?"), profit_loss)
+            return close_level, profit_loss, _r_multiple(profit_loss, initial_risk)
+        # direction unknown → fall through to the history match.
+
+    # (3) Fallback: heuristic transaction-history match (settlement-delayed on IG demo).
     env = broker.get_trade_history(days=_HISTORY_DAYS)
     if not getattr(env, "ok", False):
         raise PnLUnavailable(
@@ -94,11 +149,12 @@ def resolve(closed: Any, broker: Any, opened: Any, cfg: RewardConfig) -> tuple[f
     size = float(opened.size)
     intended_open_level = float(opened.intended_open_level)
 
-    # Hard filter: same size + a usable (non-null) close level and P&L.
+    # Hard filter: same size *magnitude* (IG signs the history size — see module
+    # docstring) + a usable (non-null) close level and P&L.
     candidates: list[dict[str, Any]] = []
     for tx in transactions:
         tx_size = tx.get("size")
-        if tx_size is None or abs(float(tx_size) - size) > _SIZE_TOL:
+        if tx_size is None or abs(abs(float(tx_size)) - abs(size)) > _SIZE_TOL:
             continue
         if tx.get("profit_loss") is None or tx.get("close_level") is None:
             continue
@@ -123,9 +179,7 @@ def resolve(closed: Any, broker: Any, opened: Any, cfg: RewardConfig) -> tuple[f
 
     close_level = float(best["close_level"])
     profit_loss = float(best["profit_loss"])
-
-    initial_risk = float(opened.initial_risk)
-    r_multiple = (profit_loss / initial_risk) if initial_risk != 0 else 0.0
+    r_multiple = _r_multiple(profit_loss, initial_risk)
 
     logger.debug(
         "pnl_resolver matched deal_id=%s → close_level=%s profit_loss=%s r=%s",

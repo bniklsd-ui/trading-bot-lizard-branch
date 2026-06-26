@@ -74,6 +74,9 @@ Imports im Code/Tests: `from execution.<modul> import …`. Editable installs vi
 - **`reconcile_positions(expected_references=…).data`** = `{broker_position_count,
   broker_deal_ids, present, missing, unexpected}` (die drei Mengen nur mit Refs).
 - **`close_position(deal_id)`** schlägt Richtung/Size selbst nach und schließt gegenläufig.
+  **⟳ 2026-06-23:** `.data` trägt jetzt zusätzlich `close_level`/`profit_loss`/`profit_currency`/
+  `close_deal_reference` aus dem Close-Confirm (best-effort; `None` wenn der Confirm lagte) — die
+  **lag-freie** P&L-Quelle für Phase 7. `monitor_position` reicht sie in `ExecutionResult` durch.
 - **P2** `StateManager(state_dir)`: `load_candidates()`/`candidates_are_fresh()`/`save_candidates`/
   `clear_candidates`/`load_bot_config()`. `Database(path)`: `get_risk_level()→
   "AGGRESSIV"|"KONSERVATIV"` (Schwelle Score 50), `get_current_score()`,
@@ -111,6 +114,17 @@ Hand-off „Candidate → Gates → Order" so bauen, dass P6 die Richtungs-/Size
 > P5-Modul-Imports bleiben `execution.* + stdlib`. **Default `None` ⇒ P5 bit-identisch + AI-frei**
 > (135 → **142**, +7 Seam-Tests in `test_executor.py`; `FakeDB` um `get_current_score` ergänzt).
 > Detail: `phase7_reward/` + `docs/concepts/phase7_reward_concept.md` §6 Step 10.
+
+> 🔁 **Phase-7-Edit (2026-06-23, cross-phase — user-authorized "specific yes"):** **lag-freie
+> P&L am Close.** `ExecutionResult` bekam **additiv** `close_level: float | None = None` +
+> `profit_loss: float | None = None` (Defaults ⇒ alle Bestands-Konstruktionen bleiben gültig).
+> `monitor.py` liest im **TIME_STOP**-Zweig `close_env.data` (`close_position` reicht jetzt den
+> Close-Confirm durch, s. P1-Edit) und füllt die beiden Felder; `CLOSED_BY_BROKER` bleibt `None`
+> (kein bot-eigener Close-Confirm → P7 fällt auf die History zurück). **Warum:** IG-Demo bucht
+> `get_trade_history` erst nach Settlement (intraday 0 Zeilen) → der Reward braucht die realisierte
+> P&L direkt aus dem Close-Confirm. `build_closed` (P7-Naht in `executor.py`) reicht beide Felder in
+> den `ClosedTrade`. **Additiv, P5 bit-identisch** (Defaults); +4 Tests (`test_monitor.py` +2,
+> `test_executor.py` +2 für `build_closed`) → **142 → 146**. Detail: `phase7_reward/` + Konzept §9.
 
 ## Datei-/Modul-Übersicht (Soll, Konzept §"Modul-Plan")
 ```
