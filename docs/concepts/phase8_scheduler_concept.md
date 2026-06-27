@@ -286,6 +286,24 @@ class Clock:
   Mitternacht → POST_WINDOW; Wochenende → IDLE; `seconds_until(WINDOW)` korrekt über
   Mitternacht; DST-Wechseltag plausibel.
 
+> **⟳ Angepasst 2026-06-28 (Modul 3 gebaut, Code = Source of Truth) — drei Reconciliations:**
+> 1. **`classify` ist config-getrieben, `is_market_open` lazy reused.** Decision 2 verlangt
+>    Reuse von `market_hours`, aber `is_market_open` vermengt Weekday **und** 09:00–17:30 →
+>    es kann nicht allein „heute Handelstag?" um 08:00 (Pre-Open) beantworten, und das
+>    Scheduler-WINDOW ist **config-getrieben** (test-überschreibbar), nicht an P3s festes
+>    Fenster gekoppelt. ⇒ `classify` = Weekday-Check + config-`window_open/close` (lokales
+>    `_parse_hhmm`, von P5 gespiegelt, **nicht** importiert); P3s Prädikat wird als
+>    Laufzeit-Guard via `Clock.market_is_open(now)` **lazy** reused — so bleibt `import
+>    scheduler.clock` stdlib-only (Import-Isolation bewiesen). v1 **kein Feiertagskalender**
+>    (Weekday-Proxy, gleiche P3-Vereinfachung).
+> 2. **★ DST-korrekt via UTC-Subtraktion.** `(a-b)` zweier datetimes mit **demselben**
+>    `ZoneInfo` rechnet naiv wall-clock (63h für eine Spanne über die Frühjahrs-Umstellung,
+>    real 62h). `seconds_until` konvertiert beide Seiten nach UTC vor der Subtraktion →
+>    Tests pinnen 62h (Spring-Forward) / 64h (Fall-Back), **nicht** 63h. Exakt das geforderte
+>    „keine naiven `timedelta`-Stunden-Hacks".
+> 3. **`Phase`-Enum + `market_is_open` ergänzt** die skizzierte API; `seconds_until(IDLE)`
+>    wirft `ValueError` (IDLE hat keine Einzel-Start-Zeit; kein Sleep-Target). **19 Tests.**
+
 ### 3. `state.py` + Tests
 
 ```python

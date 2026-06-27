@@ -71,7 +71,7 @@ Safety.
 | `scheduler/__init__.py` | Paket-Marker (Exports wachsen pro Modul) | ✅ (leer) |
 | `scheduler/config.py` | `SchedulerConfig` (frozen) — alle Tunables an einem Ort | ✅ (Modul 1, 10 Tests) |
 | `scheduler/exceptions.py` | `SchedulerError`/`PreflightError`/… | ✅ (Modul 2, 6 Tests) |
-| `scheduler/clock.py` | `now_fn`/`sleep_fn` injizierbar; Phasen-Klassifikation (reuse `is_market_open` + P5-Fenster) | ⬜ |
+| `scheduler/clock.py` | `now_fn`/`sleep_fn` injizierbar; Phasen-Klassifikation (config-Fenster + Weekday; `is_market_open` lazy via `market_is_open`) | ✅ (Modul 3, 19 Tests) |
 | `scheduler/state.py` | `SchedulerState` ↔ `scheduler_state.json`; Tages-Rollover (Europe/Berlin) | ⬜ |
 | `scheduler/killswitch.py` | KILL-Datei lesen/setzen/löschen (von `safety` + `webui` geteilt) | ⬜ |
 | `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ⬜ |
@@ -191,11 +191,71 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   Records selbst (Filter `ts`-Datum in Europe/Berlin).
 - `external_data.market_hours.is_market_open(now=None) -> bool`
   (`external_data/market_hours.py:24`): Mo–Fr 09:00–17:30 Europe/Berlin, DST-aware, **kein
-  Feiertagskalender** (Feiertage fallen in Broker-/VETO-fail-closed). `clock.py` reusen
-  für „Handelstag/Markt offen"; die WINDOW-Phase nutzt P5 `config.trading_window_start/
-  end` (09:30–11:19 — Defaults im `clock.py`-Step gegen `execution/config.py` prüfen).
+  Feiertagskalender** (Feiertage fallen in Broker-/VETO-fail-closed). ⟳ **2026-06-28
+  (Modul 3, Code = Wahrheit):** das frühere „WINDOW nutzt P5 `trading_window_start/end`
+  (09:30–11:19)" war stale — die echte P5-`ExecutionConfig` ist `09:00`/`17:30`
+  (`execution/config.py:99-100`), bereits in Modul 1 übernommen. `clock.classify` nutzt
+  daher `SchedulerConfig.window_open/close` (test-überschreibbar); `is_market_open` wird
+  nur als **laufzeit-Markt-offen-Prädikat** via `Clock.market_is_open` reused (lazy Import,
+  damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 3: `scheduler/clock.py`)
+
+### Completed
+- **`scheduler/clock.py`** — `Phase`-Enum (`PRE_OPEN | WINDOW | POST_WINDOW | IDLE`) +
+  `Clock(config, *, now_fn, sleep_fn)`: `now()` (tz-aware in `config.tz`), `classify(now)`,
+  `seconds_until(target, now)`, `sleep(s)` (delegiert an `sleep_fn`), `market_is_open(now)`.
+  Erstes echtes Logik-Modul. `_parse_hhmm` **lokal gespiegelt** von P5 `gates._parse_hhmm`
+  (nicht importiert — Phasen-Isolation für einen Einzeiler).
+- **`scheduler/__init__.py`** exportiert jetzt zusätzlich `Clock` + `Phase`.
+- **`tests/test_clock.py`** — **19 Tests**: alle 4 Phasen + Weekend; inklusive Fenster-
+  Grenzen (09:00/17:30 → WINDOW); `seconds_until` same-day/across-midnight/across-weekend,
+  strikt-nächster bei Boundary==now, `PRE_OPEN`-Target, `IDLE`→`ValueError`; `now`/`sleep`-
+  Delegation; `market_is_open`-Delegation an P3; **config-getriebenes Fenster** (Override
+  reklassifiziert); Package-Export.
+
+### Zwei Design-Entscheidungen (Code = Source of Truth — dated §2-Annotation im Konzept)
+- **★ DST-Falle gefixt:** `(a - b)` zweier datetimes mit **demselben** `ZoneInfo`-Objekt
+  rechnet **naiv wall-clock** (eine Spanne über die Frühjahrs-Umstellung liefert 63h statt
+  real 62h). `seconds_until` konvertiert daher **beide Seiten nach UTC** vor der Subtraktion
+  → DST-korrekt (Tests pinnen 62h Spring-Forward / 64h Fall-Back, **nicht** 63h). Das ist
+  exakt das vom Konzept geforderte „keine naiven `timedelta`-Stunden-Hacks".
+- **Konzept↔Code-Reconciliation (market_hours-Reuse, Decision 2):** `is_market_open`
+  vermengt Weekday **und** 09:00–17:30 → es kann `classify` nicht allein „heute Handelstag?"
+  um 08:00 beantworten, und das Scheduler-WINDOW ist **config-getrieben** (test-überschreibbar),
+  nicht an P3s festes Fenster gekoppelt. Aufteilung: `classify` = Weekday-Check + config-Fenster
+  (`_parse_hhmm`); P3s Prädikat wird **lazy** via `Clock.market_is_open` reused (Laufzeit-Guard
+  im Runner). So bleibt der heiße Pfad stdlib-only (Import-Isolation bewiesen: `import
+  scheduler.clock` zieht **kein** pandas/external_data — erst der `market_is_open`-Aufruf).
+  v1 **kein Feiertagskalender** (Weekday-Proxy, gleiche P3-Vereinfachung; Feiertage →
+  Broker-/VETO-fail-closed downstream).
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **35 passed** (10 config + 6 exceptions + 19 clock).
+  `py_compile` clean. **Import-Isolation:** `import scheduler.clock` zieht **NONE** von
+  pandas/numpy/external_data/yfinance/broker_wrapper/execution/research/reward.
+- **Regression grün + unberührt** (additiv in `phase8_scheduler/`; nur ein read-only lazy
+  Import von `external_data.market_hours`): P1 52 · P2 62 · P4 94 · P5 146 · P6 70 · P7 128
+  (separat gelaufen — `tests.conftest`-Namenskollision; jede Phase einzeln).
+
+### Next — **Modul 4: `scheduler/state.py`** (Konzept §3, TDD)
+- `SchedulerState`-Dataclass (date/trades_today/realized_pnl_today/last_research_ts/
+  last_reconcile_ts/consecutive_failures/kill_reason/last_no_trade_reason) + `StateStore`
+  (`load`/`save` **atomic** tmp+`os.replace` wie P2 `state.py`; `rollover_if_new_day` resettet
+  Counter/Loss/Failures bei neuem Europe/Berlin-Datum, idempotent; `record_cycle` inkrementiert
+  `trades_today` **nur** bei echtem Trade-Status {OPEN, CLOSED_BY_BROKER, TIME_STOP} — Contract E).
+  Tests ≥5 (roundtrip, Rollover resettet/selber-Tag-nicht, atomic überlebt Teil-Write,
+  record_cycle nur bei Trade). Kein Netz/LLM. **Clock liefert `now` für den Rollover.**
+
+### Offene Punkte / [VERIFY] (für spätere Module, jetzt nur dokumentiert)
+- `safety.py`: `daily_loss_cap`-Produktionswert (≈€1800) + `realized_pnl_today` aus der DB
+  (Contract E) — beim Wiring setzen.
+- **Commit:** dieser Step ist committet, **falls** der Operator es triggert (Branch
+  `phase8-scheduler`); „Commit ⇒ Note-Update" gilt im selben Commit.
 
 ---
 
