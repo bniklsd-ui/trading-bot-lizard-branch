@@ -69,7 +69,7 @@ Safety.
 |---|---|---|
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
 | `scheduler/__init__.py` | Paket-Marker (Exports wachsen pro Modul) | ✅ (leer) |
-| `scheduler/config.py` | `SchedulerConfig` (frozen) — alle Tunables an einem Ort | ⬜ |
+| `scheduler/config.py` | `SchedulerConfig` (frozen) — alle Tunables an einem Ort | ✅ (Modul 1, 10 Tests) |
 | `scheduler/exceptions.py` | `SchedulerError`/`PreflightError`/… | ⬜ |
 | `scheduler/clock.py` | `now_fn`/`sleep_fn` injizierbar; Phasen-Klassifikation (reuse `is_market_open` + P5-Fenster) | ⬜ |
 | `scheduler/state.py` | `SchedulerState` ↔ `scheduler_state.json`; Tages-Rollover (Europe/Berlin) | ⬜ |
@@ -196,6 +196,59 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   end` (09:30–11:19 — Defaults im `clock.py`-Step gegen `execution/config.py` prüfen).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 1: `scheduler/config.py`)
+
+### Completed
+- **`scheduler/config.py`** — frozen `SchedulerConfig` (Konzept §1), alle Tunables an einem
+  Ort, **stdlib-only, importiert nichts cross-phase** (spiegelt P5 `execution/config.py`).
+  `__post_init__` emittiert **eine** laute `logger.warning`, wenn `daily_loss_cap is None`
+  (Breaker inaktiv — bewusste „setz es bewusst"-Markierung; read-only, kein Raise, frozen-safe).
+- **`scheduler/__init__.py`** exportiert jetzt `SchedulerConfig` (+ `__all__`; Exports wachsen
+  pro Modul).
+- **`tests/test_config.py`** — **10 Tests** (Stil wie P5 `test_config`/P7 `test_models`): Defaults,
+  frozen, `account="live"` baubar (Demo-Lock ist `safety.py`, nicht hier), `daily_loss_cap=None`
+  → genau **eine** WARNING (caplog), gesetzter Cap → keine WARNING, `daily_token_budget=None`
+  ohne Config-WARNING (gehört `budget.py`), Full-Override-Roundtrip, Package-Export-Identität,
+  **+ die zwei Reconciliations gepinnt** (Fenster `09:00`/`17:30`, **nicht** `09:30`/`11:19`;
+  `HH:MM`-Strings, nicht `time`).
+
+### Zwei Konzept↔Code-Reconciliations (Code = Source of Truth, dated §1-Annotation im Konzept)
+- **Handelsfenster = volles Marktfenster `09:00`–`17:30`** (Operator-Entscheidung 2026-06-28),
+  **nicht** das Konzept-`09:30`–`11:19`. Das „aus P5-Config" war faktisch falsch — die echte,
+  live-verifizierte P5-`ExecutionConfig` ist `09:00`/`17:30`, ebenso `market_hours.is_market_open`.
+  Volles Fenster = mehr Trade-Versuche = mehr reale Demo-Daten (die Mission).
+- **Fenster als `HH:MM`-Strings**, nicht `datetime.time` — gemäß Build-Note „reuse P5-Strings"
+  + Source-of-Truth-Sibling P5. `clock.py` (Modul 2) reused dasselbe Parse-Idiom.
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- **`scheduler` editable-installiert** (`pip install -e phase8_scheduler` im Projekt-venv
+  `phase1_broker_wrapper/.venv`) → `import scheduler` / `from scheduler import SchedulerConfig` OK.
+- `pytest phase8_scheduler/tests -v` → **10 passed**. `py_compile` clean. **Import-Isolation
+  bewiesen:** `import scheduler.config` zieht **kein** `broker_wrapper`/`persistence`/
+  `external_data`/`research`/`execution`/`reward`/`debate`/`anthropic`/`requests` (NONE).
+- **Regression grün + unberührt** (rein additiv in `phase8_scheduler/`): **P2 62 · P5 146 ·
+  P7 128** (separat gelaufen — die Phasen teilen den `tests.conftest`-Modulnamen, daher **nicht**
+  gemeinsam in einem `pytest`-Lauf collectbar; jede Phase einzeln). P1 52 · P4 94 · P6 70
+  unverändert (kein berührter Import).
+
+### Next — **Modul 2: `scheduler/exceptions.py`** (typisierte Hierarchie, TDD)
+- `SchedulerError` (Basis, `code`-Class-Attr-Muster wie P5/P6/P7) → `PreflightError` (Keyring/
+  Broker/DB-Preflight, `runner.preflight`), ggf. weitere (`SchedulerStateError`?). Klein; **danach
+  Modul 3 `clock.py`** (das erste echte Logik-Modul: `now_fn`/`sleep_fn` injizierbar, Phasen-
+  Klassifikation reuse `market_hours.is_market_open` + `config.window_open/close` via einem
+  `_parse_hhmm`-Idiom; **gegen `execution/config.py` ist bereits bestätigt: P5-Fenster 09:00–17:30**).
+
+### Offene Punkte / [VERIFY] (für spätere Module, jetzt nur dokumentiert)
+- `clock.py`: P5-Fenster-Frage **gelöst** (09:00–17:30, s. o.) — `clock.classify` nutzt
+  `config.window_open/close`; `market_hours.is_market_open` nur für „Handelstag/Markt offen".
+- `safety.py`: `daily_loss_cap`-Produktionswert (≈€1800) + `realized_pnl_today` aus der **DB**
+  (Contract E) — beim Wiring setzen, nicht im Config-Default.
+- **Commit:** dieser Step ist noch **nicht** committet (Operator-Entscheidung; Branch
+  `phase8-scheduler`). Beim Commit gilt „Commit ⇒ Note-Update": Status-Tabelle (oben ✅) **und**
+  dieser Block sind im selben Commit aktuell.
 
 ---
 

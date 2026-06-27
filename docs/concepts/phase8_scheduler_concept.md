@@ -246,6 +246,19 @@ class SchedulerConfig:
   verweigert (nicht hier hart fehlschlagen — Trennung der Verantwortung); `daily_loss_cap=None`
   erzeugt eine geloggte WARNING-Markierung (kein Crash).
 
+> **⟳ Angepasst 2026-06-28 (Modul 1 gebaut, Code = Source of Truth) — zwei Reconciliations:**
+> 1. **Handelsfenster = volles Marktfenster `09:00`–`17:30`** (Operator-Entscheidung 2026-06-28),
+>    **nicht** das hier skizzierte `09:30`–`11:19`. Das „aus P5-Config (09:30 CET)" war faktisch
+>    falsch: die echte, live-verifizierte P5-`ExecutionConfig.trading_window_start/_end` ist
+>    `09:00`/`17:30` (und `external_data.market_hours.is_market_open` läuft ebenso `09:00–17:30`).
+>    Das volle Fenster maximiert Trade-Versuche = mehr reale Demo-Daten (die Phasen-Mission). P5s
+>    Gate 1 re-checkt `09:00–17:30` unabhängig.
+> 2. **Fenster als `HH:MM`-Strings** (`"09:00"`), **nicht** `datetime.time` — gemäß `CLAUDE.md`-
+>    Build-Note „Zeitfenster (reuse P5-Strings)" und dem Source-of-Truth-Sibling P5 (Strings, via
+>    `gates._parse_hhmm` geparst). Hält ein einziges Parse-Idiom, das `clock.py` (Modul 2)
+>    wiederverwendet. — `daily_loss_cap` bleibt Default `None` + lauter `__post_init__`-WARNING
+>    (Operator-Produktionswert ≈ €1800 wird erst im Wiring gesetzt). **10 Tests grün.**
+
 ### 2. `clock.py` + Tests
 
 ```python

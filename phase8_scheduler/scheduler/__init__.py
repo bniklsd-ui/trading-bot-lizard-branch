@@ -21,3 +21,9 @@ Reconcile -> Loop/Daemon -> (last) Web-UI.
 
 Full design + the 20 locked decisions: ``../docs/concepts/phase8_scheduler_concept.md``.
 """
+
+from __future__ import annotations
+
+from .config import SchedulerConfig
+
+__all__ = ["SchedulerConfig"]
