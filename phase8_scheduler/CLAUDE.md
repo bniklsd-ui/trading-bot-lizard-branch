@@ -70,7 +70,7 @@ Safety.
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
 | `scheduler/__init__.py` | Paket-Marker (Exports wachsen pro Modul) | ✅ (leer) |
 | `scheduler/config.py` | `SchedulerConfig` (frozen) — alle Tunables an einem Ort | ✅ (Modul 1, 10 Tests) |
-| `scheduler/exceptions.py` | `SchedulerError`/`PreflightError`/… | ⬜ |
+| `scheduler/exceptions.py` | `SchedulerError`/`PreflightError`/… | ✅ (Modul 2, 6 Tests) |
 | `scheduler/clock.py` | `now_fn`/`sleep_fn` injizierbar; Phasen-Klassifikation (reuse `is_market_open` + P5-Fenster) | ⬜ |
 | `scheduler/state.py` | `SchedulerState` ↔ `scheduler_state.json`; Tages-Rollover (Europe/Berlin) | ⬜ |
 | `scheduler/killswitch.py` | KILL-Datei lesen/setzen/löschen (von `safety` + `webui` geteilt) | ⬜ |
@@ -196,6 +196,51 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   end` (09:30–11:19 — Defaults im `clock.py`-Step gegen `execution/config.py` prüfen).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 2: `scheduler/exceptions.py`)
+
+### Completed
+- **`scheduler/exceptions.py`** — `SchedulerError` (Basis, `code="SCHEDULER_ERROR"`) →
+  `PreflightError` (`code="PREFLIGHT_ERROR"`). `code`-Class-Attr-Muster **verbatim wie P5**
+  (`execution/exceptions.py`), stdlib-only, **importiert nichts cross-phase**.
+- **`scheduler/__init__.py`** exportiert jetzt zusätzlich `SchedulerError` + `PreflightError`.
+- **`tests/test_exceptions.py`** — **6 Tests**: Basis ist `Exception` + Code; `PreflightError`
+  erbt + überschreibt Code; distinkte Codes; Family-Catch (`except SchedulerError`);
+  Message-Roundtrip + `code` am Instance; Package-Export-Identität.
+
+### Bewusste Scope-Entscheidung (minimal + ehrlich — dated §-Annotation im Konzept)
+- Das Konzept-`exceptions.py # SchedulerError, PreflightError, ...` lässt das „…" — **bleibt
+  leer.** Die **einzige** custom Raise-Stelle ist `runner.preflight()` (`PreflightError`,
+  fail-closed Keyring/Broker/DB — der Deployment-Top-Risk Q3). Alle anderen Module returnen
+  Werte oder fehlschlagen fail-closed **ohne** Re-raise (`safety`→`(bool, reason)`, `budget`→
+  `bool`, `reconcile`/`research_tick`→`logger.critical`, `killswitch`/`state` self-heal). Keine
+  spekulativen `StateError`/`BudgetError` → die Datei **wächst pro Modul** bei echtem Bedarf.
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **16 passed** (10 config + 6 exceptions). `py_compile`
+  clean. **Import-Isolation:** `import scheduler.exceptions` zieht **kein** cross-phase/heavy
+  Modul (NONE).
+- **Regression grün + unberührt** (additiv in `phase8_scheduler/`): **P5 146 · P7 128** (separat
+  gelaufen — `tests.conftest`-Namenskollision; jede Phase einzeln). P1 52 · P2 62 · P4 94 · P6 70
+  unverändert.
+
+### Next — **Modul 3: `scheduler/clock.py`** (erstes echtes Logik-Modul, TDD)
+- `Clock(config, *, now_fn, sleep_fn)` mit `now() -> datetime` (tz-aware Europe/Berlin),
+  `classify(now) -> Phase` (PRE_OPEN | WINDOW | POST_WINDOW | IDLE), `seconds_until(target, now)`,
+  `sleep(s)` (delegiert an `sleep_fn`, Tests no-op). **Reuse `external_data.market_hours.
+  is_market_open`** für „Handelstag/Markt offen" (Mo–Fr, DST-aware); die WINDOW-Phase nutzt
+  `config.window_open`/`window_close` (**09:00–17:30 bereits bestätigt**, s. Modul-1-Block) via
+  einem `_parse_hhmm`-Idiom (spiegelt P5 `gates._parse_hhmm`). DST: tz-aware Arithmetik, **keine**
+  naiven `timedelta`-Stunden-Hacks. Tests ≥6 mit Fake-`now_fn` (Wochenende→IDLE, vor/in/nach
+  Fenster, `seconds_until(WINDOW)` über Mitternacht, DST-Tag plausibel).
+
+### Offene Punkte / [VERIFY] (für spätere Module, jetzt nur dokumentiert)
+- `safety.py`: `daily_loss_cap`-Produktionswert (≈€1800) + `realized_pnl_today` aus der DB
+  (Contract E) — beim Wiring setzen.
+- **Commit:** dieser Step ist committet, **falls** der Operator es triggert (Branch
+  `phase8-scheduler`); „Commit ⇒ Note-Update" gilt im selben Commit.
 
 ---
 

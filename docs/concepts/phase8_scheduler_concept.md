@@ -210,6 +210,15 @@ phase8_scheduler/
 > **One file = one responsibility.** Killswitch ist ein eigenes Mini-Modul, weil `safety`
 > (Leser) und `webui` (Schreiber) es teilen.
 
+> **⟳ Angepasst 2026-06-28 (Modul 2 `exceptions.py` gebaut, Code = Source of Truth):** Das
+> „…" hinter `SchedulerError, PreflightError` bleibt **bewusst leer** — die einzige custom
+> Raise-Stelle ist `runner.preflight()` (`PreflightError`, fail-closed Keyring/Broker/DB). Alle
+> anderen Module returnen Werte oder fehlschlagen fail-closed **ohne** Re-raise (`safety`→
+> `(bool, reason)`, `budget`→`bool`, `reconcile`/`research_tick`→`logger.critical`, `killswitch`/
+> `state` self-heal). Spekulative `StateError`/`BudgetError` wären jetzt toter Code → die Datei
+> wächst pro Modul, falls ein späteres genuin einen neuen Typ braucht. `code`-Class-Attr-Muster
+> wie P5/P6/P7. **6 Tests grün** (Paket-Suite 10+6=16).
+
 ---
 
 ### 1. `config.py` + Tests
