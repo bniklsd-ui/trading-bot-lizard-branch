@@ -1,0 +1,21 @@
+# Phase 8 — Scheduler (autonomous unattended demo trading).
+#
+# The trade core has NO new runtime dependency of its own: Phase 8 is pure mechanics
+# composed over the existing P1–P7 editable installs (broker_wrapper / persistence /
+# external_data / research / execution / reward), all reached through their defined
+# contracts and wired in `scripts/wiring.py`. See `scripts/dev_install.sh` at the repo
+# root, which installs P1 -> ... -> P8 in dependency order.
+#
+# Phase 8 adds NO new AI — a scheduler is deterministic code. The only AI in the live
+# path stays the reused Phase-4 research pick, the (optional) Phase-6 debate, and the
+# Phase-7 lesson Haiku. No unit test imports a real LLM, hits the network, or sleeps
+# for real (clock/sleep are injected).
+#
+# The two genuinely new runtime deps below are used ONLY by the read-mostly Web-UI
+# (`webui/`), which is built LAST and is the first thing dropped under time pressure
+# (never the safety). They are inert until that step.
+fastapi>=0.110
+uvicorn>=0.29
+
+# dev / test
+pytest>=7.4.0

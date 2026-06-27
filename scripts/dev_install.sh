@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 #
-# dev_install.sh — composition root (concept §"Step C", Phase 5 + Phase 6 + Phase 7).
+# dev_install.sh — composition root (concept §"Step C", Phase 5 + Phase 6 + Phase 7 + Phase 8).
 #
 # Editable-install every phase package in dependency order (P1 -> P2 -> P3 -> P4
-# -> P5 -> P6 -> P7) into the *currently active* virtualenv, so that
-#   import broker_wrapper / persistence / external_data / research / execution / debate / reward
+# -> P5 -> P6 -> P7 -> P8) into the *currently active* virtualenv, so that
+#   import broker_wrapper / persistence / external_data / research / execution / debate / reward / scheduler
 # all resolve at runtime WITHOUT any sys.path manipulation, and `pytest`
 # collects cleanly. Run once per fresh venv. (P6 + P7 import `research`, so they
-# are installed after P4; P7 also reuses the Phase-2 `persistence` Database.)
+# are installed after P4; P7 also reuses the Phase-2 `persistence` Database. P8
+# composes the whole P1–P7 stack, so it is installed last.)
 #
 # Usage:
 #   source <your-venv>/bin/activate
@@ -15,6 +16,7 @@
 #   pytest phase5_execution/tests -v       # green => Step C proven (P5)
 #   pytest phase6_debate/tests -v          # green => Step C proven (P6)
 #   pytest phase7_reward/tests -v          # green => Step C proven (P7)
+#   pytest phase8_scheduler/tests -v       # green => Step C proven (P8)
 #
 # Editable installs change only *packaging*, not code dependencies: each phase
 # still imports its siblings only through their defined contracts (cross-phase
@@ -37,10 +39,11 @@ for pkg in \
     phase4_research \
     phase5_execution \
     phase6_debate \
-    phase7_reward
+    phase7_reward \
+    phase8_scheduler
 do
     echo "dev_install: pip install -e $pkg"
     "$PY" -m pip install -e "$ROOT/$pkg"
 done
 
-echo "dev_install: all seven packages installed editable. Run: pytest phase7_reward/tests -v"
+echo "dev_install: all eight packages installed editable. Run: pytest phase8_scheduler/tests -v"

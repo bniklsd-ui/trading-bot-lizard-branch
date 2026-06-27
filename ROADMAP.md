@@ -199,21 +199,39 @@ live running).
 
 ---
 
-## Phase 8 — Scheduler
+## Phase 8 — Scheduler  *(🔄 in progress, since 2026-06-27)*
 
-**Goal:** Make it autonomous. Wake up, run, sleep, on a schedule.
+> **Mission (read first):** "Scheduler" is only the name — the goal is **autonomous,
+> unattended generation of real demo trades**, because everything after P8 (confidence
+> out of `INSUFFICIENT`, P9 instinct-promotion) is gated on *real outcomes*. The hard
+> path is **autonomous candidate generation** via real Phase-4 research (never the manual
+> seed). **No new AI** — a scheduler is pure mechanics; AI stays at P4-pick / P6-debate /
+> P7-lesson. Build order is binding: **Cleanup → Verify → autonomous candidates →
+> Auto-Confirm/Safety → Reconcile → Loop/Daemon → (last) Web-UI**; under pressure the UI
+> drops, never the safety.
 
-- [ ] 09:20 Session Track trigger
-- [ ] 09:25 Research trigger
-- [ ] 09:30–11:19 Trading window (Gate 1 enforced)
-- [ ] 11:30 hard stop
-- [ ] Token refresh / session keepalive
-- [ ] Graceful shutdown
+**Goal:** Make it autonomous — a long-running daemon that wakes, researches, trades
+within the window, reconciles, and sleeps, collecting the first real outcome data.
 
-**Done when:** Bot runs unattended for a full session, performs research,
-trades within window, stops cleanly.
+- [ ] Pre-steps: Step 0 (legacy grep — clean), Step 0b (docs), Step 1 (contract-verify),
+      Step 2 (scaffold `phase8_scheduler/`, pkg `scheduler`)
+- [ ] `clock.py` — market-hours phases (reuse `is_market_open` + Gate-1 window), injectable `now_fn`/`sleep_fn`
+- [ ] `state.py` — `scheduler_state.json` (trade count, daily loss, backoff, kill-reason), Europe/Berlin rollover
+- [ ] `safety.py` — Auto-Confirm `confirm_fn` (demo-only fail-closed + caps + loss-breaker + budget)
+- [ ] `killswitch.py` — file-based KILL (UI-independent); `backoff.py` — consecutive-failure trip; `budget.py` — token budget
+- [ ] `research_tick.py` — autonomous candidates (real P4 research, never the seed; `no_trade_reason` skeleton)
+- [ ] `reconcile.py` — idempotent `CLOSED_BY_BROKER` P&L catch-up (reuse `reconcile_startup` + `reward_sink.reconcile_open_trades`)
+- [ ] `runner.py` — the loop/daemon + fail-closed keyring preflight + graceful shutdown
+- [ ] `scripts/` — wiring (full P1–P7 stack), `run.py` entry, `run_scheduler.sh`, smoke_test, live_test
+- [ ] Web-UI (`webui/`, FastAPI read-mostly + static dashboard) — **built last**
+
+**Done when:** `live_test.py` runs unattended vs IG Demo — real research → full cycle →
+**either** a real demo trade (`trade_outcomes` CLOSED + `reward_pts`) **or** a documented
+`no_trade_reason`; idempotent broker-close reconcile; clean stop. Kill-switch + backoff-trip
++ daily-loss-breaker demonstrable. ≥50 unit tests; no prior-phase regression.
 
 **Directory:** `phase8_scheduler/` *(to be created)*
+**Concept:** [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md)
 
 ---
 

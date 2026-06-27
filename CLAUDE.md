@@ -77,35 +77,35 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 7 — Reward/Brain (`phase7_reward/`, Paket `reward`): ✅ **live-verifiziert
-(2026-06-26)** — `live_test.py` lief **5/5** gegen IG Demo (SELL → Time-Stop-Close → Close-Confirm-P&L
-`-41.16` → `trade_outcomes` CLOSED + `reward_pts` + `trade_lessons`), **gemerged nach `main`**;
-Pre-Steps (0/0b/1/2) erledigt; `reward/models.py` (Datentypen + `RewardConfig` +
-Exceptions) ✅, `reward/confidence.py` (Wilson-LB/Expectancy-R/SQN/N_min-Gate) ✅,
-`reward/scorer.py` (prozess-bewusstes Reward-Delta + Clamping) ✅, `reward/synthetic.py`
-(Generator + Pfad-Guard + Edge-Selector, harte Synthetik/Echt-Trennung) ✅, `reward/brain.py`
-(`reflect()` Lesson-Extraktion — **das einzige AI-Modul der Phase**, EIN Haiku-Call, best-effort,
-swappbares `LessonExtractor`-Protocol) ✅, `reward/pnl_resolver.py` (heuristischer History-Match,
-no-match → `PnLUnavailable` fail-closed) ✅, `reward/recorder.py` (`RewardSink`: open→close→reward→
-Lesson orchestriert, fail-closed/idempotent) ✅ — **118 P7-Tests grün**.
-Reward-Mathe + Daten-Trennung + Lesson-AI + P&L-Auflösung + Orchestrierung stehen; **Seam (Step 10) ✅**
-verdrahtet — `Executor` bekam einen keyword-only `reward_sink=None` (default ⇒ P5 bit-identisch + AI-frei),
-`on_trade_opened`/`on_trade_closed` um `monitor_position`, beide guarded (J), `build_opened`/`build_closed`
-mit lazy `reward.models`-Import (**P5 135 → 142**, P7 118/P4 88/P6 70 unberührt). **Loop-Closure (Step 11) ✅**
-— `mark_lesson_used` in P4-`research.py` verdrahtet (nach erfolgreichem LLM-Call, best-effort; erster
-DB-Write aus Research, **P4 88 → 94**). **Migration 002 (Step 12) ✅** — `phase2_persistence/migrations/
-002_phase7_reward.sql` (`initial_risk`/`account`/`r_multiple`) + P2-Whitelist-Erweiterung (`db.py`); die
-vom Recorder/Seam bereits geschriebenen Felder landen jetzt gegen die echte DB (**P2 59 → 62**, frische
-DB = Schema-Version 2). **Wiring/Operator-Scripts (Step 13) ✅** — `reward/credentials.py`-Shim +
-`scripts/wiring.py` (`build_reward_sink`/`build_brain`/`build_executor`, spiegelt P6 — Executor direkt
-aus `execution`, `reward_sink` injiziert, **keine** P5-Edit) + `smoke_test.py`/`live_test.py`/
-`backfill_synthetic.py` (guard-first). **Phase 7 ist live-verifiziert (2026-06-26, `live_test.py` 5/5)
-+ gemerged nach `main`** — der Reward-Loop läuft end-to-end live (place → monitor → lag-freie
-Close-Confirm-P&L → score → reward → lesson). ⚠ **live-verifiziert ≠ profit-validiert** (ein Trade
-beweist den Pfad, nicht die Edge). Phase 6 (Bull/Bear/Judge-Debatte)
-bleibt ✅ Code-complete + live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`,
-2026-06-16); Phase 5 (ig_bot Gates 1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen +
-live-verifiziert (Order-/Monitor-Pfad).
+**Active phase:** Phase 8 — Scheduler (`phase8_scheduler/`, Paket `scheduler`): 🔄 **in Umsetzung**
+(gestartet 2026-06-27). **Mission (zuerst lesen):** Phase 8 heißt „Scheduler", aber das Ziel ist
+**autonome, unbeaufsichtigte Erzeugung echter Demo-Trades** — alles danach (Confidence aus
+`INSUFFICIENT`, P9-Instinct-Promotion) ist auf reale Outcomes gegatet. Der harte Pfad ist die
+**autonome Kandidaten-Generierung** (echtes P4-Research, **nie** der manuelle Seed), nicht „ein
+Cron-Job bauen". **Phase 8 fügt KEINE neue AI hinzu** (reine Mechanik; AI bleibt P4-Pick/P6-Debatte/
+P7-Lesson). Langlaufender Daemon (injizierbares `now_fn`/`sleep_fn`), Auto-Confirm (demo-only,
+fail-closed), Datei-Kill-Switch, Tages-Loss-Breaker, Token-Budget, idempotenter Reconcile-Pass,
+zuletzt eine read-mostly Web-UI. **Build-Reihenfolge:** Cleanup → Verify → autonome Candidates →
+Auto-Confirm/Safety → Reconcile → Loop/Daemon → **zuletzt** UI; unter Druck fällt die UI weg, **nie**
+die Safety. Konzept: `docs/concepts/phase8_scheduler_concept.md` (20 gelockte Entscheidungen +
+Modul-Plan). **Stand: Initial-Steps** — Step 0 (Legacy-grep) = **sauber/No-Op**; Step 0b (Doku-
+Reconciliation, dieser Step); Step 1 (Contract-Verify gegen Live-Code) + Step 2 (Scaffold
+`phase8_scheduler/`) folgen. **Step-1-Befunde (Code = Wahrheit, ⚠ weichen vom Handover ab):**
+(A) `confirm_fn` ist ein **Konstruktor**-Arg, **nicht** `run()`-Arg → `run()` ist arglos, der Executor
+wird **einmal** mit `AutoConfirm` gebaut; (B) `candidates_are_fresh()` ist **False für `[]`** → leere
+Liste bei Abstain würde Research **re-callen** ⇒ **No-op-`research_runner` injizieren** (P7-Muster),
+echtes Research vorher in `research_tick`; (C) Seed-Marker ist englisch `"MANUAL SEED (not a real
+research pick)"`; (D) `confirm_fn` bekommt einen `OrderPlan` **ohne `account`** → Demo-Lock strukturell
+im Wiring (`config.account="demo"`, nur `ig_demo`-Broker); (E) `realized_pnl_today` für den Loss-Breaker
+aus der **DB** lesen (CLOSED_BY_BROKER trägt keine sofortige P&L). Reuse: `reconcile_startup` (P5) +
+`reward_sink.reconcile_open_trades()` (P7 13b) decken den Reconcile-Pass ab.
+
+**Phase 7** bleibt ✅ **live-verifiziert (2026-06-26) + gemerged nach `main`** — der Reward-Loop läuft
+end-to-end live (place → monitor → lag-freie Close-Confirm-P&L → score → reward → lesson); ⚠
+**live-verifiziert ≠ profit-validiert** (ein Trade beweist den Pfad, nicht die Edge). Detail im
+**Phase-7-status**-Block unten. Phase 6 (Bull/Bear/Judge-Debatte) bleibt ✅ Code-complete +
+live-verifiziert, **gemerged + gepusht nach `main`** (`49cda8a`, 2026-06-16); Phase 5 (ig_bot Gates
+1–5 + 4 VETOs + place/monitor/close) bleibt ✅ abgeschlossen + live-verifiziert (Order-/Monitor-Pfad).
 
 **Phase 7 status:** ✅ **live-verifiziert (2026-06-26) + gemerged nach `main`** — Reward-Mathe Confidence+Scorer + Synthetik/Echt-Trennung + Lesson-AI + pnl_resolver + Recorder-Orchestrierung + Executor-Seam + Loop-Closure + Migration 002 + Wiring/Operator-Scripts + signed-size-Fix + reconcile/retry + **lag-freie Close-Confirm-P&L (cross-phase P1+P5+P7)**. `live_test.py` 5/5 (SELL → Time-Stop → Confirm-P&L `-41.16` → CLOSED + `reward_pts` + `trade_lessons`); **128 P7-Tests** (Regression P1 52 · P2 62 · P4 94 · P5 146 · P6 70). ⚠ **live-verifiziert ≠ profit-validiert** (2026-06-26)
 - **Live-verifiziert ✅ (2026-06-26):** `live_test.py` → **5/5**. SELL `DIAAAAXUYTL77A3` (size 19.6, open 24771.3) → Time-Stop-Close → **Close-Confirm** lieferte close 24772.4 + `profit_loss=-41.16` → in-cycle resolve gelang (Branch 1: IG liefert `profit`; die Differenz zur Level-Rechnung = der Spread) → `trade_outcomes` CLOSED + `reward_pts` + echte Haiku-`trade_lessons`. Der ganze Loop ist damit end-to-end live bewiesen. Doku-Flip + Merge nach `main` in diesem Commit.

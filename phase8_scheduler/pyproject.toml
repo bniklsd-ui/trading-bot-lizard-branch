@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scheduler"
+version = "0.1.0"
+description = "Phase 8 — Scheduler (autonomous unattended demo trading: market-hours daemon, auto-confirm safety, kill-switch, loss-breaker, token budget, reconcile) for the DAX CFD trading bot."
+requires-python = ">=3.11"
+# Phase 8 adds NO new AI and (for the trade core) NO new runtime dependency: it is
+# pure mechanics composed over the existing P1–P7 editable installs. It triggers the
+# real Phase-4 research, drives the Phase-5 `Executor`, and records via the Phase-7
+# `RewardSink` — all reached through their defined contracts, wired in
+# `scripts/wiring.py`. The only new runtime deps are `fastapi` + `uvicorn`, used ONLY
+# by the read-mostly Web-UI (`webui/`), which is built last; see `requirements.txt`.
+#
+# This packaging metadata exists only to enable editable installs (`pip install -e`)
+# so `import scheduler` resolves at runtime without sys.path hacks. The sibling
+# `scripts`, `tests` and `webui` directories are deliberately excluded from the
+# installed package by the include glob (the Web-UI runs as a separate process).
+#
+# Layout note: the importable package is `scheduler/` nested under this
+# `phase8_scheduler/` project dir, mirroring the established repo convention
+# (phase4_research/ -> research/, phase5_execution/ -> execution/,
+# phase6_debate/ -> debate/, phase7_reward/ -> reward/).
+
+[tool.setuptools.packages.find]
+include = ["scheduler*"]

@@ -20,7 +20,7 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 5     | ig_bot.py Gates 1–5 + 4 VETOs + place/monitor/close | ✅ Abgeschlossen — live-**verifiziert** (Order-/Monitor-Pfad, Demo), noch nicht profit-validiert ² |
 | 6     | Bull/Bear/Judge Debate              | ✅ Abgeschlossen — live-**verifiziert** (Debatte-Pfad, Demo), noch nicht profit-validiert ³ |
 | 7     | Reward/Punishment + Brain           | ✅ live-verifiziert (Demo, 2026-06-26) — `live_test.py` 5/5; 128 Unit-Tests ⁴ |
-| 8     | Scheduler                           | Nicht begonnen                                      |
+| 8     | Scheduler                           | 🔄 In Umsetzung (seit 2026-06-27) ⁵                 |
 | 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert)       |
 
 ¹ **Live-getestet ≠ profit-validiert.** Die Research-Pipeline läuft nachweislich
@@ -56,6 +56,13 @@ geschrieben, P&L **lag-frei aus dem Close-Confirm** aufgelöst (Live-Debug 13b/1
 Lesson-Extraktion (`reflect()`, ein Haiku-Call, best-effort); Confidence ist **observe-only und
 gatet nichts** (keine VETO-Berührung — Instinct→VETO ist Phase 9f). ⚠ Nur **ein** Trade beweist den
 Pfad, **nicht** die Profitabilität (Edge = Live-Betrieb). Demo only, manueller Trigger.
+
+⁵ **Phase 8 (Scheduler) — in Umsetzung.** „Scheduler" ist nur der Name; das Ziel ist die **autonome,
+unbeaufsichtigte Erzeugung echter Demo-Trades** (der Datennachschub, auf den P9 gegatet ist). Der harte
+Pfad ist die **autonome Kandidaten-Generierung** über echtes P4-Research (nie der manuelle Seed).
+**Keine neue AI** — reine Mechanik: Daemon mit Marktzeiten-Phasen, Auto-Confirm (demo-only, fail-closed),
+Datei-Kill-Switch, Tages-Loss-Breaker, Token-Budget, idempotenter Reconcile, zuletzt eine read-mostly
+Web-UI. Konzept fertig (`docs/concepts/phase8_scheduler_concept.md`); Initial-Steps laufen.
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)
