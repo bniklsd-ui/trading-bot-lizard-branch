@@ -24,6 +24,7 @@ Full design + the 20 locked decisions: ``../docs/concepts/phase8_scheduler_conce
 
 from __future__ import annotations
 
+from . import killswitch
 from .clock import Clock, Phase
 from .config import SchedulerConfig
 from .exceptions import PreflightError, SchedulerError
@@ -37,4 +38,5 @@ __all__ = [
     "Phase",
     "SchedulerState",
     "StateStore",
+    "killswitch",
 ]

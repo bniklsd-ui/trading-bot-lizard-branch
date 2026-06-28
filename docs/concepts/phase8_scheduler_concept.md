@@ -362,6 +362,21 @@ def read_reason(kill_path) -> str | None: ...
   UI/Operator schreibt `manual:<text>`.
 - Tests (≥4): set→is_set True; clear→False; reason roundtrip; fehlende Datei → kein Crash.
 
+> **⟳ Angepasst 2026-06-28 (Modul 5 `killswitch.py` gebaut, Code = Source of Truth):**
+> Implementierungs-Klärungen zu den §4-Signaturen (alle benign, fail-soft):
+> - **Inhalt = JSON `{"reason", "ts"(UTC ISO)}`** (das „Reason+Timestamp" konkretisiert) —
+>   konsistent mit `scheduler_state.json`, sauberer `read_reason`-roundtrip.
+> - **`is_set` = reine Existenzprüfung**, robust gegen jeden Inhalt (leeres `touch`,
+>   halb-geschrieben → beide „halted"; fail-safe Richtung). **`set_kill` atomic** (`.tmp`+
+>   `os.replace`, Paket-Pattern) + mkdir parent. **`clear_kill`** = `unlink(missing_ok=True)`.
+> - **`read_reason` fail-soft, wirft nie**: missing/empty/unparseable → `None`; JSON-Objekt →
+>   `"reason"`; Plain-Text → stripped raw (Operator-Hand-Reason); unlesbare existierende Datei
+>   → eine WARNING + `None`. Der laute Trip-Log bleibt im **Runner** (Loop loggt `critical`),
+>   killswitch ist im Happy-Path still (one file = one responsibility).
+> - **Als Modul-Namespace exportiert** (`from scheduler import killswitch` → `killswitch.is_set
+>   (...)`, wie die §10-Loop-Skizze), **nicht** als bare Funktionen am Paket-Root. **12 Tests
+>   grün** (Paket-Suite 65). Stdlib-only (json/os/datetime/pathlib/logging), import-isoliert.
+
 ### 5. `safety.py` + Tests — **das Auto-Confirm-Gate (Code, kein AI)**
 
 ```python

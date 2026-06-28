@@ -73,7 +73,7 @@ Safety.
 | `scheduler/exceptions.py` | `SchedulerError`/`PreflightError`/… | ✅ (Modul 2, 6 Tests) |
 | `scheduler/clock.py` | `now_fn`/`sleep_fn` injizierbar; Phasen-Klassifikation (config-Fenster + Weekday; `is_market_open` lazy via `market_is_open`) | ✅ (Modul 3, 19 Tests) |
 | `scheduler/state.py` | `SchedulerState` ↔ `scheduler_state.json` (atomic); Tages-Rollover (Europe/Berlin) + `record_cycle` (Contract E) | ✅ (Modul 4, 18 Tests) |
-| `scheduler/killswitch.py` | KILL-Datei lesen/setzen/löschen (von `safety` + `webui` geteilt) | ⬜ |
+| `scheduler/killswitch.py` | KILL-Datei lesen/setzen/löschen (von `safety` + `webui` geteilt) — fail-soft, atomic | ✅ (Modul 5, 12 Tests) |
 | `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ⬜ |
 | `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ⬜ |
 | `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ⬜ |
@@ -200,6 +200,64 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 5: `scheduler/killswitch.py`)
+
+### Completed
+- **`scheduler/killswitch.py`** — der Datei-Kill-Switch (`data/state/KILL`, Decision 8),
+  **stateless Modul-Funktionen** (Konzept §4-Signaturen), **fail-soft / wirft nie**:
+  - `is_set(kill_path)` = reine Existenzprüfung (robust gegen **jeden** Inhalt — auch ein
+    leeres `touch` oder eine halb-geschriebene Datei lesen als „halted"; fail-safe Richtung).
+  - `set_kill(kill_path, reason)` = mkdir parent + **atomic** (`.tmp`+`os.replace`) JSON
+    `{"reason", "ts"(UTC ISO)}`. Konvention: Backoff-Trip `"auto:backoff"`, UI/Operator
+    `"manual:<text>"`. Der laute Trip-Log bleibt im **Runner** (Loop loggt `critical`) →
+    killswitch ist im Happy-Path still (single responsibility, wie `state.py`).
+  - `clear_kill(kill_path)` = `unlink(missing_ok=True)` (fehlende Datei → no-op).
+  - `read_reason(kill_path)` = tolerant: missing/empty/unparseable → `None`; JSON-Objekt →
+    `"reason"`; Plain-Text → stripped raw (Operator-Hand-Reason); unlesbare existierende
+    Datei → **eine** WARNING + `None`.
+- **`scheduler/__init__.py`** exportiert jetzt zusätzlich das **Modul** `killswitch`
+  (`from . import killswitch`; Consumer rufen `killswitch.is_set(...)`, wie die §10-Loop-Skizze).
+- **`tests/test_killswitch.py`** — **12 Tests**: is_set False→True; auto-/manual-Reason
+  roundtrip; parent-dir auto + kein `.tmp`-Rest; clear disengaged; clear-missing no-op;
+  read missing→None; leeres `touch` = is_set True + reason None; Plain-Text→raw;
+  overwrite (latest wins); unlesbar→1 WARNING+None (monkeypatched `read_text`); Modul-Export-Identität.
+
+### Design-Notizen (Code = Source of Truth — dated §4-Annotation im Konzept)
+- **Inhalt = JSON `{reason, ts}`** (Konzept sagt nur „Reason+Timestamp") — konsistent mit
+  `scheduler_state.json`, sauberer roundtrip. **`is_set` = nur Existenz** (operator-touchbar).
+  **`read_reason` fail-soft** (empty/plain-text/unparseable toleriert). **atomic + parent-dir**
+  (Paket-Pattern). **Als Modul-Namespace exportiert**, nicht als bare Funktionen am Paket-Root.
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **65 passed** (10 config + 6 exceptions + 19 clock +
+  18 state + 12 killswitch). `py_compile` clean. **Import-Isolation:** `import
+  scheduler.killswitch` zieht **NONE** cross-phase/heavy (pure stdlib: json/os/datetime/
+  pathlib/logging).
+- **Regression grün + unberührt** (rein additiv in `phase8_scheduler/`): P1 52 · P2 62 ·
+  P4 94 · P5 146 · P6 70 · P7 128 (separat gelaufen — `tests.conftest`-Namenskollision).
+
+### Next — **Modul 6: `scheduler/safety.py`** (Konzept §5, das Auto-Confirm-Gate — schwerstes Safety-Modul, TDD ≥8 Tests)
+- `AutoConfirm(config, state_store, kill_path, budget)` als `confirm_fn`-Ersatz für den
+  P5-Human-Confirm. `__call__(order_ctx) -> bool` (Final-Gate vor `place_order`) **und**
+  `can_open(state) -> (bool, reason)` (Pre-Cycle-Gate, spart LLM-Tokens). `True` **nur** wenn
+  **alle** harten Bedingungen: (1) `config.account == "demo"` (Demo-Lock strukturell aus der
+  **Config**, **nicht** aus dem `OrderPlan` — Contract D; alles ≠ demo → `False` +
+  `logger.critical`); (2) `killswitch.is_set` False; (3) `state.trades_today <
+  max_trades_per_day`; (4) Tages-Loss-Breaker: `daily_loss_cap is not None` und
+  heutige realized P&L `> -daily_loss_cap` — **aus der DB** (Contract E), **nicht** aus
+  `state.realized_pnl_today` (Snapshot-Falle, s. Modul-4-Reconciliation); `None` → eine
+  WARNING, kein Block; (5) `budget.is_exhausted()` False. ⚠ **Vor Bau Contracts A/D/E
+  heranziehen** + `budget.py`-API (Modul 7, evtl. vorzuziehen oder per Protocol stubben).
+
+### Offene Punkte / [VERIFY]
+- `safety.py`: `realized_pnl_today` aus der **DB** lesen (Contract E) — die DB-Query-Form
+  beim Wiring/Modul 6 klären (heutige `trade_outcomes`/`reward_pts` über `session_date`).
+  `budget` ist eine Dependency → entweder Modul 7 `budget.py` vorziehen oder via Protocol stubben.
+- **Commit:** dieser Step ist committet (Operator-getriggert, Branch `phase8-scheduler`);
+  „Commit ⇒ Note-Update" im selben Commit.
 
 ---
 
