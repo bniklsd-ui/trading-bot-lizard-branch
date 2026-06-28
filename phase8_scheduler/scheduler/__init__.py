@@ -25,6 +25,7 @@ Full design + the 20 locked decisions: ``../docs/concepts/phase8_scheduler_conce
 from __future__ import annotations
 
 from . import killswitch
+from .backoff import BackoffTracker
 from .budget import TokenBudget
 from .clock import Clock, Phase
 from .config import SchedulerConfig
@@ -47,4 +48,5 @@ __all__ = [
     "TokenBudget",
     "ResearchTick",
     "ResearchResult",
+    "BackoffTracker",
 ]

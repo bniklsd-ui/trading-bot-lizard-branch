@@ -460,6 +460,23 @@ class BackoffTracker:
 - Tests (≥5): Erfolg resettet; 3 Fehler → should_trip True; 2 Fehler → False; `delay_s` wächst
   exponentiell und respektiert `backoff_cap_s`; Reset nach Erfolg setzt delay zurück.
 
+> **⟳ Angepasst 2026-06-28 (`backoff.py` gebaut, Code = Source of Truth) — drei
+> Reconciliations:**
+> 1. **Advisory, nicht selbst-trippend.** Die §6-Notiz „Trip → Kill-Switch `auto:backoff` +
+>    sauberer Shutdown" — aber `BackoffTracker` **setzt den Kill-Switch nie selbst**; er meldet
+>    nur `should_trip`. Der **Runner** (§10-Loop) ruft `killswitch.set_kill(..., "auto:backoff")`
+>    + `shutdown()`. Single-responsibility (spiegelt den killswitch-Trip-Log, der ebenfalls im
+>    Runner lebt, nicht in `killswitch.py`).
+> 2. **`delay_s` ist total — `n <= 0 → 0.0`.** Die Skizze `min(base·2^(n-1), cap)` ist bei `n=0`
+>    undefiniert; der Guard macht die Methode jederzeit sicher aufrufbar (die Loop ruft sie real
+>    nur nach `record_failure`, also `n >= 1`). Der `cap` bound't das Ergebnis (kein
+>    Overflow-Guard nötig).
+> 3. **Mutate-and-return** (dasselbe Objekt), konsistent mit `state.record_cycle`/`research_tick`;
+>    der Runner ist der einzige Persistenz-Eigentümer. `record_*` berühren **nur**
+>    `consecutive_failures` (nicht `kill_reason`/Counter/`last_no_trade_reason`). **9 Tests grün**
+>    (Paket-Suite 106 → 115). Fehler-**Klassifikation** (transient vs. strukturell) bleibt
+>    bewusst v1-deferred (reine konsekutive Cycle-Exceptions).
+
 ### 7. `budget.py` + Tests
 
 ```python

@@ -75,7 +75,7 @@ Safety.
 | `scheduler/state.py` | `SchedulerState` ↔ `scheduler_state.json` (atomic); Tages-Rollover (Europe/Berlin) + `record_cycle` (Contract E) | ✅ (Modul 4, 18 Tests) |
 | `scheduler/killswitch.py` | KILL-Datei lesen/setzen/löschen (von `safety` + `webui` geteilt) — fail-soft, atomic | ✅ (Modul 5, 12 Tests) |
 | `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ✅ (Modul 6, 18 Tests) |
-| `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ⬜ |
+| `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ✅ (9 Tests) |
 | `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ✅ (Modul 7, 13 Tests) |
 | `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ✅ (Modul 8, 10 Tests) |
 | `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ⬜ |
@@ -200,6 +200,62 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (`scheduler/backoff.py` — konsekutive-Fehler-Tracking + Backoff)
+
+### Completed
+- **`scheduler/backoff.py`** — `BackoffTracker`, die Fehler-Gedächtnis-Einheit der Loop (Konzept
+  §6 / Decision 9, **kein AI**, reine Arithmetik). **Advisory**: trackt den Counter + rechnet
+  Delay/Trip-Verdikt, **setzt den Kill-Switch nie selbst** — das macht der Runner (§10) auf
+  `should_trip`. Stdlib-only, importiert nur `scheduler.config`/`scheduler.state`.
+  - `record_failure(state)` / `record_success(state)` — mutate+return (wie `record_cycle`/
+    `research_tick`); berühren **nur** `consecutive_failures` (state.py-Docstring: dieses Feld
+    ist „owned by backoff.py").
+  - `should_trip(state)` — `consecutive_failures >= config.max_consecutive_failures` (boundary-
+    inklusiv).
+  - `delay_s(state)` — `n<=0 → 0.0` (total/defensiv); sonst `min(backoff_base_s · 2^(n-1),
+    backoff_cap_s)` (Defaults: 30→60→120→…→cap 600; der Cap bound't, kein Overflow-Guard nötig).
+- **`scheduler/__init__.py`** exportiert jetzt zusätzlich `BackoffTracker`.
+- **`tests/test_backoff.py`** — **9 Tests**: failure inkrementiert (gleiches Objekt); success
+  resettet; should_trip unter Schwelle False / **at-threshold** True; `delay_s` exponentiell
+  (30/60/120); Cap clamps; `n<=0 → 0.0` dann base nach einer Failure; **Feld-Isolation** (nur
+  `consecutive_failures` berührt, alle anderen State-Felder unverändert); Package-Export-Identität.
+
+### Drei Konzept↔Code-Reconciliations (Code = Source of Truth — dated §6-Annotation im Konzept)
+- **(1) Advisory, nicht selbst-trippend.** `BackoffTracker` meldet nur `should_trip`; der
+  **Runner** (§10) ruft `killswitch.set_kill(..., "auto:backoff")` + `shutdown()`. Single-
+  responsibility (spiegelt den Trip-Log, der im Runner lebt, nicht in `killswitch.py`).
+- **(2) `delay_s` total — `n<=0 → 0.0`** (Skizze `min(base·2^(n-1), cap)` ist bei n=0 undefiniert).
+- **(3) Mutate-and-return**; `record_*` berühren nur `consecutive_failures`. Fehler-Klassifikation
+  (transient vs. strukturell) bleibt v1-deferred (reine konsekutive Cycle-Exceptions).
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **115 passed** (10 config + 6 exceptions + 19 clock + 18
+  state + 12 killswitch + 18 safety + 13 budget + 10 research_tick + 9 backoff). `py_compile` clean.
+  **Import-Isolation:** `import scheduler.backoff` zieht **NONE** broker_wrapper/persistence/
+  external_data/research/execution/reward/debate/pandas/numpy/yfinance/anthropic/requests.
+- **Regression grün + unberührt** (rein additiv): P2 62 · P4 94 · P5 146 · P7 128 (separat
+  gelaufen). P1 52 · P6 70 unverändert.
+
+### Next — **Modul 9: `scheduler/reconcile.py`** (Konzept §9, Komposition — nicht neu bauen)
+- `Reconciler(broker, db, reward_sink, state_store).tick(state) -> ReconcileReport`: **Komposition**
+  aus (a) `reconcile_startup` (P5 `execution/order.py`, läuft bereits in **jedem** `executor.run()`
+  — orphan PENDING) + (b) **`reward_sink.reconcile_open_trades(deal_ids=None)`** (P7 Step 13b,
+  idempotenter `CLOSED_BY_BROKER`-P&L-Nachzieh über `get_trade_history`, fail-closed) — **Contract
+  F**. Idempotent via `deal_id`; läuft Startup + alle `reconcile_interval_min` + Shutdown.
+  `last_reconcile_ts` aktualisieren. Fail-closed (`logger.critical`, kein Re-raise). Tests ≥5
+  (orphan→closed; broker-closed→P&L+reward; bereits gebucht→kein Doppel-Insert; History-Fehler→
+  fail-closed weiter; nichts offen→No-op). **Vor Bau Contract F + die P7-`reconcile_open_trades`-
+  Signatur gegenlesen.**
+- **Danach** Modul 10 `runner.py` (§10, die Loop) → Modul 11 `wiring.py` → **zuletzt** UI.
+
+### Offene Punkte / [VERIFY]
+- `reconcile.py`: P7-`reward_sink.reconcile_open_trades`-Rückgabeform + `broker.reconcile_positions`-
+  `.data` (Contract F) gegenlesen, bevor `Reconciler` baut.
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
+  Note-Update" im selben Commit.
 
 ---
 
