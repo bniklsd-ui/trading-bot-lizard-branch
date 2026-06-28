@@ -72,7 +72,7 @@ Safety.
 | `scheduler/config.py` | `SchedulerConfig` (frozen) — alle Tunables an einem Ort | ✅ (Modul 1, 10 Tests) |
 | `scheduler/exceptions.py` | `SchedulerError`/`PreflightError`/… | ✅ (Modul 2, 6 Tests) |
 | `scheduler/clock.py` | `now_fn`/`sleep_fn` injizierbar; Phasen-Klassifikation (config-Fenster + Weekday; `is_market_open` lazy via `market_is_open`) | ✅ (Modul 3, 19 Tests) |
-| `scheduler/state.py` | `SchedulerState` ↔ `scheduler_state.json`; Tages-Rollover (Europe/Berlin) | ⬜ |
+| `scheduler/state.py` | `SchedulerState` ↔ `scheduler_state.json` (atomic); Tages-Rollover (Europe/Berlin) + `record_cycle` (Contract E) | ✅ (Modul 4, 18 Tests) |
 | `scheduler/killswitch.py` | KILL-Datei lesen/setzen/löschen (von `safety` + `webui` geteilt) | ⬜ |
 | `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ⬜ |
 | `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ⬜ |
@@ -200,6 +200,66 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 4: `scheduler/state.py`)
+
+### Completed
+- **`scheduler/state.py`** — `SchedulerState` (mutable `@dataclass`, concept §3:
+  date/trades_today/realized_pnl_today/last_research_ts/last_reconcile_ts/
+  consecutive_failures/kill_reason/last_no_trade_reason) + `StateStore`:
+  - `load()` **self-heals, never raises** — missing file → fresh `SchedulerState()`;
+    corrupt/partial JSON → **eine** WARNING + fresh state; unbekannte Keys gedroppt,
+    fehlende defaulted (forward/backward-compat via `dataclasses.fields`-Filter).
+  - `save()` **atomic** (`.tmp` + `os.replace`) — die P2 `_atomic_write`-Pattern **lokal
+    kopiert** (nicht importiert; `import scheduler.state` zieht **NONE** cross-phase/heavy).
+  - `rollover_if_new_day(state, now)` — neues Europe/Berlin-Datum ⇒ reset
+    trades/pnl/failures + `kill_reason`/`last_no_trade_reason`=None, `date`=today;
+    **behält** `last_research_ts`/`last_reconcile_ts` (last-action ts, keine Day-Counter).
+    Idempotent (same-day = no-op). `now` muss tz-aware in der Daemon-Zone sein (Clock liefert das).
+  - `record_cycle(state, result)` — duck-typed (kein `execution`-Import); `trades_today += 1`
+    nur bei `TRADE_STATUSES = {OPEN, CLOSED_BY_BROKER, TIME_STOP}` (**Contract E**);
+    `profit_loss` best-effort akkumuliert wenn present. Berührt **nicht**
+    `consecutive_failures` (backoff), `last_no_trade_reason` (Loop/research_tick) oder die ts.
+- **`scheduler/__init__.py`** exportiert jetzt zusätzlich `SchedulerState` + `StateStore`.
+- **`tests/test_state.py`** — **18 Tests**: roundtrip; load missing/corrupt(1 WARNING)/
+  tolerant(unknown+missing keys); atomic save (parent auto-created, kein `.tmp`-Rest);
+  rollover new-day/same-day/idempotent/fresh-init; `record_cycle` × {OPEN,CLOSED_BY_BROKER,
+  TIME_STOP} zählt / × {NO_TRADE,ABORTED_BY_USER,ABORT} zählt nicht; pnl present vs None;
+  failures/reason unberührt; Package-Export-Identität.
+
+### Eine Konzept↔Code-Reconciliation (Code = Source of Truth — dated §3-Annotation im Konzept)
+- **`realized_pnl_today` = best-effort persisted Snapshot, NICHT die Loss-Breaker-Quelle.**
+  `record_cycle` faltet P&L nur wenn das Cycle-Result sie trägt (zur Cycle-Zeit = der
+  TIME_STOP-Pfad; **Contract E**: `CLOSED_BY_BROKER` liefert `profit_loss=None`, erst per
+  Reconcile/Modul 9 aufgelöst) → das Feld kann für broker-closes der DB hinterherhängen.
+  Der **autoritative** Tages-Loss-Breaker (`safety.py`/Modul 5) liest die heutige realized
+  P&L aus der **DB** (Contract E) und hängt **nicht** an diesem Feld. Hält Modul 4
+  self-contained + vermeidet eine Doppelzähl-Falle (jetzt geflaggt, damit kein späteres
+  Modul den Breaker fälschlich an diesen Snapshot hängt).
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **53 passed** (10 config + 6 exceptions + 19 clock
+  + 18 state). `py_compile` clean. **Import-Isolation:** `import scheduler.state` zieht
+  **NONE** von broker_wrapper/persistence/external_data/research/execution/reward/debate/
+  pandas/numpy/yfinance/anthropic/requests.
+- **Regression grün + unberührt** (rein additiv in `phase8_scheduler/`): P1 52 · P2 62 ·
+  P4 94 · P5 146 · P6 70 · P7 128 (separat gelaufen — `tests.conftest`-Namenskollision).
+
+### Next — **Modul 5: `scheduler/killswitch.py`** (Konzept §4, klein, TDD)
+- Modul-Funktionen `is_set(kill_path)`, `set_kill(kill_path, reason)`, `clear_kill(kill_path)`,
+  `read_reason(kill_path)`. Datei-Existenz = Wahrheit; Reason+Timestamp im Inhalt
+  (`auto:backoff` vom Backoff-Trip, `manual:<text>` von UI/Operator). Geteilt von `safety`
+  (Leser) + `webui` (Schreiber) → eigenes Mini-Modul (one file = one responsibility).
+  Tests ≥4: set→is_set True; clear→False; reason roundtrip; fehlende Datei → kein Crash.
+  Stdlib-only, fail-soft (fehlende/korrupte Datei → kein Raise, wie `state.load`).
+
+### Offene Punkte / [VERIFY] (für spätere Module, jetzt nur dokumentiert)
+- `safety.py`: `daily_loss_cap`-Produktionswert (≈€1800) + `realized_pnl_today` aus der **DB**
+  (Contract E, s. Reconciliation oben) — beim Wiring setzen, **nicht** an den State-Snapshot hängen.
+- **Commit:** dieser Step ist committet, **falls** der Operator es triggert (Branch
+  `phase8-scheduler`); „Commit ⇒ Note-Update" gilt im selben Commit.
 
 ---
 

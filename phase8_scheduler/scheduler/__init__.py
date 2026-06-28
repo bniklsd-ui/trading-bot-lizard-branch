@@ -27,6 +27,7 @@ from __future__ import annotations
 from .clock import Clock, Phase
 from .config import SchedulerConfig
 from .exceptions import PreflightError, SchedulerError
+from .state import SchedulerState, StateStore
 
 __all__ = [
     "SchedulerConfig",
@@ -34,4 +35,6 @@ __all__ = [
     "PreflightError",
     "Clock",
     "Phase",
+    "SchedulerState",
+    "StateStore",
 ]

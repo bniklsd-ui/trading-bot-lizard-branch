@@ -331,6 +331,24 @@ class StateStore:
 - Tests (≥5): roundtrip; Rollover resettet Counter; selber Tag resettet **nicht**; atomic write
   überlebt simulierten Teil-Write; `record_cycle` inkrementiert nur bei tatsächlichem Trade.
 
+> **⟳ Angepasst 2026-06-28 (Modul 4 `state.py` gebaut, Code = Source of Truth):**
+> 1. **`realized_pnl_today` ist ein best-effort persisted Snapshot, NICHT die Quelle des
+>    Loss-Breakers.** `record_cycle` faltet `result.profit_loss` nur ein, wenn das Cycle-Result
+>    sie zur Cycle-Zeit trägt — das ist der **TIME_STOP**-Pfad. Verifiziert (Contract E):
+>    `CLOSED_BY_BROKER` liefert `profit_loss=None` (erst per Reconcile-Pass / Modul 9 aufgelöst),
+>    also kann dieses Feld der DB für broker-geschlossene Trades hinterherhängen. Der
+>    **autoritative** Tages-Loss-Breaker (`safety.py`/Modul 5, §5 Punkt 4) liest die heutige
+>    realized P&L aus der **DB** (Contract E) und hängt **nicht** an diesem Feld — das vermeidet
+>    eine Doppelzähl-Falle und hält Modul 4 self-contained. (Spätere Module dürfen den Breaker
+>    **nicht** an diesen Snapshot binden.)
+> 2. **`load()` self-heilt, wirft nie** (wie `killswitch`/`state`-Zeile im exceptions-Scope):
+>    fehlende Datei → fresh `SchedulerState()`, korrupt/partiell → eine WARNING + fresh state;
+>    unbekannte Keys gedroppt, fehlende defaulted (forward/backward-compat). `rollover` behält
+>    `last_research_ts`/`last_reconcile_ts` (last-action ts), resettet nur Day-Counter +
+>    `kill_reason`/`last_no_trade_reason`; resettet das **State-Feld** `kill_reason`, **nicht**
+>    die `KILL`-Datei (die gehört `killswitch.py`). `record_cycle` ist duck-typed (kein
+>    `execution`-Import). **18 Tests grün** (Paket-Suite 53).
+
 ### 4. `killswitch.py` + Tests
 
 ```python
