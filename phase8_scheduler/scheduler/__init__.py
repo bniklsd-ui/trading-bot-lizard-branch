@@ -29,6 +29,7 @@ from .budget import TokenBudget
 from .clock import Clock, Phase
 from .config import SchedulerConfig
 from .exceptions import PreflightError, SchedulerError
+from .research_tick import ResearchResult, ResearchTick
 from .safety import AutoConfirm, Budget
 from .state import SchedulerState, StateStore
 
@@ -44,4 +45,6 @@ __all__ = [
     "AutoConfirm",
     "Budget",
     "TokenBudget",
+    "ResearchTick",
+    "ResearchResult",
 ]

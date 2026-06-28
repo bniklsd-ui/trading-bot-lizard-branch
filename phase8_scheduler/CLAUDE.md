@@ -77,7 +77,7 @@ Safety.
 | `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ✅ (Modul 6, 18 Tests) |
 | `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ⬜ |
 | `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ✅ (Modul 7, 13 Tests) |
-| `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ⬜ |
+| `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ✅ (Modul 8, 10 Tests) |
 | `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ⬜ |
 | `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown | ⬜ |
 | `webui/api.py` + `webui/static/*` | FastAPI read-mostly + statisches Dashboard | ⬜ (zuletzt) |
@@ -200,6 +200,73 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 8: `scheduler/research_tick.py` — autonome Kandidaten, der Blocker)
+
+### Completed
+- **`scheduler/research_tick.py`** — `ResearchTick`, der **autonome Kandidaten-Generator** (die
+  eigentliche Phasen-Mission; Decision 4/5, **kein neues AI** — die einzige AI ist der eine
+  P4-`ask_candidate`-Call **innerhalb** `Research.run()`, unverändert reused). Triggert pro Zyklus
+  das **echte** `Research.run()` (über das duck-typed `_ResearchLike`-Protocol → kein
+  `research`-Import, Phasen-Isolation), klassifiziert das Ergebnis, schreibt einen minimalen
+  `no_trade_reason`, fail-closed bei jedem Fehler. **Nie** `seed_candidate.py` → der Marker
+  `"MANUAL SEED"` taucht in einem autonomen Pick **nie** auf (`test_no_manual_seed_marker`).
+  - `ensure_candidates(state) -> ResearchResult`: stempelt **immer** `state.last_research_ts`
+    (Versuch fand statt); dann **pick** (`run()` non-empty) → `picked=True`, `reason=None`,
+    `last_no_trade_reason` cleared; **abstain** (`[]`) → `picked=False`, `REASON_LLM_ABSTAIN`;
+    **exception** → `logger.critical` (kein Re-raise), **defensiver** `save_candidates([])` über
+    `research.state` (stale Pick darf nicht getradet werden), `REASON_PREFLIGHT`.
+  - `ResearchResult(picked, n, reason)` (frozen); Reason-Konstanten `REASON_LLM_ABSTAIN`/
+    `REASON_PREFLIGHT` (v1) + deklariert-aber-reserviert `REASON_EMPTY_UNIVERSE`/
+    `REASON_VALIDATOR_REJECT`/`REASON_FILTER_FAIL` (P9).
+- **`scheduler/__init__.py`** exportiert jetzt zusätzlich `ResearchTick` + `ResearchResult`.
+- **`tests/test_research_tick.py`** — **10 Tests**: PASS (Pick, Reason cleared, ts, run×1);
+  abstain → `LLM_ABSTAIN`; exception → `PREFLIGHT_FAIL` + 1 critical + `save_candidates([])` +
+  kein Re-raise; cleanup-fehlschlag-auch → 2 criticals, swallowed; **`test_no_manual_seed_marker`**;
+  `last_research_ts` auf **jedem** Outcome (parametrisiert pass/abstain/exception); Default-`now_fn`
+  tz-aware; Package-Export-Identität.
+
+### Zwei Konzept↔Code-Reconciliations (Code = Source of Truth — dated §8-Annotation im Konzept)
+- **(H) ★ 5-Code-Taxonomie kollabiert auf 2 v1-Buckets.** `Research.run() -> list[Candidate]`
+  trägt **keine** Begründung (nur stderr-Log) → unterscheidbar sind nur pick/abstain/exception.
+  v1: `PREFLIGHT_FAIL` (raise) + `LLM_ABSTAIN` (`[]`-Umbrella); `EMPTY_UNIVERSE`/`VALIDATOR_REJECT`/
+  `FILTER_FAIL` deklariert, gesetzt erst in P9 (P4 muss einen Grund liefern). Decision 5 konform;
+  `safety.py:97` antizipiert die Trennung (Gate-Block- vs. No-Candidate-Taxonomie).
+- **(C) Konstruktor** `ResearchTick(research, *, now_fn=None)` statt `(research, state_store)`:
+  mutiert nur den übergebenen `SchedulerState` (wie `record_cycle`/`backoff`), der **Runner**
+  persistiert (`finally: state_store.save`) → `state_store` (ungenutzt) raus, keyword-only `now_fn`
+  rein (Determinismus). Fail-closed Clear reused `research.state` — keine Extra-Dependency.
+  **Freshness ist NICHT hier** (Contract B): der No-op-`research_runner` im Executor (Wiring/Modul
+  11) verhindert den Gate-2-Re-Call; `research_tick` läuft nur echtes Research **vor** `run()`.
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **106 passed** (10 config + 6 exceptions + 19 clock + 18
+  state + 12 killswitch + 18 safety + 13 budget + 10 research_tick). `py_compile` clean.
+  **Import-Isolation:** `import scheduler.research_tick` zieht **NONE** broker_wrapper/persistence/
+  external_data/research/execution/reward/debate/pandas/numpy/yfinance/anthropic/requests.
+- **Regression grün + unberührt** (rein additiv): P2 62 · P4 94 · P5 146 · P7 128 (separat
+  gelaufen). P1 52 · P6 70 unverändert (kein berührter Import).
+
+### Next — **Modul 6: `scheduler/backoff.py`** (Konzept §6, klein, TDD ≥5) — die letzte mechanische Einheit vor dem Runner
+- `BackoffTracker(config)` mit `record_success(state)`/`record_failure(state)` (mutate+return wie
+  `record_cycle`/`research_tick`), `should_trip(state)` (`consecutive_failures >=
+  max_consecutive_failures`), `delay_s(state)` (`min(backoff_base_s * 2^(n-1), backoff_cap_s)`).
+  Trip → der Runner setzt `killswitch.set_kill(..., "auto:backoff")` + sauberer Stop (§10). Tests:
+  Erfolg resettet; 3 Fehler → trip; 2 → kein trip; `delay_s` exponentiell + cap; Reset setzt delay
+  zurück. Stdlib-only, kein Re-raise.
+- **Danach** Modul 9 `reconcile.py` (§9, Komposition aus `reconcile_startup` (P5, läuft schon in
+  jedem `run()`) + `reward_sink.reconcile_open_trades` (P7) — Contract F) → Modul 10 `runner.py`
+  (§10, die Loop) → Modul 11 `wiring.py` (No-op-`research_runner` injizieren, EINEN Broker teilen,
+  `realized_pnl_today`-Closure, `daily_loss_cap≈1800`, `daily_token_budget`) → **zuletzt** UI.
+
+### Offene Punkte / [VERIFY]
+- `wiring.py`/Modul 11: `Research` direkt aus `research` bauen (geteilter Broker, Contract G);
+  **No-op-`research_runner`** in den Executor (Contract B); `realized_pnl_today`-Closure (Query im
+  Modul-6-Block) + `daily_loss_cap≈1800` + `daily_token_budget` + `now_fn=clock.now` an `ResearchTick`.
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
+  Note-Update" gilt im selben Commit.
 
 ---
 

@@ -519,6 +519,31 @@ class ResearchTick:
   `reason_code`; Research-Exception → fail-closed `[]` + `reason_code=PREFLIGHT_FAIL`;
   `test_no_manual_seed_marker` (aus Step 1.1); `last_research_ts` aktualisiert.
 
+> **⟳ Angepasst 2026-06-28 (Modul 8 `research_tick.py` gebaut, Code = Source of Truth) — zwei
+> Reconciliations:**
+> 1. **★ Das 5-Code-`no_trade_reason`-Modell kollabiert in v1 auf ZWEI Buckets (Reconciliation
+>    H).** `Research.run()` returnt **nur** `list[Candidate]` (`[]` | `[pick]`) — **keine**
+>    Begründung; der granulare Grund (empty universe / LLM-error / validator-reject / valid
+>    abstain / filter-reject) wird nur per `log.info` auf stderr geschrieben
+>    (`phase4_research/research/research.py`). Aus dem Rückgabewert sind nur **pick / abstain
+>    (`[]`) / exception** unterscheidbar ⇒ v1 setzt `PREFLIGHT_FAIL` (run() wirft) oder
+>    `LLM_ABSTAIN` (run() → `[]`, der Umbrella für **alle** Abstain-Ursachen). `EMPTY_UNIVERSE`/
+>    `VALIDATOR_REJECT`/`FILTER_FAIL` sind als Konstanten **deklariert, aber reserviert für P9**
+>    (RESEARCH_V3, wenn P4 einen Grund zurückgibt) — exakt Decision 5 („minimal jetzt, volles
+>    Modell = P9"); `safety.py` dokumentiert genau diese Trennung bereits (Gate-Block-Taxonomie
+>    vs. No-Candidate-Taxonomie).
+> 2. **Konstruktor `ResearchTick(research, *, now_fn=None)`** statt `(research, state_store)`.
+>    Das Modul **mutiert** nur den übergebenen `SchedulerState` (`last_research_ts`/
+>    `last_no_trade_reason`) — dasselbe mutate-and-return-Muster wie `state.record_cycle`/
+>    `backoff`; der **Runner** ist der einzige Persistenz-Eigentümer (`finally:
+>    state_store.save`, §10). ⇒ `state_store` (ungenutzt) entfällt; ein keyword-only `now_fn`
+>    kommt dazu (Determinismus-Regel; die Skizze unter-spezifizierte die Timestamp-Quelle). Der
+>    fail-closed Clear bei Exception reused das schon injizierte `research.state` (P2
+>    `StateManager` → `save_candidates([])`), keine Extra-Dependency. **Freshness ist NICHT
+>    hier** (Contract B): der No-op-`research_runner` im Executor (Wiring/Modul 11) verhindert
+>    den Gate-2-Re-Call; `research_tick` läuft nur das echte Research **vor** `executor.run()`.
+>    **10 Tests grün** (Paket-Suite 96 → 106).
+
 ### 9. `reconcile.py` + Tests
 
 ```python
