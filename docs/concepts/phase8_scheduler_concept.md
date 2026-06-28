@@ -722,6 +722,44 @@ while True:
   dokumentierter `no_trade_reason` geschrieben wird, und dass ein sauberer Stop + Reconcile
   passiert. Hart asserted, `exit 0` = PASS. **Nicht** in CI.
 
+> **⟳ Angepasst 2026-06-28 (Modul 11 gebaut, Code = Source of Truth) — acht Reconciliations:**
+> 1. **Wiring repliziert die P4/P6/P7-Builder inline** (aus `research`/`debate`/`reward`), importiert
+>    **nicht** deren `scripts.wiring` (`scripts.wiring`-Namenskollision P4/P5/P6/P7/P8) — exakt wie P7
+>    `build_executor` replizierte statt P5 zu importieren. Baut den **vollen** Zyklus: Debatte **und**
+>    Reward **beide** in EINEN Executor (die §11-Zeile „`Research` (P4-Factory)" ist faktisch korrigiert:
+>    P4s Factory baut sich einen **eigenen** Broker → P8 baut `Research` direkt mit dem **geteilten**
+>    Broker, Contract G).
+> 2. **`run.py` lebt im Paket (`scheduler/run.py`), NICHT `scripts/`** — `python -m scheduler.run`
+>    (§19-Entry) braucht es installiert (`pyproject include=["scheduler*"]` schließt `scripts/` aus).
+>    Spiegelt `execution/ig_bot.py` + dessen lazy `scripts.wiring`-Import. (Die §11-Liste führte es unter
+>    `scripts/` — der dokumentierte Entry diktiert den Paket-Ort.)
+> 3. **`run.py`-Signal-Handler → `runner.request_stop()`**, **nicht** `shutdown()` direkt (wie hier
+>    skizziert): `shutdown()` braucht den `state` (Loop-intern); ein **additives** non-sticky
+>    `SchedulerRunner.request_stop()` (Loop-Top-Check) lässt die Loop sauber stoppen + selbst `shutdown()`
+>    rufen. **Bewusst nicht** die KILL-Datei (die wäre sticky → blockt den nächsten Restart). In-Progress-
+>    `sleep` läuft v1 erst aus (Latenz; interruptible-sleep = später).
+> 4. **Struktureller Demo-Lock im Wiring** (Decision 7/Contract D): `build_scheduler` wirft bei
+>    `config.account != "demo"`, baut nur `ig_demo`; `AutoConfirm` re-checkt zur Laufzeit.
+> 5. **Alle Daten-Pfade absolut** (via `dataclasses.replace` auf den `<repo_root>/data/`-Baum) → cwd-
+>    unabhängig, teilt exakt die Dateien von `init_db.py` + P4–P7 (DB, `scheduler_state.json`, `KILL`,
+>    Command, `llm_usage.json`, `execution_state.json`, `cache/`).
+> 6. **Die drei Runner-Closures leben im Wiring:** `realized_pnl_today` (DB-`SUM(profit_loss)` via
+>    `db.conn`, Contract E) · `pending_reconcile_fn` (P5-`reconcile_startup`, geteilter Broker) ·
+>    `preflight_fn` (Keyring `get_credential(IG_DEMO_API_KEY)` + **Migration-002-Check** via `PRAGMA
+>    table_info` → `account`; **verifiziert, migriert nicht** — ein Safety-Daemon mutiert kein Schema).
+> 7. **EIN geteiltes `now_fn`** durch Clock/Executor/ResearchTick/Reconciler/TokenBudget; der Executor
+>    behält sein **eigenes echtes `sleep_fn`** (Monitor muss real warten) — nur die Loop-Kadenz nutzt das
+>    injizierte `sleep_fn`. `build_scheduler(config, *, now_fn=None, sleep_fn=None, max_iterations=None,
+>    exec_config=None)` — die Injektions-Parameter erlauben `live_test` (kurzer Hold, gebundene Loop).
+> 8. **`smoke_test` = offline Sim-Tag mit Fakes** (Konzept-treu §11: „Fake-Clock + gemockter Broker/
+>    Research/Executor") — bewusste Abweichung vom P5/P6/P7-„real dry stack", weil der Loop-Wert die
+>    Mechanik (Phasen/Cap/Kill) ist. **Lokal gelaufen: 3/3, exit 0.** `live_test` ist lenient (No-Trade =
+>    valider PASS, P5/P6/P7-Disziplin), hart nur: sauberer Stop + State persistiert + (falls CLOSED-Trade)
+>    `reward_pts` vorhanden.
+> — **146 Tests grün** (Paket-Suite 138 → 146: +2 `request_stop`, +6 `test_run`). `import scripts.wiring`/
+> `scheduler.run` ziehen **NONE** cross-phase beim Laden (alle Cross-Phase-Imports lazy in den Funktionen).
+> Sibling-Suiten grün + unberührt (P1 52 · P2 62 · P4 94 · P5 146 · P6 70 · P7 128).
+
 ### 12. Web-UI (`webui/`) — **zuletzt, read-mostly**
 
 ```python

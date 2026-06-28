@@ -88,14 +88,19 @@ fail-closed), Datei-Kill-Switch, Tages-Loss-Breaker, Token-Budget, idempotenter 
 zuletzt eine read-mostly Web-UI. **Build-Reihenfolge:** Cleanup → Verify → autonome Candidates →
 Auto-Confirm/Safety → Reconcile → Loop/Daemon → **zuletzt** UI; unter Druck fällt die UI weg, **nie**
 die Safety. Konzept: `docs/concepts/phase8_scheduler_concept.md` (20 gelockte Entscheidungen +
-Modul-Plan). **Stand (2026-06-28): Module 1–10 gebaut + grün, Module 11 (wiring/scripts) als
-Nächstes, dann zuletzt Module 12 (Web-UI).** Initial-Steps (Step 0 Legacy-grep = sauber/No-Op,
-Step 0b Doku-Reconciliation, Step 1 Contract-Verify, Step 2 Scaffold) **erledigt**. Gebaut +
-getestet (gemockt, kein Netz/LLM): `config` · `exceptions` · `clock` · `state` · `killswitch` ·
-`safety` (AutoConfirm) · `backoff` · `budget` · `research_tick` · `reconcile` · **`runner`** (die
-Loop — Preflight/run/Shutdown, Contract A bare `executor.run()`, injizierte `now_fn`/`sleep_fn` +
-`max_iterations`-Stop). **138 P8-Tests** (Regression unberührt: P1 52 · P2 62 · P4 94 · P5 146 ·
-P6 70 · P7 128). Jedes Modul ist import-isoliert (`import scheduler.<m>` zieht NONE cross-phase).
+Modul-Plan). **Stand (2026-06-28): Module 1–11 gebaut + grün — der autonome Daemon ist composed;
+nur Module 12 (Web-UI) fehlt (zuletzt).** Initial-Steps (Step 0 Legacy-grep = sauber/No-Op, Step 0b
+Doku-Reconciliation, Step 1 Contract-Verify, Step 2 Scaffold) **erledigt**. Gebaut + getestet (gemockt/
+offline, kein Netz/LLM): `config` · `exceptions` · `clock` · `state` · `killswitch` · `safety`
+(AutoConfirm) · `backoff` · `budget` · `research_tick` · `reconcile` · **`runner`** (die Loop —
+Preflight/run/Shutdown/`request_stop`, Contract A bare `executor.run()`, injizierte `now_fn`/`sleep_fn`
++ `max_iterations`) · **Modul 11 = Composition Root:** `scripts/wiring.py` `build_scheduler()` (EIN
+geteilter warmer `ig_demo`-Broker treibt echtes P4-Research, P6-Debatte **und** P7-Reward beide in EINEN
+P5-Executor; 3 Closures `realized_pnl_today`/`pending_reconcile_fn`/`preflight_fn`; harter Demo-Lock) +
+`scheduler/run.py` (`python -m scheduler.run`, SIGTERM→`request_stop`) + `run_scheduler.sh` + offline
+`smoke_test.py` (3/3) + operator `live_test.py`. **146 P8-Tests** (Regression unberührt: P1 52 · P2 62 ·
+P4 94 · P5 146 · P6 70 · P7 128). Jedes Scheduler-Modul + `scripts.wiring`/`scheduler.run` ist
+import-isoliert (zieht NONE cross-phase beim Laden — Cross-Phase lazy in den Funktionen).
 **Step-1-Befunde (Code = Wahrheit, ⚠ weichen vom Handover ab — voll in `phase8_scheduler/CLAUDE.md`
 → `## Verifizierte Contracts`):** (A) `confirm_fn` ist ein **Konstruktor**-Arg, **nicht** `run()`-Arg
 → `run()` arglos, Executor **einmal** mit `AutoConfirm` gebaut; (B) `candidates_are_fresh()` ist
@@ -104,9 +109,12 @@ P6 70 · P7 128). Jedes Modul ist import-isoliert (`import scheduler.<m>` zieht 
 `OrderPlan` trägt **kein `account`** → Demo-Lock strukturell im Wiring (`config.account="demo"`, nur
 `ig_demo`-Broker); (E) `realized_pnl_today` für den Loss-Breaker aus der **DB** (CLOSED_BY_BROKER
 trägt keine sofortige P&L). Reuse: `reconcile_startup` (P5) + `reward_sink.reconcile_open_trades()`
-(P7 13b) decken den Reconcile-Pass ab. **Module 11 (wiring) muss noch bauen:** geteilter warmer
-Broker (Contract G), die drei Closures `realized_pnl_today`/`pending_reconcile_fn`/**`preflight_fn`**
-(Keyring + DB), Caps (`daily_loss_cap≈1800`, `account="demo"` hart).
+(P7 13b) decken den Reconcile-Pass ab. **Alle fünf Befunde sind in Modul 11 (`scripts/wiring.py`)
+verdrahtet** (No-op-`research_runner`, Demo-Lock, DB-`realized_pnl_today`-Closure, geteilter Broker).
+**Nächstes (zuletzt): Modul 12 — `webui/`** (FastAPI read-mostly + statisches Dashboard; liest DB
+read-only + `scheduler_state.json`, steuert nur via Kill-/Command-Datei; `fastapi`+`uvicorn` die
+einzigen neuen Runtime-Deps, nur UI; fällt unter Druck weg, **nie** die Safety). **Operator:** im
+Fenster `python phase8_scheduler/scripts/live_test.py` gegen IG-Demo → erste reale autonome Outcomes.
 
 **Phase 7** bleibt ✅ **live-verifiziert (2026-06-26) + gemerged nach `main`** — der Reward-Loop läuft
 end-to-end live (place → monitor → lag-freie Close-Confirm-P&L → score → reward → lesson); ⚠

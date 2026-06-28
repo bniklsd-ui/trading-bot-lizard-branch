@@ -388,6 +388,30 @@ def test_kill_switch_stops_loop_and_runs_shutdown(tmp_path) -> None:
     assert broker.disconnect_calls == 1       # shutdown ran
 
 
+# --- graceful stop (request_stop) ------------------------------------------
+
+
+def test_request_stop_breaks_loop_and_runs_shutdown(tmp_path) -> None:
+    """request_stop() before run() → loop breaks on the first iteration, shutdown runs, no trade."""
+    ex = _FakeExecutor()
+    broker = _FakeBroker()
+    runner, _sleep, _store, _cfg = _make_runner(
+        tmp_path, times=[_WINDOW_T], executor=ex, broker=broker, max_iterations=5
+    )
+
+    runner.request_stop()
+    runner.run()
+
+    assert ex.run_calls == 0                   # stopped before any cycle work
+    assert broker.disconnect_calls == 1        # shutdown ran
+
+
+def test_request_stop_is_non_sticky(tmp_path) -> None:
+    """A fresh runner has no stop pending (the flag is in-memory, not a sticky file)."""
+    runner, _sleep, _store, _cfg = _make_runner(tmp_path, times=[_WINDOW_T])
+    assert runner._stop_requested is False
+
+
 # --- backoff trip (real BackoffTracker) ------------------------------------
 
 

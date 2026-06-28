@@ -164,6 +164,10 @@ class SchedulerRunner:
         self._broker = broker
         self._preflight_fn = preflight_fn
         self._max_iterations = max_iterations
+        # Non-sticky graceful-stop flag (set by request_stop(), checked at the loop top).
+        # Deliberately NOT the kill-switch file: a SIGTERM-driven stop must not persist a
+        # halt that would block the next restart (the KILL file is for genuine, sticky halts).
+        self._stop_requested = False
 
         self._kill_path = config.kill_path
         self._cycle_interval_s = config.cycle_interval_min * 60
@@ -189,6 +193,19 @@ class SchedulerRunner:
         if not env.get("ok"):
             raise PreflightError(f"broker connect failed: {env.get('error')}")
 
+    # --- graceful stop -----------------------------------------------------
+
+    def request_stop(self) -> None:
+        """Ask the loop to stop cleanly at the next iteration boundary (non-sticky).
+
+        Sets an in-memory flag the loop checks at the top of each iteration; the loop then breaks
+        and runs :meth:`shutdown`. Used by the ``run.py`` SIGTERM/SIGINT handler — deliberately
+        *not* the kill-switch file, so a signal-driven stop does not persist a halt that would block
+        the next restart. Safe to call from a signal handler (a single boolean assignment); an
+        in-progress ``clock.sleep`` completes before the stop takes effect (v1 latency).
+        """
+        self._stop_requested = True
+
     # --- the loop ----------------------------------------------------------
 
     def run(self) -> None:
@@ -210,6 +227,9 @@ class SchedulerRunner:
             now = self._clock.now()
             state = self._state_store.rollover_if_new_day(state, now)
             try:
+                if self._stop_requested:
+                    logger.info("stop requested — shutting down.")
+                    break
                 if killswitch.is_set(self._kill_path):
                     state.kill_reason = killswitch.read_reason(self._kill_path)
                     logger.critical("kill switch set: %s — stopping.", state.kill_reason)

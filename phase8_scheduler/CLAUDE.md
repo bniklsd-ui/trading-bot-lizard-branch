@@ -79,10 +79,12 @@ Safety.
 | `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ✅ (Modul 7, 13 Tests) |
 | `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ✅ (Modul 8, 10 Tests) |
 | `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ✅ (7 Tests) |
-| `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown | ✅ (Modul 10, 16 Tests) |
+| `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown + `request_stop()` | ✅ (Modul 10, 18 Tests) |
+| `scheduler/run.py` | `python -m scheduler.run` Entry (in-package, lazy `scripts.wiring`, SIGTERM/SIGINT → `request_stop`) | ✅ (Modul 11, 6 Tests) |
+| `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures | ✅ (Modul 11, operator-run) |
+| `scripts/run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Operator-Tools (Start-Script · offline Sim-Tag mit Fakes · echter unbeaufsichtigter IG-Demo-Zyklus) | ✅ (Modul 11, operator-run) |
 | `webui/api.py` + `webui/static/*` | FastAPI read-mostly + statisches Dashboard | ⬜ (zuletzt) |
-| `scripts/wiring.py` · `run.py` · `run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⬜ |
-| `tests/*` | gemockt, kein Netz/LLM/echter sleep (≥50, Schwerpunkt `test_runner` + `test_safety`) | ⬜ |
+| `tests/*` | gemockt, kein Netz/LLM/echter sleep (146, Schwerpunkt `test_runner` + `test_safety`) | ✅ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine
 Datei = eine Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging →
@@ -200,6 +202,86 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 11: `scripts/wiring.py` + `scheduler/run.py` + Operator-Scripts — der Composition Root)
+
+### Completed
+- **`scripts/wiring.py`** — `build_scheduler(config, *, now_fn=None, sleep_fn=None, max_iterations=None,
+  exec_config=None) -> SchedulerRunner`, der **einzige** Ort, an dem `scheduler` an den echten P1–P7-
+  Stack gebunden wird (Konzept §11, **kein AI**). Baut den **vollen** Zyklus (anders als P6/P7-Wiring,
+  die je nur ihre eine Naht verdrahteten): EIN geteilter warmer `ig_demo`-Broker treibt das echte P4-
+  `Research`, der P6-`debate_runner` **und** der P7-`reward_sink` werden **beide** in EINEN P5-`Executor`
+  injiziert (`confirm_fn=AutoConfirm` — Contract A; `research_runner=_no_research` — Contract B), drumherum
+  die Scheduler-Module (`Clock`/`StateStore`/`AutoConfirm`/`BackoffTracker`/`TokenBudget`/`ResearchTick`/
+  `Reconciler`/`SchedulerRunner`). Alle Cross-Phase-Imports **lazy in den Funktionskörpern** → `import
+  scripts.wiring` zieht **NONE** cross-phase (offline-importierbar, spiegelt P7).
+- **`scheduler/run.py`** — `python -m scheduler.run` Entry **im Paket** (nicht `scripts/`, da `-m` das
+  installierte Paket braucht; spiegelt `execution/ig_bot.py`). Argparse-Caps → demo-gelockte
+  `SchedulerConfig` → lazy `from scripts.wiring import build_scheduler` (sys.path-insert) → SIGTERM/SIGINT
+  → `runner.request_stop()` → `runner.run()`. `PreflightError` → exit 2 (sauber, kein Trade). Logging →
+  stderr.
+- **`scheduler/runner.py`** (additive Modul-10-Erweiterung) — `request_stop()` (non-sticky In-Memory-Flag)
+  + Loop-Top-Check (vor dem Kill-Switch). **Bewusst NICHT** die KILL-Datei: ein Signal-Stop darf keinen
+  Halt persistieren, der den nächsten Restart blockt.
+- **`scripts/run_scheduler.sh`** — dokumentierter Start in **entsperrter** Session (Keyring/Secret-Service,
+  Q3) + `# known issue`-Note zu Background/Headless; `exec python -m scheduler.run "$@"`.
+- **`scripts/smoke_test.py`** — **offline** simulierter Tag mit Fakes + Fake-Clock (Konzept §11; bewusst
+  **anders** als P5/P6/P7-„real dry stack" — der Loop-Wert sind die Mechanik: Phasen/Cap/Kill). Druckt 3
+  Szenarien (voller Tag · CAP_BLOCK · Kill-Switch), kein Netz/Keyring/Order. **Lokal gelaufen: 3/3, exit 0.**
+- **`scripts/live_test.py`** — echter unbeaufsichtigter IG-Demo-Zyklus (operator-run, nicht CI):
+  `build_scheduler(sleep_fn=no-op, max_iterations, exec_config=short-hold)` → `runner.run()` → read-only
+  DB/State-Asserts: sauberer Stop · State persistiert · **falls** heute ein CLOSED-Trade → `reward_pts`
+  vorhanden (autonomer open→close→reward-Beweis); ein No-Trade-Lauf (Abstain/VETO/Cap/ruhig) ist valider
+  PASS (P5/P6/P7-Disziplin). Im Fenster laufen.
+- **`tests/test_run.py`** (6, offline) + **`tests/test_runner.py`** (+2 `request_stop`).
+
+### Acht Konzept↔Code-Reconciliations (Code = Source of Truth — dated §11-Annotation im Konzept)
+1. **Wiring repliziert die P4/P6/P7-Builder inline** (aus `research`/`debate`/`reward`), importiert **nicht**
+   deren `scripts.wiring` (Namenskollision) — wie P7 `build_executor` replizierte statt P5 zu importieren.
+2. **`run.py` lebt im Paket (`scheduler/run.py`), nicht `scripts/`** — `python -m scheduler.run` braucht es
+   installiert (`include=["scheduler*"]` schließt `scripts/` aus); spiegelt `execution/ig_bot.py`.
+3. **Struktureller Demo-Lock im Wiring** (Decision 7 / Contract D): `build_scheduler` wirft bei
+   `config.account != "demo"`, baut **nur** `get_broker("ig_demo")`; `AutoConfirm` re-checkt zur Laufzeit
+   (zwei unabhängige Locks).
+4. **Alle Daten-Pfade absolut auf den `<repo_root>/data/`-Baum** (via `dataclasses.replace`) → der Daemon
+   ist cwd-unabhängig + teilt exakt die Dateien von `init_db.py` + P4–P7.
+5. **Die drei Runner-Closures leben im Wiring:** `realized_pnl_today` (DB-`SUM(profit_loss)` via `db.conn`,
+   Contract E) · `pending_reconcile_fn` (P5-`reconcile_startup` über den geteilten Broker) · `preflight_fn`
+   (Keyring `get_credential(IG_DEMO_API_KEY)` + **Migration-002-Check** via `PRAGMA table_info` → `account`-
+   Spalte; **verifiziert, migriert nicht** — ein Safety-Daemon mutiert kein Schema).
+6. **EIN geteiltes `now_fn`** durch Clock/Executor/ResearchTick/Reconciler/TokenBudget; der Executor behält
+   sein **eigenes echtes `sleep_fn`** (der Monitor muss real warten) — nur die **Loop-Kadenz** nutzt das
+   injizierte `sleep_fn`.
+7. **`smoke_test` = offline Sim-Tag mit Fakes** (Konzept §11, bewusste Abweichung vom P5/P6/P7-Muster).
+8. **Graceful Stop = `request_stop()`** (non-sticky, Loop-Top-Check) statt KILL-Datei — sonst blockt ein
+   Signal den nächsten Restart. In-Progress-`sleep` läuft v1 erst aus (Latenz; interruptible-sleep = später).
+
+### Verifiziert (gemockt / offline — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **146 passed** (138 + 2 `request_stop` + 6 `test_run`). `py_compile`
+  aller neuen Dateien + `bash -n run_scheduler.sh` clean. **`smoke_test.py` lokal gelaufen → 3/3, exit 0.**
+  `python -m scheduler.run --help` exit 0; `live_test.py --help` exit 0 (beide offline — Cross-Phase-Import
+  lazy in `main`). **Import-Isolation:** `import scheduler.run` / `import scripts.wiring` /
+  `import scheduler.runner` ziehen **NONE** cross-phase beim Laden.
+- **Regression grün + unberührt** (rein additiv, separat gelaufen): P1 52 · P2 62 · P4 94 · P5 146 · P6 70 ·
+  P7 128.
+
+### Next — **Modul 12: `webui/` (FastAPI read-mostly + statisches Dashboard)** — **zuletzt**
+- `webui/api.py` (FastAPI, bind `127.0.0.1`): read-only DB-Connection (`mode=ro`) + `scheduler_state.json`;
+  Endpoints `/api/{status,score,confidence,lessons,trades,last_cycle}` (read) + `POST /api/{kill,clear_kill,
+  command}` (schreibt **nur** Kill-/Command-Datei — Decision 14, der Trader hängt **nie** an der UI).
+  `webui/static/{index.html,app.js,style.css}` (GitHub-Dark, Monospace, Glass-/Neumorphism-Buttons, Polling
+  5–10 s, kein Build-Step). Tests ≥5 (FastAPI `TestClient`, gemockte DB/State). **`fastapi`+`uvicorn` sind die
+  einzigen neuen Runtime-Deps (nur UI).** Unter Druck fällt die UI weg, **nie** die Safety.
+- **Operator (vor/parallel zu Modul 12):** im Fenster `python phase8_scheduler/scripts/live_test.py` gegen
+  IG-Demo → erste reale autonome Demo-Outcomes sammeln.
+
+### Offene Punkte / [VERIFY]
+- `live_test.py` ist noch **nicht** live gelaufen (Operator). Erwartung im Fenster: sauberer Stop + State +
+  entweder ein CLOSED-Trade mit `reward_pts` **oder** ein valider No-Trade-Lauf.
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
+  Note-Update" im selben Commit.
 
 ---
 
