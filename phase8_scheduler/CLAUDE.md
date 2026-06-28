@@ -78,7 +78,7 @@ Safety.
 | `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ✅ (9 Tests) |
 | `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ✅ (Modul 7, 13 Tests) |
 | `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ✅ (Modul 8, 10 Tests) |
-| `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ⬜ |
+| `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ✅ (7 Tests) |
 | `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown | ⬜ |
 | `webui/api.py` + `webui/static/*` | FastAPI read-mostly + statisches Dashboard | ⬜ (zuletzt) |
 | `scripts/wiring.py` · `run.py` · `run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⬜ |
@@ -200,6 +200,71 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (`scheduler/reconcile.py` — idempotenter Reconcile-Pass)
+
+### Completed
+- **`scheduler/reconcile.py`** — `Reconciler`, der Daten-Recovery-Pass (Konzept §9, **kein AI**,
+  **reine Komposition** zweier bereits gebauter+getesteter Stücke — Contract F). **Mission-kritisch:**
+  ein geschlossener Trade, dessen P&L in-cycle nicht aufgelöst werden konnte (IG bucht History erst
+  nach Settlement → `CLOSED_BY_BROKER` lässt die `trade_outcomes`-Zeile **OPEN**, ohne Reward/Lesson),
+  wird per späterem Pass nachgezogen, sobald die History aufholt — sonst gehen die realen Demo-Daten
+  verloren. `tick(state) -> ReconcileReport`, **durchgehend fail-closed (wirft nie in die Loop)**:
+  1. **orphan PENDING** via injizierter zero-arg `pending_reconcile_fn` (wraps P5 `reconcile_startup`);
+     raised sie (`ReconcileConflict`/`ExecutionAbort`) → `critical` + `pending_ok=False`, **Schritt 2
+     läuft trotzdem**.
+  2. **CLOSED_BY_BROKER-P&L-Nachzieh** via `reward_sink.reconcile_open_trades()` (P7, None = alle OPEN;
+     idempotent via OPEN/CLOSED-Status; defensiv geguarded, obwohl die echte Methode nie wirft).
+  3. `state.last_reconcile_ts` stempeln; `ReconcileReport(pending_ok, resolved_deal_ids, n_resolved)`.
+- **`scheduler/__init__.py`** exportiert jetzt zusätzlich `Reconciler` + `ReconcileReport`.
+- **`tests/test_reconcile.py`** — **7 Tests**: happy-path (beide Hälften + ts + `reconcile_open_trades`
+  mit `None`); nichts offen → No-op; **pending raised → contained + Schritt 2 läuft weiter**;
+  `reconcile_open_trades` raised → contained; **beide raised → 2 criticals, kein Re-raise, ts gesetzt**;
+  Default-`now_fn` tz-aware; Package-Export-Identität.
+
+### Drei Konzept↔Code-Reconciliations (Code = Source of Truth — dated §9-Annotation im Konzept)
+- **(1) Ctor `Reconciler(reward_sink, pending_reconcile_fn, *, now_fn=None)`** statt
+  `(broker, db, reward_sink, state_store)`. **Beide Reuse-Ziele INJIZIERT, nicht importiert** → die
+  verifizierte Import-Isolation bleibt erhalten (`import scheduler.reconcile` zieht **NONE** cross-phase).
+  `broker`+P5-`reconcile_startup` → zero-arg `pending_reconcile_fn`-Closure (Wiring bindet sie am
+  Composition-Root); `db` raus (reward_sink besitzt es); `state_store` raus (mutate+Runner-persistiert,
+  wie `research_tick`/`record_cycle`/`backoff`); `now_fn` rein (Determinismus).
+- **(2) Komposition, keine Reimplementierung** (Contract F): `reconcile_open_trades` macht
+  History-Resolve→`update_trade_close`+`insert_reward` (idempotent) bereits — `reconcile.py` ruft nur.
+- **(3) orphan-PENDING-Hälfte teil-redundant** mit dem executor-eigenen `reconcile_startup`; der
+  Scheduler-Pass ergänzt Between-Window-Abdeckung + den P&L-Nachzieh. **Scheduling** = Runner (§10);
+  **Closure bauen + Broker teilen** = Wiring (Modul 11).
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **122 passed** (10 config + 6 exceptions + 19 clock + 18 state +
+  12 killswitch + 18 safety + 13 budget + 10 research_tick + 9 backoff + 7 reconcile). `py_compile` clean.
+  **Import-Isolation:** `import scheduler.reconcile` zieht **NONE** broker_wrapper/persistence/
+  external_data/research/execution/reward/debate/pandas/numpy/yfinance/anthropic/requests.
+- **Regression grün + unberührt** (rein additiv): P2 62 · P4 94 · P5 146 · P7 128. P1 52 · P6 70 unverändert.
+
+### Next — **Modul 10: `scheduler/runner.py`** (Konzept §10 — die Loop, das Herzstück; **Schwerpunkt-Tests ≥8**)
+- `SchedulerRunner(*, clock, state_store, killswitch_path, auto_confirm, backoff, budget,
+  research_tick, reconciler, executor, broker, config)` + `preflight()` (fail-closed: Keyring/`get_credential`
+  + `broker.connect` + DB/Migrations da → sonst `PreflightError` → sauberer Exit, **kein** Trade) +
+  `run()` (die Hauptschleife) + `shutdown()` (finaler Reconcile + Session schließen). Loop-Skizze §10:
+  rollover → killswitch-Check → `clock.classify` → PRE_OPEN(ensure_session+reconcile) / WINDOW
+  (reconcile → `auto_confirm.can_open` Pre-Cycle-Gate → `research_tick.ensure_candidates` → **bare
+  `executor.run()`** (Contract A: `confirm_fn=AutoConfirm` ist am Konstruktor, **nicht** hier) →
+  `record_cycle` → `backoff.record_success`) / POST_WINDOW(finaler Reconcile) / IDLE; `except` →
+  `backoff.record_failure` → `should_trip` → `killswitch.set_kill("auto:backoff")`+shutdown; `finally:
+  state_store.save`. **Determinismus:** `now_fn`/`sleep_fn` injiziert, Loop über `now_fn` getrieben + nach
+  K Iterationen via injizierbare Stop-Bedingung abgebrochen (kein echter sleep/Netz).
+- **Danach** Modul 11 `wiring.py` (No-op-`research_runner`, EINEN Broker teilen, `pending_reconcile_fn`-
+  Closure, `realized_pnl_today`-Closure, Caps setzen) + Operator-Scripts → **zuletzt** Web-UI.
+
+### Offene Punkte / [VERIFY]
+- `runner.py`: Contract A (bare `run()`, `confirm_fn` am Konstruktor) + die §10-Loop-Skizze + die
+  Stop-Bedingungs-Injektion für deterministische Tests heranziehen. `preflight` = Deployment-Top-Risk Q3
+  (Keyring/Secret-Service in entsperrter Session).
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
+  Note-Update" im selben Commit.
 
 ---
 

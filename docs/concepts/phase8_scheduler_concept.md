@@ -578,6 +578,30 @@ class Reconciler:
   gebucht; bereits gebucht → **kein** Doppel-Insert (idempotent); History-Fehler → fail-closed,
   Loop läuft weiter; nichts offen → No-op.
 
+> **⟳ Angepasst 2026-06-28 (`reconcile.py` gebaut, Code = Source of Truth) — drei
+> Reconciliations:**
+> 1. **Konstruktor `Reconciler(reward_sink, pending_reconcile_fn, *, now_fn=None)`** statt
+>    `(broker, db, reward_sink, state_store)`. **Beide Reuse-Ziele werden INJIZIERT, nicht
+>    importiert** — das ist, was die verifizierte Import-Isolation jedes Scheduler-Moduls wahrt
+>    (`import scheduler.reconcile` zieht **NONE** cross-phase): `broker` + die P5-`reconcile_startup`
+>    falten in eine zero-arg `pending_reconcile_fn`-Closure (das Wiring/Modul 11 bindet
+>    `execution.order.reconcile_startup` über den geteilten broker/exec_state/`ExecutionConfig` am
+>    Composition-Root, wo Cross-Phase-Imports erlaubt sind); `db` entfällt (`reward_sink` besitzt es —
+>    `reconcile_open_trades` ist self-contained); `state_store` entfällt (mutiert
+>    `state.last_reconcile_ts`, der **Runner** persistiert — wie `research_tick`/`record_cycle`/
+>    `backoff`); `now_fn` kommt dazu (Determinismus). Muster wie `safety.Budget`/`state.CycleResult`/
+>    `research_tick._ResearchLike`.
+> 2. **Komposition, keine Reimplementierung** (Contract F): `reconcile_open_trades` macht den
+>    History-Resolve → `update_trade_close` + `insert_reward` **bereits** (idempotent via OPEN/CLOSED-
+>    Status). `reconcile.py` re-implementiert die §9-„Schritt-2"-SQL **nicht** — es ruft die getestete
+>    P7-Methode. Beide Hälften fail-closed (je `logger.critical`, kein Re-raise; eine raisende Hälfte
+>    überspringt die andere nie).
+> 3. **Die orphan-PENDING-Hälfte ist teil-redundant** mit dem executor-eigenen per-Cycle
+>    `reconcile_startup`; der Scheduler-Pass ergänzt die **Between-Window**-Abdeckung + den P&L-
+>    Nachzieh, den der Executor nicht macht. **Scheduling** (Startup/periodisch/Shutdown) ist der
+>    Runner (§10); die Closure bauen + Broker teilen ist das Wiring (Modul 11). **7 Tests grün**
+>    (Paket-Suite 115 → 122).
+
 ### 10. `runner.py` + Tests — **die Loop**
 
 ```python
