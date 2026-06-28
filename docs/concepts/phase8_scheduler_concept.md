@@ -473,6 +473,30 @@ class TokenBudget:
   (+ WARNING). Tagesgrenze Europe/Berlin konsistent mit `state`-Rollover.
 - Tests (≥3): unter Budget → False; über → True; None → False + WARNING.
 
+> **⟳ Angepasst 2026-06-28 (Modul 7 `budget.py` gebaut, Code = Source of Truth) — vier
+> Reconciliations:**
+> 1. **Konstruktor `TokenBudget(config, usage_log_path, *, now_fn=None)`, nicht `(config,
+>    token_meter)`.** Das P4-`token_meter`-Modul hat **kein** Read-API → nichts zu injizieren (die
+>    §-eigene Notiz „Kein Reader → budget.py summiert selbst" bestätigt das). `budget.py` liest die
+>    `llm_usage.json` direkt (fail-soft, spiegelt `usage_report.load_records`/`token_meter._load_log`).
+>    Der Konstruktor braucht **wo** (`usage_log_path`, vom Wiring — wie `safety.py` `kill_path`
+>    explizit nimmt) + **die Tagesgrenze** (`now_fn`, tz-aware, deterministische Tests). **Kein
+>    Edit an `config.py`/Modul 1** (kein `usage_log_path`-Feld — minimal gehalten).
+> 2. **Berlin-Tagesgrenze aus einem UTC-`ts`.** `token_meter` schreibt `ts` **UTC** mit `Z`-Suffix
+>    (`"…Z"`), die Daemon-Tagesgrenze ist aber `config.tz` (konsistent mit `state`-Rollover) → jeder
+>    Record-`ts` wird **vor** dem `.date()` nach `config.tz` konvertiert (ein `22:30Z`-Call zählt zum
+>    nächsten Berlin-Tag, CEST +2). Stdlib-only (`datetime.fromisoformat` + `Z`→`+00:00` + `zoneinfo`);
+>    `research.timeutil` **nicht** importiert → `import scheduler.budget` zieht **NONE** cross-phase.
+> 3. **Token-Maß = alle vier billed Felder** (`input_tokens` + `output_tokens` +
+>    `cache_creation_input_tokens` + `cache_read_input_tokens`), tolerant gegen fehlende Keys
+>    (ältere 6-Feld-Records ohne `cache_*` → 0). So undercountet das Budget nie (P6 cached →
+>    `cache_* > 0`). v1, am echten Output tunbar.
+> 4. **Advisory-Budget = fail-OPEN** (fehlende/korrupte Log → `consumed 0` → nicht erschöpft →
+>    Cycles erlaubt) — bewusst **anders** als der fail-CLOSED Loss-Breaker in `safety.py`: das Budget
+>    ist eine Kosten-Kappe, kein Geld-Safety-Gate, und der Meter selbst ist „advisory, never break a
+>    pick". `is_exhausted()` **wirft nie** (das Auto-Confirm-Gate vertraut dem Bool). **13 Tests grün**
+>    (Paket-Suite 96), inkl. Protocol-Handoff (echtes `TokenBudget` als `AutoConfirm.budget` → BUDGET).
+
 ### 8. `research_tick.py` + Tests — **autonome Kandidaten (der Blocker)**
 
 ```python

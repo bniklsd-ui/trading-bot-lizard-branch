@@ -25,6 +25,7 @@ Full design + the 20 locked decisions: ``../docs/concepts/phase8_scheduler_conce
 from __future__ import annotations
 
 from . import killswitch
+from .budget import TokenBudget
 from .clock import Clock, Phase
 from .config import SchedulerConfig
 from .exceptions import PreflightError, SchedulerError
@@ -42,4 +43,5 @@ __all__ = [
     "killswitch",
     "AutoConfirm",
     "Budget",
+    "TokenBudget",
 ]

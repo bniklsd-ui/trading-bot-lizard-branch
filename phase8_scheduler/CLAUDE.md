@@ -76,7 +76,7 @@ Safety.
 | `scheduler/killswitch.py` | KILL-Datei lesen/setzen/löschen (von `safety` + `webui` geteilt) — fail-soft, atomic | ✅ (Modul 5, 12 Tests) |
 | `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ✅ (Modul 6, 18 Tests) |
 | `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ⬜ |
-| `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ⬜ |
+| `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ✅ (Modul 7, 13 Tests) |
 | `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ⬜ |
 | `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ⬜ |
 | `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown | ⬜ |
@@ -200,6 +200,67 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 7: `scheduler/budget.py` — das Token-Budget-Gate)
+
+### Completed
+- **`scheduler/budget.py`** — `TokenBudget`, das deterministische Tages-Token-Budget (Decision 12,
+  **kein AI**). Erfüllt das in Modul 6 definierte `safety.Budget`-Protocol (**löst den Stub ein**).
+  Reuse des geteilten 8-Feld-Meters (`data/state/llm_usage.json`, von `research.token_meter`
+  geschrieben über P4/P6/P7) — **kein** zweites Mess-System; es gibt **keinen** importierbaren Reader
+  (nur das Script `usage_report.py`), also liest `budget.py` das JSON-Array selbst (fail-soft).
+  - `consumed_today() -> int` — summiert alle vier billed Token-Felder (`input`+`output`+
+    `cache_creation`+`cache_read`, tolerant gegen fehlende Keys) über die Records, deren UTC-`ts`
+    auf **heute in `config.tz`** fällt (alle Modelle; system-weites Tagesbudget).
+  - `is_exhausted() -> bool` — `daily_token_budget None` → False (+ 1 WARNING beim Konstruieren);
+    sonst `consumed_today() >= budget` (Grenze inklusive). **Wirft nie** (Auto-Confirm vertraut dem Bool).
+- **`scheduler/__init__.py`** exportiert jetzt zusätzlich `TokenBudget`.
+- **`tests/test_budget.py`** — **13 Tests**: unter/über/exakt am Budget; cache-Felder gezählt;
+  6-Feld-Record (ohne `cache_*`) toleriert; nur heutige Records; **Berlin-Grenze** (`22:30Z` zählt
+  zum nächsten Berlin-Tag, CEST +2); fehlende/korrupte Log → 0 (fail-open, kein Raise); Bad-`ts`
+  geskippt; `None` → 1 `scheduler.budget`-WARNING + nie erschöpft; **Protocol-Handoff** (echtes
+  `TokenBudget` als `AutoConfirm.budget` → `REASON_BUDGET`); Export-Identität.
+
+### Vier Konzept↔Code-Reconciliations (Code = Source of Truth)
+- **(1) Konstruktor `TokenBudget(config, usage_log_path, *, now_fn=None)`** statt `(config,
+  token_meter)` — das P4-`token_meter` hat **kein** Read-API; `budget.py` liest die JSON direkt. Der
+  Pfad kommt explizit (wie `safety.py` `kill_path` nimmt) + `now_fn` für die Tagesgrenze. **Kein
+  Edit an `config.py`/Modul 1.**
+- **(2) Berlin-Tagesgrenze aus UTC-`ts`** — der Meter schreibt UTC (`Z`-Suffix), der Tag ist
+  `config.tz` → `ts` wird **vor** `.date()` nach `config.tz` konvertiert. Stdlib-only (`fromisoformat`
+  + `Z`→`+00:00` + `zoneinfo`), **kein** `research.timeutil`-Import (Isolation: `import
+  scheduler.budget` zieht **NONE** cross-phase).
+- **(3) Token-Maß = alle vier billed Felder** (tolerant gegen fehlende `cache_*`) → undercountet
+  nie. v1, tunbar.
+- **(4) Advisory-Budget fail-OPEN** (Log-Read-Fehler → consumed 0 → nicht erschöpft) — bewusst
+  **anders** als `safety.py`s fail-CLOSED Loss-Breaker (Kosten-Kappe, kein Geld-Safety-Gate).
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **96 passed** (10 config + 6 exceptions + 19 clock + 18
+  state + 12 killswitch + 18 safety + 13 budget). `py_compile` clean. **Import-Isolation:** `import
+  scheduler.budget` zieht **NONE** broker_wrapper/persistence/external_data/research/execution/
+  reward/debate/pandas/numpy/yfinance/anthropic/requests.
+- **Regression grün + unberührt** (rein additiv): P2 62 · P5 146 · P7 128 (separat gelaufen). P1 52 ·
+  P4 94 · P6 70 unverändert.
+
+### Next — **Modul 8: `scheduler/research_tick.py`** (Konzept §8 — der eigentliche Blocker: autonome Candidates)
+- `ResearchTick(research, state_store).ensure_candidates(state) -> ResearchResult`: triggert
+  **ausschließlich** das echte `Research.run()` (P4, via Wiring) → frische `turbo_candidates.json`
+  (1 Pick | `[]`), **nie** `seed_candidate.py` (kein `"MANUAL SEED"`-Marker → `test_no_manual_seed_
+  marker`). `no_trade_reason` minimal (`EMPTY_UNIVERSE|LLM_ABSTAIN|VALIDATOR_REJECT|FILTER_FAIL|
+  PREFLIGHT_FAIL`) → `state.last_no_trade_reason`. **Freshness-Disziplin (Contract B):** bei Abstain
+  `save_candidates([])`, aber Gate 2 re-callt bei `[]` → der **No-op-`research_runner`** muss in den
+  Executor injiziert werden (Wiring/Modul 11), echtes Research läuft **vorher** hier. `last_research_ts`
+  aktualisieren.
+
+### Offene Punkte / [VERIFY]
+- `wiring.py`/Modul 11: `TokenBudget(config, _USAGE_LOG, now_fn=tz_now)` (Pfad `data/state/llm_usage.json`
+  wie P4/P6/P7-Wiring) an `AutoConfirm` reichen; `realized_pnl_today`-Closure (Query in Modul-6-Block)
+  + `daily_loss_cap≈1800` + `daily_token_budget` setzen; **No-op-`research_runner`** + EINEN Broker teilen.
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
+  Note-Update" gilt im selben Commit.
 
 ---
 
