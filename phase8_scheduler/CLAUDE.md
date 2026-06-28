@@ -74,7 +74,7 @@ Safety.
 | `scheduler/clock.py` | `now_fn`/`sleep_fn` injizierbar; Phasen-Klassifikation (config-Fenster + Weekday; `is_market_open` lazy via `market_is_open`) | ✅ (Modul 3, 19 Tests) |
 | `scheduler/state.py` | `SchedulerState` ↔ `scheduler_state.json` (atomic); Tages-Rollover (Europe/Berlin) + `record_cycle` (Contract E) | ✅ (Modul 4, 18 Tests) |
 | `scheduler/killswitch.py` | KILL-Datei lesen/setzen/löschen (von `safety` + `webui` geteilt) — fail-soft, atomic | ✅ (Modul 5, 12 Tests) |
-| `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ⬜ |
+| `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ✅ (Modul 6, 18 Tests) |
 | `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ⬜ |
 | `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ⬜ |
 | `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ⬜ |
@@ -200,6 +200,75 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 6: `scheduler/safety.py` — das Auto-Confirm-Gate)
+
+### Completed
+- **`scheduler/safety.py`** — `AutoConfirm`, der deterministische `confirm_fn`-Ersatz für den
+  P5-Human-Confirm (das schwerste Safety-Modul, **kein AI**). Fünf harte Gates, **alle** müssen
+  halten, sonst `(False, reason)`:
+  1. **Demo-Lock (strukturell, config-only — Contract D):** `config.account == "demo"`, sonst
+     `False` + `logger.critical`. Liest **nicht** den `OrderPlan` (der trägt kein `account`).
+  2. **Kill-Switch aus:** `killswitch.is_set(kill_path)` False (Modul 5, live pro Aufruf gelesen).
+  3. **Unter Trade-Cap:** `state.trades_today < config.max_trades_per_day`.
+  4. **Über Loss-Breaker:** `daily_loss_cap is not None` UND heutige realized P&L `> -cap` —
+     **aus der DB** (Contract E) via injiziertem `realized_pnl_today(session_date)`, **nicht**
+     `state.realized_pnl_today` (Snapshot-Falle). DB-Read **fail-CLOSED** (wirft → block).
+  5. **Budget nicht erschöpft:** `budget.is_exhausted()` False (duck-typed `Budget`-Protocol).
+- **Zwei Aufruf-Flächen, ein gemeinsamer `_evaluate`** (können nie divergieren): `can_open(state)
+  -> (bool, reason)` (Pre-Cycle-Gate, spart Tokens) + `__call__(order_plan) -> bool` (Final-Gate;
+  lädt State **live** aus dem Store — Contract A, kein Snapshot; ignoriert `order_plan`).
+- **`scheduler/__init__.py`** exportiert jetzt zusätzlich `AutoConfirm` + `Budget`.
+- **`tests/test_safety.py`** — **18 Tests**: happy-path (can_open + __call__); `account="live"` →
+  NOT_DEMO + 1 critical; Demo-Lock schlägt andere Fails; Kill blockt + **live** in `__call__`;
+  Cap at-limit/under; Loss unter Cap / **exakt am Cap** / knapp drüber; session_date == `state.date`;
+  **P&L-Read-Fehler → fail-closed block** + critical; Loss-Cap None → 1 `scheduler.safety`-WARNING +
+  kein Block + Reader nie gerufen; Budget erschöpft; `can_open`/`__call__` konsistent; `__call__`
+  ignoriert Plan-Felder; Package-Export-Identität.
+
+### Drei Konzept↔Code-Reconciliations + zwei Design-Entscheidungen (Code = Source of Truth)
+- **(1) Konstruktor +5. Arg `realized_pnl_today: Callable[[str], float]`** — die §5-Skizze
+  `AutoConfirm(config, state_store, kill_path, budget)` hat keine DB-P&L-Quelle, Contract E
+  verlangt sie. Injizierte Closure (Wiring backt sie DB-seitig) hält `safety` phasen-isoliert
+  (`import scheduler.safety` zieht **NONE** cross-phase). **Query-Form (für Wiring/Modul 11):**
+  `SELECT COALESCE(SUM(profit_loss),0.0) FROM trade_outcomes WHERE session_date=? AND profit_loss
+  IS NOT NULL` (OPEN/CANCELLED sind NULL → fallen raus); Argument = `state.date`.
+- **(2) §5-`order_ctx.account=="demo"`-Doppel-Check entfällt** (Contract D: kein `account` im
+  `OrderPlan`) → Demo-Lock config-only; strukturelle zweite Hälfte (nur `ig_demo`-Broker) = Wiring.
+- **(3) `budget` = duck-typed `Budget`-Protocol** (Operator-Sondernotiz: „stub via Protocol" statt
+  Modul 7 vorziehen). Modul-7-`TokenBudget` wird es erfüllen.
+- **Design A:** Loss-Breaker-DB-Read **fail-CLOSED** (wirft → block + critical; im Zweifel nicht traden).
+- **Design B:** eigene `scheduler.safety`-WARNING bei `daily_loss_cap=None` beim Konstruieren
+  (zusätzlich zur `config`-WARNING — `config` warnt vorm Wert, `safety` warnt, dass **sein** Gate
+  aus ist; eine WARNING pro Verantwortung).
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **83 passed** (10 config + 6 exceptions + 19 clock + 18
+  state + 12 killswitch + 18 safety). `py_compile` clean. **Import-Isolation:** `import
+  scheduler.safety` zieht **NONE** broker_wrapper/persistence/external_data/research/execution/
+  reward/debate/pandas/numpy/yfinance/anthropic/requests.
+- **Regression grün + unberührt** (rein additiv in `phase8_scheduler/`): P2 62 · P5 146 · P7 128
+  (cross-referenzierte Phasen separat gelaufen — `tests.conftest`-Namenskollision). P1 52 · P4 94 ·
+  P6 70 unverändert (kein berührter Import).
+
+### Next — **Modul 7: `scheduler/budget.py`** (Konzept §7, TDD ≥3) — löst den `Budget`-Protocol-Stub ein
+- `TokenBudget(config, token_meter)` mit `consumed_today() -> int` + `is_exhausted() -> bool` (muss
+  das in `safety.py` definierte `Budget`-Protocol erfüllen). **Kein Reader** in `token_meter`
+  (Contract bestätigt) → die heutigen 8-Feld-Records aus `data/state/llm_usage.json` selbst
+  summieren, `ts`-Datum-Filter **Europe/Berlin** (konsistent mit `state`-Rollover).
+  `daily_token_budget=None` → nie erschöpft + **eine** WARNING (gehört `budget.py`, nicht `config`).
+  Tests: unter Budget → False; über → True; None → False + WARNING.
+- **Danach Modul 8 `research_tick.py`** (der eigentliche Blocker: autonome Candidates) + Modul 9
+  `reconcile.py` + Modul 11 `runner.py`. Beim Wiring: die `realized_pnl_today`-Closure mit der
+  obigen Query an `AutoConfirm` reichen; `daily_loss_cap≈1800` setzen.
+
+### Offene Punkte / [VERIFY]
+- `wiring.py`/Modul 11: `realized_pnl_today`-Closure (Query oben) + `daily_loss_cap` setzen; EINEN
+  Broker teilen (Contract G); `Research` direkt aus `research` bauen.
+- **Commit:** dieser Step ist committet, **falls** der Operator es triggert (Branch
+  `phase8-scheduler`); „Commit ⇒ Note-Update" gilt im selben Commit (Status-Tabelle ✅ + dieser Block).
 
 ---
 

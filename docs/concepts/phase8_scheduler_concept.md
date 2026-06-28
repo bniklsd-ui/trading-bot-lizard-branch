@@ -411,6 +411,35 @@ Harte Bedingungen (alle müssen erfüllt sein, sonst `False` + Reason):
   False; Trade-Cap erreicht → False; Loss über Cap → False; Loss-Cap None → True + WARNING;
   Budget erschöpft → False; `can_open` und `__call__` konsistent.
 
+> **⟳ Angepasst 2026-06-28 (Modul 6 `safety.py` gebaut, Code = Source of Truth) — drei
+> Reconciliations + zwei Design-Entscheidungen:**
+> 1. **Konstruktor bekommt ein 5. Arg `realized_pnl_today`.** Die §5-Skizze ist
+>    `AutoConfirm(config, state_store, kill_path, budget)` — aber der eigene Loss-Breaker (§5
+>    Punkt 4) + Contract E verlangen die heutige realized P&L **aus der DB**, wofür diese
+>    Signatur keine Quelle hat. Das injizierte `realized_pnl_today: Callable[[str], float]`
+>    (session_date → €) ist der minimale, phasen-isolierte Weg (kein P2-Import in `safety`; das
+>    Wiring backt die Closure mit `SELECT COALESCE(SUM(profit_loss),0) FROM trade_outcomes WHERE
+>    session_date=? AND profit_loss IS NOT NULL`). **Nicht** an `state.realized_pnl_today` hängen
+>    (Snapshot-Falle, s. Modul-4-Reconciliation: `CLOSED_BY_BROKER` liefert `profit_loss=None`).
+> 2. **Der §5-`order_ctx.account=="demo"`-Doppel-Check entfällt.** Contract D: der `OrderPlan` trägt
+>    **kein** `account` → Demo-Lock ist **config-only** (`config.account`); `__call__(plan)` liest
+>    **nichts** vom Plan. Strukturelle zweite Hälfte (nur `ig_demo`-Broker) lebt im Wiring.
+> 3. **`budget` ist ein duck-typed `Budget`-Protocol** (`is_exhausted() -> bool`), **nicht** die
+>    konkrete Modul-7-Klasse — `safety` (Modul 6) wird **vor** `budget.py` (Modul 7) gebaut (per
+>    Operator-Sondernotiz: „stub via Protocol" statt Modul 7 vorziehen). Modul 7s `TokenBudget`
+>    erfüllt das Protocol; Tests reichen einen Fake (spiegelt `CycleResult` in `state.py`).
+> - **Design A — Loss-Breaker-DB-Read fail-CLOSED:** wirft der P&L-Reader (DB unreachable), wird
+>   der Trade **geblockt** (`REASON_LOSS` + `critical`) — wir können nicht beweisen, dass wir unter
+>   dem Cap sind ⇒ nicht traden (ein späterer Zyklus re-evaluiert + erholt sich). „Im Zweifel nicht
+>   traden", die sichere Richtung.
+> - **Design B — eigene WARNING bei `daily_loss_cap=None` beim Konstruieren** (Logger
+>   `scheduler.safety`), zusätzlich zur `config.py`-WARNING: `config` warnt vor dem **Wert**,
+>   `safety` warnt, dass **sein Gate** deaktiviert ist (eine WARNING pro Verantwortung; in einem
+>   Safety-Modul ist die laute Selbst-Dokumentation eines abgeschalteten Gates gewollt).
+> - **Reason-Codes** (`REASON_NOT_DEMO/KILL/CAP_BLOCK/LOSS_BREAKER/BUDGET`) als Modul-Konstanten →
+>   `state.last_no_trade_reason` (§10-Loop); Gate-Reihenfolge most-structural-first
+>   (demo → kill → cap → loss → budget). **18 Tests grün** (Paket-Suite 83).
+
 ### 6. `backoff.py` + Tests
 
 ```python
