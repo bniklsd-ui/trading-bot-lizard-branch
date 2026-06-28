@@ -35,6 +35,9 @@ from .research_tick import ResearchResult, ResearchTick
 from .safety import AutoConfirm, Budget
 from .state import SchedulerState, StateStore
 
+# Imported last: the runner depends on every other submodule above.
+from .runner import SchedulerRunner
+
 __all__ = [
     "SchedulerConfig",
     "SchedulerError",
@@ -52,4 +55,5 @@ __all__ = [
     "BackoffTracker",
     "Reconciler",
     "ReconcileReport",
+    "SchedulerRunner",
 ]

@@ -88,17 +88,25 @@ fail-closed), Datei-Kill-Switch, Tages-Loss-Breaker, Token-Budget, idempotenter 
 zuletzt eine read-mostly Web-UI. **Build-Reihenfolge:** Cleanup → Verify → autonome Candidates →
 Auto-Confirm/Safety → Reconcile → Loop/Daemon → **zuletzt** UI; unter Druck fällt die UI weg, **nie**
 die Safety. Konzept: `docs/concepts/phase8_scheduler_concept.md` (20 gelockte Entscheidungen +
-Modul-Plan). **Stand: Initial-Steps** — Step 0 (Legacy-grep) = **sauber/No-Op**; Step 0b (Doku-
-Reconciliation, dieser Step); Step 1 (Contract-Verify gegen Live-Code) + Step 2 (Scaffold
-`phase8_scheduler/`) folgen. **Step-1-Befunde (Code = Wahrheit, ⚠ weichen vom Handover ab):**
-(A) `confirm_fn` ist ein **Konstruktor**-Arg, **nicht** `run()`-Arg → `run()` ist arglos, der Executor
-wird **einmal** mit `AutoConfirm` gebaut; (B) `candidates_are_fresh()` ist **False für `[]`** → leere
-Liste bei Abstain würde Research **re-callen** ⇒ **No-op-`research_runner` injizieren** (P7-Muster),
-echtes Research vorher in `research_tick`; (C) Seed-Marker ist englisch `"MANUAL SEED (not a real
-research pick)"`; (D) `confirm_fn` bekommt einen `OrderPlan` **ohne `account`** → Demo-Lock strukturell
-im Wiring (`config.account="demo"`, nur `ig_demo`-Broker); (E) `realized_pnl_today` für den Loss-Breaker
-aus der **DB** lesen (CLOSED_BY_BROKER trägt keine sofortige P&L). Reuse: `reconcile_startup` (P5) +
-`reward_sink.reconcile_open_trades()` (P7 13b) decken den Reconcile-Pass ab.
+Modul-Plan). **Stand (2026-06-28): Module 1–10 gebaut + grün, Module 11 (wiring/scripts) als
+Nächstes, dann zuletzt Module 12 (Web-UI).** Initial-Steps (Step 0 Legacy-grep = sauber/No-Op,
+Step 0b Doku-Reconciliation, Step 1 Contract-Verify, Step 2 Scaffold) **erledigt**. Gebaut +
+getestet (gemockt, kein Netz/LLM): `config` · `exceptions` · `clock` · `state` · `killswitch` ·
+`safety` (AutoConfirm) · `backoff` · `budget` · `research_tick` · `reconcile` · **`runner`** (die
+Loop — Preflight/run/Shutdown, Contract A bare `executor.run()`, injizierte `now_fn`/`sleep_fn` +
+`max_iterations`-Stop). **138 P8-Tests** (Regression unberührt: P1 52 · P2 62 · P4 94 · P5 146 ·
+P6 70 · P7 128). Jedes Modul ist import-isoliert (`import scheduler.<m>` zieht NONE cross-phase).
+**Step-1-Befunde (Code = Wahrheit, ⚠ weichen vom Handover ab — voll in `phase8_scheduler/CLAUDE.md`
+→ `## Verifizierte Contracts`):** (A) `confirm_fn` ist ein **Konstruktor**-Arg, **nicht** `run()`-Arg
+→ `run()` arglos, Executor **einmal** mit `AutoConfirm` gebaut; (B) `candidates_are_fresh()` ist
+**False für `[]`** ⇒ **No-op-`research_runner` injizieren** (echtes Research vorher in
+`research_tick`); (C) Seed-Marker englisch `"MANUAL SEED (not a real research pick)"`; (D)
+`OrderPlan` trägt **kein `account`** → Demo-Lock strukturell im Wiring (`config.account="demo"`, nur
+`ig_demo`-Broker); (E) `realized_pnl_today` für den Loss-Breaker aus der **DB** (CLOSED_BY_BROKER
+trägt keine sofortige P&L). Reuse: `reconcile_startup` (P5) + `reward_sink.reconcile_open_trades()`
+(P7 13b) decken den Reconcile-Pass ab. **Module 11 (wiring) muss noch bauen:** geteilter warmer
+Broker (Contract G), die drei Closures `realized_pnl_today`/`pending_reconcile_fn`/**`preflight_fn`**
+(Keyring + DB), Caps (`daily_loss_cap≈1800`, `account="demo"` hart).
 
 **Phase 7** bleibt ✅ **live-verifiziert (2026-06-26) + gemerged nach `main`** — der Reward-Loop läuft
 end-to-end live (place → monitor → lag-freie Close-Confirm-P&L → score → reward → lesson); ⚠

@@ -666,6 +666,41 @@ while True:
   → Backoff-Sleep, dann weiter; `preflight`-Fail → Exit ohne Trade-Versuch; `state` wird in
   `finally` immer gespeichert.
 
+> **⟳ Angepasst 2026-06-28 (Modul 10 `runner.py` gebaut, Code = Source of Truth) — sechs
+> Reconciliations + 16 Tests:**
+> 1. **`broker.ensure_session()` → privates `_warm_session()`.** Die §10-Skizze ruft
+>    `broker.ensure_session()`, aber die Methode **existiert nicht** — der P1-Adapter hat
+>    `is_connected()`/`connect()→Envelope`/`disconnect()` (`ig_adapter.py:137,157,178`). Der Runner
+>    komponiert das Warmup aus den echten Methoden („falls nicht connected, connect; raise bei
+>    `not env['ok']`"). Raise in der Loop → caught → Backoff; in `preflight`/`shutdown` vom Caller
+>    gewrapped/geguarded.
+> 2. **Konstruktor droppt `budget`.** Das Budget-Gate sitzt schon in `auto_confirm.can_open()`
+>    (Modul 6 hält das Budget) — die Loop ruft Budget nie direkt ⇒ ungenutzte Dependency. Gleiche
+>    „drop the unused injected dep"-Disziplin wie `reconcile.py` (db/state_store) /
+>    `research_tick.py` (state_store).
+> 3. **★ Cross-Phase-Preflight-Probes werden INJIZIERT, nicht inlined.** Die §10-`preflight`-Skizze
+>    inlined `get_credential` + DB/Migrations-Check. Um die bewiesene Import-Isolation (`import
+>    scheduler.runner` zieht NONE cross-phase) **und** die 100%-Unit-Testbarkeit zu wahren, nimmt
+>    der Runner ein keyword-frei `preflight_fn: Callable[[], None]` (wirft bei Fehler), das das
+>    Wiring (Modul 11) mit den Keyring- + DB-Checks backt — exakt das Muster, das `safety.py`
+>    (`realized_pnl_today`-Closure) und `reconcile.py` (`pending_reconcile_fn`-Closure) etabliert
+>    haben. `broker.connect()` macht der Runner zusätzlich selbst (er hält den Broker für das
+>    Loop-Warmup ohnehin).
+> 4. **`killswitch_path` → `config.kill_path`** (der Runner hält die Config; kein separater
+>    Pfad-Arg wie in der §10-Skizze).
+> 5. **Stop-Bedingung = keyword-only `max_iterations: int | None = None`** (Default None ⇒ echter
+>    Endlos-Daemon; Tests übergeben K — die §10-„bricht die Schleife nach K Iterationen").
+>    `now_fn`/`sleep_fn` sind bereits über den `Clock` injiziert.
+> 6. **`reconcile_interval_min` via kleinem Throttle** (`_maybe_reconcile`/`_due`, UTC-Compare,
+>    DST-sicher) — die 5-min-WINDOW-Kadenz hämmert nicht jeden Cycle `get_trade_history`; Reconcile
+>    ist **forced** bei Startup, POST_WINDOW, Shutdown (Decision 11: „Startup + periodisch +
+>    Shutdown"). Idempotent ⇒ Über-Laufen ist nur Kosten, nie Korrektheit.
+> — **16 Tests grün** (Paket-Suite 122 → **138**): deterministisch über einen echten `Clock` mit
+> stepping `now_fn` (1 Aufruf/Iteration, weil alle Kollaboratoren Fakes sind, die `clock.now` nicht
+> rufen) + recording `sleep_fn` + `max_iterations`; **echter `AutoConfirm`/`BackoffTracker`** in den
+> CAP-/Backoff-Tests (beweist das Zusammenspiel). Sibling-Suiten grün + unberührt (P1 52 · P2 62 ·
+> P4 94 · P5 146 · P6 70 · P7 128).
+
 ### 11. `scripts/`
 
 - **`wiring.py`** — Composition Root. Erweitert P7-`wiring.py`: baut echten `IGAdapter`

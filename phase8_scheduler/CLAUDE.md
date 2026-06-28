@@ -79,7 +79,7 @@ Safety.
 | `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ✅ (Modul 7, 13 Tests) |
 | `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ✅ (Modul 8, 10 Tests) |
 | `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ✅ (7 Tests) |
-| `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown | ⬜ |
+| `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown | ✅ (Modul 10, 16 Tests) |
 | `webui/api.py` + `webui/static/*` | FastAPI read-mostly + statisches Dashboard | ⬜ (zuletzt) |
 | `scripts/wiring.py` · `run.py` · `run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Composition + Operator-Tools | ⬜ |
 | `tests/*` | gemockt, kein Netz/LLM/echter sleep (≥50, Schwerpunkt `test_runner` + `test_safety`) | ⬜ |
@@ -200,6 +200,101 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 10: `scheduler/runner.py` — die Loop, das Herzstück)
+
+### Completed
+- **`scheduler/runner.py`** — `SchedulerRunner`, der Daemon-Orchestrator, der die Module 1–9
+  *ausführt* (Konzept §10, **kein AI** — reine Mechanik; die AI bleibt in den getriebenen
+  Kollaboratoren: P4-`ask_candidate` in `research_tick`, P6-Debatte + P7-Lesson in
+  `executor.run()`). Drei öffentliche Methoden:
+  - **`preflight()`** — fail-closed: injizierter `preflight_fn()` (Keyring + DB/Migrations, vom
+    Wiring gebaut) **und** `broker.connect()`; Fehler → `PreflightError` → sauberer Exit, **kein**
+    Trade-Versuch (Deployment-Top-Risk Q3).
+  - **`run()`** — `preflight()` → einmal Startup-Reconcile (forced) → die §10-Loop: pro Iteration
+    `clock.now()` → `rollover_if_new_day` → Kill-Switch-Check (gesetzt → `kill_reason` + break) →
+    `clock.classify` → Phasen-Arbeit, jede Iteration `try/except/finally`: Cycle-Exception →
+    `logger.critical` + `backoff.record_failure`; `should_trip` → `killswitch.set_kill("auto:
+    backoff")` + break, sonst `clock.sleep(delay_s)`; **`finally: state_store.save`**. Nach der
+    Loop **immer** `shutdown()` + save.
+  - **`shutdown(state)`** — fail-soft: finaler Reconcile + `broker.disconnect`, jeder Schritt
+    geguarded (`critical`, kein Re-raise) — ein sauberer Stop crasht nie.
+  - **Phasen-Arbeit (`_run_phase`):** PRE_OPEN = warm + reconcile + sleep `min(seconds_until(WINDOW),
+    idle_poll)`; **WINDOW** = warm + reconcile + `auto_confirm.can_open` (Pre-Cycle-Gate, spart
+    Tokens) → bei OK `research_tick.ensure_candidates` dann **bare `executor.run()`** (Contract A!)
+    → `record_cycle`, sonst `last_no_trade_reason = reason`; POST_WINDOW = warm + forced Reconcile +
+    sleep bis nächstem Pre-Open; IDLE = nur `idle_poll`-Sleep.
+- **`scheduler/__init__.py`** exportiert jetzt zusätzlich `SchedulerRunner` (zuletzt importiert —
+  hängt von allen anderen Submodulen ab).
+- **`tests/test_runner.py`** — **16 Tests** (deterministisch, kein Netz/LLM/echter Sleep): echter
+  `Clock` mit stepping `now_fn` (1 Aufruf/Iteration, weil alle Kollaboratoren Fakes sind, die
+  `clock.now` nicht rufen) + recording `sleep_fn`, Fake-Kollaboratoren, **echter** `StateStore` auf
+  `tmp_path`, `max_iterations`-Stop. Abgedeckt: Fixture-Zeiten-Klassifikation; WINDOW-Happy-Path
+  (research → **bare** `run()` → OPEN bumpt `trades_today`); NO_TRADE zählt nicht; **CAP_BLOCK via
+  echtem `AutoConfirm`** (kein research/execute, Reason gesetzt); PRE_OPEN/POST_WINDOW/IDLE;
+  voller simulierter Tag (IDLE→PRE_OPEN→WINDOW→POST_WINDOW, `tick`=5, 4 Sleeps); Kill-Switch →
+  stop + shutdown; **Backoff-Trip via echtem `BackoffTracker`** (3 Exceptions → `set_kill("auto:
+  backoff")`); transienter Fehler → Backoff-Delay-Sleep, dann Recovery; Preflight-Fail (`preflight_
+  fn` raises / `broker.connect` not-ok → `PreflightError`, nie Loop); Preflight-Pass; Reconcile-
+  Throttle; Package-Export-Identität.
+
+### Sechs Konzept↔Code-Reconciliations (Code = Source of Truth — dated §10-Annotation im Konzept)
+- **(1) `broker.ensure_session()` → privates `_warm_session()`** komponiert aus den **echten**
+  P1-Methoden `is_connected()`/`connect()` + `env["ok"]`-Check (kein `ensure_session` existiert,
+  `ig_adapter.py:137,157,178`). Raise in der Loop → caught → Backoff; in `preflight`/`shutdown`
+  vom Caller gewrapped/geguarded.
+- **(2) Konstruktor droppt `budget`** (Konzept §10 listete es): das Budget-Gate sitzt bereits in
+  `auto_confirm.can_open()`; die Loop ruft Budget nie direkt → ungenutzte Dependency. Gleiche
+  „drop the unused injected dep"-Disziplin wie `reconcile.py` (db/state_store) / `research_tick.py`.
+- **(3) Cross-Phase-Preflight-Probes INJIZIERT, nicht inlined.** Konzept §10 inlined
+  `get_credential` + DB-Check; um die Import-Isolation (`import scheduler.runner` zieht NONE
+  cross-phase) + 100%-Unit-Testbarkeit zu wahren, nimmt der Runner ein keyword-frei
+  `preflight_fn: Callable[[], None]` (wirft bei Fehler), das das Wiring mit Keyring+DB backt —
+  exakt das Muster `safety.realized_pnl_today` / `reconcile.pending_reconcile_fn`. `broker.connect()`
+  macht der Runner selbst (hält den Broker eh).
+- **(4) `killswitch_path` → `config.kill_path`** (Runner hält die Config; kein Extra-Arg).
+- **(5) Stop-Bedingung = keyword-only `max_iterations: int | None = None`** (Default None = echter
+  Endlos-Daemon; Tests übergeben K). `now_fn`/`sleep_fn` sind über den `Clock` injiziert.
+- **(6) `reconcile_interval_min` via kleinem Throttle** (`_maybe_reconcile`/`_due`, UTC-Compare,
+  DST-sicher) — die 5-min-WINDOW-Kadenz hämmert nicht jeden Cycle `get_trade_history`; Reconcile
+  ist **forced** bei Startup, POST_WINDOW, Shutdown (Decision 11). Idempotent ⇒ Über-Laufen ist
+  nur Kosten, nie Korrektheit.
+
+### Verifiziert (gemockt / lokal — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -v` → **138 passed** (10 config + 6 exceptions + 19 clock + 18
+  state + 12 killswitch + 18 safety + 13 budget + 10 research_tick + 9 backoff + 7 reconcile + **16
+  runner**). `py_compile` clean. **Import-Isolation:** `import scheduler.runner` zieht **NONE**
+  broker_wrapper/persistence/external_data/research/execution/reward/debate/pandas/numpy/yfinance/
+  anthropic/requests.
+- **Regression grün + unberührt** (rein additiv, separat gelaufen): P1 52 · P2 62 · P4 94 · P5 146
+  · P6 70 · P7 128.
+
+### Next — **Modul 11: `scripts/wiring.py` + `run.py` + `run_scheduler.sh` + `smoke_test.py` + `live_test.py`** (Konzept §11 — der Composition Root)
+- **`wiring.py`** (`build_scheduler(config) -> SchedulerRunner`): EINEN geteilten **warmen** Broker
+  (Contract G), `Database`(`live_db_path`), `StateManager`, `MarketDataFetcher`
+  (`register_volume_proxy("EXS1.DE")`), `Research` **direkt** aus dem `research`-Paket (Contract G,
+  Namenskollision umgehen), `reward_sink` (P7) + `debate_runner` (P6); den Executor **einmal** mit
+  `confirm_fn=AutoConfirm` + **No-op-`research_runner`** (Contract B) + `reward_sink`/`debate_runner`
+  bauen; die drei Closures backen: `realized_pnl_today` (DB-`SELECT … session_date`),
+  `pending_reconcile_fn` (P5-`reconcile_startup` über den geteilten Broker), **`preflight_fn`**
+  (Keyring `get_credential` + DB/Migrations-Check); Caps setzen (`daily_loss_cap≈1800`,
+  `account="demo"` **hart**, nur `ig_demo`-Broker); dann `Clock`/`StateStore`/`AutoConfirm`/
+  `BackoffTracker`/`TokenBudget`/`ResearchTick`/`Reconciler` → `SchedulerRunner` (`max_iterations=
+  None`).
+- **`run.py`** (`python -m scheduler.run`): Config laden, `build_scheduler`, `runner.run()`,
+  SIGTERM/SIGINT → `shutdown`. **`run_scheduler.sh`** (entsperrte Session, Keyring-Note).
+  **`smoke_test.py`** (1 simulierter Tag, Fake-Clock, kein echter Trade). **`live_test.py`**
+  (echter unbeaufsichtigter Zyklus gegen IG Demo, nicht in CI). **Danach** Modul 12 Web-UI (zuletzt).
+
+### Offene Punkte / [VERIFY]
+- `wiring.py`: das `preflight_fn` muss den **echten** IG-Demo-Keyring-Key prüfen + die DB-Version
+  (Migration 002) — gegen `broker_wrapper.credentials.get_credential` + `persistence`/`init_db.py`
+  gegenlesen, bevor gebaut wird. P7-`scripts/wiring.py` (`build_executor`/`build_reward_sink`) ist
+  die Vorlage (geteilter Broker, `_no_research`, tz-aware `now_fn`).
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
+  Note-Update" im selben Commit.
 
 ---
 
