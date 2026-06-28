@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>scheduler · dashboard</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div class="brand-text">
+        <h1>SCHEDULER</h1>
+        <p>autonomous demo trader · phase 8</p>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <div id="state-pill" class="pill pill--unknown" title="running state">
+        <span class="pill-dot"></span>
+        <span id="state-label">…</span>
+      </div>
+      <div class="updated">
+        <span class="updated-label">updated</span>
+        <span id="updated-at" class="updated-val">—</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="grid">
+
+    <!-- STATUS -->
+    <section class="card card--status" aria-labelledby="h-status">
+      <div class="card-head">
+        <h2 id="h-status">STATUS</h2>
+        <span id="phase-tag" class="tag">—</span>
+      </div>
+      <div class="status-stats">
+        <div class="stat">
+          <span class="stat-label">trades today</span>
+          <span class="stat-value"><span id="trades-today">–</span><span class="stat-sub">/<span id="trades-cap">–</span></span></span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">realized p&amp;l</span>
+          <span id="pnl-today" class="stat-value mono-num">–</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">failures</span>
+          <span class="stat-value"><span id="fails">–</span><span class="stat-sub">/<span id="fails-max">–</span></span></span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">session</span>
+          <span id="session-date" class="stat-value stat-value--sm">–</span>
+        </div>
+      </div>
+      <div id="kill-banner" class="kill-banner" hidden>
+        <span class="kill-banner-label">KILLED</span>
+        <span id="kill-reason" class="kill-banner-reason"></span>
+      </div>
+    </section>
+
+    <!-- CONTROLS -->
+    <section class="card card--controls" aria-labelledby="h-controls">
+      <div class="card-head"><h2 id="h-controls">CONTROL</h2></div>
+      <p class="control-note">writes only the kill / command files the daemon polls — never a direct call into the trader.</p>
+      <div class="btn-row">
+        <button id="btn-start" class="btn btn--start" type="button">START</button>
+        <button id="btn-stop" class="btn btn--stop" type="button">STOP</button>
+      </div>
+      <div class="btn-row">
+        <button id="btn-kill" class="btn btn--kill" type="button">KILL</button>
+        <button id="btn-clear" class="btn btn--clear" type="button">CLEAR KILL</button>
+      </div>
+      <p id="control-msg" class="control-msg" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- SCORE -->
+    <section class="card card--score" aria-labelledby="h-score">
+      <div class="card-head">
+        <h2 id="h-score">SCORE</h2>
+        <span id="score-now" class="tag tag--accent">—</span>
+      </div>
+      <div class="spark-well">
+        <svg id="spark" class="spark" viewBox="0 0 600 140" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <p id="spark-empty" class="empty">no scored trades yet</p>
+      </div>
+    </section>
+
+    <!-- CONFIDENCE -->
+    <section class="card card--conf" aria-labelledby="h-conf">
+      <div class="card-head">
+        <h2 id="h-conf">CONFIDENCE</h2>
+        <span id="conf-state" class="tag">—</span>
+      </div>
+      <p class="conf-note">observe-only · gates nothing (Decision C)</p>
+      <div class="conf-grid">
+        <div class="kv"><span>n / n_min</span><b id="conf-n">–</b></div>
+        <div class="kv"><span>value</span><b id="conf-val">–</b></div>
+        <div class="kv"><span>wilson lb</span><b id="conf-wilson">–</b></div>
+        <div class="kv"><span>expectancy R</span><b id="conf-exp">–</b></div>
+        <div class="kv"><span>win rate</span><b id="conf-wr">–</b></div>
+        <div class="kv"><span>SQN</span><b id="conf-sqn">–</b></div>
+      </div>
+    </section>
+
+    <!-- LAST CYCLE -->
+    <section class="card card--cycle" aria-labelledby="h-cycle">
+      <div class="card-head"><h2 id="h-cycle">LAST CYCLE</h2></div>
+      <div class="kv kv--wide"><span>no-trade reason</span><b id="cycle-reason">–</b></div>
+      <div class="kv kv--wide"><span>last research</span><b id="cycle-research" class="mono-ts">–</b></div>
+      <div class="kv kv--wide"><span>last reconcile</span><b id="cycle-reconcile" class="mono-ts">–</b></div>
+    </section>
+
+    <!-- TRADES -->
+    <section class="card card--trades" aria-labelledby="h-trades">
+      <div class="card-head">
+        <h2 id="h-trades">TRADES</h2>
+        <span id="trades-count" class="tag">0</span>
+      </div>
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>opened</th><th>dir</th><th>epic</th><th class="num">size</th>
+              <th class="num">open</th><th class="num">close</th><th class="num">p&amp;l</th><th>status</th>
+            </tr>
+          </thead>
+          <tbody id="trades-body">
+            <tr><td colspan="8" class="empty">no trades yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- LESSONS -->
+    <section class="card card--lessons" aria-labelledby="h-lessons">
+      <div class="card-head">
+        <h2 id="h-lessons">LESSONS</h2>
+        <span id="lessons-count" class="tag">0</span>
+      </div>
+      <ul id="lessons-list" class="lessons">
+        <li class="empty">no lessons yet</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <span id="conn-state" class="conn conn--ok">api</span>
+    <span>read-only · localhost · polling 7s</span>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

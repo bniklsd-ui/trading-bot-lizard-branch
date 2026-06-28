@@ -32,7 +32,9 @@ Wer hier ein LLM „entscheiden/sizen/timen/vetoen" lassen will → **stop**, da
 ## Build-Reihenfolge (verbindlich)
 Cleanup → Verify → **autonome Candidates** → Auto-Confirm/Safety → Reconcile →
 Loop/Daemon → **zuletzt** Web-UI. Unter Zeit-/Token-Druck fällt die UI weg, **nie** die
-Safety.
+Safety. **Stand 2026-06-28: Module 1–12 gebaut + grün — Phase 8 code-complete.** Modul 12
+(Web-UI + reale Start/Stop-Pause) ist die letzte Einheit; offen ist nur der Operator-Live-Lauf
+(`live_test.py` im Handelsfenster) + Doku-Flip auf ✅ + Merge.
 
 ## Harte Regeln (nicht verhandelbar)
 - **Demo-only strukturell, fail-closed.** Auto-Confirm gibt `True` **nur** bei: `account
@@ -74,6 +76,7 @@ Safety.
 | `scheduler/clock.py` | `now_fn`/`sleep_fn` injizierbar; Phasen-Klassifikation (config-Fenster + Weekday; `is_market_open` lazy via `market_is_open`) | ✅ (Modul 3, 19 Tests) |
 | `scheduler/state.py` | `SchedulerState` ↔ `scheduler_state.json` (atomic); Tages-Rollover (Europe/Berlin) + `record_cycle` (Contract E) | ✅ (Modul 4, 18 Tests) |
 | `scheduler/killswitch.py` | KILL-Datei lesen/setzen/löschen (von `safety` + `webui` geteilt) — fail-soft, atomic | ✅ (Modul 5, 12 Tests) |
+| `scheduler/command.py` | Start/Stop-Command-Datei (`scheduler_command.json`) lesen/schreiben/löschen — von `webui` (Schreiber) + `runner` (Leser) geteilt; fail-soft, atomic; **soft** Pause/Resume (≠ hartem KILL) | ✅ (Modul 12, 10 Tests) |
 | `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ✅ (Modul 6, 18 Tests) |
 | `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ✅ (9 Tests) |
 | `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ✅ (Modul 7, 13 Tests) |
@@ -83,8 +86,8 @@ Safety.
 | `scheduler/run.py` | `python -m scheduler.run` Entry (in-package, lazy `scripts.wiring`, SIGTERM/SIGINT → `request_stop`) | ✅ (Modul 11, 6 Tests) |
 | `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures | ✅ (Modul 11, operator-run) |
 | `scripts/run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Operator-Tools (Start-Script · offline Sim-Tag mit Fakes · echter unbeaufsichtigter IG-Demo-Zyklus) | ✅ (Modul 11, operator-run) |
-| `webui/api.py` + `webui/static/*` | FastAPI read-mostly + statisches Dashboard | ⬜ (zuletzt) |
-| `tests/*` | gemockt, kein Netz/LLM/echter sleep (146, Schwerpunkt `test_runner` + `test_safety`) | ✅ |
+| `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes | ✅ (Modul 12, 13 Tests) |
+| `tests/*` | gemockt, kein Netz/LLM/echter sleep (171, Schwerpunkt `test_runner` + `test_safety` + `test_webui`) | ✅ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine
 Datei = eine Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging →
@@ -202,6 +205,84 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-28 (Modul 12: `webui/` Web-UI + reale Start/Stop-Pause — **Phase 8 code-complete**)
+
+> Operator-Notiz: der `smoke_test` war erfolgreich; der `live_test` wartet aufs Handelsfenster.
+> In der Zwischenzeit die **letzte** Einheit gebaut (Konzept §12, „zuletzt, read-mostly"). Zwei
+> Operator-Entscheidungen diese Session: **Visual = Dark-Neumorphism** (GitHub-Dark-Palette aus den
+> Konzept-SVGs als Canvas + die weiche Neumorphism/Glass-Tiefe aus `ui_concept/`); **Controls =
+> reale Start/Stop** inkl. des Extra-Schritts (Daemon pollt die Command-Datei). Dashboard mit der
+> `frontend-design`-Skill gebaut.
+
+### Completed
+- **`scheduler/command.py`** (NEU, spiegelt `killswitch.py`) — die Start/Stop-Command-Datei
+  (`data/state/scheduler_command.json`), von `webui` (Schreiber) + `runner` (Leser) geteilt.
+  `read_command` (`"start"`|`"stop"`|`None`, fail-soft, toleriert hand-geschriebenes bare word),
+  `write_command` (atomic `.tmp`+`os.replace`, validiert `cmd`), `clear_command`. **Semantik bewusst
+  ≠ KILL:** `stop` = **weiche, reversible Pause** (Daemon-Prozess bleibt am Leben), KILL = harter Stop.
+  Exportiert als Modul aus `scheduler/__init__.py`.
+- **`scheduler/runner.py`** (additive Edit — der „Extra-Schritt", konzept-sanktioniert §12 „Daemon
+  pollt"). Loop-Top nach dem Kill-Check: `command.read_command(config.command_path) == "stop"` →
+  **Pause-Iteration** (kein warm/reconcile/research/execute; `clock.sleep(idle_poll)`; `continue`;
+  **kein** `break`, **kein** State-Feld berührt — die UI leitet PAUSED aus der Command-Datei ab) → ein
+  späteres `start`/Löschen resumed denselben Daemon. **Keine Command-Datei ⇒ bit-identisch** (Default
+  unverändert; additiv wie die `reward_sink`/`debate_runner`-Nähte). Docstring-Reconciliation #7 ergänzt.
+- **`webui/api.py`** (NEU, FastAPI, bind 127.0.0.1) — `create_app(config)` + Modul-`app` (demo-locked
+  Default-Config mit absoluten `data/`-Pfaden wie das Wiring). **DB strikt read-only** (`ro_connect`:
+  `file:…?mode=ro` → Write wirft `OperationalError`, der Isolations-Beweis); `_query` fail-soft (fehlende
+  DB/Tabelle → `[]`). Endpoints §12: `GET /api/{status,score,confidence,lessons,trades,last_cycle}` +
+  `POST /api/{kill,clear_kill,command}`. **Control = nur Datei-Writes** (kein Executor/Broker/Runner-
+  Import → UI-Crash kann Trading strukturell nicht berühren, Decision 14). Cross-Phase-`reward`-Import
+  (Confidence-Mathe) **lazy im Endpoint** → `import webui.api` zieht nur `fastapi`+`scheduler.*`+stdlib
+  (laufzeit-geprüft: reward/anthropic/broker_wrapper/execution NOT loaded).
+- **`webui/static/{index.html,style.css,app.js}`** (NEU, kein Build-Step) — Dark-Neumorphism, Monospace
+  (offline-sichere System-Mono-Stack, **kein** CDN-Fetch), kein Emoji. Karten: Status · Control (Start/
+  Stop/Kill/Clear) · Score-Sparkline (inline-SVG) · Confidence (observe-only) · Last Cycle · Trades-
+  Tabelle · Lessons. Vanilla `fetch`-Polling 7 s, fail-soft (`api down`-Footer hält letzte Werte),
+  Profit grün / Loss rot.
+- **`scripts/run_webui.sh`** (NEU, spiegelt `run_scheduler.sh`) — `PYTHONPATH=phase8_scheduler exec
+  uvicorn webui.api:app --host 127.0.0.1`. Braucht **keinen** Keyring (kein Broker-Talk). `--port`.
+- **`tests/test_command.py`** (10) + **`tests/test_webui.py`** (13, FastAPI `TestClient`, Temp-SQLite +
+  Temp-State; inkl. **read-only-Connection-rejects-write**-Isolationsbeweis) + **`tests/test_runner.py`**
+  (+2: `stop`→Pause-Iteration ohne `executor.run`; `start`→normaler Zyklus).
+
+### Reconciliations / Design-Entscheidungen (Code = Source of Truth)
+- **`webui` ist NICHT installiert** (pyproject `include=["scheduler*"]` schließt es bewusst aus — „UI
+  läuft als separater Prozess"). Importierbar im Test, weil pytest `phase8_scheduler/` auf `sys.path`
+  legt (tests/ ist Paket, phase8_scheduler/ nicht); für `uvicorn` setzt `run_webui.sh` `PYTHONPATH`.
+- **Confidence-Endpoint reused P7** (`select_edge_set` + `compute_confidence`, `ConfidenceReport.state`/
+  `win_rate_wilson_lb` — **nicht** `status`/`wilson_lb`); fehlschlagend → `state="UNAVAILABLE"`, nie 500.
+- **PAUSED-Quelle = die Command-Datei selbst** (die UI liest sie direkt) → **kein** `state.py`-Feld
+  nötig (Modul 4 unberührt). `running_state` = HALTED (KILL) > PAUSED (cmd stop) > RUNNING.
+- **Pause berührt kein State-Feld** im Runner → ein echter `last_no_trade_reason` wird nicht überschrieben.
+
+### Verifiziert (gemockt / offline — kein Netz, kein LLM; Live = Operator)
+- `pytest phase8_scheduler/tests -q` → **171 passed** (146 + 10 command + 2 runner + 13 webui).
+  `py_compile`/`bash -n`/`node --check` clean. Static-Serving + alle 6 GET + 3 POST end-to-end via
+  `TestClient` geprüft (index referenziert app.js/style.css; `mode=ro` weist Write ab).
+- **Import-Isolation:** `import webui.api` zieht **NONE** reward/anthropic/broker_wrapper/execution;
+  `import scheduler.command` zieht NONE cross-phase. `import scheduler.runner` unverändert isoliert.
+- **Regression unberührt** (Edits **nur** in `phase8_scheduler/`; P1–P7 importieren `scheduler.*` nicht):
+  P1 52 · P2 62 · P4 94 · P5 146 · P6 70 · P7 128.
+- **Neue Runtime-Deps installiert** (waren in `requirements.txt`, inert bis jetzt): `fastapi`/`uvicorn`
+  in den geteilten venv; `httpx` (TestClient) bereits da.
+
+### Next — **Operator-Live-Lauf** (Phase-8-Gate schließen)
+- Im Handelsfenster `python phase8_scheduler/scripts/live_test.py` gegen IG-Demo → erste reale autonome
+  Outcomes. Parallel `bash phase8_scheduler/scripts/run_webui.sh` → `http://127.0.0.1:8000` öffnen,
+  Karten gegen die echte `data/trading_bot.sqlite` prüfen; Kill/Start/Stop schreiben die Dateien;
+  bei laufendem Daemon: Stop pausiert / Start resumed / Kill hält.
+- **Danach** Doku auf ✅ flippen (ROADMAP P8, README-Statustabelle), Post-Build-Schritte (Architektur-
+  SVG/`ARCHITECTURE.md`, `phase8_scheduler_konzept.svg`, P9-Handover), Merge `phase8-scheduler` → `main`.
+
+### Offene Punkte / [VERIFY]
+- `live_test.py` ist noch **nicht** live gelaufen (Operator) — Erwartung unverändert (sauberer Stop +
+  State + CLOSED-Trade mit `reward_pts` **oder** valider No-Trade-Lauf).
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
+  Note-Update" im selben Commit.
 
 ---
 

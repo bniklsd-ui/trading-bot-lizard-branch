@@ -66,6 +66,14 @@ Concept↔code reconciliations (dated 2026-06-28, code = source of truth):
    5-minute WINDOW cadence does not hammer ``get_trade_history`` every cycle; reconcile is *forced*
    on startup, in POST_WINDOW, and at shutdown (Decision 11: "Startup + periodisch + Shutdown").
    The pass is idempotent, so over-running would only be a cost concern, never a correctness one.
+
+7. **Web-UI start/stop is a soft pause via the command file** (Module 12, concept §12 "Daemon
+   pollt"). After the kill-switch check the loop reads ``command.read_command(config.command_path)``;
+   a ``"stop"`` makes the iteration a no-op idle (no ``break``, no state field touched — the UI
+   derives PAUSED from the command file) so a later ``"start"`` / cleared file resumes the same live
+   daemon. The KILL file stays the *hard* stop. **No command file ⇒ behavior is bit-identical** to
+   before (the default path is unchanged) — additive, like the ``reward_sink`` / ``debate_runner``
+   seams elsewhere.
 """
 
 from __future__ import annotations
@@ -74,7 +82,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Protocol
 
-from scheduler import killswitch
+from scheduler import command, killswitch
 from scheduler.backoff import BackoffTracker
 from scheduler.clock import Clock, Phase
 from scheduler.config import SchedulerConfig
@@ -170,6 +178,7 @@ class SchedulerRunner:
         self._stop_requested = False
 
         self._kill_path = config.kill_path
+        self._command_path = config.command_path
         self._cycle_interval_s = config.cycle_interval_min * 60
         self._idle_poll_s = config.idle_poll_min * 60
         self._reconcile_interval_s = config.reconcile_interval_min * 60
@@ -234,6 +243,15 @@ class SchedulerRunner:
                     state.kill_reason = killswitch.read_reason(self._kill_path)
                     logger.critical("kill switch set: %s — stopping.", state.kill_reason)
                     break
+                if command.read_command(self._command_path) == "stop":
+                    # Soft, reversible pause (UI ``stop``): keep the process alive and do no
+                    # trading work until the command flips to ``start`` / is cleared. Distinct
+                    # from the kill-switch (the hard stop above): no ``break``, no state field
+                    # touched (the UI derives PAUSED from the command file directly), so a later
+                    # ``start`` resumes the same live daemon. Idle-poll cadence while paused.
+                    logger.info("paused by command file (ui:stop) — idling.")
+                    self._clock.sleep(self._idle_poll_s)
+                    continue
                 self._run_phase(self._clock.classify(now), state, now)
                 self._backoff.record_success(state)
             except Exception:  # noqa: BLE001 — a bad cycle must never crash the data-collection daemon

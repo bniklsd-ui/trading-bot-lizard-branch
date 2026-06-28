@@ -762,6 +762,22 @@ while True:
 
 ### 12. Web-UI (`webui/`) — **zuletzt, read-mostly**
 
+> **✅ gebaut 2026-06-28 (Code = Source of Truth) — Reconciliations:**
+> (a) **Visual = Dark-Neumorphism** (Operator-Entscheidung): GitHub-Dark-Palette aus den Konzept-SVGs
+> als Canvas + die weiche Neumorphism/Glass-Tiefe aus `phase8_scheduler/ui_concept/`; Monospace
+> (offline-sichere System-Stack, **kein** CDN-Fetch), kein Emoji; Polling **7 s**.
+> (b) **`POST /api/command` ist real verdrahtet** (Operator wollte funktionierende Start/Stop): der
+> „# Daemon pollt"-Hinweis ist jetzt umgesetzt — neues `scheduler/command.py` (geteilt webui-Schreiber/
+> runner-Leser) + ein **additiver** Loop-Top-Check in `runner.py`. `stop` = **weiche, reversible Pause**
+> (Daemon-Prozess bleibt am Leben, kein Trade-Work bis `start`/Löschen), KILL bleibt der **harte** Stop.
+> Keine Command-Datei ⇒ Loop bit-identisch. **PAUSED** wird von der UI direkt aus der Command-Datei
+> abgeleitet (kein `state.py`-Feld nötig → Modul 4 unberührt); `running_state` = HALTED>PAUSED>RUNNING.
+> (c) **`webui` ist NICHT installiert** (pyproject `include=["scheduler*"]`); `run_webui.sh` setzt
+> `PYTHONPATH=phase8_scheduler`, Tests via pytest-`sys.path`. (d) Confidence reused P7
+> `select_edge_set`+`compute_confidence` (`ConfidenceReport.state`/`win_rate_wilson_lb`); cross-phase
+> `reward`-Import **lazy im Endpoint** → `import webui.api` zieht nur `fastapi`+`scheduler.*`+stdlib.
+> 13 `test_webui`-Tests inkl. read-only-Connection-rejects-write-Isolationsbeweis; **P8 171 grün.**
+
 ```python
 # webui/api.py  (FastAPI, bind 127.0.0.1)
 GET  /api/status        -> Scheduler-Phase, running?, kill_reason, heute Trade-Count/Cap, Backoff

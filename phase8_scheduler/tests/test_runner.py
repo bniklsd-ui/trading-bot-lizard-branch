@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from scheduler import SchedulerRunner as ExportedSchedulerRunner
-from scheduler import killswitch
+from scheduler import command, killswitch
 from scheduler.backoff import BackoffTracker
 from scheduler.clock import Clock, Phase
 from scheduler.config import SchedulerConfig
@@ -410,6 +410,47 @@ def test_request_stop_is_non_sticky(tmp_path) -> None:
     """A fresh runner has no stop pending (the flag is in-memory, not a sticky file)."""
     runner, _sleep, _store, _cfg = _make_runner(tmp_path, times=[_WINDOW_T])
     assert runner._stop_requested is False
+
+
+# --- web-ui pause/resume (command file) ------------------------------------
+
+
+def test_command_stop_pauses_iteration_without_trading(tmp_path) -> None:
+    """A ``stop`` command makes each iteration a no-op idle: no research/execute, idle-poll sleep,
+    the loop keeps running (a soft pause, NOT a hard stop) and shutdown still runs at the bound."""
+    cfg = _config(tmp_path)
+    command.write_command(cfg.command_path, "stop")
+    rt = _FakeResearchTick()
+    ex = _FakeExecutor(result=_Result("OPEN"))
+    broker = _FakeBroker()
+    runner, sleep, store, _cfg = _make_runner(
+        tmp_path, times=[_WINDOW_T, _WINDOW_T], config=cfg, research_tick=rt,
+        executor=ex, broker=broker, max_iterations=2,
+    )
+
+    runner.run()
+
+    assert ex.run_calls == 0                     # paused → never trades
+    assert rt.calls == 0
+    assert store.load().trades_today == 0
+    assert sleep.sleeps == [cfg.idle_poll_min * 60, cfg.idle_poll_min * 60]  # idle each iteration
+    assert broker.disconnect_calls == 1          # soft pause, but the bound ends → shutdown runs
+    assert not killswitch.is_set(cfg.kill_path)  # pause is reversible — no KILL written
+
+
+def test_command_start_runs_a_normal_cycle(tmp_path) -> None:
+    """A ``start`` command (like a cleared file) leaves the cycle normal — research + bare execute."""
+    cfg = _config(tmp_path)
+    command.write_command(cfg.command_path, "start")
+    ex = _FakeExecutor(result=_Result("OPEN"))
+    runner, _sleep, store, _cfg = _make_runner(
+        tmp_path, times=[_WINDOW_T], config=cfg, executor=ex, max_iterations=1
+    )
+
+    runner.run()
+
+    assert ex.run_calls == 1                      # resumed → normal cycle
+    assert store.load().trades_today == 1
 
 
 # --- backoff trip (real BackoffTracker) ------------------------------------
