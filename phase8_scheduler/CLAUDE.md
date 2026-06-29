@@ -391,6 +391,31 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## UI-Overhaul Runde 5 — 2026-06-29 (Score: die Graph-LINIE selbst in den Metall graviert)
+
+> **Auslöser:** der Nikinger: der tiefe Recess „looks great", aber gemeint war — **die Graph-Linie
+> selbst** (nicht ein Rechteck/Well drumherum) **größer** machen und **ihre Form** als Stempel nutzen,
+> „so that the graph itself has weight". Möglich? Ja. Reine `style.css` + ein `app.js`-SVG-Markup-Edit.
+
+### Completed
+- **`.spark-well` → flache polierte Metallplatte** (statt tiefer Recess): mid-tone `var(--surface)` +
+  leichter `inset`-Schatten + polierter Sheen `::before`; Höhe 168→**184**. Die Platte ist jetzt nur
+  noch der Träger — der Held ist die gravierte Linie.
+- **Graph-Linie selbst graviert** (`app.js` `renderScore` zeichnet 3 Pfade desselben `line`-d):
+  `.spark-shadow` (dunkle Kopie, `translate(0,-2.2)` = obere Schattenkante) + `.spark-light` (helle
+  Kopie, `translate(0,2.2)` = untere Licht-Lippe) flankieren den **dickeren Amber-Kern** (`.spark-line`,
+  `stroke-width 5`, `vector-effect:non-scaling-stroke`) → die Linie sieht in die Platte **eingestanzt**
+  aus und bekommt Gewicht. Area-Fill auf opacity 0.3 reduziert; End-Dot größer (r 4.5) mit dunklem Ring.
+  `is-fresh`-Draw-on animiert jetzt alle drei Pfade synchron.
+
+### Verifiziert (gemockt/offline + visuell)
+- `pytest phase8_scheduler/tests -q` → **181 passed**; `node --check app.js` clean.
+- **Visuell** :8011 @1920×1080 (+ Score-Close-up): die Graph-Linie liest als in die polierte Cognac-
+  Platte gravierte Nut (dunkle Ober-, helle Unterkante), dicker + mit Gewicht; Konsole fehlerfrei.
+- **Commit:** committet, falls der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒ Note-Update".
+
+---
+
 ## UI-Overhaul Runde 4 — 2026-06-29 (Palette: Cognac-Metall + dunkelbraunes Leder · polished-scraped · Score-Gravur)
 
 > **Auslöser:** der Nikinger wollte die Palette durchprobieren. Ich habe via `<body data-theme>` drei

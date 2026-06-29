@@ -290,37 +290,34 @@ body {
 /* ---- score sparkline (framed instrument) ---- */
 .spark-well {
   position: relative; overflow: hidden;
-  /* deep dark floor so the orange glows down in the recess */
-  background:
-    radial-gradient(120% 90% at 50% 35%, rgba(0,0,0,0.12), rgba(0,0,0,0.5) 100%),
-    linear-gradient(180deg, #15110f 0%, var(--surface-2) 130%);
-  /* the graph is clearly stamped DEEP into the metal plate — strong recess on every side,
-     a crisp top shadow edge + a bottom light lip where the press catches the light */
+  /* a polished metal plate (mid-tone) so the engraved graph line reads as incised into it */
+  background: linear-gradient(160deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.16) 100%), var(--surface);
   box-shadow:
-    inset 0 13px 26px -5px rgba(0,0,0,0.92),
-    inset 0 -8px 18px -7px rgba(0,0,0,0.78),
-    inset 8px 0 18px -8px rgba(0,0,0,0.72),
-    inset -8px 0 18px -8px rgba(0,0,0,0.72),
-    inset 0 2px 2px rgba(0,0,0,0.85),
-    inset 0 -2px 1px rgba(255,255,255,0.11),
-    inset 0 0 0 1px rgba(0,0,0,0.65),
-    0 1px 0 rgba(255,255,255,0.08);
-  border-radius: var(--radius-sm); padding: 16px; height: 168px;
+    inset 0 2px 5px rgba(0,0,0,0.5),
+    inset 0 -1px 0 rgba(255,255,255,0.08),
+    inset 0 0 0 1px rgba(0,0,0,0.5);
+  border-radius: var(--radius-sm); padding: 16px; height: 184px;
 }
-/* extra depth: the top of the recess falls into shadow (no raised glare in a deep stamp) */
+/* polished sheen across the plate (sits below the chart) */
 .spark-well::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
-  box-shadow: inset 0 22px 28px -14px rgba(0,0,0,0.85);
-  background: linear-gradient(180deg, rgba(0,0,0,0.26) 0%, transparent 22%);
+  background: linear-gradient(101deg, transparent 36%, rgba(255,255,255,0.05) 50%, transparent 64%);
 }
 .spark { position: relative; z-index: 2; width: 100%; height: 100%; display: block; }
-.spark-line { fill: none; stroke: var(--amber); stroke-width: 2.5;
+/* the graph LINE itself is engraved into the plate: a dark top edge + a light bottom lip
+   flank a thick amber core, so the line looks stamped in and carries weight */
+.spark-line, .spark-shadow, .spark-light {
+  fill: none; stroke-width: 5; vector-effect: non-scaling-stroke;
   stroke-linejoin: round; stroke-linecap: round;
-  filter: drop-shadow(0 0 6px rgba(230,162,76,0.45)); }
-.spark-area { fill: url(#spark-grad); opacity: 0.5; }
-.spark-dot { fill: var(--amber); filter: drop-shadow(0 0 5px rgba(230,162,76,0.7)); }
+}
+.spark-shadow { stroke: rgba(0,0,0,0.72); }
+.spark-light  { stroke: rgba(255,255,255,0.16); }
+.spark-line   { stroke: var(--amber); filter: drop-shadow(0 0 3px rgba(230,162,76,0.42)); }
+.spark-area { fill: url(#spark-grad); opacity: 0.3; }
+.spark-dot { fill: var(--amber); stroke: rgba(0,0,0,0.55); stroke-width: 1.5;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6)) drop-shadow(0 0 4px rgba(230,162,76,0.5)); }
 /* draw-on: only added (by app.js) when the score data actually changed */
-.spark.is-fresh .spark-line {
+.spark.is-fresh .spark-line, .spark.is-fresh .spark-shadow, .spark.is-fresh .spark-light {
   stroke-dasharray: 1400; stroke-dashoffset: 1400;
   animation: spark-draw 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
