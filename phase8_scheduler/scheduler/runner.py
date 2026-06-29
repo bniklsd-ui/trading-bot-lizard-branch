@@ -74,13 +74,23 @@ Concept↔code reconciliations (dated 2026-06-28, code = source of truth):
    daemon. The KILL file stays the *hard* stop. **No command file ⇒ behavior is bit-identical** to
    before (the default path is unchanged) — additive, like the ``reward_sink`` / ``debate_runner``
    seams elsewhere.
+
+8. **The broker return is an Envelope read by ATTRIBUTE, not a mapping** (fixed 2026-06-29, the
+   first ``live_test`` run). The Phase-1 ``Envelope`` is a ``@dataclass`` (``.ok`` / ``.data`` /
+   ``.error``) with **no** ``.get()``; the original Module-10 code read ``env.get("ok")`` and the
+   ``_BrokerLike`` protocol mis-documented "a mapping with an ``'ok'`` key". This passed CI only
+   because the test ``_FakeBroker`` returned plain ``dict``\\s, then raised ``'Envelope' object has
+   no attribute 'get'`` against the real broker on the first live cycle. Now ``preflight`` and
+   ``_warm_session`` read ``env.ok`` / ``env.error`` (see :class:`_EnvelopeLike`), and the fakes
+   return objects matching that shape so the contract divergence cannot recur. Lesson: a fake that
+   diverges from the real return shape turns a live-only bug invisible in CI.
 """
 
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Protocol
 
 from scheduler import command, killswitch
 from scheduler.backoff import BackoffTracker
@@ -95,19 +105,40 @@ from scheduler.state import SchedulerState, StateStore
 logger = logging.getLogger("scheduler.runner")
 
 
+class _EnvelopeLike(Protocol):
+    """A Phase-1 :class:`~broker_wrapper.envelope.Envelope` return — read by **attribute**.
+
+    ⚠ **Reconciliation (2026-06-29, first live run — code = source of truth):** the real
+    ``Envelope`` is a ``@dataclass`` (``broker_wrapper/envelope.py``) with ``.ok`` / ``.data`` /
+    ``.error`` **attributes** — it is **not** a mapping and has **no** ``.get()``. The original
+    Module-10 ``_BrokerLike`` wrongly documented "a mapping with an ``'ok'`` key" and the runner
+    read ``env.get("ok")``; that worked only because the unit-test ``_FakeBroker`` returned plain
+    ``dict``\\s, so it passed in CI but raised ``'Envelope' object has no attribute 'get'`` against
+    the real broker on the first ``live_test``. The runner now reads ``env.ok`` / ``env.error`` and
+    the fakes return objects matching this shape (so the contract divergence can't recur).
+    """
+
+    @property
+    def ok(self) -> bool: ...
+
+    @property
+    def error(self) -> Any: ...
+
+
 class _BrokerLike(Protocol):
     """The slice of the Phase-1 broker the runner drives (duck-typed — no cross-phase import).
 
     The real ``IGAdapter`` satisfies it; tests pass a tiny fake. ``connect`` / ``disconnect``
-    return an :class:`~broker_wrapper.envelope.Envelope` (a mapping with an ``"ok"`` key) and
-    never raise on broker errors (they return an error envelope) — the runner reads ``env["ok"]``.
+    return an :class:`~broker_wrapper.envelope.Envelope` (an object with ``.ok`` / ``.error``
+    **attributes**, see :class:`_EnvelopeLike`) and never raise on broker errors (they return an
+    error envelope) — the runner reads ``env.ok``. ``is_connected`` returns a bare ``bool``.
     """
 
     def is_connected(self) -> bool: ...
 
-    def connect(self) -> Mapping[str, Any]: ...
+    def connect(self) -> _EnvelopeLike: ...
 
-    def disconnect(self) -> Mapping[str, Any]: ...
+    def disconnect(self) -> _EnvelopeLike: ...
 
 
 class _ExecutorLike(Protocol):
@@ -199,8 +230,8 @@ class SchedulerRunner:
             raise PreflightError(f"preflight check failed: {exc}") from exc
 
         env = self._broker.connect()
-        if not env.get("ok"):
-            raise PreflightError(f"broker connect failed: {env.get('error')}")
+        if not env.ok:  # Envelope is a dataclass (.ok / .error), NOT a mapping — see _EnvelopeLike
+            raise PreflightError(f"broker connect failed: {env.error}")
 
     # --- graceful stop -----------------------------------------------------
 
@@ -335,8 +366,8 @@ class SchedulerRunner:
         if self._broker.is_connected():
             return
         env = self._broker.connect()
-        if not env.get("ok"):
-            raise SchedulerError(f"broker connect failed: {env.get('error')}")
+        if not env.ok:  # Envelope is a dataclass (.ok / .error), NOT a mapping — see _EnvelopeLike
+            raise SchedulerError(f"broker connect failed: {env.error}")
 
     def _maybe_reconcile(
         self, state: SchedulerState, now: datetime, *, force: bool = False

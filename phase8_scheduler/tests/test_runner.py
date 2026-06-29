@@ -79,8 +79,21 @@ class _Result:
         self.profit_loss = profit_loss
 
 
+class _Env:
+    """A minimal stand-in for the Phase-1 ``Envelope`` dataclass — read by ATTRIBUTE.
+
+    The real ``Envelope`` exposes ``.ok`` / ``.error`` attributes and has **no** ``.get()``; the
+    runner reads ``env.ok``. The fake mirrors that shape so this matches the live contract — the
+    earlier dict-returning fake hid the ``env.get("ok")`` bug that only surfaced on the first live
+    run (see ``runner.py`` reconciliation 8 / the ``_EnvelopeLike`` protocol)."""
+
+    def __init__(self, ok: bool, error=None) -> None:
+        self.ok = ok
+        self.error = error
+
+
 class _FakeBroker:
-    """Duck-typed Phase-1 broker: records connect/disconnect; returns an Envelope-like mapping."""
+    """Duck-typed Phase-1 broker: records connect/disconnect; returns an ``Envelope``-like object."""
 
     def __init__(self, *, connected: bool = False, connect_ok: bool = True) -> None:
         self._connected = connected
@@ -91,15 +104,15 @@ class _FakeBroker:
     def is_connected(self) -> bool:
         return self._connected
 
-    def connect(self) -> dict:
+    def connect(self) -> _Env:
         self.connect_calls += 1
         self._connected = self._connect_ok
-        return {"ok": self._connect_ok, "error": None if self._connect_ok else "boom"}
+        return _Env(self._connect_ok, None if self._connect_ok else "boom")
 
-    def disconnect(self) -> dict:
+    def disconnect(self) -> _Env:
         self.disconnect_calls += 1
         self._connected = False
-        return {"ok": True}
+        return _Env(True)
 
 
 class _FakeExecutor:
@@ -519,6 +532,21 @@ def test_preflight_broker_connect_failure_raises(tmp_path) -> None:
     with pytest.raises(PreflightError):
         runner.run()
     assert ex.run_calls == 0
+
+
+def test_broker_envelope_read_by_attribute_not_mapping(tmp_path) -> None:
+    """Regression (2026-06-29 live-run bug): the broker return is read via ``.ok`` (attribute),
+    never ``.get("ok")``. The fake Envelope has NO ``.get`` — so a dict-style read would raise
+    ``AttributeError`` and fail the test, exactly as it did against the real Envelope live."""
+    broker = _FakeBroker(connect_ok=True)
+    assert not hasattr(broker.connect(), "get")        # the real Envelope shape: no mapping API
+    ex = _FakeExecutor(result=_Result("OPEN"))
+    runner, _sleep, _store, _cfg = _make_runner(
+        tmp_path, times=[_WINDOW_T], executor=ex, broker=_FakeBroker(connect_ok=True),
+        max_iterations=1,
+    )
+    runner.run()  # preflight + warm-up read env.ok — must not raise AttributeError
+    assert ex.run_calls == 1
 
 
 def test_preflight_pass_enters_loop(tmp_path) -> None:

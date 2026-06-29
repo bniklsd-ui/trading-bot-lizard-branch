@@ -208,6 +208,40 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Bugfix — 2026-06-29 (erster `live_test`-Lauf: `'Envelope' object has no attribute 'get'`)
+
+> **Auslöser:** der erste Operator-`live_test.py`-Lauf gegen IG-Demo brach im Preflight ab —
+> `'Envelope' object has no attribute 'get'`. **Code = Source of Truth.**
+
+### Ursache
+- Die Phase-1-`Envelope` (`broker_wrapper/envelope.py`) ist ein **`@dataclass`** mit Attributen
+  `.ok` / `.data` / `.error` — **keine** Mapping, **kein** `.get()`. `runner.py` las den
+  `broker.connect()`-Return aber mit **`env.get("ok")`** (in `preflight` **und** `_warm_session`)
+  und das `_BrokerLike`-Protocol behauptete fälschlich „a mapping with an `'ok'` key".
+- **Warum CI grün, live rot:** der Unit-Test-`_FakeBroker` gab **`dict`s** zurück (`{"ok": …}`) →
+  `.get()` funktionierte im Test, schlug aber gegen den **echten** `IGAdapter.connect() -> Envelope`
+  fehl. Klassischer „fake diverges from the real return shape" → live-only Bug, in CI unsichtbar.
+
+### Fix (rein in `phase8_scheduler/`, additiv außerhalb der zwei Lese-Stellen)
+- **`scheduler/runner.py`:** `env.get("ok")` → **`env.ok`**, `env.get("error")` → **`env.error`**
+  (beide Stellen, `preflight`:202 + `_warm_session`:338). Neues `_EnvelopeLike`-Protocol (liest
+  `.ok`/`.error` per Property) + `_BrokerLike` korrigiert (`connect`/`disconnect -> _EnvelopeLike`);
+  `Mapping`-Import entfernt (ungenutzt). Dated Docstring-Reconciliation #8. `is_connected() -> bool`
+  war **nie** betroffen (bare bool).
+- **`tests/test_runner.py`:** neuer `_Env`-Stand-in (`.ok`/`.error`, **kein** `.get`); `_FakeBroker`
+  gibt jetzt `_Env` zurück statt `dict` → die Fakes **matchen die echte Envelope-Form**. **+1
+  Regressions-Test** `test_broker_envelope_read_by_attribute_not_mapping` (asserted: der Return hat
+  **kein** `.get`, und `run()` läuft trotzdem durch → ein dict-style-Read würde wieder failen).
+
+### Verifiziert (gemockt / offline — kein Netz; Live = Operator-Re-Run)
+- `pytest phase8_scheduler/tests -q` → **172 passed** (171 + 1 Regression). `py_compile` clean.
+  Regression unberührt (Edit nur in `phase8_scheduler/`): P1 52 · P2 62 · P4 94 · P5 146 · P6 70 · P7 128.
+- **Offen:** Operator-`live_test.py`-Re-Run gegen IG-Demo (der Preflight passiert jetzt den
+  Broker-Connect). Erwartung unverändert (sauberer Stop + State + CLOSED-Trade `reward_pts` **oder**
+  valider No-Trade-Lauf).
+
+---
+
 ## Session stopped — 2026-06-28 (Modul 12: `webui/` Web-UI + reale Start/Stop-Pause — **Phase 8 code-complete**)
 
 > Operator-Notiz: der `smoke_test` war erfolgreich; der `live_test` wartet aufs Handelsfenster.
