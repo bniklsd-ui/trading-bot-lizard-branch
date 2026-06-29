@@ -10,12 +10,15 @@
   --bg:        #16151a;   /* warm graphite canvas */
   --surface:   #1d1c21;   /* brushed card body */
   --surface-2: #161519;   /* inset wells (darker than surface) */
-  --shadow-dk: #0b0a0d;   /* lower-right cast (machined dark) */
-  --shadow-lt: #2b2932;   /* upper-left highlight (cool silver sheen) */
-  --line:      #34323c;   /* hairline / chrome edge */
+  --shadow-dk: #060507;   /* lower-right cast (machined dark — deeper for relief) */
+  --shadow-lt: #34313d;   /* upper-left highlight (cool silver sheen — brighter) */
+  --line:      #38353f;   /* hairline / chrome edge */
 
-  /* brushed-panel sheen (top→bottom) for cards */
-  --panel: linear-gradient(157deg, #242229 0%, var(--surface) 52%, #18171b 100%);
+  /* brushed-panel sheen (top→bottom) for cards — more curvature = more domed metal */
+  --panel: linear-gradient(156deg, #2d2a35 0%, #221f27 46%, var(--surface) 70%, #141318 100%);
+
+  /* ambient cast a card throws onto the leather dash (the real depth cue) */
+  --cast: 0 22px 46px -18px rgba(0,0,0,0.66), 0 6px 16px -10px rgba(0,0,0,0.55);
 
   /* text — warm aluminum family (one gray hue, warm) */
   --text:  #d8d2c8;   /* primary aluminum */
@@ -45,7 +48,8 @@
 /* the [hidden] attribute must win over any explicit display rule below */
 [hidden] { display: none !important; }
 
-html, body { height: 100%; }
+html { height: 100%; }
+body { min-height: 100%; }  /* grow with content so the leather layer covers the full scroll height */
 
 body {
   margin: 0;
@@ -56,7 +60,7 @@ body {
     linear-gradient(152deg, #1c1a1f 0%, #16151a 46%, #121116 100%),
     radial-gradient(140% 120% at 50% 0%, transparent 55%, rgba(0,0,0,0.42) 100%),
     var(--bg);
-  background-attachment: fixed;
+  position: relative;            /* containing block for the scrolling leather layer */
   color: var(--text);
   font-family: var(--mono);
   font-size: 14px;
@@ -65,13 +69,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* fine-leather pebble grain (inline feTurbulence — offline, no asset) over the whole dash */
+/* embossed fine-leather grain: feDiffuseLighting lights a turbulence bump-map into real
+   3D-looking pebble pores (inline SVG — offline, no asset). A second fine layer adds bite. */
 .grain {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.09;
+  position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.42;
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='l'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23l)'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-  mix-blend-mode: overlay;
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='le'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.045 0.05' numOctaves='5' seed='11' stitchTiles='stitch' result='n'/%3E%3CfeDiffuseLighting in='n' lighting-color='%23ffffff' surfaceScale='2.2' diffuseConstant='1.05' result='d'%3E%3CfeDistantLight azimuth='235' elevation='52'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23le)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 260px 260px, 160px 160px;
+  mix-blend-mode: soft-light;
 }
 
 /* ---- topbar ---- */
@@ -132,9 +138,9 @@ body {
 /* ---- grid ---- */
 .grid {
   position: relative; z-index: 1;
-  display: grid; gap: clamp(14px, 1.6vw, 22px);
+  display: grid; gap: clamp(20px, 2.2vw, 34px);
   grid-template-columns: repeat(12, 1fr);
-  padding: clamp(16px, 2.4vw, 30px) clamp(16px, 3vw, 44px);
+  padding: clamp(22px, 3vw, 40px) clamp(20px, 3.4vw, 52px);
   max-width: 1800px; margin: 0 auto;
 }
 /* landscape instrument cluster:
@@ -169,11 +175,32 @@ body {
 
 /* ---- card ---- */
 .card {
-  background: var(--panel);
+  /* fine vertical brushed-metal striation layered over the panel sheen */
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(255,255,255,0.022) 0, rgba(255,255,255,0.022) 1px, transparent 1px, transparent 3px),
+    var(--panel);
   border-radius: var(--radius);
-  box-shadow: var(--rise), inset 0 1px 0 rgba(255,255,255,0.045);
+  position: relative;
+  /* machined metal with depth: outer rim + ambient cast onto the leather,
+     the neumorphism relief, a bright top chrome edge + a dark bottom chamfer */
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.45),
+    var(--cast),
+    var(--rise),
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.5);
   padding: 20px 22px;
   animation: rise-in 0.5s both;
+}
+/* stitched leather gasket: a dashed amber seam framing each panel on the dash, with a
+   routed-pocket groove — the leather grips and stitches the metal instrument in place */
+.card::after {
+  content: ""; position: absolute; inset: -9px;
+  border-radius: calc(var(--radius) + 7px);
+  border: 1.5px dashed rgba(230, 162, 76, 0.30);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(255, 255, 255, 0.03);
+  pointer-events: none; z-index: 2;
 }
 .grid > .card:nth-child(1) { animation-delay: 0.02s; }
 .grid > .card:nth-child(2) { animation-delay: 0.06s; }

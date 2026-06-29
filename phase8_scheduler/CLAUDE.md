@@ -391,6 +391,37 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## UI-Overhaul Runde 3 — 2026-06-29 (Finish: scrollendes Leder · Gasket-Mounting · Metall-Textur)
+
+> **Auslöser:** der Nikinger: „zwei small fixes, dann kann die UI so bleiben" — (1) das Leder soll
+> **nicht fixed** sein, sondern mit dem Inhalt scrollen; (2) die Panels wirken „nur draufgeworfen" →
+> **mehr Abstand** + eine **mechanische Verbindung** Leder↔Panel; (3) ein bisschen **Metall-Textur**.
+> Gelockte Operator-Entscheidung (AskUserQuestion): Mounting = **Stitched leather gasket** (das Leder
+> umfasst + vernäht jedes Panel), nicht Corner-Bolts / Rivet-Rail. **Reine `style.css`-Änderung.**
+
+### Completed (alle in `webui/static/style.css`)
+- **Leder scrollt mit** (war `position:fixed` / `background-attachment:fixed`): `.grain` → `position:
+  absolute` in einem `position:relative` Body; `html,body{height:100%}` → `html{height:100%}` +
+  `body{min-height:100%}`, damit der Body mit dem Inhalt wächst und die `inset:0`-Leder-Schicht die
+  **volle Scroll-Höhe** deckt (verifiziert: grain-rect ≈ docHeight). `background-attachment:fixed` weg.
+- **Mehr Abstand:** `.grid` gap `clamp(14,1.6vw,22)` → **`clamp(20,2.2vw,34)`**, padding großzügiger
+  → mehr Leder **zwischen** den Panels (die Montagefläche).
+- **Stitched leather gasket** (`.card::after`): ein gestricheltes Amber-Seam `inset:-9px` um **jedes**
+  Panel auf dem Leder + Routed-Pocket-Groove (`inset 0 0 0 1px` dunkel) → das Leder „greift" und
+  vernäht das Metall-Instrument. `.card{position:relative}` ergänzt (Containing-Block fürs Seam).
+- **Brushed-Metal-Textur** auf den Karten: feine vertikale Striation (`repeating-linear-gradient` 90deg,
+  ~0.022 alpha) über dem `--panel`-Sheen → liest als gebürstetes Metall, subtil.
+- (Runde-3-Vorlauf in derselben Sitzung schon drin: tieferes Relief `--shadow-dk/lt`, `--cast`
+  Ambient-Drop, domed `--panel`, Chrome-Edge/Chamfer am `.card` — die „mehr Tiefe"-Bitte davor.)
+
+### Verifiziert (gemockt/offline + visuell)
+- `pytest phase8_scheduler/tests -q` → **181 passed**; `node --check app.js` clean (app.js unberührt).
+- **Visuell** :8011 @1920×1080: Gasket-Seams rahmen alle Panels, Leder zwischen ihnen sichtbar +
+  **scrollt** (Scroll-Screenshot zeigt Leder unter dem Fold), Brushed-Textur subtil, Konsole fehlerfrei.
+- **Commit:** committet, falls der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒ Note-Update".
+
+---
+
 ## UI-Overhaul Runde 2 — 2026-06-29 (Leder-Dash-Cockpit: Textur + Instrumente + Motion)
 
 > **Auslöser:** der Nikinger mochte Runde 1 („def the right decision") und wollte weiter: (1) ein
