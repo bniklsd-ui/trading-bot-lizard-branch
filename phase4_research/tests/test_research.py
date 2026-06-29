@@ -118,6 +118,26 @@ def test_run_abstain_saves_empty_but_asks_llm() -> None:
     assert len(llm.calls) == 1  # abstain is a content answer — LLM was asked
 
 
+def test_run_abstain_captures_llm_prose_reason() -> None:
+    """A valid abstain keeps the model's prose ``reasoning`` for display (``last_no_pick_reasoning``)."""
+    llm = FakeLLM(raw={"abstain": True, "reasoning": "  No clean setup; weak momentum.  "})
+    research, _state, _llm, _ = _research(llm=llm)
+
+    research.run()
+
+    assert research.last_no_pick_reasoning == "No clean setup; weak momentum."  # stripped, display-only
+
+
+def test_run_pass_clears_abstain_prose_reason() -> None:
+    """A pick leaves ``last_no_pick_reasoning`` as ``None`` (it is reset each cycle)."""
+    research, _state, _llm, _ = _research(llm=FakeLLM(raw=_buy_raw()))
+    research.last_no_pick_reasoning = "stale from a previous cycle"
+
+    research.run()
+
+    assert research.last_no_pick_reasoning is None
+
+
 # --------------------------------------------------------------------------- #
 # 3. Validator REJECT (hallucinated epic)                                     #
 # --------------------------------------------------------------------------- #

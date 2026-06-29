@@ -310,6 +310,7 @@ def create_app(config: SchedulerConfig | None = None) -> FastAPI:
 
         return {
             "last_no_trade_reason": state.last_no_trade_reason,
+            "last_no_trade_detail": state.last_no_trade_detail,
             "last_research_ts": state.last_research_ts,
             "last_reconcile_ts": state.last_reconcile_ts,
             "trades_today": state.trades_today,

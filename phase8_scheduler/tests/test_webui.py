@@ -323,4 +323,16 @@ def test_last_cycle_absent_artifacts_are_null(client) -> None:
     body = c.get("/api/last_cycle").json()
     assert body["research_pick"] is None
     assert body["debate"] is None
+    assert body["last_no_trade_detail"] is None     # no abstain prose in the seeded state
     assert body["trades_today"] == 1                # existing cycle field still present
+
+
+def test_last_cycle_exposes_abstain_detail(client) -> None:
+    c, cfg = client
+    StateStore(cfg.state_path).save(
+        SchedulerState(date="2026-06-28", last_no_trade_reason="LLM_ABSTAIN",
+                       last_no_trade_detail="Weak momentum and a wide spread; skipping.")
+    )
+    body = c.get("/api/last_cycle").json()
+    assert body["last_no_trade_reason"] == "LLM_ABSTAIN"
+    assert body["last_no_trade_detail"] == "Weak momentum and a wide spread; skipping."

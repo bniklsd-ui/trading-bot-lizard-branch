@@ -127,6 +127,12 @@ function renderCycle(c) {
       </div>
       <p class="reason-block">${escapeHtml(p.reasoning || "")}</p>`;
     markStale("pick-stale", p.generated_at, c.session_date);
+  } else if (c.last_no_trade_detail) {
+    // No pick this cycle — show the LLM's prose reason for abstaining (display-only).
+    pickEl.innerHTML = `
+      <div class="reason-meta"><span class="reason-num">ABSTAIN REASONING</span></div>
+      <p class="reason-block">${escapeHtml(c.last_no_trade_detail)}</p>`;
+    $("pick-stale").hidden = true;
   } else {
     pickEl.innerHTML = `<p class="empty">no research pick on record yet</p>`;
     $("pick-stale").hidden = true;

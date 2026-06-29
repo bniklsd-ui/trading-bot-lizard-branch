@@ -136,6 +136,10 @@ class Research:
         self.market_data = market_data
         self.llm = llm
         self.config = config
+        # Display-only: the LLM's prose reason from the *last* valid abstain (``abstain=true``),
+        # captured so a UI can show *why* it skipped. ``None`` after a pick or a pre-LLM abort.
+        # Never gates anything and never becomes a candidate (root rule 3). Read by Phase-8.
+        self.last_no_pick_reasoning: str | None = None
 
     # ------------------------------------------------------------------ #
     # Public API                                                         #
@@ -152,6 +156,9 @@ class Research:
             ``[candidate]`` on PASS, otherwise ``[]``. Reasons are logged to
             stderr; stdout is left untouched (Step-8 scripts own the result JSON).
         """
+        # Reset the display-only abstain prose each cycle (a pick / pre-LLM abort leaves it clear).
+        self.last_no_pick_reasoning = None
+
         # 1. Session-health pre-flight. Any fault → abort, no AI call.
         try:
             self._preflight()
@@ -196,6 +203,10 @@ class Research:
         if not vr.valid:
             return self._abstain(f"validator REJECT: {vr.rejected_reason}")
         if vr.candidate is None:
+            # Valid abstain (model set ``abstain=true``): keep its prose reason for the UI.
+            # Scoped to this branch only — on a REJECT, ``raw["reasoning"]`` is the model's
+            # *pick* rationale (it wanted to trade), which would be misleading as a skip reason.
+            self.last_no_pick_reasoning = (raw.get("reasoning") or "").strip() or None
             return self._abstain("validator abstain (no pick)")
 
         # 7. The real deterministic gate (a soft drift warn is ok=True → passes).

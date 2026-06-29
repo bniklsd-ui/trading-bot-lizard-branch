@@ -132,6 +132,30 @@ def test_abstain_sets_llm_abstain_reason() -> None:
     assert research.run_calls == 1
 
 
+def test_abstain_surfaces_llm_prose_detail() -> None:
+    """The LLM's prose abstain reason is copied onto ``state.last_no_trade_detail`` (display-only)."""
+    research = _FakeResearch(result=[])
+    research.last_no_pick_reasoning = "Weak momentum and a wide spread; skipping."
+    tick = ResearchTick(research, now_fn=_fixed_now())
+    state = _state()
+
+    tick.ensure_candidates(state)
+
+    assert state.last_no_trade_detail == "Weak momentum and a wide spread; skipping."
+
+
+def test_pick_clears_abstain_detail() -> None:
+    """A pick clears any stale ``last_no_trade_detail`` from a previous abstain."""
+    research = _FakeResearch(result=[_real_pick()])
+    tick = ResearchTick(research, now_fn=_fixed_now())
+    state = _state()
+    state.last_no_trade_detail = "stale prose from a previous cycle"
+
+    tick.ensure_candidates(state)
+
+    assert state.last_no_trade_detail is None
+
+
 # --- exception (fail-closed) ----------------------------------------------
 
 

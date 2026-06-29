@@ -106,6 +106,7 @@ class SchedulerState:
     consecutive_failures: int = 0
     kill_reason: str | None = None
     last_no_trade_reason: str | None = None
+    last_no_trade_detail: str | None = None  # the LLM's prose abstain reason (display-only); reset on rollover
 
 
 # Field names allowed when reconstructing from disk — computed once. Used to filter a
@@ -191,6 +192,7 @@ class StateStore:
         state.consecutive_failures = 0
         state.kill_reason = None
         state.last_no_trade_reason = None
+        state.last_no_trade_detail = None
         return state
 
     def record_cycle(

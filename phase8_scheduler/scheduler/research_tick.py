@@ -114,6 +114,9 @@ class _ResearchLike(Protocol):
     """
 
     state: Any  # the Phase-2 StateManager (used only for the fail-closed clear on exception)
+    # Optional: the LLM's prose abstain reason from the last ``run()`` (``None`` after a pick /
+    # pre-LLM abort). Read defensively via ``getattr`` so a fake without it still satisfies this.
+    last_no_pick_reasoning: str | None
 
     def run(self) -> list: ...
 
@@ -176,14 +179,19 @@ class ResearchTick:
             )
             self._clear_candidates_fail_closed()
             state.last_no_trade_reason = REASON_PREFLIGHT
+            state.last_no_trade_detail = None  # pre-LLM/exception path has no model prose
             return ResearchResult(picked=False, n=0, reason=REASON_PREFLIGHT)
 
         if candidates:
             state.last_no_trade_reason = None
+            state.last_no_trade_detail = None  # a pick: no abstain reason to show
             logger.info("research tick: %d candidate(s) written (PASS).", len(candidates))
             return ResearchResult(picked=True, n=len(candidates), reason=None)
 
         state.last_no_trade_reason = REASON_LLM_ABSTAIN
+        # The LLM's prose abstain reason (display-only); ``None`` unless Phase-4 captured one
+        # (only the genuine ``abstain=true`` path carries prose — see research.py).
+        state.last_no_trade_detail = getattr(self._research, "last_no_pick_reasoning", None)
         logger.info("research tick: abstain (no candidate, reason=%s).", REASON_LLM_ABSTAIN)
         return ResearchResult(picked=False, n=0, reason=REASON_LLM_ABSTAIN)
 

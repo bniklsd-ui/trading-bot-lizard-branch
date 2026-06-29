@@ -49,6 +49,7 @@ def test_save_then_load_roundtrips_all_fields(tmp_path) -> None:
         consecutive_failures=1,
         kill_reason="auto:backoff",
         last_no_trade_reason="LLM_ABSTAIN",
+        last_no_trade_detail="Weak momentum and a wide spread; skipping.",
     )
     store.save(state)
     assert store.load() == state
@@ -114,6 +115,7 @@ def test_rollover_new_day_resets_day_scoped_keeps_timestamps(tmp_path) -> None:
         consecutive_failures=2,
         kill_reason="auto:backoff",
         last_no_trade_reason="CAP_BLOCK",
+        last_no_trade_detail="some prose from yesterday's abstain",
         last_research_ts="2026-06-27T10:00:00Z",
         last_reconcile_ts="2026-06-27T17:30:00Z",
     )
@@ -127,6 +129,7 @@ def test_rollover_new_day_resets_day_scoped_keeps_timestamps(tmp_path) -> None:
     assert out.consecutive_failures == 0
     assert out.kill_reason is None
     assert out.last_no_trade_reason is None
+    assert out.last_no_trade_detail is None
     # cross-day timestamps are preserved
     assert out.last_research_ts == "2026-06-27T10:00:00Z"
     assert out.last_reconcile_ts == "2026-06-27T17:30:00Z"

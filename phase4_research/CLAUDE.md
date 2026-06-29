@@ -31,6 +31,16 @@ is kicked off in the browser concept session, not here.
 > is otherwise unchanged (+6 tests → **88 → 94**; `FakeDB` gained a recording
 > `mark_lesson_used`). Detail: `phase7_reward/` + `docs/concepts/phase7_reward_concept.md` §6 Step 11.
 
+> 🔁 **Phase-8 additive edit (2026-06-29 — UI surfacing, code = source of truth):** the dashboard needed
+> the LLM's **prose abstain reason**, which the schema already produces (`prompt.py` `required:[abstain,
+> reasoning]`) but `run()` discarded. `research.py` now keeps it: a new instance attr
+> `Research.last_no_pick_reasoning`, reset each `run()` and filled from `raw["reasoning"]` **only** on the
+> valid-abstain branch (`vr.candidate is None`, i.e. `abstain=true`) — **not** on REJECT/filter (there the
+> `reasoning` is the model's *pick* rationale, misleading as a skip reason). **Display-only: it gates
+> nothing and never becomes a candidate** (root rule 3 intact); `run()`'s return type + all behaviour are
+> unchanged. Phase 8 reads it (`scheduler/research_tick.py`) into `scheduler_state.last_no_trade_detail`
+> for the UI. +2 P4 tests (**94 → 96**). Detail: `phase8_scheduler/CLAUDE.md` → `## UI-Erweiterung — 2026-06-29`.
+
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which
 candidate?"). Everything else is plain code:

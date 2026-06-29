@@ -90,7 +90,7 @@ Lauf, der (a) einen netto-neuen autonomen Trade in **einem** sauberen Lauf öffn
 | `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures | ✅ (Modul 11, operator-run) |
 | `scripts/run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Operator-Tools (Start-Script · offline Sim-Tag mit Fakes · echter unbeaufsichtigter IG-Demo-Zyklus) | ✅ (Modul 11, operator-run) |
 | `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes. **+ Token-Meter-Card** (`/api/token_usage`) **+ Last-Cycle-Reasoning** (`/api/last_cycle` zeigt jetzt Research-Pick + Bull/Bear/Judge-Transkript) — s. `## UI-Erweiterung — 2026-06-29` | ✅ (Modul 12, 18 Tests) |
-| `tests/*` | gemockt, kein Netz/LLM/echter sleep (178, Schwerpunkt `test_runner` + `test_safety` + `test_webui`) | ✅ |
+| `tests/*` | gemockt, kein Netz/LLM/echter sleep (181, Schwerpunkt `test_runner` + `test_safety` + `test_webui`) | ✅ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine
 Datei = eine Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging →
@@ -347,6 +347,47 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 ### Next (unverändert)
 - Operator-Re-Run von `live_test.py` im nicht-konservativen Fenster; **danach** Doku-Flip auf ✅ + Merge.
 - **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒ Note-Update".
+
+---
+
+## UI-Erweiterung — 2026-06-29 (LLM-Abstain-Prosa-Grund in der UI)
+
+> **Auslöser:** der Nikinger wollte den **echten LLM-Abstain-Grund** (Prosa) sehen, nicht nur den Code
+> `LLM_ABSTAIN`. **Befund (klein):** das Schema (`research/prompt.py`) hat `required:[abstain, reasoning]`
+> → das Modell liefert **immer** eine Prosa-`reasoning`, auch bei `abstain=true` — sie wurde nur verworfen
+> (`validator.py:100-102` gibt valid-abstain ohne sie zurück; `research.py:199` nutzt nur den Code-String).
+> **Kein Schema-/Prompt-Change, keine neue AI.**
+
+### Completed (additiv; **eine** P4-Berührung, sonst P8/UI)
+- **P4 `research/research.py`** (cross-phase, additiv, **display-only — gatet nichts, wird nie ein
+  Candidate**, root rule 3 intakt): neues Instanz-Attribut `last_no_pick_reasoning`, in `run()` pro Zyklus
+  auf `None` zurückgesetzt und **nur** auf dem echten valid-abstain-Zweig (`vr.candidate is None`,
+  `abstain=true`) aus `raw["reasoning"]` (gestrippt) gefüllt. Bewusst **nicht** auf REJECT/Filter (dort ist
+  `reasoning` die *Pick*-Begründung → als Skip-Grund irreführend).
+- **P8 `scheduler/state.py`:** neues Feld `last_no_trade_detail: str | None` (display-only) + Reset im
+  `rollover_if_new_day`. `load()` self-heilt unbekannte/fehlende Keys → additiv-sicher.
+- **P8 `scheduler/research_tick.py`:** setzt `state.last_no_trade_detail` neben `last_no_trade_reason` —
+  abstain → `getattr(self._research, "last_no_pick_reasoning", None)` (defensiv, Fake ohne Attr ok),
+  pick/exception → `None`. `_ResearchLike`-Protocol um das optionale Attr ergänzt.
+- **P8 `webui/`:** `/api/last_cycle` gibt `last_no_trade_detail` zurück; `app.js` `renderCycle` zeigt es
+  **im RESEARCH-PICK-Block als „ABSTAIN REASONING"**, wenn kein Pick aber ein Detail da ist (sonst der
+  bisherige Empty-State). Reuse der bestehenden `.reason-block`-Styles — **kein** neues CSS.
+
+### Verifiziert (gemockt/offline + visuell)
+- `pytest phase4_research/tests -q` → **96** (94 + 2: abstain captures prose / pick clears it).
+- `pytest phase8_scheduler/tests -q` → **181** (178 + 3: research_tick surfaces/clears detail, state
+  round-trip+rollover, webui last_cycle exposes detail). `node --check app.js` clean.
+- **Visuell** (throwaway-Webui mit Temp-State, das `last_no_trade_detail` trägt): RESEARCH PICK rendert
+  „ABSTAIN REASONING" + die volle Modell-Prosa. Screenshot an den Operator.
+- **Regression** logisch unberührt (P4-Change = additives Attribut; P6/P7 reusen `LLMClient`/`token_meter`,
+  nicht die `Research`-Klasse).
+
+### Grenzen (ehrlich, dokumentiert)
+- **Füllt sich erst beim NÄCHSTEN Abstain-Zyklus nach Daemon-Neustart** — alte Zyklen sind nicht
+  backfillbar (die Prosa wurde damals nicht gespeichert).
+- **Nur der echte `abstain=true`-Pfad** trägt Prosa; Pre-LLM-Aborts (empty universe, LLM-Error,
+  session-health) + Validator/Filter-Rejects → `last_no_trade_detail` bleibt `None`, der Code-Grund zeigt.
+- **Operator:** Daemon **und** Webui neu starten (neue P4/P8-Code), dann Browser hart neu laden.
 
 ---
 
