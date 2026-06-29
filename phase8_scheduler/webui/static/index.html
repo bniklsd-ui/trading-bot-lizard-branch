@@ -107,12 +107,50 @@
       </div>
     </section>
 
+    <!-- TOKENS -->
+    <section class="card card--tokens" aria-labelledby="h-tokens">
+      <div class="card-head">
+        <h2 id="h-tokens">TOKEN METER</h2>
+        <span id="tok-pct" class="tag tag--accent">—</span>
+      </div>
+      <p class="conf-note">today's LLM spend over the shared meter · runaway breaker</p>
+      <div class="meter">
+        <div class="meter-track"><div id="tok-bar" class="meter-bar" style="width:0%"></div></div>
+        <div class="meter-scale">
+          <span><b id="tok-consumed">–</b> tokens</span>
+          <span>budget <b id="tok-budget">–</b></span>
+        </div>
+      </div>
+      <div class="conf-grid">
+        <div class="kv"><span>cost today €</span><b id="tok-cost">–</b></div>
+        <div class="kv"><span>LLM calls</span><b id="tok-calls">–</b></div>
+      </div>
+    </section>
+
     <!-- LAST CYCLE -->
     <section class="card card--cycle" aria-labelledby="h-cycle">
       <div class="card-head"><h2 id="h-cycle">LAST CYCLE</h2></div>
       <div class="kv kv--wide"><span>no-trade reason</span><b id="cycle-reason">–</b></div>
       <div class="kv kv--wide"><span>last research</span><b id="cycle-research" class="mono-ts">–</b></div>
       <div class="kv kv--wide"><span>last reconcile</span><b id="cycle-reconcile" class="mono-ts">–</b></div>
+
+      <!-- research pick (most recent on disk) -->
+      <div class="reason-head">
+        <span class="reason-title">RESEARCH PICK</span>
+        <span id="pick-stale" class="stale" hidden></span>
+      </div>
+      <div id="cycle-pick" class="reason-zone">
+        <p class="empty">no research pick on record yet</p>
+      </div>
+
+      <!-- debate (most recent on disk) -->
+      <div class="reason-head">
+        <span class="reason-title">DEBATE · BULL / BEAR / JUDGE</span>
+        <span id="debate-stale" class="stale" hidden></span>
+      </div>
+      <div id="cycle-debate" class="reason-zone">
+        <p class="empty">no debate on record yet</p>
+      </div>
     </section>
 
     <!-- TRADES -->

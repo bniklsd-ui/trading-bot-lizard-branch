@@ -12,7 +12,11 @@ write raises ``OperationalError``).
 from __future__ import annotations
 
 import dataclasses
+import json
 import sqlite3
+from datetime import datetime, timedelta
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -211,3 +215,112 @@ def test_db_connection_is_read_only(client) -> None:
             conn.execute("INSERT INTO trade_outcomes (deal_id) VALUES ('HACK')")
     finally:
         conn.close()
+
+
+# --- token meter -----------------------------------------------------------
+
+
+def _utc_z(local_dt: datetime) -> str:
+    """A noon-local datetime → the UTC ``...Z`` string ``token_meter`` writes."""
+    noon = local_dt.replace(hour=12, minute=0, second=0, microsecond=0)
+    return noon.astimezone(ZoneInfo("UTC")).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def _write_usage_log(cfg) -> None:
+    """Two records today + one yesterday (Berlin) at the wiring's ``llm_usage.json`` path."""
+    tz = ZoneInfo(cfg.tz)
+    today = datetime.now(tz)
+    yest = today - timedelta(days=1)
+    records = [
+        {"ts": _utc_z(today), "model": "claude-sonnet-4-6", "input_tokens": 1000,
+         "output_tokens": 200, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0,
+         "est_cost_usd": 0.006, "est_cost_eur": 0.0055},
+        {"ts": _utc_z(today), "model": "claude-haiku-4-5-20251001", "input_tokens": 500,
+         "output_tokens": 100, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0,
+         "est_cost_usd": 0.001, "est_cost_eur": 0.0009},
+        {"ts": _utc_z(yest), "model": "claude-sonnet-4-6", "input_tokens": 9999,
+         "output_tokens": 9999, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0,
+         "est_cost_usd": 9.9, "est_cost_eur": 9.9},
+    ]
+    (Path(cfg.state_path).parent / "llm_usage.json").write_text(
+        json.dumps(records), encoding="utf-8"
+    )
+
+
+def test_token_usage_counts_today_only(client) -> None:
+    c, cfg = client
+    _write_usage_log(cfg)
+    body = c.get("/api/token_usage").json()
+    assert body["consumed_tokens"] == 1800          # (1000+200)+(500+100); yesterday excluded
+    assert body["calls_today"] == 2
+    assert abs(body["cost_eur_today"] - 0.0064) < 1e-9
+    assert body["budget"] == 200_000                # the armed default
+    assert body["percent"] == 0.9                   # 100*1800/200000
+
+
+def test_token_usage_missing_log_is_zeros(client) -> None:
+    c, _cfg = client                                # fixture writes no llm_usage.json
+    body = c.get("/api/token_usage").json()
+    assert body["consumed_tokens"] == 0
+    assert body["calls_today"] == 0
+    assert body["percent"] == 0.0
+    assert body["budget"] == 200_000
+
+
+def test_token_usage_budget_disabled_percent_none(tmp_path) -> None:
+    cfg = dataclasses.replace(
+        SchedulerConfig(daily_token_budget=None),
+        live_db_path=str(tmp_path / "trading_bot.sqlite"),
+        state_path=str(tmp_path / "scheduler_state.json"),
+        kill_path=str(tmp_path / "KILL"),
+        command_path=str(tmp_path / "cmd.json"),
+    )
+    body = TestClient(create_app(cfg)).get("/api/token_usage").json()
+    assert body["budget"] is None
+    assert body["percent"] is None                  # no budget ⇒ no percent
+
+
+# --- last-cycle reasoning detail -------------------------------------------
+
+
+def test_last_cycle_surfaces_pick_and_debate(client) -> None:
+    c, cfg = client
+    state_dir = Path(cfg.state_path).parent
+    (state_dir / "turbo_candidates.json").write_text(
+        json.dumps([{
+            "epic": "IX.D.DAX.IFMM.IP", "direction": "BUY", "llm_confidence": 72.0,
+            "reasoning": "Momentum and a tight spread favor a long.", "score_at_pick": 55.0,
+            "threshold_applied": 55.0, "generated_at": "2026-06-28T09:30:00Z", "source": "research",
+        }]), encoding="utf-8",
+    )
+    (state_dir / "debate_log.json").write_text(
+        json.dumps([{
+            "ts": "2026-06-28T09:31:00Z", "epic": "IX.D.DAX.IFMM.IP", "seed_direction": "BUY",
+            "final_decision": "TRADE", "final_direction": "BUY", "confidence": 67.0,
+            "rounds_used": 1, "rationale": "The bull case is stronger.",
+            "regime_snapshot": {"spread_pct": 0.01},
+            "transcript": [
+                {"round": 1, "agent": "BULL", "model": "claude-haiku-4-5-20251001",
+                 "text": "Up we go.", "usage": {"input_tokens": 1}},
+                {"round": 1, "agent": "BEAR", "model": "claude-haiku-4-5-20251001",
+                 "text": "Be careful.", "usage": {"input_tokens": 1}},
+                {"round": 1, "agent": "JUDGE", "model": "claude-sonnet-4-6",
+                 "text": "Trade BUY.", "usage": {"input_tokens": 1}},
+            ],
+        }]), encoding="utf-8",
+    )
+    body = c.get("/api/last_cycle").json()
+    assert body["research_pick"]["reasoning"].startswith("Momentum")
+    assert body["research_pick"]["llm_confidence"] == 72.0
+    assert body["debate"]["final_decision"] == "TRADE"
+    assert [t["agent"] for t in body["debate"]["transcript"]] == ["BULL", "BEAR", "JUDGE"]
+    assert "usage" not in body["debate"]["transcript"][0]   # payload kept lean
+    assert "last_no_trade_reason" in body and "session_date" in body  # existing fields preserved
+
+
+def test_last_cycle_absent_artifacts_are_null(client) -> None:
+    c, _cfg = client                                # fixture writes neither file
+    body = c.get("/api/last_cycle").json()
+    assert body["research_pick"] is None
+    assert body["debate"] is None
+    assert body["trades_today"] == 1                # existing cycle field still present

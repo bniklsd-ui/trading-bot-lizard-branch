@@ -89,8 +89,8 @@ Lauf, der (a) einen netto-neuen autonomen Trade in **einem** sauberen Lauf öffn
 | `scheduler/run.py` | `python -m scheduler.run` Entry (in-package, lazy `scripts.wiring`, SIGTERM/SIGINT → `request_stop`) | ✅ (Modul 11, 6 Tests) |
 | `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures | ✅ (Modul 11, operator-run) |
 | `scripts/run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Operator-Tools (Start-Script · offline Sim-Tag mit Fakes · echter unbeaufsichtigter IG-Demo-Zyklus) | ✅ (Modul 11, operator-run) |
-| `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes | ✅ (Modul 12, 13 Tests) |
-| `tests/*` | gemockt, kein Netz/LLM/echter sleep (171, Schwerpunkt `test_runner` + `test_safety` + `test_webui`) | ✅ |
+| `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes. **+ Token-Meter-Card** (`/api/token_usage`) **+ Last-Cycle-Reasoning** (`/api/last_cycle` zeigt jetzt Research-Pick + Bull/Bear/Judge-Transkript) — s. `## UI-Erweiterung — 2026-06-29` | ✅ (Modul 12, 18 Tests) |
+| `tests/*` | gemockt, kein Netz/LLM/echter sleep (178, Schwerpunkt `test_runner` + `test_safety` + `test_webui`) | ✅ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine
 Datei = eine Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging →
@@ -307,6 +307,46 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   4 unbewiesenen Punkte.
 - **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
   Note-Update" im selben Commit.
+
+---
+
+## UI-Erweiterung — 2026-06-29 (Token-Meter + detailliertes Last-Cycle-Reasoning)
+
+> **Auslöser:** der Nikinger ließ den Daemon + die UI laufen, alles funktionierte, und bat — **vor** einem
+> späteren Overhaul — um zwei **additive** Karten. Bewusst **kein** Redesign: rein additiv im bestehenden
+> Dark-Neumorphism-Token-Set (`static/style.css` `:root`); **kein** Design-Skill (der Overhaul ist später).
+> **UI-only, file/DB read-only** — kein Trading-/Scheduler-Modul berührt.
+
+### Completed (alle in `webui/`)
+- **Token-Meter (`GET /api/token_usage`):** liest die geteilte `llm_usage.json` über die **importierten**
+  `scheduler.budget`-Helfer (`_load_log`/`_record_tokens`/`_record_local_date` — identische Berlin-Tagesgrenze
+  wie der Breaker), summiert **heutige** Tokens + €/$-Kosten + Calls, gibt `{consumed_tokens, budget, percent,
+  cost_eur_today, cost_usd_today, calls_today}`. Fail-soft (fehlend/korrupt → Nullen). Neue Full-Width-Card
+  `card--tokens` (Bar amber >80 % / rot ≥100 %; `budget=None` → „off"/`percent=None`).
+- **Last-Cycle-Reasoning (`GET /api/last_cycle` erweitert, additiv):** zusätzlich `research_pick` (letzter
+  `turbo_candidates.json`-Eintrag: `reasoning`/`llm_confidence`/`direction`/`score`/`threshold`/`generated_at`)
+  + `debate` (letzter `debate_log.json`-Eintrag: `final_decision`/`final_direction`/`confidence`/`rounds`/
+  `rationale` + `transcript` Bull/Bear/Judge mit vollem `text`; `usage` gedroppt für schlanke Payload). Beides
+  **most-recent on disk** → die UI labelt sie mit eigenem Timestamp + **„from an earlier cycle"**-Stale-Marker
+  (Vergleich Artefakt-Datum vs. `session_date`), da Pick/Debatte nur bei echtem Pick/Debatte entstehen. Card
+  `card--cycle` um RESEARCH-PICK- + DEBATE-Blöcke erweitert (collapsible `<details>` je Agent, Farbcodierung
+  Bull=grün/Bear=rot/Judge=lila). Neuer fail-soft Helfer `_load_json_array`.
+- **Ehrliche Grenze (dokumentiert, nicht gefixt):** der **Abstain-Prosa-Grund** wird nirgends persistiert (nur
+  der Code `LLM_ABSTAIN`) → auf einem Abstain-Zyklus bleibt der Research-Pick-Block leer; das Reasoning kommt
+  aus dem **letzten** echten Pick/Debatte. Echten Abstain-Text gäbe es erst mit einer P4/P9-Änderung (das
+  reservierte `no_trade_reason`-Taxonomie-Gerüst) — außerhalb Scope.
+
+### Verifiziert (gemockt/offline + visuell — kein Netz nötig fürs UI)
+- `pytest phase8_scheduler/tests -q` → **178 passed** (171 → 178: +3 token_usage [heute-only / fehlender Log /
+  Budget=None→percent None], +2 last_cycle [Pick+Debatte populiert / fehlende Artefakte→null, Bestandsfelder
+  unberührt]). `node --check app.js` + `py_compile api.py` clean.
+- **Visuell** gegen die echte `data/state/` (separater Port 8011, Operator-`:8000` unberührt) via
+  agent-browser-Screenshot: Token-Card 18 %/€0.1555/26 Calls; Last-Cycle zeigt leeren Pick (aktueller Abstain)
+  + die **stale 06/16-Debatte** mit vollen Bull/Bear/Judge-Transkripten (Stale-Marker korrekt).
+
+### Next (unverändert)
+- Operator-Re-Run von `live_test.py` im nicht-konservativen Fenster; **danach** Doku-Flip auf ✅ + Merge.
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒ Note-Update".
 
 ---
 

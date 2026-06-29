@@ -25,16 +25,19 @@ module logger on stderr).
 from __future__ import annotations
 
 import dataclasses
+import json
 import logging
 import sqlite3
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from scheduler import command, killswitch
+from scheduler.budget import _load_log, _record_local_date, _record_tokens
 from scheduler.clock import Clock
 from scheduler.config import SchedulerConfig
 from scheduler.state import StateStore
@@ -95,6 +98,24 @@ def _query(db_path: str, sql: str, params: tuple[Any, ...] = ()) -> list[dict[st
         return []
     finally:
         conn.close()
+
+
+def _load_json_array(path: str) -> list[dict[str, Any]]:
+    """Load a gitignored ``data/state`` JSON array (candidates / debate log), fail-soft.
+
+    Missing file → ``[]``; corrupt JSON or a non-array payload → one WARNING + ``[]``. Mirrors
+    the ``_query`` discipline (the dashboard renders an empty card rather than 500ing) and the
+    ``scheduler.budget._load_log`` pattern these files share.
+    """
+    p = Path(path)
+    if not p.exists():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        logger.warning("state file at %s unreadable (%s) — treating as empty.", p, exc)
+        return []
+    return data if isinstance(data, list) else []
 
 
 def create_app(config: SchedulerConfig | None = None) -> FastAPI:
@@ -200,16 +221,102 @@ def create_app(config: SchedulerConfig | None = None) -> FastAPI:
             (_DEFAULT_LIMIT,),
         )
 
+    @app.get("/api/token_usage")
+    def token_usage() -> dict[str, Any]:
+        """Today's LLM token + cost spend vs the daemon's daily budget (the cost card).
+
+        Reads the shared 8-field ``llm_usage.json`` (the same meter the daemon's ``TokenBudget``
+        gates on) and reuses ``scheduler.budget`` helpers so the day boundary is the identical
+        Europe/Berlin one. Fail-soft: a missing / corrupt log → zeros (never 500). ``budget`` is
+        ``cfg.daily_token_budget`` (``None`` ⇒ disabled; ``percent`` then ``None``).
+        """
+        usage_path = str(Path(cfg.state_path).parent / "llm_usage.json")
+        tz = ZoneInfo(cfg.tz)
+        today = Clock(cfg).now().astimezone(tz).date()
+        tokens = calls = 0
+        cost_eur = cost_usd = 0.0
+        for rec in _load_log(usage_path):
+            if not isinstance(rec, dict):
+                continue
+            if _record_local_date(rec.get("ts"), tz) == today:
+                tokens += _record_tokens(rec)
+                cost_eur += float(rec.get("est_cost_eur") or 0.0)
+                cost_usd += float(rec.get("est_cost_usd") or 0.0)
+                calls += 1
+        budget = cfg.daily_token_budget
+        percent = round(100.0 * tokens / budget, 1) if budget else None
+        return {
+            "consumed_tokens": tokens,
+            "budget": budget,
+            "percent": percent,
+            "cost_eur_today": round(cost_eur, 4),
+            "cost_usd_today": round(cost_usd, 4),
+            "calls_today": calls,
+        }
+
     @app.get("/api/last_cycle")
     def last_cycle() -> dict[str, Any]:
-        """The last cycle's no-trade reason + the last research / reconcile timestamps."""
+        """The last cycle's outcome + the most-recent research pick and Bull/Bear/Judge debate.
+
+        The cycle counters come from ``scheduler_state.json``; the reasoning artifacts come from
+        the gitignored ``turbo_candidates.json`` (the research pick) and ``debate_log.json`` (the
+        debate). Both are the **most recent on disk** — they only exist when the bot actually
+        picked / debated, so on an abstain cycle they may pre-date the latest cycle; the UI labels
+        them with their own timestamp + a stale marker. Either is ``None`` when absent.
+        """
         state = StateStore(cfg.state_path).load()
+        state_dir = Path(cfg.state_path).parent
+
+        candidates = _load_json_array(str(state_dir / "turbo_candidates.json"))
+        pick = candidates[-1] if candidates else None
+        research_pick = None
+        if isinstance(pick, dict):
+            research_pick = {
+                "epic": pick.get("epic"),
+                "direction": pick.get("direction"),
+                "llm_confidence": pick.get("llm_confidence"),
+                "reasoning": pick.get("reasoning"),
+                "score_at_pick": pick.get("score_at_pick"),
+                "threshold_applied": pick.get("threshold_applied"),
+                "generated_at": pick.get("generated_at"),
+            }
+
+        debates = _load_json_array(str(state_dir / "debate_log.json"))
+        last = debates[-1] if debates else None
+        debate = None
+        if isinstance(last, dict):
+            transcript = [
+                {
+                    "round": t.get("round"),
+                    "agent": t.get("agent"),
+                    "model": t.get("model"),
+                    "text": t.get("text"),
+                }
+                for t in (last.get("transcript") or [])
+                if isinstance(t, dict)
+            ]
+            debate = {
+                "ts": last.get("ts"),
+                "epic": last.get("epic"),
+                "seed_direction": last.get("seed_direction"),
+                "final_decision": last.get("final_decision"),
+                "final_direction": last.get("final_direction"),
+                "confidence": last.get("confidence"),
+                "rounds_used": last.get("rounds_used"),
+                "rationale": last.get("rationale"),
+                "regime_snapshot": last.get("regime_snapshot"),
+                "transcript": transcript,
+            }
+
         return {
             "last_no_trade_reason": state.last_no_trade_reason,
             "last_research_ts": state.last_research_ts,
             "last_reconcile_ts": state.last_reconcile_ts,
             "trades_today": state.trades_today,
             "consecutive_failures": state.consecutive_failures,
+            "session_date": state.date,
+            "research_pick": research_pick,
+            "debate": debate,
         }
 
     # --- control endpoints (file writes ONLY) ------------------------------

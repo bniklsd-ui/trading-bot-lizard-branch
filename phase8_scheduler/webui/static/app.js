@@ -80,10 +80,105 @@ function renderStatus(s) {
   }
 }
 
+// local calendar date (YYYY-MM-DD) of an ISO ts, in the browser's tz (Berlin for the operator)
+function localDay(ts) {
+  if (!ts) return null;
+  const d = new Date(ts);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString("en-CA");
+}
+
+// "from an earlier cycle" marker when the artifact pre-dates today's session
+function markStale(elId, ts, sessionDate) {
+  const el = $(elId);
+  const day = localDay(ts);
+  if (ts && sessionDate && day && day !== sessionDate) {
+    el.textContent = `from an earlier cycle · ${fmtTs(ts)}`;
+    el.hidden = false;
+  } else if (ts) {
+    el.textContent = fmtTs(ts);
+    el.hidden = false;
+  } else {
+    el.hidden = true;
+  }
+}
+
+function dirBadge(dir) {
+  const d = String(dir || "").toUpperCase();
+  const cls = d === "BUY" ? "dir-buy" : d === "SELL" ? "dir-sell" : "";
+  return `<span class="${cls}">${d || "–"}</span>`;
+}
+
 function renderCycle(c) {
   $("cycle-reason").textContent = c.last_no_trade_reason || "—";
   $("cycle-research").textContent = fmtTs(c.last_research_ts);
   $("cycle-reconcile").textContent = fmtTs(c.last_reconcile_ts);
+
+  // --- research pick ---
+  const p = c.research_pick;
+  const pickEl = $("cycle-pick");
+  if (p && (p.reasoning || p.direction)) {
+    pickEl.innerHTML = `
+      <div class="reason-meta">
+        ${dirBadge(p.direction)}
+        <span class="reason-epic" title="${escapeHtml(p.epic || "")}">${shortEpic(p.epic)}</span>
+        <span class="reason-num">conf ${fmtNum(p.llm_confidence, 0)}</span>
+        <span class="reason-num">floor ${fmtNum(p.threshold_applied, 0)}</span>
+        <span class="reason-num">score ${fmtNum(p.score_at_pick, 0)}</span>
+      </div>
+      <p class="reason-block">${escapeHtml(p.reasoning || "")}</p>`;
+    markStale("pick-stale", p.generated_at, c.session_date);
+  } else {
+    pickEl.innerHTML = `<p class="empty">no research pick on record yet</p>`;
+    $("pick-stale").hidden = true;
+  }
+
+  // --- debate ---
+  const d = c.debate;
+  const debEl = $("cycle-debate");
+  if (d && (d.rationale || (d.transcript && d.transcript.length))) {
+    const decisionCls = d.final_decision === "TRADE" ? "is-ok" : "is-insufficient";
+    const flip = d.final_direction && d.seed_direction && d.final_direction !== d.seed_direction
+      ? `<span class="flip">flip ${escapeHtml(d.seed_direction)}→${escapeHtml(d.final_direction)}</span>` : "";
+    const turns = (d.transcript || [])
+      .map((t) => {
+        const agent = String(t.agent || "").toUpperCase();
+        const cls = agent === "BULL" ? "agent-bull" : agent === "BEAR" ? "agent-bear" : "agent-judge";
+        return `<details class="turn">
+          <summary><span class="${cls}">${agent || "—"}</span><span class="turn-model">${escapeHtml(t.model || "")}</span><span class="turn-round">r${t.round ?? "?"}</span></summary>
+          <p class="reason-block">${escapeHtml(t.text || "")}</p>
+        </details>`;
+      })
+      .join("");
+    debEl.innerHTML = `
+      <div class="reason-meta">
+        <span class="tag ${decisionCls}">${escapeHtml(d.final_decision || "—")}</span>
+        ${d.final_direction ? dirBadge(d.final_direction) : ""}
+        ${flip}
+        <span class="reason-num">conf ${fmtNum(d.confidence, 0)}</span>
+        <span class="reason-num">${d.rounds_used ?? "?"} round(s)</span>
+      </div>
+      ${d.rationale ? `<p class="reason-block reason-block--judge">${escapeHtml(d.rationale)}</p>` : ""}
+      <div class="turns">${turns}</div>`;
+    markStale("debate-stale", d.ts, c.session_date);
+  } else {
+    debEl.innerHTML = `<p class="empty">no debate on record yet</p>`;
+    $("debate-stale").hidden = true;
+  }
+}
+
+function renderTokenMeter(t) {
+  const pct = t.percent;
+  $("tok-pct").textContent = pct == null ? "—" : `${fmtNum(pct, 1)}%`;
+  $("tok-consumed").textContent = fmtNum(t.consumed_tokens, 0);
+  $("tok-budget").textContent = t.budget == null ? "off" : fmtNum(t.budget, 0);
+  $("tok-cost").textContent = fmtNum(t.cost_eur_today, 4);
+  $("tok-calls").textContent = fmtNum(t.calls_today, 0);
+
+  const bar = $("tok-bar");
+  const w = pct == null ? 0 : Math.min(100, Math.max(0, pct));
+  bar.style.width = w + "%";
+  bar.classList.toggle("warn", pct != null && pct > 80 && pct < 100);
+  bar.classList.toggle("over", pct != null && pct >= 100);
 }
 
 function renderConfidence(c) {
@@ -194,13 +289,14 @@ function setConn(ok) {
 // ---- poll loop ----
 async function refresh() {
   try {
-    const [status, cycle, conf, score, trades, lessons] = await Promise.all([
+    const [status, cycle, conf, score, trades, lessons, tokens] = await Promise.all([
       getJSON("/api/status"),
       getJSON("/api/last_cycle"),
       getJSON("/api/confidence"),
       getJSON("/api/score"),
       getJSON("/api/trades"),
       getJSON("/api/lessons"),
+      getJSON("/api/token_usage"),
     ]);
     renderStatus(status);
     renderCycle(cycle);
@@ -208,6 +304,7 @@ async function refresh() {
     renderScore(score);
     renderTrades(trades);
     renderLessons(lessons);
+    renderTokenMeter(tokens);
     $("updated-at").textContent = new Date().toLocaleTimeString();
     setConn(true);
   } catch (err) {
