@@ -56,6 +56,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="executor max-hold minutes so a placed trade closes fast via time-stop (default 1).",
     )
     p.add_argument("--daily-loss-cap", type=float, default=1800.0, help="daily-loss breaker (default 1800).")
+    p.add_argument(
+        "--token-budget", type=int, default=200_000,
+        help="daily LLM token budget — runaway breaker (default 200000 ≈ €0.8/day; 0 → disabled).",
+    )
     return p.parse_args(argv)
 
 
@@ -85,7 +89,12 @@ def main(argv: list[str] | None = None) -> int:
     from scheduler.exceptions import PreflightError  # noqa: E402
     from scripts.wiring import build_scheduler  # noqa: E402
 
-    config = SchedulerConfig(account="demo", daily_loss_cap=args.daily_loss_cap)
+    # ``--token-budget 0`` disables the breaker (→ None); any positive int arms it.
+    config = SchedulerConfig(
+        account="demo",
+        daily_loss_cap=args.daily_loss_cap,
+        daily_token_budget=args.token_budget or None,
+    )
     # Short hold so a placed demo trade closes quickly via the monitor time-stop; the clock sleep is a
     # no-op so the bounded loop runs back-to-back (the executor keeps its own real sleep for monitoring).
     exec_cfg = ExecutionConfig(max_hold_minutes=args.max_hold_min, poll_interval_s=10)

@@ -88,12 +88,20 @@ fail-closed), Datei-Kill-Switch, Tages-Loss-Breaker, Token-Budget, idempotenter 
 zuletzt eine read-mostly Web-UI. **Build-Reihenfolge:** Cleanup → Verify → autonome Candidates →
 Auto-Confirm/Safety → Reconcile → Loop/Daemon → **zuletzt** UI; unter Druck fällt die UI weg, **nie**
 die Safety. Konzept: `docs/concepts/phase8_scheduler_concept.md` (20 gelockte Entscheidungen +
-Modul-Plan). **Stand (2026-06-28): Module 1–12 gebaut + grün — Phase 8 code-complete; offen ist nur
-der Operator-Live-Lauf (`live_test.py` im Fenster) + Doku-Flip auf ✅ + Merge.** Modul 12 = `webui/`
+Modul-Plan). **Stand (2026-06-29): Module 1–12 gebaut + grün; erster Operator-`live_test`-Lauf grün (3/3) —
+aber NUR teilweise live-bewiesen, KEIN ✅-Flip.** **Bewiesen:** Daemon-Lifecycle (Preflight→bounded Loop→sauberer
+Shutdown), State-Persistenz, autonomes echtes P4-Research (Sonnet) mit korrektem Fail-Safe-ABSTAIN (KONSERVATIV,
+Score 45.83<50 → Floor 70 by-design, kein Bug), **Reconcile+Reward-Loop auf 2 realen früheren Demo-Trades**
+(open→close→reward→lesson auf echten Outcomes). **NOCH NICHT bewiesen** (braucht einen Mehr-Zyklen-/Mehr-Tage-Lauf
+in einem nicht-konservativen Fenster): ein netto-neuer autonomer Trade in **einem** sauberen Lauf geöffnet+geschlossen;
+die Safety-Breaker, die **tatsächlich auslösen**; Mehr-Zyklen-Verhalten; Edge/Profit (nie im Scope). **Fix 2026-06-29:**
+das Token-Budget war diesen Lauf deaktiviert (`daily_token_budget=None`) → Default jetzt by-default scharf
+(`200_000` ≈ €0.8/Tag Runaway-Breaker) + Flags (`--no-token-budget`/`--token-budget`); **173 P8-Tests**. Erst nach
+den bewiesenen Punkten Doku-Flip auf ✅ + Merge. Modul 12 = `webui/`
 (FastAPI read-mostly, DB `mode=ro` + Kill/Command-Dateien, Dark-Neumorphism-Dashboard) + reale
 Start/Stop-Pause (neues `scheduler/command.py` + additiver Runner-Command-Poll, konzept §12 „Daemon
-pollt"; `stop`=weiche Pause, KILL=harter Stop). **171 P8-Tests** (146 + 10 command + 2 runner + 13
-webui). Initial-Steps (Step 0 Legacy-grep = sauber/No-Op, Step 0b
+pollt"; `stop`=weiche Pause, KILL=harter Stop). **173 P8-Tests** (171 + 1 Envelope-Regression +
+1 `--no-token-budget`). Initial-Steps (Step 0 Legacy-grep = sauber/No-Op, Step 0b
 Doku-Reconciliation, Step 1 Contract-Verify, Step 2 Scaffold) **erledigt**. Gebaut + getestet (gemockt/
 offline, kein Netz/LLM): `config` · `exceptions` · `clock` · `state` · `killswitch` · `safety`
 (AutoConfirm) · `backoff` · `budget` · `research_tick` · `reconcile` · **`runner`** (die Loop —
@@ -102,7 +110,7 @@ Preflight/run/Shutdown/`request_stop`, Contract A bare `executor.run()`, injizie
 geteilter warmer `ig_demo`-Broker treibt echtes P4-Research, P6-Debatte **und** P7-Reward beide in EINEN
 P5-Executor; 3 Closures `realized_pnl_today`/`pending_reconcile_fn`/`preflight_fn`; harter Demo-Lock) +
 `scheduler/run.py` (`python -m scheduler.run`, SIGTERM→`request_stop`) + `run_scheduler.sh` + offline
-`smoke_test.py` (3/3) + operator `live_test.py`. **171 P8-Tests** (Regression unberührt: P1 52 · P2 62 ·
+`smoke_test.py` (3/3) + operator `live_test.py`. **173 P8-Tests** (Regression unberührt: P1 52 · P2 62 ·
 P4 94 · P5 146 · P6 70 · P7 128). Jedes Scheduler-Modul + `scripts.wiring`/`scheduler.run` ist
 import-isoliert (zieht NONE cross-phase beim Laden — Cross-Phase lazy in den Funktionen).
 **Step-1-Befunde (Code = Wahrheit, ⚠ weichen vom Handover ab — voll in `phase8_scheduler/CLAUDE.md`
@@ -120,9 +128,12 @@ Kill/Command-Dateien; Dark-Neumorphism-Dashboard GitHub-Dark/Monospace/Polling 7
 Control **nur** Datei-Writes → UI-Crash kann Trading nie berühren, Decision 14) **+ reale Start/Stop-
 Pause** (neues `scheduler/command.py` + additiver Runner-Command-Poll, konzept §12 „Daemon pollt":
 `stop`=weiche reversible Pause, KILL=harter Stop; keine Command-Datei ⇒ Loop bit-identisch).
-`fastapi`+`uvicorn` die einzigen neuen Runtime-Deps (nur UI). **Nächstes: Operator-Live-Lauf** im
-Fenster `python phase8_scheduler/scripts/live_test.py` gegen IG-Demo (+ `run_webui.sh`) → erste reale
-autonome Outcomes, dann Doku-Flip auf ✅ + Merge.
+`fastapi`+`uvicorn` die einzigen neuen Runtime-Deps (nur UI). **Nächstes: Operator-Re-Run** von
+`live_test.py` in einem **nicht-konservativen** Fenster (Score ≥ 50 → Floor 55) gegen IG-Demo
+(+ `run_webui.sh`), um einen **netto-neuen autonomen open→close in einem sauberen Lauf** zu fangen +
+die Safety-Breaker auslösen zu sehen (die WARNING „token budget is DISABLED" muss weg sein); **erst
+danach** Doku-Flip auf ✅ + Merge. Detail-Analyse + proven/unproven: `phase8_scheduler/CLAUDE.md`
+→ `## Session stopped — 2026-06-29`.
 
 **Phase 7** bleibt ✅ **live-verifiziert (2026-06-26) + gemerged nach `main`** — der Reward-Loop läuft
 end-to-end live (place → monitor → lag-freie Close-Confirm-P&L → score → reward → lesson); ⚠

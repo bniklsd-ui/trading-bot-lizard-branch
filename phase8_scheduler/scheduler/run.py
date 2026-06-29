@@ -59,8 +59,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--daily-token-budget",
         type=int,
-        default=None,
-        help="daily LLM token budget over the shared meter (default: unset → advisory, never exhausted).",
+        default=200_000,
+        help="daily LLM token budget over the shared meter (default 200000 ≈ €0.8/day runaway breaker). "
+        "Use --no-token-budget to disable (NOT recommended).",
+    )
+    parser.add_argument(
+        "--no-token-budget",
+        action="store_true",
+        help="disable the token budget (sets daily_token_budget=None — a loud WARNING). Discouraged.",
     )
     parser.add_argument(
         "--max-trades",
@@ -93,13 +99,14 @@ def config_from_args(args: argparse.Namespace) -> SchedulerConfig:
     """Build the demo-locked :class:`SchedulerConfig` from parsed CLI args.
 
     ``account`` is hard-set to ``"demo"`` here (the wiring re-checks it and refuses anything else —
-    the structural demo-lock). ``--no-loss-cap`` sets ``daily_loss_cap=None`` (a loud WARNING). Path
-    fields keep their defaults; the wiring rewrites them to the absolute data tree.
+    the structural demo-lock). ``--no-loss-cap`` sets ``daily_loss_cap=None`` and ``--no-token-budget``
+    sets ``daily_token_budget=None`` (each a loud WARNING). Path fields keep their defaults; the wiring
+    rewrites them to the absolute data tree.
     """
     return SchedulerConfig(
         account="demo",
         daily_loss_cap=None if args.no_loss_cap else args.daily_loss_cap,
-        daily_token_budget=args.daily_token_budget,
+        daily_token_budget=None if args.no_token_budget else args.daily_token_budget,
         max_trades_per_day=args.max_trades,
         cycle_interval_min=args.cycle_interval_min,
         max_consecutive_failures=args.max_consecutive_failures,

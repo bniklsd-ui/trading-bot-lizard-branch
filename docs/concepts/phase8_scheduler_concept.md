@@ -241,7 +241,13 @@ class SchedulerConfig:
     backoff_base_s: float = 30.0
     backoff_cap_s: float = 600.0
     # Budget
-    daily_token_budget: int | None = None
+    daily_token_budget: int | None = 200_000  # ⟳ 2026-06-29 (Code=Wahrheit): Default war None
+                                               # (Breaker aus). Nach dem ersten Live-Lauf bewusst auf
+                                               # 200_000 geflippt (Operator-Entscheidung): ein v1-
+                                               # Runaway-Breaker ≈ €0.8/Tag (Sonnet-Research-Rate, die
+                                               # eine Endlosschleife dominiert) — by-default scharf,
+                                               # damit der Daemon kosten-sicher ist, auch wenn der Flag
+                                               # vergessen wird. None = explizit deaktiviert.
     # Reconcile
     reconcile_interval_min: int = 15
     # Pfade
@@ -488,6 +494,11 @@ class TokenBudget:
 
 - Reuse `token_meter` / `llm_usage.json` (P4/P6). `daily_token_budget=None` → nie erschöpft
   (+ WARNING). Tagesgrenze Europe/Berlin konsistent mit `state`-Rollover.
+  ⟳ **2026-06-29 (Code=Wahrheit):** Der Default ist jetzt `200_000` (≈ €0.8/Tag Runaway-Breaker,
+  scharf by-default) statt `None`; `None` bleibt als **expliziter** Deaktivierungs-Sentinel
+  (`--no-token-budget` in `scheduler/run.py`, `--token-budget 0` in `live_test.py`). Grund: der
+  erste Live-Lauf (2026-06-29) lief mit deaktiviertem Budget → der Breaker soll nicht erst per
+  vergessenem Flag scharf werden.
 - Tests (≥3): unter Budget → False; über → True; None → False + WARNING.
 
 > **⟳ Angepasst 2026-06-28 (Modul 7 `budget.py` gebaut, Code = Source of Truth) — vier

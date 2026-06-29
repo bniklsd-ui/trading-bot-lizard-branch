@@ -35,8 +35,8 @@ def test_defaults_match_locked_concept_values() -> None:
     assert cfg.backoff_base_s == 30.0
     assert cfg.backoff_cap_s == 600.0
 
-    # budget
-    assert cfg.daily_token_budget is None
+    # budget — armed by default (v1 runaway breaker ≈ €0.8/day); None ⇒ explicitly disabled
+    assert cfg.daily_token_budget == 200_000
 
     # reconcile
     assert cfg.reconcile_interval_min == 15

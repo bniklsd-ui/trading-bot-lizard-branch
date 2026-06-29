@@ -17,7 +17,8 @@ def test_defaults() -> None:
     args = parse_args([])
     assert args.daily_loss_cap == 1800.0
     assert args.no_loss_cap is False
-    assert args.daily_token_budget is None
+    assert args.daily_token_budget == 200_000   # armed by default (runaway breaker ≈ €0.8/day)
+    assert args.no_token_budget is False
     assert args.max_trades == 5
     assert args.cycle_interval_min == 5
     assert args.max_consecutive_failures == 3
@@ -48,7 +49,7 @@ def test_config_from_args_is_demo_locked_with_caps() -> None:
     assert isinstance(cfg, SchedulerConfig)
     assert cfg.account == "demo"                 # hard demo-lock, regardless of args
     assert cfg.daily_loss_cap == 1800.0
-    assert cfg.daily_token_budget is None
+    assert cfg.daily_token_budget == 200_000     # armed by default
     assert cfg.max_trades_per_day == 5
     assert cfg.cycle_interval_min == 5
     assert cfg.max_consecutive_failures == 3
@@ -67,6 +68,11 @@ def test_config_from_args_threads_overrides() -> None:
 def test_no_loss_cap_disables_breaker() -> None:
     cfg = config_from_args(parse_args(["--no-loss-cap"]))
     assert cfg.daily_loss_cap is None            # breaker disabled (loud WARNING at construction)
+
+
+def test_no_token_budget_disables_breaker() -> None:
+    cfg = config_from_args(parse_args(["--no-token-budget"]))
+    assert cfg.daily_token_budget is None        # token budget disabled (loud WARNING in budget.py)
 
 
 def test_help_exits_zero() -> None:

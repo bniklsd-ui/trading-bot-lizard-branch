@@ -32,9 +32,12 @@ Wer hier ein LLM „entscheiden/sizen/timen/vetoen" lassen will → **stop**, da
 ## Build-Reihenfolge (verbindlich)
 Cleanup → Verify → **autonome Candidates** → Auto-Confirm/Safety → Reconcile →
 Loop/Daemon → **zuletzt** Web-UI. Unter Zeit-/Token-Druck fällt die UI weg, **nie** die
-Safety. **Stand 2026-06-28: Module 1–12 gebaut + grün — Phase 8 code-complete.** Modul 12
-(Web-UI + reale Start/Stop-Pause) ist die letzte Einheit; offen ist nur der Operator-Live-Lauf
-(`live_test.py` im Handelsfenster) + Doku-Flip auf ✅ + Merge.
+Safety. **Stand 2026-06-29: Module 1–12 gebaut + grün — Phase 8 code-complete; erster
+Operator-`live_test`-Lauf grün (3/3), aber NUR teilweise live-bewiesen** (s. `## Session
+stopped — 2026-06-29`). **Kein Doku-Flip auf ✅** — es fehlt ein echter Mehr-Zyklen-/Mehr-Tage-
+Lauf, der (a) einen netto-neuen autonomen Trade in **einem** sauberen Lauf öffnet+schließt und
+(b) die Safety-Breaker tatsächlich auslösen sieht. **Token-Budget jetzt by-default scharf**
+(Default `200_000` ≈ €0.8/Tag; vorher `None`/aus).
 
 ## Harte Regeln (nicht verhandelbar)
 - **Demo-only strukturell, fail-closed.** Auto-Confirm gibt `True` **nur** bei: `account
@@ -239,6 +242,71 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 - **Offen:** Operator-`live_test.py`-Re-Run gegen IG-Demo (der Preflight passiert jetzt den
   Broker-Connect). Erwartung unverändert (sauberer Stop + State + CLOSED-Trade `reward_pts` **oder**
   valider No-Trade-Lauf).
+
+---
+
+## Session stopped — 2026-06-29 (erster grüner `live_test`-Lauf — Analyse + Token-Budget scharf)
+
+> **Auslöser:** der Nikinger hat `live_test.py --iterations 2 --max-hold-min 1 --daily-loss-cap 1800`
+> gegen IG-Demo gelaufen → **RESULT 3/3 passed**. Analyse-Auftrag: „Problem? Wenn ja, Fix-Plan."
+> **Befund: kein Bug.** Die 3/3 sind echt. Aber der Lauf hat die Mission **nur teilweise** bewiesen
+> (Research hat beide Zyklen abstained) + er deckte eine deaktivierte Safety-Kappe auf.
+
+### Analyse (Code = Source of Truth)
+- **3/3 PASS ist by-design, kein maskierter Fail.** `live_test.py` (Docstring Z. 9–16) ist bewusst
+  lenient: ein sauberer No-Order-Lauf (Abstain/VETO/Cap/ruhig) ist ein **valider PASS** (P5/6/7-Disziplin).
+- **Warum Research beide Zyklen abstained:** der echte P4-Call (`claude-sonnet-4-6`) lief korrekt, aber
+  der Markt-Score war `45.83 < 50` → KONSERVATIV → `candidate_filter.confidence_threshold` zog den
+  **strengeren Floor 70.0** (statt Default 55.0, `research/models.py:327-329`). Der LLM-Self-Report blieb
+  drunter → Abstain. **Risk-Management-Clamp by-design, kein Defekt.** Floor **nicht** gesenkt (Out of
+  scope: P4 markiert ihn als provisorisch, P7-outcome-anchored ersetzt ihn).
+- **Der Reward-Loop wurde DOCH auf echten Daten geübt:** der Reconcile-Pass löste **2 reale** frühere
+  Demo-Trades auf (`DIAAAAXTGBTEYAC`, `DIAAAAXTGMAF2A9`) — IG-History geholt, P&L nachgezogen, echte
+  Haiku-Lessons extrahiert. open→close→reward→lesson ist damit auf realen Outcomes live-bewiesen.
+
+### Completed (Fix — rein in `phase8_scheduler/`, additiv)
+- **Token-Budget by-default scharf** (der Nikinger: „real cap + flag, $0.75–€1/Tag max").
+  `scheduler/config.py`: `daily_token_budget` Default `None` → **`200_000`** (≈ €0.82/Tag bei der
+  Sonnet-Research-Rate ~1700 Tok ≈ $0.0075/Call, die einen Runaway dominiert → ~227K Tok/$;
+  Cache-Reads werden voll gezählt → der Breaker trippt **vor** €1, nie danach). `None` bleibt als
+  **expliziter** Deaktivierungs-Sentinel.
+- **Flags:** `scheduler/run.py` `--daily-token-budget` Default `None`→`200_000` + neues
+  `--no-token-budget` (spiegelt `--no-loss-cap`); `scripts/live_test.py` neues `--token-budget`
+  (Default `200_000`, `0` → deaktiviert). Beide threaden in `SchedulerConfig`.
+- **Tests (in-phase):** `test_run.py` Defaults `200_000` + neuer `test_no_token_budget_disables_breaker`;
+  `test_config.py` Default `200_000`. **→ 173 passed** (172 + 1).
+- **Doku:** Konzept §1 (Z. 244) + §7 (Z. 495) dated annotiert; root `CLAUDE.md` Phase-8-Block ehrlich
+  (proven/unproven, kein ✅-Flip).
+
+### Verifiziert (gemockt / offline — Live = Operator)
+- `pytest phase8_scheduler/tests -q` → **173 passed**. `python -m scheduler.run --help` + `live_test.py
+  --help` exit 0, zeigen die neuen Defaults. Mit Default-Config feuert die „token budget is DISABLED"-
+  WARNING **nicht** mehr. Regression unberührt (Edit nur in `phase8_scheduler/`).
+
+### Was der 2026-06-29-Lauf BEWIESEN hat
+- ✅ Daemon-Lifecycle: Preflight → bounded Loop → sauberer Shutdown (keine Exception/Orphan).
+- ✅ State-Persistenz (`scheduler_state.json`, alle Felder).
+- ✅ Autonomes echtes P4-Research lief (Sonnet) + korrekter Fail-Safe-ABSTAIN im KONSERVATIV-Regime.
+- ✅ Reconcile + Reward-Loop auf **realen** früheren Demo-Trades (2 aufgelöst, echte Haiku-Lessons).
+
+### NOCH NICHT bewiesen (braucht einen echten Mehr-Zyklen-/Mehr-Tage-Lauf)
+- ❌ Ein **netto-neuer** autonomer Trade, in **einem** sauberen Lauf geöffnet **und** geschlossen
+  (Research abstained beide Zyklen → der Auto-Confirm-/Order-Pfad aus einem frischen autonomen
+  Candidate wurde diesen Lauf **nicht** end-to-end beobachtet; er geschah nur über frühere Läufe,
+  sichtbar als die 2 reconciled Trades).
+- ❌ Die Safety-Breaker, die **tatsächlich auslösen** (kein Verlust eingetreten; Budget war diesen Lauf
+  aus — jetzt scharf, aber das Auslösen ist weiterhin live-unverifiziert).
+- ❌ Mehr-Zyklen-Verhalten über ein volles Handelsfenster / mehrere Tage (nur 2 bounded Zyklen).
+- ❌ Edge / Profitabilität (nie im Scope — Langzeit-Live-Betrieb).
+
+### Next
+- **Operator:** `live_test.py` in einem **nicht-konservativen** Fenster (Score ≥ 50 → Floor 55) erneut
+  laufen, um einen netto-neuen autonomen open→close zu fangen; ggf. ein längerer Mehr-Zyklen-Lauf.
+  WARNING „token budget is DISABLED" muss weg sein.
+- **Erst danach** Doku-Flip auf ✅ (ROADMAP/README) + Merge `phase8-scheduler` → `main`. Gated auf die
+  4 unbewiesenen Punkte.
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
+  Note-Update" im selben Commit.
 
 ---
 
