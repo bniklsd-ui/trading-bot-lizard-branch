@@ -51,6 +51,88 @@ function shortEpic(e) {
   return parts.length > 2 ? parts.slice(1, 3).join(".") : e;
 }
 
+// ---- motion infrastructure (all fail-soft; honors prefers-reduced-motion) ----
+const REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+const _odo = {};        // id -> Odometer instance
+const _odoLast = {};    // id -> last numeric value
+
+function flashTick(el) {
+  if (REDUCED || !el) return;
+  el.classList.remove("flash-tick");
+  void el.offsetWidth; // restart the animation
+  el.classList.add("flash-tick");
+}
+
+// route a headline number through the vendored odometer (rolling digits), with a
+// glow flash on change. Falls back to plain text if Odometer didn't load. Never throws.
+function setNum(id, value, dp) {
+  const el = $(id);
+  if (!el) return;
+  dp = dp || 0;
+  const finite = value !== null && value !== undefined && value !== "" && !Number.isNaN(Number(value));
+  if (!finite) {
+    el.textContent = "–";
+    el.dataset.odoBroken = "1";
+    _odoLast[id] = undefined;
+    return;
+  }
+  const n = Number(value);
+  const changed = _odoLast[id] !== undefined && _odoLast[id] !== n;
+  try {
+    if (window.Odometer) {
+      const fmt = dp > 0 ? "(,ddd)." + "d".repeat(dp) : "(,ddd)";
+      if (!_odo[id] || el.dataset.odoBroken) {
+        el.textContent = "";
+        _odo[id] = new window.Odometer({ el, value: n, format: fmt, theme: "minimal", duration: 900 });
+        delete el.dataset.odoBroken;
+      } else {
+        _odo[id].update(n);
+      }
+    } else {
+      el.textContent = n.toLocaleString([], { minimumFractionDigits: dp, maximumFractionDigits: dp });
+    }
+  } catch (_e) {
+    el.textContent = n.toFixed(dp); // last-resort, UI never breaks
+  }
+  if (changed) flashTick(el);
+  _odoLast[id] = n;
+}
+
+// P&L can be negative and odometer 0.4.8 drops the minus sign (a loss would read as a gain),
+// so signed values get a custom count-up tween that keeps the +/- via fmtSigned. Fail-soft.
+function tweenSigned(id, to) {
+  const el = $(id);
+  if (!el) return;
+  const finite = to !== null && to !== undefined && to !== "" && !Number.isNaN(Number(to));
+  if (!finite) { el.textContent = "–"; _odoLast[id] = undefined; return; }
+  const target = Number(to);
+  const prev = _odoLast[id];
+  const changed = prev !== undefined && prev !== target;
+  if (REDUCED || prev === undefined || !changed) {
+    el.textContent = fmtSigned(target);
+  } else {
+    const from = prev, dur = 700, t0 = performance.now();
+    (function step(now) {
+      const k = Math.min(1, (now - t0) / dur);
+      el.textContent = fmtSigned(from + (target - from) * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+  if (changed) flashTick(el);
+  _odoLast[id] = target;
+}
+
+// only rebuild a heavy section's DOM when its payload actually changed — saves work and,
+// crucially, stops the 7s poll from collapsing any debate <details> the user opened.
+const _lastJSON = {};
+function renderIfChanged(key, data, fn) {
+  const s = JSON.stringify(data);
+  if (_lastJSON[key] === s) return false;
+  _lastJSON[key] = s;
+  fn(data);
+  return true;
+}
+
 // ---- renderers ----
 function renderStatus(s) {
   const map = { RUNNING: "running", PAUSED: "paused", HALTED: "halted" };
@@ -60,14 +142,14 @@ function renderStatus(s) {
   $("state-label").textContent = s.running_state || "—";
 
   $("phase-tag").textContent = s.phase || "—";
-  $("trades-today").textContent = s.trades_today ?? "–";
+  setNum("trades-today", s.trades_today, 0);
   $("trades-cap").textContent = s.max_trades_per_day ?? "–";
   $("fails").textContent = s.consecutive_failures ?? "–";
   $("fails-max").textContent = s.max_consecutive_failures ?? "–";
   $("session-date").textContent = s.session_date || "–";
 
   const pnl = $("pnl-today");
-  pnl.textContent = fmtSigned(s.realized_pnl_today);
+  tweenSigned("pnl-today", s.realized_pnl_today);
   pnl.classList.toggle("pos", Number(s.realized_pnl_today) > 0);
   pnl.classList.toggle("neg", Number(s.realized_pnl_today) < 0);
 
@@ -175,9 +257,9 @@ function renderCycle(c) {
 function renderTokenMeter(t) {
   const pct = t.percent;
   $("tok-pct").textContent = pct == null ? "—" : `${fmtNum(pct, 1)}%`;
-  $("tok-consumed").textContent = fmtNum(t.consumed_tokens, 0);
+  setNum("tok-consumed", t.consumed_tokens, 0);
   $("tok-budget").textContent = t.budget == null ? "off" : fmtNum(t.budget, 0);
-  $("tok-cost").textContent = fmtNum(t.cost_eur_today, 4);
+  setNum("tok-cost", t.cost_eur_today, 4);
   $("tok-calls").textContent = fmtNum(t.calls_today, 0);
 
   const bar = $("tok-bar");
@@ -193,6 +275,15 @@ function renderConfidence(c) {
   tag.textContent = state;
   tag.className = "tag " + ({ OK: "is-ok", INSUFFICIENT: "is-insufficient" }[state] || "is-unavailable");
   $("conf-n").textContent = `${c.n ?? "–"} / ${c.n_min ?? "–"}`;
+
+  // dial: n / n_min progress arc + center count (circumference of r=15.5 ≈ 97.4)
+  const n = Number(c.n), nmin = Number(c.n_min);
+  const frac = nmin > 0 && Number.isFinite(n) ? Math.max(0, Math.min(1, n / nmin)) : 0;
+  const arc = $("dial-arc");
+  if (arc) arc.style.strokeDashoffset = String((97.4 * (1 - frac)).toFixed(2));
+  $("dial-n").textContent = Number.isFinite(n) ? n : "–";
+  $("conf-dial").setAttribute("class",
+    "conf-dial " + ({ OK: "is-ok", INSUFFICIENT: "" }[state] || "is-unavailable"));
   $("conf-val").textContent = c.confidence_value === null || c.confidence_value === undefined ? "–" : fmtNum(c.confidence_value, 1);
   $("conf-wilson").textContent = fmtNum(c.win_rate_wilson_lb, 3);
   $("conf-exp").textContent = fmtNum(c.expectancy_r, 2);
@@ -204,7 +295,7 @@ function renderScore(rows) {
   const svg = $("spark");
   const empty = $("spark-empty");
   const pts = rows.map((r) => Number(r.score_after)).filter((v) => !Number.isNaN(v));
-  $("score-now").textContent = pts.length ? fmtNum(pts[pts.length - 1], 1) : "—";
+  setNum("score-now", pts.length ? pts[pts.length - 1] : null, 1);
 
   if (pts.length < 2) {
     svg.innerHTML = "";
@@ -226,13 +317,21 @@ function renderScore(rows) {
   svg.innerHTML = `
     <defs>
       <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#3fb950" stop-opacity="0.35"/>
-        <stop offset="100%" stop-color="#3fb950" stop-opacity="0"/>
+        <stop offset="0%" stop-color="#e6a24c" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#e6a24c" stop-opacity="0"/>
       </linearGradient>
     </defs>
     <path class="spark-area" d="${area}"/>
     <path class="spark-line" d="${line}"/>
     <circle class="spark-dot" cx="${lastX}" cy="${lastY}" r="3.5"/>`;
+
+  // draw-on the needle (renderScore is change-gated, so this only fires on real new data)
+  if (!REDUCED) { svg.classList.remove("is-fresh"); void svg.offsetWidth; svg.classList.add("is-fresh"); }
+}
+
+let _prevTradeKeys = null; // null until first render, so the first paint doesn't animate every row
+function tradeKey(t) {
+  return `${t.deal_id || ""}|${t.open_ts || ""}|${t.direction || ""}|${t.open_level ?? ""}`;
 }
 
 function renderTrades(rows) {
@@ -240,6 +339,7 @@ function renderTrades(rows) {
   const body = $("trades-body");
   if (!rows.length) {
     body.innerHTML = `<tr><td colspan="8" class="empty">no trades yet</td></tr>`;
+    _prevTradeKeys = new Set();
     return;
   }
   body.innerHTML = rows
@@ -249,7 +349,7 @@ function renderTrades(rows) {
       const pl = t.profit_loss;
       const plCls = pl > 0 ? "pos" : pl < 0 ? "neg" : "";
       const stCls = "st--" + String(t.status || "").toLowerCase();
-      return `<tr>
+      return `<tr data-key="${escapeHtml(tradeKey(t))}">
         <td>${fmtTs(t.open_ts)}</td>
         <td class="${dirCls}">${dir || "–"}</td>
         <td title="${t.epic || ""}">${shortEpic(t.epic)}</td>
@@ -261,6 +361,15 @@ function renderTrades(rows) {
       </tr>`;
     })
     .join("");
+
+  // highlight rows that are new since the last render (skip the very first paint)
+  const keys = new Set(rows.map(tradeKey));
+  if (_prevTradeKeys && !REDUCED) {
+    body.querySelectorAll("tr[data-key]").forEach((tr) => {
+      if (!_prevTradeKeys.has(tr.getAttribute("data-key"))) tr.classList.add("row-new");
+    });
+  }
+  _prevTradeKeys = keys;
 }
 
 function renderLessons(rows) {
@@ -305,13 +414,16 @@ async function refresh() {
       getJSON("/api/token_usage"),
     ]);
     renderStatus(status);
-    renderCycle(cycle);
     renderConfidence(conf);
-    renderScore(score);
-    renderTrades(trades);
-    renderLessons(lessons);
     renderTokenMeter(tokens);
-    $("updated-at").textContent = new Date().toLocaleTimeString();
+    // heavy DOM rebuilds only when their payload changed (also preserves open <details>)
+    renderIfChanged("cycle", cycle, renderCycle);
+    renderIfChanged("score", score, renderScore);
+    renderIfChanged("trades", trades, renderTrades);
+    renderIfChanged("lessons", lessons, renderLessons);
+    const u = $("updated-at");
+    u.textContent = new Date().toLocaleTimeString();
+    if (!REDUCED) { u.classList.remove("pip"); void u.offsetWidth; u.classList.add("pip"); }
     setConn(true);
   } catch (err) {
     setConn(false);
@@ -322,7 +434,7 @@ async function refresh() {
 function flash(msg, isErr) {
   const el = $("control-msg");
   el.textContent = msg;
-  el.style.color = isErr ? "var(--red)" : "var(--cyan)";
+  el.style.color = isErr ? "var(--red)" : "var(--amber)";
 }
 
 async function control(action) {

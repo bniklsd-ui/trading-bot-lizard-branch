@@ -391,6 +391,127 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## UI-Overhaul Runde 2 — 2026-06-29 (Leder-Dash-Cockpit: Textur + Instrumente + Motion)
+
+> **Auslöser:** der Nikinger mochte Runde 1 („def the right decision") und wollte weiter: (1) ein
+> **stoff-/lederartiger** Hintergrund, (2) die einzelnen UI-Elemente als **Instrumente** lesen (etwas
+> Varianz erlaubt), (3) **kleine Libs erlaubt**, wenn sie helfen — „decent, yet unique", (4) **kleine
+> statische Animationen** + Animationen beim Renew/Render + Button-Press. Gelockte Operator-
+> Entscheidungen (AskUserQuestion): **odometer.js vendoren** (rollende Cockpit-Ziffern) · **Refined**
+> (nicht Pronounced). Weiter **UI-only, file/DB read-only, fail-soft** — kein Trading-/Scheduler-/
+> Safety-Modul berührt, `webui/api.py` unverändert. **Design-Skill** `redesign-existing-projects`
+> invoked.
+
+### Completed (alle in `webui/static/`, additiv)
+- **NEU `webui/static/vendor/odometer.min.js` + `odometer-theme.css`** — odometer 0.4.8 (MIT)
+  **lokal vendored** (offline-safe, **kein Runtime-CDN**; einmal beim Build via cdnjs geholt). Theme =
+  **minimal** (clean, erbt unsere Mono + `currentColor`); die **car**-Variante wurde **verworfen**, weil
+  sie ein `@import` auf Google Fonts trägt → das hätte die Offline-Garantie gebrochen. Geladen **vor**
+  `app.js` (sonst `window.Odometer` undefined). Rollgeschwindigkeit in `style.css` auf 0.9s gedrosselt
+  (Theme-Default 2s).
+- **`style.css` — Leder-Dash:** `body`-Background = warmer Hide-Ton-Gradient + Edge-Vignette + die
+  Ambient-Amber/Steel-Radials; `.grain` von vertikalem Brushing auf **fine-leather Pebble** (inline
+  `feTurbulence` SVG-Data-URI, **kein** Asset-File, opacity 0.09, blend overlay). `background-attachment:
+  fixed`. **Stitch-Naht:** ein faint amber gestricheltes `::after`-Seam unter der Topbar.
+- **`style.css` — Instrumente (Varianz, thin bezels auf den drei Signatur-Stücken):**
+  · **SCORE** = gerahmtes Instrument (machined Bezel-Ring + Glass-Glare-`::before`; Amber-Nadel mit Glow);
+    Draw-on (`stroke-dasharray`) nur bei echtem Daten-Change.
+  · **TOKEN METER** = Fuel-Gauge (`.meter-ticks` Tick-Marks + `.meter-redline` schraffierte 80→100%-
+    Gefahrenzone; Bar eased width 0.7s; Normal steel-blue / warn amber / over rot unverändert).
+  · **CONFIDENCE** = kleines **Dial** (inline-SVG Radial-Arc `n/n_min`, Mitte = n; Farbe via Klasse
+    is-ok grün / INSUFFICIENT amber / unavailable dim) im Card-Head → **keine** Extra-Höhe.
+  · Andere Karten bleiben clean Brushed-Metal (Refined, nicht über-instrumentiert).
+- **`app.js` — Motion-Infrastruktur (alles fail-soft + `prefers-reduced-motion`-aware):**
+  · **`setNum(id,val,dp)`** routet die Headline-Zahlen (trades-today, tokens, cost, score-now) durch den
+    Odometer (rollende Ziffern) + Glow-`flash-tick` bei Change; **Fallback** `textContent`, wenn
+    `window.Odometer` fehlt → UI bricht nie. **P&L NICHT über Odometer:** odometer 0.4.8 **verschluckt das
+    Minus** (live verifiziert: `-41.16` → „41.16" — ein Verlust läse sich als Gewinn!) → eigener
+    **`tweenSigned()`** rAF-Count-up mit `fmtSigned` (+/- korrekt).
+  · **Change-Gating** (`renderIfChanged`, JSON-Vergleich pro Sektion) für cycle/score/trades/lessons →
+    rebaut DOM nur bei echtem Change. **Fixt einen echten Bug:** der 7-s-Poll baute die LAST-CYCLE-Karte
+    jedes Mal neu und **klappte jedes vom User geöffnete Debate-`<details>` wieder zu** — jetzt nicht mehr.
+  · **Renew-Animationen:** Tick-Flash bei Wert-Change, Score-Draw-on, Confidence-Dial-Arc-Tween,
+    **neue Trades-Zeile** (`row-new` Amber-Sweep, erste Paint-Runde ausgenommen), `updated`-Pip-Blink.
+  · **Idle:** Brand-Mark Amber-Glow „breathe" (4.6s). **Button-Press:** Glow-Ripple `::after` + der
+    bestehende Inset/translateY; Success-`flash()` `--cyan`→**`--amber`** gefixt.
+  · Alle Runde-2-Animationen unter `@media (prefers-reduced-motion: reduce)` deaktiviert (CSS + JS-Guards).
+
+### Verifiziert (gemockt/offline + visuell — kein Netz/LLM/Broker; UI importiert den Trader nie)
+- `node --check app.js` clean; grep: **0** alte Palette-/`--cyan`-Reste.
+- `pytest phase8_scheduler/tests -q` → **181 passed** (test_webui prüft API + index→app.js/style.css;
+  die zusätzlichen Vendor-`<link>/<script>` brechen nichts).
+- **Visuell** auf throwaway **:8011** (Operator-Port unberührt) via agent-browser @1920×1080: Leder-Dash
+  + Stitch + die drei Instrument-Treatments + Fuel-Gauge-Ticks/Redline sichtbar; `GET /vendor/*` → **200**
+  (lokal, kein CDN); **Konsole fehlerfrei**; `window.Odometer===true`; P&L = `+0.00` (Tween, Minus
+  korrekt); Odometer-negativ-Bug **vor** dem Fix reproduziert + **nach** dem Fix (tweenSigned) erledigt.
+- **Regression** logisch unberührt (CSS/HTML/JS-only; api.py/Trader nicht angefasst).
+
+### Grenzen / Next
+- **Operator:** im laufenden Setup nur **Browser hart neu laden** (Static + ein neues Vendor-Verzeichnis;
+  **kein** Daemon-/API-Neustart nötig).
+- **Static-Screenshots zeigen keine Bewegung** — die Motion (Odometer-Roll, Tweens, Draw-on, Ripple,
+  Breathe) ist verdrahtet + fehlerfrei, aber im PNG nicht sichtbar; live im Browser sichtbar.
+- Mission unverändert: netto-neuer autonomer open→close + auslösende Safety-Breaker gaten den ✅-Flip +
+  Merge — **nicht** das UI.
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
+  Note-Update" im selben Commit. **Neu im Repo:** `webui/static/vendor/` (zwei vendored Dateien).
+
+---
+
+## UI-Overhaul — 2026-06-29 („Mechanics Overhaul": Warm-Metal-Cockpit-Reskin + 16:9-Layout)
+
+> **Auslöser:** der Nikinger ließ Daemon + UI laufen und wollte — während ein echter Demo-Trade
+> reift — einen **visuellen** Overhaul: (1) das aus dem Konzept kopierte GitHub-Dark-Farbschema
+> raus, rein ein **polierter, weicher Metall-Look** wie ein 2015+-BMW-Cockpit; (2) **16:9 oder
+> breiter** statt der hohen ~1440px-Spalte. **Reskin + Re-Flow, KEIN Redesign** (die Karten +
+> Neumorphism gefielen). **UI-only, file/DB read-only** — kein Trading-/Scheduler-/Safety-Modul
+> berührt, `webui/api.py` unverändert. Zwei gelockte Operator-Entscheidungen (AskUserQuestion):
+> **Ambient-Akzent = Amber / warm metal**; **Layout = Repack auf Instrument-Cluster (~1800px)**.
+> Design-Skill `redesign-existing-projects` invoked (Projekt-Konvention).
+
+### Completed (alle in `webui/static/`, additiv)
+- **`style.css` — Palette-Swap (`:root`) „Gunmetal + Amber":** warm-graphite Canvas (`--bg
+  #16151a`), brushed-panel Surfaces (`--surface #1d1c21` + neuer `--panel`-Gradient), warm-Alu
+  Text (`--text #d8d2c8`/`--muted`/`--dim` in **einer** warmen Grau-Familie), **ein** Ambient-
+  Akzent `--amber #e6a24c` (Brand-Mark, Tags, Score-„Nadel"-Sparkline, Focus, Control-Msg, Table-
+  Hover), `--blue` → Steel-Blue **nur** als Sekundär-Info (Token-Meter-Normalbalken). Profit-Grün/
+  Loss-Rot **behalten**, nur metall-weicher (`#6bbf8a`/`#e0685f`). Alle früher hardcodeten
+  GitHub-Dark-rgba-Glows mit-umgefärbt (Body-Radials, Brand-Glow, Pulse, Kill-Banner, Meter-,
+  Spark-Drop-Shadows). `--cyan` = Legacy-Alias auf neutrales Silber (kein zweiter Akzent).
+- **`style.css` — Metall-Politur (weich, nicht überzogen):** `.card` bekommt den `--panel`-Sheen
+  (Top→Bottom) + 1px Inner-Top-Highlight (`inset 0 1px 0 rgba(255,255,255,.045)` = Chrome-Kante)
+  über dem bestehenden `--rise`-Neumorphism; `.grain` von horizontalen auf **vertikale** Brushed-
+  Striation gedreht (opacity 0.05).
+- **`style.css` — Layout (CSS-only, kein HTML-Strukturwechsel):** `.grid` max-width **1440 → 1800px**;
+  12-Col via `order:` umgeordnet in einen **Landscape-Instrument-Cluster**: Reihe 1 Gauge-Band
+  STATUS·CONTROL·CONFIDENCE·TOKENS (je `span 3`, vier gleiche Viertel), Reihe 2 SCORE·TRADES (je
+  `span 6`), Reihe 3 LAST-CYCLE(`7`)·LESSONS(`5`). `.status-stats` von 1×4 auf **2×2** (gauge-artig,
+  füllt die durch `align-items:stretch` entstehende Höhe → keine tote Fläche, CLEAR-KILL bricht
+  nicht mehr um). Neuer Zwischen-Breakpoint **`max-width:1320px`** (Band → 2-across, Panels → full)
+  vor der bestehenden 900px-Full-Stack-Regel.
+- **`app.js` — eine Farb-Literal-Änderung:** das inline-SVG `spark-grad` stop-color `#3fb950` →
+  `#e6a24c` (die einzige Farbe, die keine CSS-Var liest). Sonst **nichts** an `app.js`.
+- **`screenshots/dashboard.png`** auf den neuen Look aktualisiert.
+
+### Verifiziert (gemockt/offline + visuell — kein Netz/LLM/Broker; UI importiert den Trader nie)
+- `node --check app.js` clean; grep auf alle alten Palette-Literale = **0** Rest.
+- `pytest phase8_scheduler/tests -q` → **181 passed** (UI-Tests prüfen API + dass index app.js/
+  style.css referenziert, **nicht** CSS-Inhalt → unberührt). Regression logisch unberührt
+  (CSS/HTML-only).
+- **Visuell** gegen die echte `data/state/` auf separatem Port **:8011** (Operator-Port unberührt)
+  via agent-browser bei **1920×1080**: Gauge-Band + Score/Trades liegen above-the-fold (echtes
+  16:9-At-a-Glance), Amber-Cockpit-Palette kohärent, kein Umbruch, Sparkline = glühende Amber-Nadel.
+
+### Grenzen / Next (unverändert)
+- **Operator:** im laufenden Setup nur **Browser hart neu laden** (Static-Reskin, kein Daemon-/API-
+  Neustart nötig — nur `webui/static/*` + ein `app.js`-Literal geändert).
+- Mission unberührt: der **netto-neue autonome open→close** + auslösende Safety-Breaker stehen
+  weiter aus (gaten den ✅-Doku-Flip + Merge — **nicht** das UI).
+- **Commit:** committet, **falls** der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒
+  Note-Update" im selben Commit.
+
+---
+
 ## Session stopped — 2026-06-28 (Modul 12: `webui/` Web-UI + reale Start/Stop-Pause — **Phase 8 code-complete**)
 
 > Operator-Notiz: der `smoke_test` war erfolgreich; der `live_test` wartet aufs Handelsfenster.

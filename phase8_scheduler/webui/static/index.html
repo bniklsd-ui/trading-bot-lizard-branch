@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="dark" />
   <title>scheduler · dashboard</title>
+  <link rel="stylesheet" href="/vendor/odometer-theme.css" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -42,11 +43,11 @@
       <div class="status-stats">
         <div class="stat">
           <span class="stat-label">trades today</span>
-          <span class="stat-value"><span id="trades-today">–</span><span class="stat-sub">/<span id="trades-cap">–</span></span></span>
+          <span class="stat-value"><span id="trades-today" class="odo">0</span><span class="stat-sub">/<span id="trades-cap">–</span></span></span>
         </div>
         <div class="stat">
           <span class="stat-label">realized p&amp;l</span>
-          <span id="pnl-today" class="stat-value mono-num">–</span>
+          <span id="pnl-today" class="stat-value mono-num">+0.00</span>
         </div>
         <div class="stat">
           <span class="stat-label">failures</span>
@@ -82,7 +83,7 @@
     <section class="card card--score" aria-labelledby="h-score">
       <div class="card-head">
         <h2 id="h-score">SCORE</h2>
-        <span id="score-now" class="tag tag--accent">—</span>
+        <span class="tag tag--accent"><span id="score-now" class="odo">0</span></span>
       </div>
       <div class="spark-well">
         <svg id="spark" class="spark" viewBox="0 0 600 140" preserveAspectRatio="none" aria-hidden="true"></svg>
@@ -94,7 +95,14 @@
     <section class="card card--conf" aria-labelledby="h-conf">
       <div class="card-head">
         <h2 id="h-conf">CONFIDENCE</h2>
-        <span id="conf-state" class="tag">—</span>
+        <div class="head-instruments">
+          <svg id="conf-dial" class="conf-dial" viewBox="0 0 40 40" aria-hidden="true">
+            <circle class="dial-bg" cx="20" cy="20" r="15.5"></circle>
+            <circle id="dial-arc" class="dial-arc" cx="20" cy="20" r="15.5"></circle>
+            <text id="dial-n" class="dial-n" x="20" y="21" text-anchor="middle">0</text>
+          </svg>
+          <span id="conf-state" class="tag">—</span>
+        </div>
       </div>
       <p class="conf-note">observe-only · gates nothing (Decision C)</p>
       <div class="conf-grid">
@@ -115,14 +123,18 @@
       </div>
       <p class="conf-note">today's LLM spend over the shared meter · runaway breaker</p>
       <div class="meter">
-        <div class="meter-track"><div id="tok-bar" class="meter-bar" style="width:0%"></div></div>
+        <div class="meter-track">
+          <div id="tok-bar" class="meter-bar" style="width:0%"></div>
+          <div class="meter-ticks" aria-hidden="true"></div>
+          <div class="meter-redline" aria-hidden="true"></div>
+        </div>
         <div class="meter-scale">
-          <span><b id="tok-consumed">–</b> tokens</span>
+          <span><b id="tok-consumed" class="odo">0</b> tokens</span>
           <span>budget <b id="tok-budget">–</b></span>
         </div>
       </div>
       <div class="conf-grid">
-        <div class="kv"><span>cost today €</span><b id="tok-cost">–</b></div>
+        <div class="kv"><span>cost today €</span><b id="tok-cost" class="odo">0</b></div>
         <div class="kv"><span>LLM calls</span><b id="tok-calls">–</b></div>
       </div>
     </section>
@@ -192,6 +204,8 @@
     <span>read-only · localhost · polling 7s</span>
   </footer>
 
+  <!-- vendored locally (no runtime CDN) — must load before app.js so window.Odometer exists -->
+  <script src="/vendor/odometer.min.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

@@ -1,29 +1,34 @@
-/* Scheduler dashboard — "dark control room".
-   GitHub-Dark palette (pinned from the concept SVGs) + soft neumorphism on a dark
-   surface (the ui_concept control style), monospace, no emoji. Offline-safe: a system
-   monospace stack, no CDN font fetch (this serves a localhost daemon box). No build step. */
+/* Scheduler dashboard — "warm-metal cockpit".
+   Gunmetal/anthracite canvas + brushed-aluminum text + a single amber ambient glow
+   (steel-blue as secondary info), modeled on a 2015+ BMW cockpit. Soft neumorphism with
+   a faint brushed-panel sheen + a chrome top edge on cards. Monospace, no emoji.
+   Offline-safe: a system monospace stack, no CDN font fetch (this serves a localhost
+   daemon box). No build step. */
 
 :root {
-  /* canvas / surface — neumorphism needs a mid-dark surface so both shadows read */
-  --bg:        #0d1117;   /* GitHub canvas */
-  --surface:   #11171f;   /* card body */
-  --surface-2: #0c1118;   /* inset wells */
-  --shadow-dk: #05080c;   /* lower-right cast */
-  --shadow-lt: #1b2530;   /* upper-left highlight */
-  --line:      #232c38;
+  /* canvas / surface — warm graphite; neumorphism needs a mid-dark surface so both shadows read */
+  --bg:        #16151a;   /* warm graphite canvas */
+  --surface:   #1d1c21;   /* brushed card body */
+  --surface-2: #161519;   /* inset wells (darker than surface) */
+  --shadow-dk: #0b0a0d;   /* lower-right cast (machined dark) */
+  --shadow-lt: #2b2932;   /* upper-left highlight (cool silver sheen) */
+  --line:      #34323c;   /* hairline / chrome edge */
 
-  /* text */
-  --text:  #c9d1d9;
-  --muted: #8b949e;
-  --dim:   #6b7785;
+  /* brushed-panel sheen (top→bottom) for cards */
+  --panel: linear-gradient(157deg, #242229 0%, var(--surface) 52%, #18171b 100%);
 
-  /* accents (concept palette) */
-  --green:  #3fb950;
-  --red:    #f85149;
-  --amber:  #d29922;
-  --blue:   #58a6ff;
-  --purple: #bc8cff;
-  --cyan:   #39c5cf;
+  /* text — warm aluminum family (one gray hue, warm) */
+  --text:  #d8d2c8;   /* primary aluminum */
+  --muted: #a39e95;   /* silver */
+  --dim:   #736e66;   /* dim silver */
+
+  /* accents — one ambient (amber) + a steel-blue for info; profit/loss kept (softened) */
+  --amber:  #e6a24c;   /* ★ ambient accent (brand, sparkline, tags, focus) */
+  --blue:   #6aa0c4;   /* steel-blue — secondary info only */
+  --green:  #6bbf8a;   /* profit (kept, softened toward metal) */
+  --red:    #e0685f;   /* loss (kept, softened) */
+  --purple: #b59cc8;   /* judge (softened) */
+  --cyan:   #c6bfb2;   /* legacy alias → neutral silver (no second accent) */
 
   --radius: 16px;
   --radius-sm: 10px;
@@ -44,10 +49,14 @@ html, body { height: 100%; }
 
 body {
   margin: 0;
+  /* leather dashboard: ambient glows + a soft diagonal hide-tone + edge vignette over warm graphite */
   background:
-    radial-gradient(1100px 600px at 88% -10%, rgba(88,166,255,0.06), transparent 60%),
-    radial-gradient(900px 500px at -5% 110%, rgba(63,185,80,0.05), transparent 60%),
+    radial-gradient(1200px 640px at 86% -12%, rgba(230,162,76,0.07), transparent 60%),
+    radial-gradient(900px 520px at -6% 112%, rgba(106,160,196,0.045), transparent 60%),
+    linear-gradient(152deg, #1c1a1f 0%, #16151a 46%, #121116 100%),
+    radial-gradient(140% 120% at 50% 0%, transparent 55%, rgba(0,0,0,0.42) 100%),
     var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--mono);
   font-size: 14px;
@@ -56,11 +65,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* faint grain so the dark surface isn't flat */
+/* fine-leather pebble grain (inline feTurbulence — offline, no asset) over the whole dash */
 .grain {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.035;
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.09;
   background-image:
-    repeating-linear-gradient(0deg, #fff 0, #fff 1px, transparent 1px, transparent 3px);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='l'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23l)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
   mix-blend-mode: overlay;
 }
 
@@ -69,14 +79,22 @@ body {
   position: relative; z-index: 1;
   display: flex; align-items: center; justify-content: space-between;
   gap: 16px; flex-wrap: wrap;
-  padding: 22px clamp(16px, 4vw, 40px) 18px;
+  padding: 22px clamp(16px, 4vw, 40px) 20px;
   border-bottom: 1px solid var(--line);
+}
+/* leather stitch seam: one faint amber dashed thread just under the topbar */
+.topbar::after {
+  content: ""; position: absolute; left: clamp(16px, 4vw, 40px); right: clamp(16px, 4vw, 40px);
+  bottom: 6px; height: 1px;
+  background: repeating-linear-gradient(90deg,
+    rgba(230,162,76,0.42) 0, rgba(230,162,76,0.42) 7px, transparent 7px, transparent 14px);
+  opacity: 0.5;
 }
 .brand { display: flex; align-items: center; gap: 14px; }
 .brand-mark {
   width: 34px; height: 34px; border-radius: 9px; flex: none;
-  background: linear-gradient(135deg, var(--green), var(--cyan));
-  box-shadow: var(--rise-sm), 0 0 18px rgba(63,185,80,0.35);
+  background: linear-gradient(135deg, var(--amber), #8a7f72);
+  box-shadow: var(--rise-sm), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 18px rgba(230,162,76,0.38);
 }
 .brand-text h1 {
   margin: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.28em;
@@ -106,37 +124,54 @@ body {
 .pill--unknown { color: var(--dim); }
 
 @keyframes pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(63,185,80,0.5); }
-  70%  { box-shadow: 0 0 0 7px rgba(63,185,80,0); }
-  100% { box-shadow: 0 0 0 0 rgba(63,185,80,0); }
+  0%   { box-shadow: 0 0 0 0 rgba(107,191,138,0.5); }
+  70%  { box-shadow: 0 0 0 7px rgba(107,191,138,0); }
+  100% { box-shadow: 0 0 0 0 rgba(107,191,138,0); }
 }
 
 /* ---- grid ---- */
 .grid {
   position: relative; z-index: 1;
-  display: grid; gap: clamp(14px, 2vw, 22px);
+  display: grid; gap: clamp(14px, 1.6vw, 22px);
   grid-template-columns: repeat(12, 1fr);
-  padding: clamp(16px, 3vw, 32px) clamp(16px, 4vw, 40px);
-  max-width: 1440px; margin: 0 auto;
+  padding: clamp(16px, 2.4vw, 30px) clamp(16px, 3vw, 44px);
+  max-width: 1800px; margin: 0 auto;
 }
-.card--status   { grid-column: span 7; }
-.card--controls { grid-column: span 5; }
-.card--score    { grid-column: span 7; }
-.card--conf     { grid-column: span 5; }
-.card--tokens   { grid-column: span 12; }
-.card--cycle    { grid-column: span 12; }
-.card--trades   { grid-column: span 7; }
-.card--lessons  { grid-column: span 5; }
+/* landscape instrument cluster:
+   row 1 — gauge band: status · control · confidence · tokens
+   row 2 — score · trades
+   row 3 — last cycle · lessons
+   (HTML order is status, control, score, conf, tokens, cycle, trades, lessons →
+    `order` reflows it into the cluster without touching the markup) */
+.card--status   { grid-column: span 3; order: 1; }
+.card--controls { grid-column: span 3; order: 2; }
+.card--conf     { grid-column: span 3; order: 3; }
+.card--tokens   { grid-column: span 3; order: 4; }
+.card--score    { grid-column: span 6; order: 5; }
+.card--trades   { grid-column: span 6; order: 6; }
+.card--cycle    { grid-column: span 7; order: 7; }
+.card--lessons  { grid-column: span 5; order: 8; }
 
+/* below the cluster width: gauge band degrades to 2-across, panels to full rows */
+@media (max-width: 1320px) {
+  .card--status   { grid-column: span 6; }
+  .card--controls { grid-column: span 6; }
+  .card--conf     { grid-column: span 6; }
+  .card--tokens   { grid-column: span 6; }
+  .card--score    { grid-column: span 12; }
+  .card--trades   { grid-column: span 12; }
+  .card--cycle    { grid-column: span 12; }
+  .card--lessons  { grid-column: span 12; }
+}
 @media (max-width: 900px) {
   .grid > .card { grid-column: 1 / -1 !important; }
 }
 
 /* ---- card ---- */
 .card {
-  background: var(--surface);
+  background: var(--panel);
   border-radius: var(--radius);
-  box-shadow: var(--rise);
+  box-shadow: var(--rise), inset 0 1px 0 rgba(255,255,255,0.045);
   padding: 20px 22px;
   animation: rise-in 0.5s both;
 }
@@ -172,10 +207,10 @@ body {
   background: var(--surface-2); box-shadow: var(--inset);
   padding: 4px 11px; border-radius: 999px;
 }
-.tag--accent { color: var(--cyan); }
+.tag--accent { color: var(--amber); }
 
 /* ---- status stats ---- */
-.status-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.status-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .stat {
   background: var(--surface-2); box-shadow: var(--inset);
   border-radius: var(--radius-sm); padding: 14px 14px 12px;
@@ -192,8 +227,8 @@ body {
 .kill-banner {
   margin-top: 16px; display: flex; align-items: center; gap: 12px;
   padding: 11px 14px; border-radius: var(--radius-sm);
-  background: rgba(248,81,73,0.10);
-  box-shadow: inset 0 0 0 1px rgba(248,81,73,0.45);
+  background: rgba(224,104,95,0.10);
+  box-shadow: inset 0 0 0 1px rgba(224,104,95,0.45);
 }
 .kill-banner-label { font-weight: 700; letter-spacing: 0.18em; color: var(--red); font-size: 12px; }
 .kill-banner-reason { color: var(--text); font-size: 13px; }
@@ -216,19 +251,35 @@ body {
 .btn--kill { color: #e8a39e; }
 .btn--kill:hover  { color: var(--red); }
 .btn--clear:hover { color: var(--text); }
-.control-msg { margin: 4px 0 0; min-height: 16px; font-size: 11px; color: var(--cyan); letter-spacing: 0.04em; }
+.control-msg { margin: 4px 0 0; min-height: 16px; font-size: 11px; color: var(--amber); letter-spacing: 0.04em; }
 
-/* ---- score sparkline ---- */
+/* ---- score sparkline (framed instrument) ---- */
 .spark-well {
-  position: relative; background: var(--surface-2); box-shadow: var(--inset);
+  position: relative; overflow: hidden;
+  background: radial-gradient(120% 100% at 50% 0%, #1a191e 0%, var(--surface-2) 70%);
+  /* machined bezel ring + the inset well depth */
+  box-shadow: var(--inset), inset 0 0 0 1px rgba(255,255,255,0.05), 0 0 0 1px rgba(0,0,0,0.5);
   border-radius: var(--radius-sm); padding: 14px; height: 168px;
 }
-.spark { width: 100%; height: 100%; display: block; }
-.spark-line { fill: none; stroke: var(--green); stroke-width: 2.5;
+/* faint glass glare across the instrument face */
+.spark-well::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  background: linear-gradient(157deg, rgba(255,255,255,0.07) 0%, transparent 32%, transparent 100%);
+}
+.spark { position: relative; z-index: 1; width: 100%; height: 100%; display: block; }
+.spark-line { fill: none; stroke: var(--amber); stroke-width: 2.5;
   stroke-linejoin: round; stroke-linecap: round;
-  filter: drop-shadow(0 0 6px rgba(63,185,80,0.4)); }
+  filter: drop-shadow(0 0 6px rgba(230,162,76,0.45)); }
 .spark-area { fill: url(#spark-grad); opacity: 0.5; }
-.spark-dot { fill: var(--green); }
+.spark-dot { fill: var(--amber); filter: drop-shadow(0 0 5px rgba(230,162,76,0.7)); }
+/* draw-on: only added (by app.js) when the score data actually changed */
+.spark.is-fresh .spark-line {
+  stroke-dasharray: 1400; stroke-dashoffset: 1400;
+  animation: spark-draw 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.spark.is-fresh .spark-dot { animation: dot-pop 1.1s ease both; }
+@keyframes spark-draw { to { stroke-dashoffset: 0; } }
+@keyframes dot-pop { 0%, 62% { opacity: 0; } 100% { opacity: 1; } }
 
 /* ---- confidence ---- */
 .conf-note { margin: -6px 0 14px; font-size: 11px; color: var(--dim); }
@@ -262,7 +313,7 @@ body {
 .tbl th.num, .tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .tbl tbody td { padding: 10px 12px; border-bottom: 1px solid rgba(35,44,56,0.5); color: var(--text); }
 .tbl tbody tr:last-child td { border-bottom: 0; }
-.tbl tbody tr:hover td { background: rgba(88,166,255,0.05); }
+.tbl tbody tr:hover td { background: rgba(230,162,76,0.06); }
 .dir-buy  { color: var(--green); font-weight: 700; }
 .dir-sell { color: var(--red); font-weight: 700; }
 .st { font-size: 10px; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 999px;
@@ -294,19 +345,35 @@ body {
 .conn--ok { color: var(--green); }
 .conn--down { color: var(--red); }
 
-/* ---- token meter ---- */
+/* ---- token meter (fuel gauge) ---- */
 .meter { margin-bottom: 14px; }
 .meter-track {
+  position: relative;
   height: 16px; border-radius: 999px; overflow: hidden;
-  background: var(--surface-2); box-shadow: var(--inset);
+  background: var(--surface-2);
+  box-shadow: var(--inset), inset 0 0 0 1px rgba(255,255,255,0.04);
 }
 .meter-bar {
+  position: relative; z-index: 1;
   height: 100%; width: 0; border-radius: 999px; background: var(--blue);
-  box-shadow: 0 0 8px rgba(88,166,255,0.45);
-  transition: width 0.4s ease, background 0.2s ease;
+  box-shadow: 0 0 8px rgba(106,160,196,0.45);
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease;
 }
-.meter-bar.warn { background: var(--amber); box-shadow: 0 0 8px rgba(210,153,34,0.45); }
-.meter-bar.over { background: var(--red);   box-shadow: 0 0 8px rgba(248,81,73,0.5); }
+/* gauge tick marks across the track */
+.meter-ticks {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: repeating-linear-gradient(90deg,
+    transparent 0, transparent calc(10% - 1px), rgba(0,0,0,0.45) calc(10% - 1px), rgba(0,0,0,0.45) 10%);
+  opacity: 0.55;
+}
+/* redline zone (80→100%) — the runaway danger band */
+.meter-redline {
+  position: absolute; top: 0; bottom: 0; right: 0; left: 80%; z-index: 2; pointer-events: none;
+  background: repeating-linear-gradient(45deg,
+    rgba(224,104,95,0.28) 0, rgba(224,104,95,0.28) 3px, transparent 3px, transparent 6px);
+}
+.meter-bar.warn { background: var(--amber); box-shadow: 0 0 8px rgba(230,162,76,0.5); }
+.meter-bar.over { background: var(--red);   box-shadow: 0 0 8px rgba(224,104,95,0.5); }
 .meter-scale {
   display: flex; justify-content: space-between; margin-top: 8px;
   font-size: 11px; color: var(--dim); letter-spacing: 0.04em;
@@ -354,3 +421,74 @@ body {
 .agent-bull  { color: var(--green);  font-weight: 700; letter-spacing: 0.12em; font-size: 12px; }
 .agent-bear  { color: var(--red);    font-weight: 700; letter-spacing: 0.12em; font-size: 12px; }
 .agent-judge { color: var(--purple); font-weight: 700; letter-spacing: 0.12em; font-size: 12px; }
+
+/* ============================================================================
+   Round 2 — leather-dash instruments + motion (all additive, reduced-motion aware)
+   ============================================================================ */
+
+/* ---- confidence dial (n / n_min, header instrument) ---- */
+.head-instruments { display: flex; align-items: center; gap: 12px; }
+.conf-dial { width: 38px; height: 38px; flex: none; transform: rotate(-90deg);
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5)); }
+.conf-dial .dial-bg  { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 4; }
+.conf-dial .dial-arc { fill: none; stroke: var(--amber); stroke-width: 4; stroke-linecap: round;
+  stroke-dasharray: 97.4; stroke-dashoffset: 97.4;
+  filter: drop-shadow(0 0 3px rgba(230,162,76,0.6));
+  transition: stroke-dashoffset 0.85s cubic-bezier(0.22,1,0.36,1), stroke 0.3s ease; }
+.conf-dial.is-ok .dial-arc          { stroke: var(--green); }
+.conf-dial.is-unavailable .dial-arc { stroke: var(--dim); }
+.conf-dial .dial-n {
+  transform: rotate(90deg); transform-origin: 20px 20px;
+  fill: var(--text); font-family: var(--mono); font-size: 12px; font-weight: 700;
+  font-variant-numeric: tabular-nums; }
+
+/* ---- odometer (rolling cockpit digits) — vendored minimal theme, restyled ---- */
+.odo .odometer-digit { font-family: var(--mono); }
+/* roll faster than the 2s theme default; inherits currentColor (pnl pos/neg, amber, text) */
+.odometer.odometer-animating-up .odometer-ribbon-inner,
+.odometer.odometer-animating-down.odometer-animating .odometer-ribbon-inner {
+  transition-duration: 0.9s !important;
+}
+
+/* ---- value tick-flash on renew (glow only — keeps pos/neg color) ---- */
+@keyframes tick-flash {
+  0%   { text-shadow: 0 0 12px rgba(230,162,76,0.75); }
+  100% { text-shadow: none; }
+}
+.flash-tick { animation: tick-flash 0.8s ease; }
+
+/* ---- updated pip blink each poll ---- */
+@keyframes pip { 0% { opacity: 0.35; } 100% { opacity: 1; } }
+.updated-val.pip { animation: pip 0.5s ease; }
+
+/* ---- idle ambient: the brand mark breathes its amber glow ---- */
+@keyframes breathe {
+  0%, 100% { box-shadow: var(--rise-sm), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 14px rgba(230,162,76,0.30); }
+  50%      { box-shadow: var(--rise-sm), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 22px rgba(230,162,76,0.55); }
+}
+.brand-mark { animation: breathe 4.6s ease-in-out infinite; }
+
+/* ---- button press: tactile glow ripple ---- */
+.btn { position: relative; overflow: hidden; }
+.btn::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(circle at center, rgba(230,162,76,0.32), transparent 62%);
+  opacity: 0; transform: scale(0.6); transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.btn:active::after { opacity: 1; transform: scale(1); transition: none; }
+
+/* ---- new trades row enters with an amber sweep ---- */
+@keyframes row-in { from { background: rgba(230,162,76,0.16); } to { background: transparent; } }
+.tbl tbody tr.row-new td { animation: row-in 1.5s ease; }
+
+/* ---- honor reduced-motion for every Round-2 animation ---- */
+@media (prefers-reduced-motion: reduce) {
+  .brand-mark,
+  .spark.is-fresh .spark-line, .spark.is-fresh .spark-dot,
+  .flash-tick, .updated-val.pip, .tbl tbody tr.row-new td { animation: none !important; }
+  .conf-dial .dial-arc, .meter-bar { transition: none !important; }
+  .odometer.odometer-animating-up .odometer-ribbon-inner,
+  .odometer.odometer-animating-down.odometer-animating .odometer-ribbon-inner {
+    transition-duration: 0s !important;
+  }
+}
