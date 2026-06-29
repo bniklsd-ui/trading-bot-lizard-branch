@@ -7,18 +7,21 @@
 
 :root {
   /* canvas / surface — warm graphite; neumorphism needs a mid-dark surface so both shadows read */
-  --bg:        #16151a;   /* warm graphite canvas */
-  --surface:   #1d1c21;   /* brushed card body */
-  --surface-2: #161519;   /* inset wells (darker than surface) */
-  --shadow-dk: #060507;   /* lower-right cast (machined dark — deeper for relief) */
-  --shadow-lt: #34313d;   /* upper-left highlight (cool silver sheen — brighter) */
-  --line:      #38353f;   /* hairline / chrome edge */
+  --bg:        #0c0b0a;   /* very dark brown leather canvas (~#0C0C0D realm) */
+  --surface:   #2f2b2a;   /* warm titanium / cognac card body */
+  --surface-2: #221f1e;   /* inset wells (darker than surface) */
+  --shadow-dk: #080706;   /* lower-right cast (machined dark) */
+  --shadow-lt: #4b443e;   /* upper-left highlight (warm titanium sheen) */
+  --line:      #453e39;   /* hairline / chrome edge */
 
-  /* brushed-panel sheen (top→bottom) for cards — more curvature = more domed metal */
-  --panel: linear-gradient(156deg, #2d2a35 0%, #221f27 46%, var(--surface) 70%, #141318 100%);
+  /* polished-metal panel sheen (top→bottom) for cards — domed warm titanium */
+  --panel: linear-gradient(156deg, #423a34 0%, #342e2a 46%, var(--surface) 70%, #221d1b 100%);
 
   /* ambient cast a card throws onto the leather dash (the real depth cue) */
   --cast: 0 22px 46px -18px rgba(0,0,0,0.66), 0 6px 16px -10px rgba(0,0,0,0.55);
+
+  /* the leather hide gradient — very dark brown, near-black */
+  --leather-grad: linear-gradient(152deg, #141010 0%, #0c0b0a 48%, #060605 100%);
 
   /* text — warm aluminum family (one gray hue, warm) */
   --text:  #d8d2c8;   /* primary aluminum */
@@ -57,7 +60,7 @@ body {
   background:
     radial-gradient(1200px 640px at 86% -12%, rgba(230,162,76,0.07), transparent 60%),
     radial-gradient(900px 520px at -6% 112%, rgba(106,160,196,0.045), transparent 60%),
-    linear-gradient(152deg, #1c1a1f 0%, #16151a 46%, #121116 100%),
+    var(--leather-grad),
     radial-gradient(140% 120% at 50% 0%, transparent 55%, rgba(0,0,0,0.42) 100%),
     var(--bg);
   position: relative;            /* containing block for the scrolling leather layer */
@@ -175,10 +178,14 @@ body {
 
 /* ---- card ---- */
 .card {
-  /* fine vertical brushed-metal striation layered over the panel sheen */
+  /* polished-scraped metal: a soft reflection sweep + faint irregular scrape lines (two
+     slightly-off directions) over the panel sheen — reads polished, not uniformly brushed */
   background:
-    repeating-linear-gradient(90deg,
-      rgba(255,255,255,0.022) 0, rgba(255,255,255,0.022) 1px, transparent 1px, transparent 3px),
+    linear-gradient(101deg, transparent 30%, rgba(255,255,255,0.05) 45%, transparent 60%),
+    repeating-linear-gradient(1deg,
+      rgba(255,255,255,0.014) 0, rgba(255,255,255,0.014) 1px, transparent 1px, transparent 4px),
+    repeating-linear-gradient(-1.4deg,
+      rgba(0,0,0,0.045) 0, rgba(0,0,0,0.045) 1px, transparent 1px, transparent 7px),
     var(--panel);
   border-radius: var(--radius);
   position: relative;
@@ -283,17 +290,28 @@ body {
 /* ---- score sparkline (framed instrument) ---- */
 .spark-well {
   position: relative; overflow: hidden;
-  background: radial-gradient(120% 100% at 50% 0%, #1a191e 0%, var(--surface-2) 70%);
-  /* machined bezel ring + the inset well depth */
-  box-shadow: var(--inset), inset 0 0 0 1px rgba(255,255,255,0.05), 0 0 0 1px rgba(0,0,0,0.5);
-  border-radius: var(--radius-sm); padding: 14px; height: 168px;
+  /* the chart sits flush on the polished metal panel (not a recessed box); a faint
+     darken keeps the amber legible */
+  background: linear-gradient(160deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.12) 100%), var(--surface);
+  border-radius: var(--radius-sm); padding: 18px; height: 168px;
 }
-/* faint glass glare across the instrument face */
+/* polished sheen across the metal face (sits below the chart) */
 .spark-well::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2;
-  background: linear-gradient(157deg, rgba(255,255,255,0.07) 0%, transparent 32%, transparent 100%);
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: linear-gradient(101deg, transparent 34%, rgba(255,255,255,0.05) 50%, transparent 64%);
 }
-.spark { position: relative; z-index: 1; width: 100%; height: 100%; display: block; }
+/* the stamped line: a single engraved groove routed AROUND the chart (dark channel +
+   a lower light lip = pressed into the metal), not a filled rectangle */
+.spark-well::after {
+  content: ""; position: absolute; inset: 9px; z-index: 3; pointer-events: none;
+  border-radius: 11px;
+  border: 2px solid rgba(0,0,0,0.42);
+  box-shadow:
+    inset 0 1px 1px rgba(0,0,0,0.55),
+    inset 0 -1px 1px rgba(255,255,255,0.10),
+    0 1px 0 rgba(255,255,255,0.07);
+}
+.spark { position: relative; z-index: 2; width: 100%; height: 100%; display: block; }
 .spark-line { fill: none; stroke: var(--amber); stroke-width: 2.5;
   stroke-linejoin: round; stroke-linecap: round;
   filter: drop-shadow(0 0 6px rgba(230,162,76,0.45)); }

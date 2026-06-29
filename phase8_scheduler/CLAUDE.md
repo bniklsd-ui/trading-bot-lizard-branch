@@ -391,6 +391,38 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## UI-Overhaul Runde 4 — 2026-06-29 (Palette: Cognac-Metall + dunkelbraunes Leder · polished-scraped · Score-Gravur)
+
+> **Auslöser:** der Nikinger wollte die Palette durchprobieren. Ich habe via `<body data-theme>` drei
+> Kandidaten gebaut (steel/cognac/nickel) + offline-Screenshots gezeigt. **Wahl: Cognac-Metall**
+> („unique element color"), aber Leder **sehr dunkelbraun, ~#0C0C0D-Realm**. Plus zwei Korrekturen:
+> (a) Metall-Textur behalten, aber **polished-scraped** statt gleichmäßig gebürstet; (b) der „stamped
+> into metal"-Effekt am Score sollte **nur eine gravierte Linie UM den Chart** sein, **kein** versenktes
+> Rechteck. Reine `style.css`-Änderung.
+
+### Completed (alle in `webui/static/style.css`)
+- **Palette (in `:root` gebacken, Kandidaten-Blöcke wieder entfernt):** Metall = warm Titanium/Cognac
+  (`--surface #2f2b2a`, `--panel` warmes Cognac-Gradient, `--shadow-lt #4b443e` warm); Leder
+  **near-black dunkelbraun** (`--bg #0c0b0a`, `--leather-grad` `#141010→#0c0b0a→#060605`). Text +
+  Amber/Green/Red-Indikatoren **unverändert** (Nikinger: „seem fine"). `--leather-grad`-Variable bleibt
+  (sauberer Swap-Punkt).
+- **Metall-Textur → polished-scraped** (`.card` background): ein diagonaler **Reflection-Sweep** (polish)
+  + zwei leicht **schräge, unregelmäßige Scrape-Linien** (eine helle 1deg, eine dunkle -1.4deg) statt der
+  gleichmäßigen vertikalen Bürstung → liest poliert-geschabt, nicht gebürstet.
+- **Score „stamped line" statt Recess** (`.spark-well`): der Chart sitzt jetzt **flush** auf dem polierten
+  Metall (kein versenktes dunkles Rechteck mehr); `::before` = polierter Sheen; **`::after` = eine einzelne
+  **gravierte Nut/Linie** (dark channel + untere Light-Lippe) **um** den Chart herum → „bigger line stamped
+  into metal surrounding the chart". Orange-Nadel/Glow bleibt. `.spark` z-index 2 über dem Sheen.
+
+### Verifiziert (gemockt/offline + visuell)
+- `pytest phase8_scheduler/tests -q` → **181 passed**; `node --check app.js` clean (app.js unberührt).
+- **Visuell** :8011 @1920×1080: dunkelbraunes Leder, Cognac-Panels heben sich klar ab, polished-scraped
+  Sheen sichtbar, Score-Gravurlinie rahmt den Chart (Close-up bestätigt), Konsole fehlerfrei. Die drei
+  Kandidaten-Themes wurden per `data-theme` live gescreenshottet, dann verworfen (nur Cognac gebacken).
+- **Commit:** committet, falls der Operator es triggert (Branch `phase8-scheduler`); „Commit ⇒ Note-Update".
+
+---
+
 ## UI-Overhaul Runde 3 — 2026-06-29 (Finish: scrollendes Leder · Gasket-Mounting · Metall-Textur)
 
 > **Auslöser:** der Nikinger: „zwei small fixes, dann kann die UI so bleiben" — (1) das Leder soll
