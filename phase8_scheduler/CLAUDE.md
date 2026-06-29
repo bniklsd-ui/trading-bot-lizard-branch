@@ -391,6 +391,26 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## UI-Overhaul Runde 6 — 2026-06-29 (Score-Gravur: breiter + tiefer, ohne Light-Lippe)
+
+> **Auslöser:** der Nikinger: Gravur stimmt, aber **breiter (2–3×, kaum sichtbar)**, die **Light-
+> Lippe weglassen** (passt nicht), und bei mehr Breite **tiefer** wirken lassen. Reine Tuning-Edit.
+
+### Completed
+- **`.spark-light` entfernt** (CSS + `app.js`-Pfad) — keine helle Unterlippe mehr.
+- **Breiter + tiefer:** statt einer schmalen Schattenkante jetzt **zwei gestapelte dunkle Soft-
+  Layer** als breite Nut: `.spark-shadow2` (16px, blur 2.8, α0.62) + `.spark-shadow` (9px, blur 1,
+  α0.96) unter dem Amber-Kern (`.spark-line` 5px) → der Graph sitzt in einem klar sichtbaren, tiefen
+  Trench (kein Light-Lip). `app.js` zeichnet beide Schatten leicht nach unten versetzt (`translate
+  0,1.5`/`0,1`); Area-Fill auf 0.2 reduziert; `is-fresh`-Draw-on deckt beide Schatten + Linie.
+
+### Verifiziert
+- `pytest phase8_scheduler/tests -q` → **181 passed**; `node --check app.js` clean; visual :8011 +
+  Score-Close-up (breite tiefe Nut, kein Light-Lip), Konsole fehlerfrei.
+- **Commit:** committet, falls der Operator es triggert (Branch `phase8-scheduler`).
+
+---
+
 ## UI-Overhaul Runde 5 — 2026-06-29 (Score: die Graph-LINIE selbst in den Metall graviert)
 
 > **Auslöser:** der Nikinger: der tiefe Recess „looks great", aber gemeint war — **die Graph-Linie

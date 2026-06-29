@@ -322,9 +322,9 @@ function renderScore(rows) {
       </linearGradient>
     </defs>
     <path class="spark-area" d="${area}"/>
-    <path class="spark-light"  d="${line}" transform="translate(0,2.2)"/>
-    <path class="spark-shadow" d="${line}" transform="translate(0,-2.2)"/>
-    <path class="spark-line"   d="${line}"/>
+    <path class="spark-shadow2" d="${line}" transform="translate(0,1.5)"/>
+    <path class="spark-shadow"  d="${line}" transform="translate(0,1)"/>
+    <path class="spark-line"    d="${line}"/>
     <circle class="spark-dot" cx="${lastX}" cy="${lastY}" r="4.5"/>`;
 
   // draw-on the needle (renderScore is change-gated, so this only fires on real new data)
