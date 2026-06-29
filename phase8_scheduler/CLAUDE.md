@@ -409,10 +409,12 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 - **Metall-Textur → polished-scraped** (`.card` background): ein diagonaler **Reflection-Sweep** (polish)
   + zwei leicht **schräge, unregelmäßige Scrape-Linien** (eine helle 1deg, eine dunkle -1.4deg) statt der
   gleichmäßigen vertikalen Bürstung → liest poliert-geschabt, nicht gebürstet.
-- **Score „stamped line" statt Recess** (`.spark-well`): der Chart sitzt jetzt **flush** auf dem polierten
-  Metall (kein versenktes dunkles Rechteck mehr); `::before` = polierter Sheen; **`::after` = eine einzelne
-  **gravierte Nut/Linie** (dark channel + untere Light-Lippe) **um** den Chart herum → „bigger line stamped
-  into metal surrounding the chart". Orange-Nadel/Glow bleibt. `.spark` z-index 2 über dem Sheen.
+- **Score = tief gestanzte Graph-Fläche** (`.spark-well`): **Korrektur nach Feedback** — der „stamped
+  into metal" gilt der **Graph-Fläche selbst**, „clearly visible and deep". (Ein Zwischenschritt mit nur
+  einer gravierten Linie **um** den Chart war daneben.) Final: ein **tiefer Recess auf allen Seiten**
+  (mehrlagige `inset`-Shadows oben/unten/links/rechts + crisper Top-Shadow-Edge + untere Light-Lippe +
+  dunkler Floor `#15110f`→`--surface-2`), `::before` deepening-Vignette oben; die Orange-Nadel glüht unten
+  in der Vertiefung. `.spark` z-index 2.
 
 ### Verifiziert (gemockt/offline + visuell)
 - `pytest phase8_scheduler/tests -q` → **181 passed**; `node --check app.js` clean (app.js unberührt).

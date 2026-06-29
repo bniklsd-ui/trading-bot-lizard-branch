@@ -290,26 +290,28 @@ body {
 /* ---- score sparkline (framed instrument) ---- */
 .spark-well {
   position: relative; overflow: hidden;
-  /* the chart sits flush on the polished metal panel (not a recessed box); a faint
-     darken keeps the amber legible */
-  background: linear-gradient(160deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.12) 100%), var(--surface);
-  border-radius: var(--radius-sm); padding: 18px; height: 168px;
+  /* deep dark floor so the orange glows down in the recess */
+  background:
+    radial-gradient(120% 90% at 50% 35%, rgba(0,0,0,0.12), rgba(0,0,0,0.5) 100%),
+    linear-gradient(180deg, #15110f 0%, var(--surface-2) 130%);
+  /* the graph is clearly stamped DEEP into the metal plate — strong recess on every side,
+     a crisp top shadow edge + a bottom light lip where the press catches the light */
+  box-shadow:
+    inset 0 13px 26px -5px rgba(0,0,0,0.92),
+    inset 0 -8px 18px -7px rgba(0,0,0,0.78),
+    inset 8px 0 18px -8px rgba(0,0,0,0.72),
+    inset -8px 0 18px -8px rgba(0,0,0,0.72),
+    inset 0 2px 2px rgba(0,0,0,0.85),
+    inset 0 -2px 1px rgba(255,255,255,0.11),
+    inset 0 0 0 1px rgba(0,0,0,0.65),
+    0 1px 0 rgba(255,255,255,0.08);
+  border-radius: var(--radius-sm); padding: 16px; height: 168px;
 }
-/* polished sheen across the metal face (sits below the chart) */
+/* extra depth: the top of the recess falls into shadow (no raised glare in a deep stamp) */
 .spark-well::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
-  background: linear-gradient(101deg, transparent 34%, rgba(255,255,255,0.05) 50%, transparent 64%);
-}
-/* the stamped line: a single engraved groove routed AROUND the chart (dark channel +
-   a lower light lip = pressed into the metal), not a filled rectangle */
-.spark-well::after {
-  content: ""; position: absolute; inset: 9px; z-index: 3; pointer-events: none;
-  border-radius: 11px;
-  border: 2px solid rgba(0,0,0,0.42);
-  box-shadow:
-    inset 0 1px 1px rgba(0,0,0,0.55),
-    inset 0 -1px 1px rgba(255,255,255,0.10),
-    0 1px 0 rgba(255,255,255,0.07);
+  box-shadow: inset 0 22px 28px -14px rgba(0,0,0,0.85);
+  background: linear-gradient(180deg, rgba(0,0,0,0.26) 0%, transparent 22%);
 }
 .spark { position: relative; z-index: 2; width: 100%; height: 100%; display: block; }
 .spark-line { fill: none; stroke: var(--amber); stroke-width: 2.5;
