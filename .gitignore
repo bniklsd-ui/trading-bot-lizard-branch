@@ -113,6 +113,14 @@ data/state/execution_state.json
 # did — only specific data/state/*.json files are ignored above; this advisory
 # audit (DB stays read-only until Phase 7, Decision I) wasn't covered, add it.
 data/state/debate_log.json
+# Phase 8 scheduler runtime state (daemon state snapshot, start/stop command
+# file, file kill-switch — all written at runtime by the scheduler/webui).
+# Added 2026-06-30 (v1.5 hotfix housekeeping, Step 0b): the same reconciliation
+# P3/P4/P5/P6 did — only specific data/state/*.json files are ignored above;
+# these operational files weren't covered, so add them here.
+data/state/scheduler_state.json
+data/state/scheduler_command.json
+data/state/KILL
 
 # --- Logs ---
 *.log
@@ -142,3 +150,11 @@ temp/
 # Smoke test logs, debugging snapshots, etc.
 smoke_test_output/
 debug_snapshots/
+
+# --- Claude Code harness artifacts (local tooling, not project source) ---
+# Added 2026-06-30 (v1.5 hotfix housekeeping, Step 0b): the agent harness
+# (skills, local permission overrides, skill lockfile) is local dev tooling,
+# not project source — keep it out of the repo, same spirit as .venv/.idea/.
+.claude/
+.agents/
+skills-lock.json

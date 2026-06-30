@@ -1,0 +1,217 @@
+<svg viewBox="0 0 960 1260" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace">
+  <!-- ===================== styles ===================== -->
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#8b949e"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#3fb950"/>
+    </marker>
+    <style>
+      .panel  { fill:#161b22; stroke:#30363d; stroke-width:1.5; }
+      .done   { fill:#11261a; stroke:#3fb950; stroke-width:1.5; }
+      .veto   { fill:#2a1517; stroke:#f85149; stroke-width:1.5; }
+      .ai     { fill:#1d1730; stroke:#bc8cff; stroke-width:1.5; }
+      .title  { fill:#c9d1d9; font-weight:700; }
+      .sub    { fill:#8b949e; }
+      .mono   { fill:#c9d1d9; }
+      .green  { fill:#3fb950; }
+      .red    { fill:#f85149; }
+      .purp   { fill:#bc8cff; }
+      .blue   { fill:#58a6ff; }
+      .yellow { fill:#d29922; }
+      .flow   { stroke:#8b949e; stroke-width:1.6; fill:none; }
+      .flowg  { stroke:#3fb950; stroke-width:1.6; fill:none; }
+    </style>
+  </defs>
+
+  <!-- ===================== background ===================== -->
+  <rect x="0" y="0" width="960" height="1260" fill="#0d1117"/>
+
+  <!-- ===================== header ===================== -->
+  <text x="36" y="46" class="title" font-size="22">Phase 5 — Execution  ·  <tspan class="mono" font-weight="400">phase5_execution/ (Paket: execution)</tspan></text>
+  <text x="36" y="72" class="sub" font-size="13">Erster Order-Pfad: Phase-4-Candidate → Gates → echte (IG Demo) Order. Manueller Trigger, KEIN Scheduler (= Phase 8).</text>
+
+  <!-- status pills -->
+  <g font-size="12" font-weight="700">
+    <rect x="36" y="88" width="220" height="26" rx="13" class="done"/>
+    <text x="50" y="105" class="green">✓ code-complete + live-verified</text>
+    <rect x="266" y="88" width="118" height="26" rx="13" class="done"/>
+    <text x="280" y="105" class="green">✓ 130 unit tests</text>
+    <rect x="394" y="88" width="150" height="26" rx="13" class="done"/>
+    <text x="408" y="105" class="green">✓ live_test 4/4 (Demo)</text>
+    <rect x="554" y="88" width="290" height="26" rx="13" fill="#2a2410" stroke="#d29922" stroke-width="1.5"/>
+    <text x="568" y="105" class="yellow">⚠ live-verified ≠ profit-validated</text>
+  </g>
+
+  <!-- ===================== data sources row ===================== -->
+  <text x="36" y="150" class="sub" font-size="12" font-weight="700">EINGÄNGE</text>
+  <g font-size="11.5">
+    <rect x="36" y="158" width="206" height="48" rx="6" class="panel"/>
+    <text x="48" y="178" class="blue" font-weight="700">IG Broker (ig_demo)</text>
+    <text x="48" y="195" class="sub">get_price · get_ohlcv · positions · orders</text>
+
+    <rect x="256" y="158" width="232" height="48" rx="6" class="panel"/>
+    <text x="268" y="178" class="purp" font-weight="700">turbo_candidates.json  ·  Phase 4</text>
+    <text x="268" y="195" class="sub">frozen 10-Feld-Kontrakt (direction kommt fertig)</text>
+
+    <rect x="502" y="158" width="186" height="48" rx="6" class="panel"/>
+    <text x="514" y="178" class="blue" font-weight="700">Database · Phase 2</text>
+    <text x="514" y="195" class="sub">get_risk_level()  (READ-ONLY)</text>
+
+    <rect x="702" y="158" width="222" height="48" rx="6" class="panel"/>
+    <text x="714" y="178" class="mono" font-weight="700">ExecutionConfig (frozen)</text>
+    <text x="714" y="195" class="sub">Fenster · VETO-Schwellen · Sizing · SL/TP</text>
+  </g>
+
+  <!-- ===================== AI boundary band ===================== -->
+  <rect x="708" y="232" width="216" height="92" rx="8" class="ai"/>
+  <text x="720" y="252" class="purp" font-size="12" font-weight="700">AI-GRENZE</text>
+  <text x="720" y="272" class="sub" font-size="11">„So wenig AI wie möglich…"</text>
+  <text x="720" y="289" class="mono" font-size="11">Phase 5 = KEINE AI.</text>
+  <text x="720" y="306" class="sub" font-size="11">Einzige AI: lazy P4-</text>
+  <text x="720" y="321" class="purp" font-size="11">research_runner (Gate 2)</text>
+
+  <!-- ===================== pipeline column ===================== -->
+  <!-- centerX = 372, column x = 132 .. 612 (width 480) -->
+
+  <!-- S1 Session-Health -->
+  <rect x="132" y="232" width="480" height="52" rx="8" class="done"/>
+  <text x="150" y="258" class="title" font-size="14">Session-Health  ·  _ensure_session()</text>
+  <text x="150" y="275" class="sub" font-size="11">is_connected / connect / get_account.ok  →  sonst ExecutionAbort  (1× pro Lauf, reused)</text>
+
+  <line x1="372" y1="284" x2="372" y2="308" class="flowg" marker-end="url(#arrowGreen)"/>
+
+  <!-- S2 Reconcile -->
+  <rect x="132" y="310" width="480" height="52" rx="8" class="done"/>
+  <text x="150" y="336" class="title" font-size="14">Reconcile-on-Startup  ·  Decision E</text>
+  <text x="150" y="353" class="sub" font-size="11">reconcile_positions(expected_refs): missing→mark_closed · unexpected→Abort (fail-closed)</text>
+
+  <line x1="372" y1="362" x2="372" y2="386" class="flowg" marker-end="url(#arrowGreen)"/>
+
+  <!-- G1 Time -->
+  <rect x="132" y="388" width="480" height="52" rx="8" class="done"/>
+  <text x="150" y="414" class="title" font-size="14">Gate 1 — Trading-Fenster</text>
+  <text x="150" y="431" class="sub" font-size="11">09:00–17:30 Europe/Berlin (konfigurierbar, tz-aware now_fn)  →  außerhalb = NO_TRADE</text>
+
+  <line x1="372" y1="440" x2="372" y2="464" class="flowg" marker-end="url(#arrowGreen)"/>
+
+  <!-- G2 Candidates (AI seam) -->
+  <rect x="132" y="466" width="480" height="56" rx="8" class="done"/>
+  <text x="150" y="492" class="title" font-size="14">Gate 2 — Candidates laden  <tspan class="purp">◆ AI</tspan></text>
+  <text x="150" y="510" class="sub" font-size="11">load_candidates / candidates_are_fresh · stale → lazy research_runner() · leer = NO_TRADE</text>
+  <!-- connector to AI band -->
+  <path d="M612,494 H690" class="flow" stroke="#bc8cff" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+
+  <line x1="372" y1="522" x2="372" y2="546" class="flowg" marker-end="url(#arrowGreen)"/>
+
+  <!-- G3 + G5 side by side -->
+  <rect x="132" y="548" width="232" height="58" rx="8" class="done"/>
+  <text x="148" y="574" class="title" font-size="13.5">Gate 3 — Constraints</text>
+  <text x="148" y="591" class="sub" font-size="10.5">Budget &gt; 0 · max_parallel</text>
+
+  <rect x="380" y="548" width="232" height="58" rx="8" class="done"/>
+  <text x="396" y="574" class="title" font-size="13.5">Gate 5 — Direction</text>
+  <text x="396" y="591" class="sub" font-size="10.5">Konsistenz, KEIN FLIP</text>
+  <text x="148" y="624" class="sub" font-size="10.5">(teilen 1× get_open_positions)   ·   Gate 5 = gate_direction_consistency</text>
+
+  <line x1="372" y1="635" x2="372" y2="659" class="flowg" marker-end="url(#arrowGreen)"/>
+
+  <!-- G4 Sizing -->
+  <rect x="132" y="661" width="480" height="64" rx="8" class="done"/>
+  <text x="150" y="685" class="title" font-size="14">Gate 4 — Sizing  ·  Decision F  <tspan class="yellow" font-size="11">(⟳ reworked 2026-06-12)</tspan></text>
+  <text x="150" y="703" class="sub" font-size="11">Risk-per-Trade ÷ Stop-Distanz: size = balance·risk_pct / (stop_pts·pt_value)</text>
+  <text x="150" y="719" class="sub" font-size="11">Notional-Cap max_leverage · ab auf 0.1 · &lt; min_deal_size → NO_TRADE</text>
+
+  <line x1="372" y1="725" x2="372" y2="749" class="flowg" marker-end="url(#arrowGreen)"/>
+
+  <!-- VETO block -->
+  <rect x="132" y="751" width="480" height="120" rx="8" class="veto"/>
+  <text x="150" y="775" class="red" font-size="14" font-weight="700">pre_trade_check — 4 HARTE VETOs</text>
+  <text x="150" y="792" class="sub" font-size="10.5">frischer Snapshot unmittelbar vor Order · erster Fail = kein Trade · Datenfehler → fail-closed</text>
+  <g font-size="11">
+    <rect x="148" y="802" width="218" height="28" rx="5" fill="#1f1416" stroke="#f85149" stroke-width="1"/>
+    <text x="160" y="820" class="mono">1 · Status / Zeit (TRADEABLE)</text>
+    <rect x="378" y="802" width="218" height="28" rx="5" fill="#1f1416" stroke="#f85149" stroke-width="1"/>
+    <text x="390" y="820" class="mono">2 · Spread frisch ≤ max</text>
+    <rect x="148" y="836" width="218" height="28" rx="5" fill="#1f1416" stroke="#f85149" stroke-width="1"/>
+    <text x="160" y="854" class="mono">3 · Momentum  ◆ get_ohlcv</text>
+    <rect x="378" y="836" width="218" height="28" rx="5" fill="#1f1416" stroke="#f85149" stroke-width="1"/>
+    <text x="390" y="854" class="mono">4 · Position-Conflict</text>
+  </g>
+
+  <line x1="372" y1="871" x2="372" y2="895" class="flowg" marker-end="url(#arrowGreen)"/>
+
+  <!-- build_order_plan (seam) -->
+  <rect x="132" y="897" width="480" height="56" rx="8" class="done"/>
+  <text x="150" y="923" class="title" font-size="14">build_order_plan</text>
+  <text x="150" y="941" class="sub" font-size="11">deal_reference bot-… · absolute SL/TP-Level (BUY: stop unter/limit über) · currency (EUR)</text>
+
+  <line x1="372" y1="953" x2="372" y2="977" class="flowg" marker-end="url(#arrowGreen)"/>
+
+  <!-- Human-Confirm -->
+  <rect x="132" y="979" width="480" height="52" rx="8" class="done"/>
+  <text x="150" y="1005" class="title" font-size="14">Human-Confirm  ·  Decision D</text>
+  <text x="150" y="1022" class="sub" font-size="11">require_confirm default AN · --yes Override · abgelehnt = ABORTED_BY_USER (keine Order)</text>
+
+  <line x1="372" y1="1031" x2="372" y2="1055" class="flowg" marker-end="url(#arrowGreen)"/>
+
+  <!-- place_order -->
+  <rect x="132" y="1057" width="480" height="64" rx="8" class="done"/>
+  <text x="150" y="1081" class="title" font-size="14">place_order  ·  Decision E (Idempotenz)</text>
+  <text x="150" y="1099" class="sub" font-size="11">record_pending WRITE-AHEAD → open_position(deal_reference, currency)</text>
+  <text x="150" y="1115" class="sub" font-size="11">ACCEPTED→mark_open · PENDING/UNKNOWN→bounded re-check, sonst fail-closed (NIE 2. Order) · REJECTED→mark_closed</text>
+
+  <line x1="372" y1="1121" x2="372" y2="1145" class="flowg" marker-end="url(#arrowGreen)"/>
+
+  <!-- monitor -->
+  <rect x="132" y="1147" width="480" height="64" rx="8" class="done"/>
+  <text x="150" y="1171" class="title" font-size="14">monitor_position  ·  Decision H (Polling)</text>
+  <text x="150" y="1189" class="sub" font-size="11">Loop poll_interval_s: Position weg → CLOSED_BY_BROKER (broker SL/TP gefüllt)</text>
+  <text x="150" y="1205" class="sub" font-size="11">square_off / max_hold → close_position → TIME_STOP   ·   now_fn/sleep_fn injiziert</text>
+
+  <!-- ===================== Phase 6 seam callout ===================== -->
+  <rect x="640" y="548" width="284" height="160" rx="8" class="ai"/>
+  <text x="654" y="572" class="purp" font-size="13" font-weight="700">↪ NAHT FÜR PHASE 6</text>
+  <text x="654" y="593" class="sub" font-size="11">Bull/Bear/Judge-Debatte ersetzt</text>
+  <text x="654" y="609" class="sub" font-size="11">die Richtungs-/Confidence-Quelle</text>
+  <text x="654" y="625" class="sub" font-size="11">hier — OHNE Gates neu zu</text>
+  <text x="654" y="641" class="sub" font-size="11">schreiben.</text>
+  <text x="654" y="664" class="mono" font-size="11">Nahtstellen:</text>
+  <text x="654" y="681" class="green" font-size="11">• gate_direction_consistency</text>
+  <text x="654" y="697" class="green" font-size="11">• build_order_plan</text>
+  <path d="M612,577 H636" class="flow" stroke="#bc8cff" marker-end="url(#arrow)"/>
+  <path d="M612,925 C628,925 628,706 636,690" class="flow" stroke="#bc8cff" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+
+  <!-- VETO non-bypass note -->
+  <rect x="640" y="751" width="284" height="120" rx="8" class="panel"/>
+  <text x="654" y="775" class="red" font-size="12" font-weight="700">VETOs sind HART &amp; AI-blind</text>
+  <text x="654" y="796" class="sub" font-size="11">Phase 6 darf KEINEN VETO</text>
+  <text x="654" y="812" class="sub" font-size="11">überschreiben (kein Force-</text>
+  <text x="654" y="828" class="sub" font-size="11">Trigger). Debatte liefert nur</text>
+  <text x="654" y="844" class="sub" font-size="11">Richtung; Gating bleibt</text>
+  <text x="654" y="860" class="sub" font-size="11">deterministischer Code.</text>
+
+  <!-- live proof -->
+  <rect x="640" y="1057" width="284" height="154" rx="8" class="done"/>
+  <text x="654" y="1081" class="green" font-size="12" font-weight="700">LIVE-BEWEIS (2026-06-12)</text>
+  <text x="654" y="1102" class="sub" font-size="11">SELL Demo-Order ACCEPTED</text>
+  <text x="654" y="1118" class="mono" font-size="10.5">deal_id=DIAAAAXQ6CSGTA5</text>
+  <text x="654" y="1136" class="sub" font-size="11">→ monitor → Time-Stop-Close</text>
+  <text x="654" y="1152" class="sub" font-size="11">→ Record CLOSED · RESULT 4/4</text>
+  <text x="654" y="1175" class="sub" font-size="11">VETO 3 live bestätigt:</text>
+  <text x="654" y="1191" class="mono" font-size="10.5">BUY into drop -0.20% → veto</text>
+  <text x="654" y="1205" class="yellow" font-size="10.5">Schwellen = v1 (Phase 7 tunen)</text>
+
+  <!-- ===================== footer legend ===================== -->
+  <line x1="36" y1="1232" x2="924" y2="1232" stroke="#30363d" stroke-width="1"/>
+  <g font-size="11">
+    <rect x="36" y="1242" width="14" height="14" rx="3" class="done"/>
+    <text x="56" y="1254" class="sub">done / live-verified</text>
+    <rect x="186" y="1242" width="14" height="14" rx="3" class="veto"/>
+    <text x="206" y="1254" class="sub">harter VETO (no trade)</text>
+    <rect x="372" y="1242" width="14" height="14" rx="3" class="ai"/>
+    <text x="392" y="1254" class="sub">AI / Phase-6-Naht</text>
+    <text x="560" y="1254" class="sub">Logging → stderr · Result-JSON → stdout · editable installs (kein sys.path) · branch phase5-execution</text>
+  </g>
+</svg>

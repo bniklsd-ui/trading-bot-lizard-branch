@@ -1,0 +1,281 @@
+<svg width="100%" viewBox="0 0 960 730" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Phase 2 — Persistence Layer Architecture</title>
+<desc>Architecture diagram: dual-state SQLite + JSON persistence for the DAX trading bot. Left: db.py with 7 tables, migrations, PRAGMA config, key methods. Right: StateManager, 3 JSON state files, paths, defaults, design decisions. Bottom: integration contracts and legend.</desc>
+
+<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <style>
+    svg { font-family: ui-monospace,'Cascadia Code','Fira Mono','Courier New',monospace; background: #0D1117; }
+    .th { font-size: 13px; font-weight: 600; fill: #E2E8F0; }
+    .t  { font-size: 12px; font-weight: 400; fill: #CBD5E1; }
+    .ts { font-size: 10.5px; font-weight: 400; fill: #94A3B8; }
+    .tm { font-size: 10px;   font-weight: 400; fill: #64748B; }
+  </style>
+</defs>
+
+<!-- background -->
+<rect width="960" height="730" fill="#0D1117"/>
+
+<!-- ═══════════════════════════════════════════════════════════
+     HEADER
+     ═══════════════════════════════════════════════════════════ -->
+<rect x="0" y="0" width="960" height="46" fill="#161D27"/>
+<line x1="0" y1="46" x2="960" y2="46" stroke="#1E2D45" stroke-width="1"/>
+<text x="16" y="20" class="th" style="font-size:15px;fill:#E2E8F0;">Phase 2 — Persistence Layer</text>
+<text x="16" y="37" class="ts">db.py · state.py · migrations.py · timeutil · defaults · paths · ~/trading-bot/data/</text>
+<rect x="832" y="11" width="116" height="22" rx="3" fill="#052E1A" stroke="#166534" stroke-width="0.8"/>
+<circle cx="846" cy="22" r="3.5" fill="#4ADE80"/>
+<text x="854" y="26.5" class="ts" style="fill:#4ADE80;font-size:10px;">phase 2 done</text>
+
+<!-- vertical divider -->
+<line x1="464" y1="52" x2="464" y2="602" stroke="#1E293B" stroke-width="1" stroke-dasharray="4,3"/>
+
+<!-- column labels -->
+<text x="10"  y="64" class="ts" style="fill:#374151;">sqlite — persistent · historical · analytically queryable</text>
+<text x="472" y="64" class="ts" style="fill:#374151;">json state — operational · ephemeral · millisecond access</text>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LEFT COLUMN — SQLite / db.py  (x=10, w=446)
+     ═══════════════════════════════════════════════════════════ -->
+
+<!-- ╔══ Main Database box  y=70..548 ══╗ -->
+<rect x="10" y="70" width="446" height="478" rx="5" fill="#070E1A" stroke="#1E3A5F" stroke-width="0.8"/>
+<rect x="10" y="70" width="3"   height="478" rx="1" fill="#60A5FA"/>
+
+<!-- header row -->
+<rect x="10" y="70" width="446" height="22" rx="5" fill="#0A1628"/>
+<text x="22" y="85" class="ts" style="fill:#2563EB;">persistence/db.py — Database</text>
+<rect x="382" y="74" width="68" height="14" rx="2" fill="#052E1A" stroke="#166534" stroke-width="0.5"/>
+<circle cx="394" cy="81" r="2.5" fill="#4ADE80"/>
+<text x="400" y="85" class="tm" style="fill:#4ADE80;font-size:9px;">59 tests ✓</text>
+
+<!-- PRAGMA strip -->
+<rect x="18" y="98" width="430" height="44" rx="3" fill="#051020" stroke="#1A3050" stroke-width="0.5"/>
+<text x="26" y="114" class="ts" style="fill:#3B6DB7;">PRAGMA</text>
+<text x="82" y="114" class="tm">journal_mode = WAL</text>
+<text x="198" y="114" class="tm" style="fill:#374151;">·</text>
+<text x="206" y="114" class="tm">foreign_keys = ON</text>
+<text x="312" y="114" class="tm" style="fill:#374151;">·</text>
+<text x="320" y="114" class="tm">busy_timeout = 30000</text>
+<text x="26" y="130" class="tm">synchronous = NORMAL</text>
+<text x="164" y="130" class="tm" style="fill:#374151;">·</text>
+<text x="172" y="130" class="tm">temp_store = MEMORY</text>
+<text x="296" y="130" class="tm" style="fill:#374151;">·</text>
+<text x="304" y="130" class="tm">cache_size = -64000 (64 MB)</text>
+
+<!-- tables label -->
+<line x1="18" y1="150" x2="454" y2="150" stroke="#0F2040" stroke-width="0.5"/>
+<text x="18" y="163" class="ts" style="fill:#2563EB;">tables — 7 total · phase 2 creates all · phase N writes data</text>
+
+<!-- ┌── bot_runs ──┐ -->
+<rect x="18" y="168" width="430" height="22" rx="2" fill="#051A10" stroke="#0F3B20" stroke-width="0.4"/>
+<circle cx="30" cy="179" r="3.2" fill="#4ADE80"/>
+<text x="40" y="183" class="tm" style="fill:#86EFAC;">bot_runs</text>
+<text x="100" y="183" class="tm">run_uuid · phase · pid · started_at · ended_at · end_reason</text>
+<text x="390" y="183" class="tm" style="fill:#4ADE80;font-size:9px;">all phases</text>
+
+<!-- ┌── trade_outcomes ──┐ -->
+<rect x="18" y="194" width="430" height="36" rx="2" fill="#051020" stroke="#1E3A5F" stroke-width="0.4"/>
+<circle cx="30" cy="204" r="3.2" fill="#3B6DB7"/>
+<text x="40" y="208" class="tm" style="fill:#93C5FD;">trade_outcomes</text>
+<text x="40" y="222" class="tm" style="fill:#475569;">deal_id · deal_reference* · epic · direction · size · open/close_level · profit_loss · session_date†</text>
+<text x="364" y="208" class="tm" style="fill:#3B6DB7;font-size:9px;">← Phase 5</text>
+
+<!-- ┌── reward_pts ──┐ -->
+<rect x="18" y="234" width="430" height="36" rx="2" fill="#100C22" stroke="#2D1B69" stroke-width="0.4"/>
+<circle cx="30" cy="244" r="3.2" fill="#8B5CF6"/>
+<text x="40" y="248" class="tm" style="fill:#C4B5FD;">reward_pts</text>
+<text x="40" y="262" class="tm" style="fill:#475569;">outcome_score_delta · score_after · win_loss · V2: process_score_delta · veto_trigger_count</text>
+<text x="364" y="248" class="tm" style="fill:#8B5CF6;font-size:9px;">← Phase 7</text>
+
+<!-- ┌── trade_lessons ──┐ -->
+<rect x="18" y="274" width="430" height="36" rx="2" fill="#100C22" stroke="#2D1B69" stroke-width="0.4"/>
+<circle cx="30" cy="284" r="3.2" fill="#8B5CF6"/>
+<text x="40" y="288" class="tm" style="fill:#C4B5FD;">trade_lessons</text>
+<text x="40" y="302" class="tm" style="fill:#475569;">lesson_text · relevance_score · used_in_research · V2: embedding_json · market_context_json</text>
+<text x="364" y="288" class="tm" style="fill:#8B5CF6;font-size:9px;">← Phase 7</text>
+
+<!-- ┌── ig_config_state ──┐ -->
+<rect x="18" y="314" width="430" height="22" rx="2" fill="#051A10" stroke="#0F3B20" stroke-width="0.4"/>
+<circle cx="30" cy="325" r="3.2" fill="#4ADE80"/>
+<text x="40" y="329" class="tm" style="fill:#86EFAC;">ig_config_state</text>
+<text x="136" y="329" class="tm">key TEXT PRIMARY KEY · value JSON · seeded by init · INSERT OR IGNORE</text>
+
+<!-- ┌── market_regime_snapshots ★V2 ──┐ -->
+<rect x="18" y="340" width="430" height="22" rx="2" fill="#0C0900" stroke="#291A00" stroke-width="0.4"/>
+<circle cx="30" cy="351" r="3.2" fill="#78350F" stroke="#D97706" stroke-width="0.8"/>
+<text x="40" y="355" class="tm" style="fill:#78350F;">market_regime_snapshots</text>
+<text x="206" y="355" class="tm" style="fill:#44403C;">volatility_pct · spread_pct · drift_pct · time_of_day_h · market_status</text>
+<text x="384" y="355" class="tm" style="fill:#78350F;font-size:9px;">★V2 Ph9</text>
+
+<!-- ┌── decision_context ★V2 ──┐ -->
+<rect x="18" y="366" width="430" height="22" rx="2" fill="#0C0900" stroke="#291A00" stroke-width="0.4"/>
+<circle cx="30" cy="377" r="3.2" fill="#78350F" stroke="#D97706" stroke-width="0.8"/>
+<text x="40" y="381" class="tm" style="fill:#78350F;">decision_context</text>
+<text x="148" y="381" class="tm" style="fill:#44403C;">bull_summary · bear_summary · judge_reasoning · council_verdict</text>
+<text x="384" y="381" class="tm" style="fill:#78350F;font-size:9px;">★V2 Ph9</text>
+
+<!-- FK / index notes -->
+<line x1="18" y1="394" x2="454" y2="394" stroke="#0F2040" stroke-width="0.5"/>
+<text x="18" y="407" class="tm" style="fill:#475569;">FK:</text>
+<text x="38" y="407" class="tm">trade_outcomes.run_id → bot_runs  ON DELETE SET NULL</text>
+<text x="38" y="419" class="tm">reward_pts · trade_lessons · market_regime_snapshots · decision_context → trade_outcomes  CASCADE</text>
+<text x="18" y="431" class="tm" style="fill:#475569;">idx:</text>
+<text x="38" y="431" class="tm">deal_id · deal_reference* · session_date · epic · status · run_id</text>
+
+<!-- session_date / deal_reference callouts -->
+<line x1="18" y1="439" x2="454" y2="439" stroke="#0F2040" stroke-width="0.5"/>
+<text x="18" y="452" class="tm" style="fill:#475569;">† session_date:</text>
+<text x="120" y="452" class="tm">Europe/Berlin local date — DAX trading day, not UTC calendar day</text>
+<text x="18" y="464" class="tm" style="fill:#475569;">* deal_reference:</text>
+<text x="130" y="464" class="tm">indexed for O(1) reconcile_positions lookup on bot restart</text>
+
+<!-- key methods -->
+<line x1="18" y1="472" x2="454" y2="472" stroke="#0F2040" stroke-width="0.5"/>
+<text x="18" y="485" class="ts" style="fill:#2563EB;">key methods</text>
+<text x="18" y="499" class="tm" style="fill:#93C5FD;">insert_trade()</text>
+<text x="108" y="499" class="tm">· get_trade_by_deal_id()  · update_trade_close()  · get_recent_trades(n=8)</text>
+<text x="18" y="511" class="tm" style="fill:#86EFAC;">record_trade_complete(trade, reward?, lesson?, regime?, context?)</text>
+<text x="370" y="511" class="tm" style="fill:#4ADE80;">← 1 atomic txn</text>
+<text x="18" y="523" class="tm" style="fill:#86EFAC;">get_unreconciled_deal_references()</text>
+<text x="232" y="523" class="tm" style="fill:#4ADE80;">← restart-safe reconcile bridge</text>
+<text x="18" y="535" class="tm" style="fill:#C4B5FD;">get_current_score()</text>
+<text x="140" y="535" class="tm">· get_risk_level() → KONSERVATIV / AGGRESSIV  (threshold: 50.0)</text>
+<!-- ╚══ end main DB box y=548 ══╝ -->
+
+<!-- ╔══ Migrations box  y=554..616 ══╗ -->
+<rect x="10" y="554" width="446" height="62" rx="4" fill="#100C22" stroke="#2D1B69" stroke-width="0.8"/>
+<rect x="10" y="554" width="3"   height="62" rx="1" fill="#A78BFA"/>
+<rect x="10" y="554" width="446" height="22" rx="4" fill="#0E0A1A"/>
+<text x="22" y="569" class="ts" style="fill:#7C3AED;">persistence/migrations.py  ·  migrations/001_initial.sql</text>
+<text x="22" y="585" class="tm">run_migrations(conn, dir)  ·  _schema_version table  ·  BEGIN IMMEDIATE  ·  idempotent</text>
+<text x="22" y="597" class="tm">001_initial.sql: all 7 tables + indexes  ·  next: 002_v2_extensions.sql  (Phase 9)</text>
+<!-- ╚══╝ y=616 -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     RIGHT COLUMN — JSON State  (x=472, w=480)
+     ═══════════════════════════════════════════════════════════ -->
+
+<!-- ╔══ StateManager  y=70..118 ══╗ -->
+<rect x="472" y="70" width="480" height="48" rx="4" fill="#042F2E" stroke="#065F46" stroke-width="0.8"/>
+<rect x="472" y="70" width="3"   height="48" rx="1" fill="#2DD4BF"/>
+<rect x="472" y="70" width="480" height="22" rx="4" fill="#062424"/>
+<text x="484" y="85" class="ts" style="fill:#0D9488;">persistence/state.py — StateManager</text>
+<text x="484" y="101" class="tm">atomic_write_json(path, data)  →  write tmp · fsync · os.replace()  (POSIX atomic rename)</text>
+<text x="484" y="113" class="tm">TTL checks via parse_utc_iso()  ·  state_dir constructor override for isolated tests</text>
+<!-- ╚══╝ y=118 -->
+
+<!-- ╔══ ig_state.json  y=124..196 ══╗ -->
+<rect x="472" y="124" width="480" height="72" rx="4" fill="#042F2E" stroke="#065F46" stroke-width="0.8"/>
+<rect x="472" y="124" width="3"   height="72" rx="1" fill="#2DD4BF"/>
+<rect x="472" y="124" width="480" height="22" rx="4" fill="#052B2B"/>
+<text x="484" y="139" class="ts" style="fill:#0D9488;">ig_state.json</text>
+<text x="556" y="139" class="tm" style="fill:#374151;">account snapshot  ·  updated on every get_account() call</text>
+<text x="484" y="155" class="tm">{ balance, available, profit_loss, currency, session_active,</text>
+<text x="484" y="167" class="tm">  open_positions: [ { deal_id, epic, direction, size, open_level, P&amp;L } ],  last_updated }</text>
+<text x="484" y="179" class="tm" style="fill:#0D9488;">TTL: fresh if last_updated &lt; 60s</text>
+<text x="644" y="179" class="tm">·  stale → bot re-fetches before any gate check</text>
+<!-- ╚══╝ y=196 -->
+
+<!-- ╔══ ig_config.json  y=202..258 ══╗ -->
+<rect x="472" y="202" width="480" height="56" rx="4" fill="#0A1628" stroke="#1E3A5F" stroke-width="0.8"/>
+<rect x="472" y="202" width="3"   height="56" rx="1" fill="#60A5FA"/>
+<rect x="472" y="202" width="480" height="22" rx="4" fill="#0D1628"/>
+<text x="484" y="217" class="ts" style="fill:#2563EB;">ig_config.json</text>
+<text x="562" y="217" class="tm" style="fill:#374151;">static config  ·  no TTL  ·  user-edited  ·  loaded once at bot start</text>
+<text x="484" y="233" class="tm">{ trading_window: { start_cet, end_cet },  risk: { max_risk_pct, position_cap_gbp },</text>
+<text x="484" y="245" class="tm">  filters: { max_spread_pct: 0.5, min_confidence: 55 },  research: { candidates_ttl_min: 30 } }</text>
+<!-- ╚══╝ y=258 -->
+
+<!-- ╔══ turbo_candidates.json  y=264..354 ══╗ -->
+<rect x="472" y="264" width="480" height="90" rx="4" fill="#180F00" stroke="#78350F" stroke-width="0.8"/>
+<rect x="472" y="264" width="3"   height="90" rx="1" fill="#FBBF24"/>
+<rect x="472" y="264" width="480" height="22" rx="4" fill="#1A1000"/>
+<text x="484" y="279" class="ts" style="fill:#B45309;">turbo_candidates.json</text>
+<text x="600" y="279" class="tm" style="fill:#374151;">research output  ·  written by Phase 4  ·  consumed by Phase 5 Gate 2</text>
+<text x="484" y="295" class="tm">{ generated_at,  ttl_minutes: 30,  expires_at (ISO 8601 UTC),  session_date,</text>
+<text x="484" y="307" class="tm">  candidates: [ { epic, direction, confidence, reasoning, spread_pct_at_research } ] }</text>
+<text x="484" y="319" class="tm" style="fill:#B45309;">TTL: 30 min via explicit expires_at field</text>
+<text x="484" y="331" class="tm">load_candidates() → [] on expiry  ·  candidates_are_fresh()  ·  clear_candidates()</text>
+<text x="484" y="343" class="tm" style="fill:#374151;">save_candidates(candidates, ttl_minutes=30, session_date=...) — always writes fresh expires_at</text>
+<!-- ╚══╝ y=354 -->
+
+<!-- ╔══ paths.py + timeutil.py  y=360..424 ══╗ -->
+<rect x="472" y="360" width="480" height="64" rx="4" fill="#0A0E14" stroke="#1E293B" stroke-width="0.8"/>
+<rect x="472" y="360" width="3"   height="64" rx="1" fill="#475569"/>
+<rect x="472" y="360" width="480" height="22" rx="4" fill="#0D1117"/>
+<text x="484" y="375" class="ts" style="fill:#475569;">persistence/paths.py  ·  persistence/timeutil.py</text>
+<text x="484" y="391" class="tm">data_root() → ~/trading-bot/data/  ·  override: env TRADING_BOT_DATA_DIR  ·  ensure_dirs()</text>
+<text x="484" y="403" class="tm">session_date_from_utc_iso(s) → Europe/Berlin date  ·  utc_iso_now()  ·  BERLIN_TZ</text>
+<text x="484" y="415" class="tm" style="fill:#374151;">berlin_now_decimal_hours()  ·  parse_utc_iso()  ·  zoneinfo stdlib (tzdata on Windows)</text>
+<!-- ╚══╝ y=424 -->
+
+<!-- ╔══ defaults.py  y=430..498 ══╗ -->
+<rect x="472" y="430" width="480" height="68" rx="4" fill="#070E1A" stroke="#1E3A5F" stroke-width="0.8"/>
+<rect x="472" y="430" width="3"   height="68" rx="1" fill="#60A5FA"/>
+<rect x="472" y="430" width="480" height="22" rx="4" fill="#0A1628"/>
+<text x="484" y="445" class="ts" style="fill:#2563EB;">persistence/defaults.py — ig_config_state seed values</text>
+<text x="484" y="461" class="tm" style="fill:#93C5FD;">bot_score</text>
+<text x="548" y="461" class="tm">→ 50.0  (neutral start · earn AGGRESSIV by pushing score above 50)</text>
+<text x="484" y="473" class="tm" style="fill:#93C5FD;">risk_level</text>
+<text x="548" y="473" class="tm">→ "KONSERVATIV"  ·  score ≤ 50 = KONSERVATIV  ·  score > 50 = AGGRESSIV</text>
+<text x="484" y="485" class="tm" style="fill:#93C5FD;">daily_pnl_today</text>
+<text x="584" y="485" class="tm">→ 0.0  ·  consec_losses → 0  ·  last_trade_id → null</text>
+<!-- ╚══╝ y=498 -->
+
+<!-- ╔══ design decisions  y=504..616 ══╗ -->
+<rect x="472" y="504" width="480" height="112" rx="4" fill="#040A14" stroke="#0F2040" stroke-width="0.6"/>
+<rect x="472" y="504" width="3"   height="112" rx="1" fill="#1E3A5F"/>
+<rect x="472" y="504" width="480" height="22" rx="4" fill="#0A1628"/>
+<text x="484" y="519" class="ts" style="fill:#374151;">design decisions locked in Phase 2</text>
+<text x="484" y="535" class="tm" style="fill:#475569;">isolation</text>
+<text x="540" y="535" class="tm">→  persistence/ never imports broker_wrapper · data flows as plain dicts</text>
+<text x="484" y="547" class="tm" style="fill:#475569;">connection</text>
+<text x="548" y="547" class="tm">→  one persistent sqlite3 conn per Database instance · context manager</text>
+<text x="484" y="559" class="tm" style="fill:#475569;">WAL</text>
+<text x="510" y="559" class="tm">→  Phase 5 (write) + Phase 8 (read) coexist without blocking</text>
+<text x="484" y="571" class="tm" style="fill:#475569;">time lib</text>
+<text x="536" y="571" class="tm">→  time-machine (not freezegun) — 100× faster · C-level mock</text>
+<text x="484" y="583" class="tm" style="fill:#475569;">data dir</text>
+<text x="534" y="583" class="tm">→  ~/trading-bot/data/ · gitignored · outside all phase dirs</text>
+<text x="484" y="595" class="tm" style="fill:#8B1414;">force_trigger</text>
+<text x="568" y="595" class="tm" style="fill:#475569;">→  NOT in defaults — anti-pattern per CLAUDE.md · no bypass lever</text>
+<!-- ╚══╝ y=616 -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     INTEGRATION CONTRACTS  y=624..706
+     ═══════════════════════════════════════════════════════════ -->
+<rect x="10" y="624" width="942" height="82" rx="4" fill="#0D0700" stroke="#78350F" stroke-width="0.8"/>
+<rect x="10" y="624" width="3"   height="82" rx="1" fill="#FBBF24"/>
+<rect x="10" y="624" width="942" height="22" rx="4" fill="#1A1000"/>
+<text x="22" y="639" class="ts" style="fill:#B45309;">Integration Contracts — Phase 1 ← → Phase 2 ← → Phase 5+</text>
+<text x="22" y="655" class="tm" style="fill:#B45309;">Phase 1 → 2</text>
+<text x="94" y="655" class="tm">Envelope.data (dict) → insert_trade()  ·  close_data dict → update_trade_close()  ·  broker field already "ig"</text>
+<text x="22" y="667" class="tm" style="fill:#3B6DB7;">Phase 5 →</text>
+<text x="84" y="667" class="tm">record_trade_complete(trade, reward?, lesson?, regime?, context?)  ← all-or-nothing BEGIN IMMEDIATE transaction</text>
+<text x="22" y="679" class="tm" style="fill:#0D9488;">Reconcile</text>
+<text x="82" y="679" class="tm">refs = db.get_unreconciled_deal_references()  →  broker.reconcile_positions(expected_references=refs)</text>
+<text x="22" y="691" class="tm" style="fill:#8B5CF6;">Phase 7 →</text>
+<text x="84" y="691" class="tm">insert_reward(trade_id, reward)  ·  insert_lesson(trade_id, lesson)  ·  mark_lesson_used(lesson_id)</text>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LEGEND  y=712..728
+     ═══════════════════════════════════════════════════════════ -->
+<rect x="10" y="712" width="942" height="14" rx="2" fill="#0A0E14"/>
+<rect x="18" y="716" width="3" height="8" rx="1" fill="#4ADE80"/>
+<text x="26" y="724" class="tm">done (Ph1/Ph2)</text>
+<rect x="124" y="716" width="3" height="8" rx="1" fill="#60A5FA"/>
+<text x="132" y="724" class="tm">Phase 5 write</text>
+<rect x="210" y="716" width="3" height="8" rx="1" fill="#A78BFA"/>
+<text x="218" y="724" class="tm">migrations</text>
+<rect x="290" y="716" width="3" height="8" rx="1" fill="#8B5CF6"/>
+<text x="298" y="724" class="tm">Phase 7 write</text>
+<rect x="378" y="716" width="3" height="8" rx="1" fill="#FBBF24"/>
+<text x="386" y="724" class="tm">★V2 Phase 9</text>
+<rect x="464" y="716" width="3" height="8" rx="1" fill="#2DD4BF"/>
+<text x="472" y="724" class="tm">JSON state</text>
+<text x="584" y="724" class="tm" style="fill:#4ADE80;">59 unit tests green · live_test.py verified · 2026-05-22</text>
+
+</svg>

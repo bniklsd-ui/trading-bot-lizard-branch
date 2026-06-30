@@ -1,0 +1,183 @@
+<svg width="100%" viewBox="0 0 960 650" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Phase 3 — External Data (yFinance) Architecture</title>
+<desc>Architecture diagram of the external_data package: input IG epic flows through MarketDataFetcher (ticker_map, market-hours guard, FileCache, RateLimiter, the single _raw_download network point, and pure indicator functions) into models/BrainContext and on to Phase 4/5/7 consumers. Right panel lists the dataclass contracts, key design decisions, the Phase-5 momentum-VETO carry-over flag, and live-verified status.</desc>
+<defs>
+<marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+<style>
+svg { font-family: ui-monospace,'Cascadia Code','Fira Mono','Courier New',monospace; background: #0D1117; }
+.th { font-size: 13px; font-weight: 600; fill: #E2E8F0; }
+.t  { font-size: 12px; font-weight: 400; fill: #CBD5E1; }
+.ts { font-size: 10.5px; font-weight: 400; fill: #94A3B8; }
+.tm { font-size: 9.5px; font-weight: 400; fill: #64748B; }
+.green  { fill: #4ADE80; }
+.amber  { fill: #FBBF24; }
+.blue   { fill: #60A5FA; }
+.red    { fill: #F87171; }
+.purple { fill: #A78BFA; }
+.teal   { fill: #2DD4BF; }
+</style>
+</defs>
+
+<rect width="960" height="650" fill="#0D1117"/>
+
+<!-- header -->
+<rect x="0" y="0" width="960" height="50" fill="#161D27"/>
+<line x1="0" y1="50" x2="960" y2="50" stroke="#1E2D45" stroke-width="1"/>
+<text x="16" y="22" class="th" style="font-size:15px;fill:#E2E8F0;">Phase 3 — External Data (yFinance)</text>
+<text x="16" y="40" class="ts">fetcher · indicators · cache · ticker_map · market_hours · models · timeutil · exceptions   —   100% code, no LLM</text>
+<rect x="800" y="13" width="146" height="24" rx="3" fill="#052E1A" stroke="#166534" stroke-width="0.8"/>
+<circle cx="816" cy="25" r="3.5" fill="#4ADE80"/>
+<text x="825" y="29" class="ts" style="fill:#4ADE80;font-size:10px;">phase 3 · live-verified</text>
+
+<!-- divider -->
+<line x1="598" y1="58" x2="598" y2="636" stroke="#1E293B" stroke-width="1" stroke-dasharray="4,3"/>
+
+<!-- ===================== LEFT: PIPELINE ===================== -->
+
+<!-- input -->
+<text x="12" y="74" class="tm" style="fill:#3B6DB7;">input</text>
+<rect x="12" y="80" width="190" height="38" rx="5" fill="#0A1628" stroke="#1E3A5F" stroke-width="0.8"/>
+<text x="22" y="98" class="ts" style="fill:#5A8ACC;">IG epic</text>
+<text x="22" y="111" class="tm">IX.D.DAX.IFMM.IP</text>
+<line x1="107" y1="118" x2="107" y2="134" stroke="#2A4060" stroke-width="1.2" marker-end="url(#arr)"/>
+
+<!-- fetcher container -->
+<rect x="12" y="136" width="574" height="378" rx="6" fill="#081A10" stroke="#166534" stroke-width="0.9"/>
+<text x="24" y="155" class="ts" style="fill:#2D7A50;">external_data/ — MarketDataFetcher pipeline</text>
+<text x="430" y="155" class="tm">single network point ↓⑤</text>
+
+<!-- public API summary -->
+<text x="24" y="174" class="tm">public API · MarketDataFetcher(mapper, cache, rate_limiter)</text>
+<circle cx="28" cy="186" r="3" fill="#4ADE80"/>
+<text x="38" y="190" class="ts">intraday → None off-hours:  get_drift · get_momentum · get_bars</text>
+<circle cx="28" cy="200" r="3" fill="#60A5FA"/>
+<text x="38" y="204" class="ts">daily (always):  get_history · get_volume_anomaly · get_high_low_distance</text>
+<circle cx="28" cy="214" r="3" fill="#A78BFA"/>
+<text x="38" y="218" class="ts">composite:  get_brain_context() → BrainContext  (fail-tolerant)</text>
+<line x1="24" y1="226" x2="574" y2="226" stroke="#10391F" stroke-width="1"/>
+
+<!-- pipeline steps (left) -->
+<!-- 1 ticker_map -->
+<rect x="24" y="236" width="270" height="30" rx="4" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<rect x="24" y="236" width="2.5" height="30" rx="1" fill="#4ADE80"/>
+<text x="34" y="249" class="ts" style="fill:#86EFAC;">① ticker_map · epic → ^GDAXI</text>
+<text x="34" y="261" class="tm">+ optional vol-proxy EXS1.DE</text>
+<line x1="159" y1="266" x2="159" y2="278" stroke="#2A6040" stroke-width="1.1" marker-end="url(#arr)"/>
+
+<!-- 2 market_hours -->
+<rect x="24" y="280" width="270" height="30" rx="4" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<rect x="24" y="280" width="2.5" height="30" rx="1" fill="#4ADE80"/>
+<text x="34" y="293" class="ts" style="fill:#86EFAC;">② market_hours.is_market_open()</text>
+<text x="34" y="305" class="tm">Mo–Fr 09:00–17:30 Europe/Berlin (DST)</text>
+<line x1="159" y1="310" x2="159" y2="322" stroke="#2A6040" stroke-width="1.1" marker-end="url(#arr)"/>
+
+<!-- 3 cache -->
+<rect x="24" y="324" width="270" height="30" rx="4" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<rect x="24" y="324" width="2.5" height="30" rx="1" fill="#4ADE80"/>
+<text x="34" y="337" class="ts" style="fill:#86EFAC;">③ FileCache · JSON + TTL (atomic)</text>
+<text x="34" y="349" class="tm">1d→midnight · 5m→120s · 30m→300s</text>
+<line x1="159" y1="354" x2="159" y2="366" stroke="#2A6040" stroke-width="1.1" marker-end="url(#arr)"/>
+
+<!-- 4 ratelimiter -->
+<rect x="24" y="368" width="270" height="26" rx="4" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<rect x="24" y="368" width="2.5" height="26" rx="1" fill="#4ADE80"/>
+<text x="34" y="385" class="ts" style="fill:#86EFAC;">④ RateLimiter · ≥ 0.5 s between calls</text>
+<line x1="159" y1="394" x2="159" y2="406" stroke="#2A6040" stroke-width="1.1" marker-end="url(#arr)"/>
+
+<!-- 5 raw_download (highlight) -->
+<rect x="24" y="408" width="270" height="30" rx="4" fill="#1A1000" stroke="#B45309" stroke-width="1"/>
+<rect x="24" y="408" width="2.5" height="30" rx="1" fill="#FBBF24"/>
+<text x="34" y="421" class="ts" style="fill:#FBBF24;">⑤ _raw_download()  ← ONLY net call</text>
+<text x="34" y="433" class="tm">retry: exp-backoff 1→2→4s · ≤3 tries</text>
+<line x1="294" y1="423" x2="356" y2="423" stroke="#7A5210" stroke-width="1.2" marker-end="url(#arr)"/>
+<line x1="159" y1="438" x2="159" y2="450" stroke="#2A6040" stroke-width="1.1" marker-end="url(#arr)"/>
+
+<!-- 6 indicators -->
+<rect x="24" y="452" width="270" height="30" rx="4" fill="#052E1A" stroke="#166534" stroke-width="0.6"/>
+<rect x="24" y="452" width="2.5" height="30" rx="1" fill="#4ADE80"/>
+<text x="34" y="465" class="ts" style="fill:#86EFAC;">⑥ indicators.py · pure fns</text>
+<text x="34" y="477" class="tm">drift% · momentum(5m) · vol z-score · high/low</text>
+
+<!-- external egress (right side inside container) -->
+<rect x="358" y="408" width="216" height="30" rx="4" fill="#180F00" stroke="#7A5210" stroke-width="0.8"/>
+<text x="368" y="421" class="ts" style="fill:#FBBF24;">yfinance ≥0.2.65 (curl_cffi internal)</text>
+<text x="368" y="433" class="tm">no custom session passed</text>
+<line x1="466" y1="438" x2="466" y2="450" stroke="#7A5210" stroke-width="1.1" marker-end="url(#arr)"/>
+<rect x="358" y="452" width="216" height="46" rx="4" fill="#160404" stroke="#7F1D1D" stroke-width="0.8"/>
+<text x="368" y="468" class="ts" style="fill:#F87171;">Yahoo Finance · ^GDAXI</text>
+<text x="368" y="481" class="tm">delayed quote ~15 min · index = 0 volume</text>
+<text x="368" y="492" class="tm">→ ETF proxy EXS1.DE for real volume</text>
+
+<!-- indicator detail strip -->
+<text x="24" y="505" class="tm" style="fill:#5E7A8A;">vol anomaly z thresholds ±2 / ±3 · high/low band 90d · near &lt; 1.5% · daily history ffill + IQR-outlier filtered</text>
+
+<!-- out of container -->
+<line x1="107" y1="514" x2="107" y2="528" stroke="#2A4060" stroke-width="1.2" marker-end="url(#arr)"/>
+
+<!-- models / BrainContext -->
+<rect x="12" y="530" width="320" height="40" rx="5" fill="#100C22" stroke="#3B2E6B" stroke-width="0.8"/>
+<rect x="12" y="530" width="2.5" height="40" rx="1" fill="#A78BFA"/>
+<text x="24" y="547" class="ts" style="fill:#C4B5FD;">models.py · BrainContext</text>
+<text x="24" y="560" class="tm">.to_prompt_dict() → LLM   ·   .to_dict() → market_context_json</text>
+<line x1="107" y1="570" x2="107" y2="584" stroke="#2A4060" stroke-width="1.2" marker-end="url(#arr)"/>
+
+<!-- consumers -->
+<rect x="12" y="586" width="574" height="46" rx="5" fill="#0A1628" stroke="#1E3A5F" stroke-width="0.8" stroke-dasharray="5,3"/>
+<text x="24" y="601" class="tm" style="fill:#3B6DB7;">consumers (later phases) — cross-phase via public contracts only</text>
+<rect x="24" y="606" width="150" height="20" rx="3" fill="#0D1E38" stroke="#1E3A5F" stroke-width="0.6"/>
+<text x="99" y="620" class="ts" style="fill:#60A5FA;text-anchor:middle;">Phase 4 · research</text>
+<rect x="184" y="606" width="210" height="20" rx="3" fill="#180F00" stroke="#7A5210" stroke-width="0.6"/>
+<text x="289" y="620" class="ts" style="fill:#FBBF24;text-anchor:middle;">Phase 5 · gates (context only ⚠)</text>
+<rect x="404" y="606" width="172" height="20" rx="3" fill="#100C22" stroke="#3B2E6B" stroke-width="0.6"/>
+<text x="490" y="620" class="ts" style="fill:#A78BFA;text-anchor:middle;">Phase 7 · longterm brain</text>
+
+<!-- ===================== RIGHT: CONTRACTS / DECISIONS ===================== -->
+
+<!-- contracts -->
+<rect x="610" y="62" width="338" height="156" rx="5" fill="#0D1428" stroke="#1E3A5F" stroke-width="0.8"/>
+<text x="622" y="80" class="ts" style="fill:#5A8ACC;">contracts · models.py  (ISO-UTC, ms, Z)</text>
+<text x="622" y="98" class="ts"><tspan class="teal">PriceBar</tspan>          <tspan class="tm">ohlcv · volume 0.0 if none</tspan></text>
+<text x="622" y="114" class="ts"><tspan class="teal">DriftResult</tspan>       <tspan class="tm">drift_pct · is_realtime=False</tspan></text>
+<text x="622" y="130" class="ts"><tspan class="teal">MomentumResult</tspan>    <tspan class="tm">5m · is_realtime=False</tspan></text>
+<text x="622" y="146" class="ts"><tspan class="teal">VolumeAnomaly</tspan>     <tspan class="tm">z · volume_available · source</tspan></text>
+<text x="622" y="162" class="ts"><tspan class="teal">HighLowDistance</tspan>   <tspan class="tm">dist hi/lo · near &lt;1.5%</tspan></text>
+<text x="622" y="178" class="ts"><tspan class="teal">BrainContext</tspan>      <tspan class="tm">composite · partial-ok</tspan></text>
+<text x="622" y="200" class="tm" style="fill:#5E7A8A;">exceptions: ExternalDataError → EpicNotMapped ·</text>
+<text x="622" y="211" class="tm" style="fill:#5E7A8A;">DataUnavailable · RateLimit  (own tree, isolated)</text>
+
+<!-- decisions -->
+<rect x="610" y="228" width="338" height="178" rx="5" fill="#0A1E10" stroke="#166534" stroke-width="0.8"/>
+<text x="622" y="246" class="ts" style="fill:#4ADE80;">key design decisions</text>
+<text x="622" y="264" class="ts">• intraday off-hours → <tspan class="amber">None</tspan> (never stale)</text>
+<text x="622" y="281" class="ts">• momentum <tspan class="amber">is_realtime=False</tspan> → context only</text>
+<text x="622" y="298" class="ts">• ^GDAXI no volume → degrade gracefully</text>
+<text x="634" y="312" class="tm">+ register_volume_proxy(epic, "EXS1.DE")</text>
+<text x="622" y="329" class="ts">• dual error modes, both retried:</text>
+<text x="634" y="343" class="tm">YFRateLimitError → RateLimitError</text>
+<text x="634" y="355" class="tm">empty/short df → DataUnavailableError</text>
+<text x="622" y="372" class="ts">• one network point: _raw_download()</text>
+<text x="622" y="389" class="ts">• phase isolation: own timeutil, no</text>
+<text x="634" y="402" class="tm">broker_wrapper / persistence imports</text>
+
+<!-- phase 5 flag -->
+<rect x="610" y="416" width="338" height="96" rx="5" fill="#1A1000" stroke="#B45309" stroke-width="1"/>
+<text x="622" y="434" class="ts" style="fill:#FBBF24;">⚠ Phase-5 carry-over (cross-phase notice)</text>
+<text x="622" y="452" class="ts">hard momentum VETO must source from</text>
+<text x="622" y="467" class="ts"><tspan class="amber">IG real-time bars (get_ohlcv)</tspan>, NOT</text>
+<text x="622" y="482" class="ts">get_momentum() — yFinance is ~15 min</text>
+<text x="622" y="497" class="ts">delayed. Phase-3 momentum = context signal.</text>
+
+<!-- status -->
+<rect x="610" y="522" width="338" height="66" rx="5" fill="#052E1A" stroke="#166534" stroke-width="0.8"/>
+<circle cx="626" cy="542" r="3.5" fill="#4ADE80"/>
+<text x="636" y="546" class="ts" style="fill:#4ADE80;">live-verified · 2026-06-02</text>
+<text x="622" y="564" class="tm" style="fill:#86EFAC;">70 mocked tests green · pytest no-network</text>
+<text x="622" y="578" class="tm" style="fill:#86EFAC;">live_test 6/6 · ETF proxy EXS1.DE z=-1.36</text>
+
+<!-- footer caption -->
+<text x="610" y="606" class="tm" style="fill:#475569;">build order: exceptions/models → timeutil/market_hours → ticker_map → cache → indicators → fetcher → exports → smoke → live → docs</text>
+<text x="610" y="620" class="tm" style="fill:#475569;">10 steps · standalone · single network site · consumed by Phase 4/5/7 through public contracts</text>
+
+</svg>

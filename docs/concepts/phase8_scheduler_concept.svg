@@ -1,0 +1,258 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" font-family="'SF Mono','DejaVu Sans Mono','Menlo','Consolas',monospace">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1117"/>
+      <stop offset="1" stop-color="#0a0e14"/>
+    </linearGradient>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 Z" fill="#8b949e"/>
+    </marker>
+    <marker id="arrG" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 Z" fill="#3fb950"/>
+    </marker>
+    <marker id="arrB" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 Z" fill="#58a6ff"/>
+    </marker>
+  </defs>
+
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1080" height="6" fill="#d29922"/>
+
+  <!-- ============ HEADER ============ -->
+  <text x="40" y="58" fill="#e6edf3" font-size="34" font-weight="700">PHASE 8 — SCHEDULER</text>
+  <text x="40" y="84" fill="#8b949e" font-size="15">Autonomer Datensammler · langlaufender Daemon · DAX-Intraday-CFD · IG Demo</text>
+  <text x="1040" y="40" fill="#6e7681" font-size="12" text-anchor="end">trading-bot-lizard-branch</text>
+  <text x="1040" y="58" fill="#6e7681" font-size="12" text-anchor="end">code = source of truth</text>
+  <text x="1040" y="76" fill="#6e7681" font-size="12" text-anchor="end">As-Built 2026-06-30</text>
+
+  <!-- ============ STATUS STRIP ============ -->
+  <g font-size="12.5">
+    <rect x="40" y="100" width="240" height="56" rx="7" fill="#161b22" stroke="#d29922" stroke-width="1.4"/>
+    <text x="56" y="124" fill="#d29922" font-weight="700">MERGED → main</text>
+    <text x="56" y="143" fill="#8b949e">2026-06-30 · halber Abschluss</text>
+
+    <rect x="294" y="100" width="200" height="56" rx="7" fill="#161b22" stroke="#3fb950" stroke-width="1.4"/>
+    <text x="310" y="124" fill="#3fb950" font-weight="700">181 Unit-Tests grün</text>
+    <text x="310" y="143" fill="#8b949e">Regression P1–P7 grün</text>
+
+    <rect x="508" y="100" width="206" height="56" rx="7" fill="#161b22" stroke="#30363d" stroke-width="1.4"/>
+    <text x="524" y="124" fill="#c9d1d9" font-weight="700">12 Module + Web-UI</text>
+    <text x="524" y="143" fill="#8b949e">Paket `scheduler`</text>
+
+    <rect x="728" y="100" width="312" height="56" rx="7" fill="#161b22" stroke="#f85149" stroke-width="1.4"/>
+    <text x="744" y="124" fill="#f85149" font-weight="700">⚠ autonomer Trade NICHT live-bewiesen</text>
+    <text x="744" y="143" fill="#8b949e">Bot abstaint fast jeden Zyklus → v1.5-Hotfix</text>
+  </g>
+
+  <!-- ============ LEFT: DAEMON LOOP ============ -->
+  <rect x="40" y="174" width="560" height="372" rx="9" fill="#11151c" stroke="#30363d"/>
+  <text x="58" y="198" fill="#e6edf3" font-size="15" font-weight="700">DAEMON-LOOP  ·  runner.py</text>
+  <text x="58" y="216" fill="#6e7681" font-size="11">injizierbares now_fn/sleep_fn · kein echtes sleep im Test</text>
+
+  <!-- preflight -->
+  <rect x="58" y="228" width="524" height="32" rx="6" fill="#1c2128" stroke="#bc8cff" stroke-width="1.3"/>
+  <text x="70" y="249" fill="#bc8cff" font-size="12.5" font-weight="700">preflight()</text>
+  <text x="170" y="249" fill="#c9d1d9" font-size="11.5">Keyring erreichbar? · Broker connect · DB/Migrationen — fail-closed</text>
+
+  <!-- phases -->
+  <g font-size="11.5">
+    <rect x="58" y="272" width="128" height="58" rx="6" fill="#161b22" stroke="#39c5cf"/>
+    <text x="68" y="291" fill="#39c5cf" font-weight="700">PRE_OPEN</text>
+    <text x="68" y="308" fill="#8b949e">Session keepalive</text>
+    <text x="68" y="323" fill="#8b949e">reconcile.tick()</text>
+
+    <rect x="200" y="272" width="248" height="58" rx="6" fill="#161b22" stroke="#d29922" stroke-width="1.4"/>
+    <text x="210" y="291" fill="#d29922" font-weight="700">WINDOW  09:30–11:19 CET</text>
+    <text x="210" y="308" fill="#8b949e">can_open? → research_tick → cycle</text>
+    <text x="210" y="323" fill="#8b949e">record_cycle · cycle_interval (5min)</text>
+
+    <rect x="462" y="272" width="120" height="58" rx="6" fill="#161b22" stroke="#39c5cf"/>
+    <text x="472" y="291" fill="#39c5cf" font-weight="700">POST_WIN</text>
+    <text x="472" y="308" fill="#8b949e">finaler</text>
+    <text x="472" y="323" fill="#8b949e">reconcile</text>
+  </g>
+
+  <!-- IDLE + loop arrows -->
+  <rect x="58" y="344" width="128" height="26" rx="6" fill="#161b22" stroke="#30363d"/>
+  <text x="68" y="361" fill="#8b949e" font-size="11.5">IDLE · Wochenende/Nacht</text>
+  <path d="M186 357 H300 V336" fill="none" stroke="#8b949e" stroke-width="1.3" marker-end="url(#arr)"/>
+  <path d="M324 272 V250 M324 250 H58 V262" fill="none" stroke="#8b949e" stroke-width="1.1" marker-end="url(#arr)"/>
+
+  <!-- guards row -->
+  <text x="58" y="392" fill="#6e7681" font-size="11">JEDER LOOP prüft:</text>
+  <g font-size="11">
+    <rect x="58" y="400" width="120" height="28" rx="6" fill="#161b22" stroke="#f85149"/>
+    <text x="68" y="418" fill="#f85149" font-weight="700">killswitch</text>
+    <text x="150" y="418" fill="#8b949e" font-size="9.5">data/state/KILL</text>
+
+    <rect x="190" y="400" width="120" height="28" rx="6" fill="#161b22" stroke="#d29922"/>
+    <text x="200" y="418" fill="#d29922" font-weight="700">backoff</text>
+    <text x="262" y="418" fill="#8b949e" font-size="9.5">N=3→trip</text>
+
+    <rect x="322" y="400" width="124" height="28" rx="6" fill="#161b22" stroke="#3fb950"/>
+    <text x="332" y="418" fill="#3fb950" font-weight="700">budget</text>
+    <text x="388" y="418" fill="#8b949e" font-size="9.5">200k≈€0.8/d</text>
+
+    <rect x="458" y="400" width="124" height="28" rx="6" fill="#161b22" stroke="#30363d"/>
+    <text x="468" y="418" fill="#c9d1d9" font-weight="700">command.py</text>
+    <text x="468" y="9" fill="#8b949e"></text>
+  </g>
+  <text x="466" y="442" fill="#6e7681" font-size="9.5">command = UI-Steuerung · P10-Hook</text>
+
+  <!-- shutdown -->
+  <rect x="58" y="456" width="524" height="30" rx="6" fill="#1c2128" stroke="#30363d"/>
+  <text x="70" y="475" fill="#c9d1d9" font-size="11.5">shutdown(): finaler reconcile · Session sauber schließen · kein Orphan</text>
+
+  <!-- proven micro -->
+  <rect x="58" y="496" width="524" height="40" rx="6" fill="#0f1620" stroke="#238636"/>
+  <text x="70" y="513" fill="#3fb950" font-size="11" font-weight="700">LIVE 2026-06-29 (3/3):</text>
+  <text x="70" y="529" fill="#8b949e" font-size="10.5">Lifecycle · State · echtes P4-Research → Fail-Safe-ABSTAIN · reconcile+reward auf 2 realen Trades</text>
+
+  <!-- ============ RIGHT: MODULE MAP + UI ============ -->
+  <rect x="620" y="174" width="420" height="372" rx="9" fill="#11151c" stroke="#30363d"/>
+  <text x="638" y="198" fill="#e6edf3" font-size="15" font-weight="700">MODUL-MAP  ·  phase8_scheduler/</text>
+
+  <g font-size="11.5">
+    <text x="638" y="224" fill="#39c5cf" font-size="11" font-weight="700">ZEIT / LOOP</text>
+    <rect x="638" y="230" width="92" height="26" rx="5" fill="#161b22" stroke="#30363d"/><text x="648" y="247" fill="#c9d1d9">config</text>
+    <rect x="738" y="230" width="92" height="26" rx="5" fill="#161b22" stroke="#30363d"/><text x="748" y="247" fill="#c9d1d9">clock</text>
+    <rect x="838" y="230" width="92" height="26" rx="5" fill="#161b22" stroke="#30363d"/><text x="848" y="247" fill="#c9d1d9">state</text>
+    <rect x="938" y="230" width="92" height="26" rx="5" fill="#161b22" stroke="#30363d"/><text x="948" y="247" fill="#c9d1d9">exceptions</text>
+
+    <text x="638" y="278" fill="#f85149" font-size="11" font-weight="700">SAFETY (Auto-Confirm = Code, kein AI)</text>
+    <rect x="638" y="284" width="118" height="26" rx="5" fill="#161b22" stroke="#f85149"/><text x="648" y="301" fill="#f0c0bd">safety</text>
+    <rect x="764" y="284" width="118" height="26" rx="5" fill="#161b22" stroke="#30363d"/><text x="774" y="301" fill="#c9d1d9">killswitch</text>
+    <rect x="890" y="284" width="140" height="26" rx="5" fill="#161b22" stroke="#30363d"/><text x="900" y="301" fill="#c9d1d9">backoff</text>
+    <rect x="638" y="316" width="118" height="26" rx="5" fill="#161b22" stroke="#30363d"/><text x="648" y="333" fill="#c9d1d9">budget</text>
+    <rect x="764" y="316" width="118" height="26" rx="5" fill="#161b22" stroke="#30363d"/><text x="774" y="333" fill="#c9d1d9">command</text>
+    <text x="892" y="333" fill="#8b949e" font-size="10">demo-only · caps ·</text>
+    <text x="892" y="346" fill="#8b949e" font-size="10">loss-breaker · budget</text>
+
+    <text x="638" y="372" fill="#bc8cff" font-size="11" font-weight="700">PIPELINE-NAHT</text>
+    <rect x="638" y="378" width="180" height="26" rx="5" fill="#161b22" stroke="#bc8cff"/><text x="648" y="395" fill="#d8c4f7">research_tick</text>
+    <rect x="826" y="378" width="150" height="26" rx="5" fill="#161b22" stroke="#bc8cff"/><text x="836" y="395" fill="#d8c4f7">reconcile</text>
+    <rect x="638" y="410" width="180" height="26" rx="5" fill="#161b22" stroke="#bc8cff"/><text x="648" y="427" fill="#d8c4f7">runner (Loop)</text>
+  </g>
+
+  <!-- Web UI -->
+  <rect x="638" y="450" width="384" height="84" rx="7" fill="#0f1620" stroke="#39c5cf" stroke-width="1.3"/>
+  <text x="650" y="470" fill="#39c5cf" font-size="12.5" font-weight="700">WEB-UI · webui/ (FastAPI + statisches HTML/JS)</text>
+  <text x="650" y="488" fill="#8b949e" font-size="10.5">SEPARATER Prozess · read-only SQLite · bind 127.0.0.1</text>
+  <text x="650" y="504" fill="#8b949e" font-size="10.5">Steuerung NUR via Kill-/Command-Datei → Trader nie UI-abhängig</text>
+  <text x="650" y="520" fill="#8b949e" font-size="10.5">GitHub-Dark · Monospace · Glass/Neumorphism-Buttons · kein React/npm</text>
+
+  <!-- ============ AUTONOMOUS TRADE PIPELINE ============ -->
+  <rect x="40" y="560" width="1000" height="118" rx="9" fill="#11151c" stroke="#30363d"/>
+  <text x="58" y="584" fill="#e6edf3" font-size="15" font-weight="700">AUTONOMER TRADE-ZYKLUS</text>
+  <text x="300" y="584" fill="#6e7681" font-size="11">— voller Stack P4→P6→P5→P7, vom Scheduler getrieben · blau = die einzigen AI-Stellen · KEIN neues AI in P8</text>
+
+  <g font-size="10.5">
+    <!-- research_tick -->
+    <rect x="58" y="600" width="120" height="62" rx="6" fill="#161b22" stroke="#bc8cff"/>
+    <text x="66" y="619" fill="#d8c4f7" font-weight="700">research_tick</text>
+    <text x="66" y="635" fill="#8b949e">echtes P4,</text>
+    <text x="66" y="649" fill="#8b949e">nie der Seed</text>
+
+    <!-- P4 -->
+    <rect x="196" y="600" width="120" height="62" rx="6" fill="#161b22" stroke="#58a6ff"/>
+    <text x="204" y="619" fill="#58a6ff" font-weight="700">P4 Research</text>
+    <text x="204" y="635" fill="#8b949e">1 Pick | [] </text>
+    <text x="204" y="649" fill="#8b949e">Validator-Gate</text>
+
+    <!-- P6 -->
+    <rect x="334" y="600" width="120" height="62" rx="6" fill="#161b22" stroke="#58a6ff"/>
+    <text x="342" y="619" fill="#58a6ff" font-weight="700">P6 Debatte</text>
+    <text x="342" y="635" fill="#8b949e">Bull/Bear/Judge</text>
+    <text x="342" y="649" fill="#8b949e">darf flippen</text>
+
+    <!-- P5 -->
+    <rect x="472" y="600" width="130" height="62" rx="6" fill="#161b22" stroke="#3fb950"/>
+    <text x="480" y="619" fill="#3fb950" font-weight="700">P5 Gates+VETOs</text>
+    <text x="480" y="635" fill="#8b949e">5 Gates · 4 VETOs</text>
+    <text x="480" y="649" fill="#8b949e">(unantastbar)</text>
+
+    <!-- AutoConfirm -->
+    <rect x="620" y="600" width="120" height="62" rx="6" fill="#161b22" stroke="#f85149" stroke-width="1.3"/>
+    <text x="628" y="619" fill="#f85149" font-weight="700">AutoConfirm</text>
+    <text x="628" y="635" fill="#8b949e">demo-only,</text>
+    <text x="628" y="649" fill="#8b949e">fail-closed</text>
+
+    <!-- order -->
+    <rect x="758" y="600" width="110" height="62" rx="6" fill="#161b22" stroke="#30363d"/>
+    <text x="766" y="619" fill="#c9d1d9" font-weight="700">place /</text>
+    <text x="766" y="635" fill="#c9d1d9" font-weight="700">monitor / close</text>
+    <text x="766" y="651" fill="#8b949e">P&amp;L lag-frei</text>
+
+    <!-- P7 -->
+    <rect x="886" y="600" width="138" height="62" rx="6" fill="#161b22" stroke="#58a6ff"/>
+    <text x="894" y="619" fill="#58a6ff" font-weight="700">P7 Reward</text>
+    <text x="894" y="635" fill="#8b949e">score + lesson</text>
+    <text x="894" y="649" fill="#8b949e">+ reconcile-catchup</text>
+  </g>
+  <g stroke-width="1.4" fill="none">
+    <path d="M178 631 H196" stroke="#bc8cff" marker-end="url(#arrB)"/>
+    <path d="M316 631 H334" stroke="#58a6ff" marker-end="url(#arrB)"/>
+    <path d="M454 631 H472" stroke="#58a6ff" marker-end="url(#arr)"/>
+    <path d="M602 631 H620" stroke="#3fb950" marker-end="url(#arr)"/>
+    <path d="M740 631 H758" stroke="#f85149" marker-end="url(#arr)"/>
+    <path d="M868 631 H886" stroke="#8b949e" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- ============ WHY HALF-DONE: C/B/A ============ -->
+  <rect x="40" y="692" width="1000" height="196" rx="9" fill="#1a1210" stroke="#f85149" stroke-width="1.4"/>
+  <text x="58" y="717" fill="#f85149" font-size="15" font-weight="700">WARUM HALBER ABSCHLUSS → v1.5-HOTFIX  (Research-Überkonservatismus, KEIN Scheduler-Bug)</text>
+  <text x="58" y="735" fill="#8b949e" font-size="11">Der Bot abstaint fast jeden Zyklus → null net-new autonome Trades. Drei Ursachen, Priorität C &gt; B &gt; A. v1.5 = nur deterministische Gates/Inputs, kein neues AI.</text>
+
+  <g font-size="11">
+    <rect x="58" y="746" width="320" height="128" rx="7" fill="#161b22" stroke="#f85149"/>
+    <text x="72" y="767" fill="#f85149" font-size="13" font-weight="700">C · Varietät (Hauptblocker)</text>
+    <text x="72" y="787" fill="#c9d1d9">Universum = 1 Epic</text>
+    <text x="72" y="803" fill="#8b949e">epic_allowlist=("IX.D.DAX.IFMM.IP",)</text>
+    <text x="72" y="821" fill="#8b949e">→ "DAX BUY oder nichts", meist nichts</text>
+    <text x="72" y="841" fill="#d8c4f7">Fix: P4 allowlist + P3 TickerMapper</text>
+    <text x="72" y="857" fill="#8b949e">+ Volume-Proxy + Sizing-Sanity je Epic</text>
+
+    <rect x="390" y="746" width="320" height="128" rx="7" fill="#161b22" stroke="#d29922"/>
+    <text x="404" y="767" fill="#d29922" font-size="13" font-weight="700">B · Doppel-Clamp &lt; Score 50</text>
+    <text x="404" y="787" fill="#c9d1d9">long-bias → BUY-only  UND</text>
+    <text x="404" y="803" fill="#c9d1d9">confidence-floor 55 → 70</text>
+    <text x="404" y="821" fill="#8b949e">= zugleich long gezwungen + strenger</text>
+    <text x="404" y="841" fill="#d8c4f7">Fix: entkoppeln/relaxen; P6-Debatte</text>
+    <text x="404" y="857" fill="#8b949e">+ VETOs als echter Richtungs-Check</text>
+
+    <rect x="722" y="746" width="304" height="128" rx="7" fill="#161b22" stroke="#bc8cff"/>
+    <text x="736" y="767" fill="#bc8cff" font-size="13" font-weight="700">A · Lessons unecht</text>
+    <text x="736" y="787" fill="#c9d1d9">Verifikations-Trades erzeugen</text>
+    <text x="736" y="803" fill="#c9d1d9">Lessons → zurück in Prompt</text>
+    <text x="736" y="821" fill="#8b949e">→ verschmutzt die eine AI-Eingabe</text>
+    <text x="736" y="841" fill="#d8c4f7">Fix: Provenance-Quarantäne + Purge</text>
+    <text x="736" y="857" fill="#8b949e">(nach C/B — Sequencing-Thema)</text>
+  </g>
+
+  <!-- ============ FOOTER: PROVEN / NOT + PRINCIPLE ============ -->
+  <rect x="40" y="902" width="495" height="150" rx="9" fill="#0f1620" stroke="#238636"/>
+  <text x="58" y="925" fill="#3fb950" font-size="13" font-weight="700">✓ BEWIESEN (mechanisch, unit + 1 Live-Run)</text>
+  <g font-size="11" fill="#c9d1d9">
+    <text x="58" y="947">Daemon-Lifecycle · State-Persistenz (atomic)</text>
+    <text x="58" y="966">Echtes autonomes P4-Research (korrekter ABSTAIN)</text>
+    <text x="58" y="985">Reconcile + Reward auf realen Demo-Trades</text>
+    <text x="58" y="1004">Token-Budget scharf · alle Safety-Code-Pfade</text>
+    <text x="58" y="1023">Read-only Web-UI · keyring-Preflight fail-closed</text>
+  </g>
+  <text x="58" y="1044" fill="#6e7681" font-size="10">181 Tests grün · Regression P1–P7 grün</text>
+
+  <rect x="545" y="902" width="495" height="150" rx="9" fill="#1a1210" stroke="#d29922"/>
+  <text x="563" y="925" fill="#d29922" font-size="13" font-weight="700">⚠ NICHT BEWIESEN (→ v1.5)</text>
+  <g font-size="11" fill="#c9d1d9">
+    <text x="563" y="947">Net-new autonomer open→close in EINEM Lauf</text>
+    <text x="563" y="966">Safety-Breaker, die real auslösen (Loss/Budget)</text>
+    <text x="563" y="985">Multi-Cycle / Multi-Day-Verhalten</text>
+    <text x="563" y="1004">Edge / Profitabilität (nie im Scope)</text>
+  </g>
+  <text x="563" y="1028" fill="#8b949e" font-size="10.5">NICHT behaupten: „tradet autonom in Produktion",</text>
+  <text x="563" y="1043" fill="#8b949e" font-size="10.5">Lessons seien sinnvoll, irgendeine Edge.</text>
+
+  <!-- principle ribbon -->
+  <rect x="0" y="1066" width="1080" height="14" fill="#161b22"/>
+  <text x="40" y="1076" fill="#6e7681" font-size="10">Bauprinzip: so wenig AI wie möglich · P8 = reine Mechanik · demo-only fail-closed · VETOs unantastbar · nächster Schritt: PHASE8_V1.5_HOTFIX_HANDOVER.md</text>
+</svg>
