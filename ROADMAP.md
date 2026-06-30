@@ -199,7 +199,7 @@ live running).
 
 ---
 
-## Phase 8 — Scheduler  *(🔄 in progress, since 2026-06-27)*
+## Phase 8 — Scheduler  *(🟡 code-complete + merged 2026-06-30 — autonomous trade NOT yet live-proven)*
 
 > **Mission (read first):** "Scheduler" is only the name — the goal is **autonomous,
 > unattended generation of real demo trades**, because everything after P8 (confidence
@@ -213,24 +213,33 @@ live running).
 **Goal:** Make it autonomous — a long-running daemon that wakes, researches, trades
 within the window, reconciles, and sleeps, collecting the first real outcome data.
 
-- [ ] Pre-steps: Step 0 (legacy grep — clean), Step 0b (docs), Step 1 (contract-verify),
+- [x] Pre-steps: Step 0 (legacy grep — clean), Step 0b (docs), Step 1 (contract-verify),
       Step 2 (scaffold `phase8_scheduler/`, pkg `scheduler`)
-- [ ] `clock.py` — market-hours phases (reuse `is_market_open` + Gate-1 window), injectable `now_fn`/`sleep_fn`
-- [ ] `state.py` — `scheduler_state.json` (trade count, daily loss, backoff, kill-reason), Europe/Berlin rollover
-- [ ] `safety.py` — Auto-Confirm `confirm_fn` (demo-only fail-closed + caps + loss-breaker + budget)
-- [ ] `killswitch.py` — file-based KILL (UI-independent); `backoff.py` — consecutive-failure trip; `budget.py` — token budget
-- [ ] `research_tick.py` — autonomous candidates (real P4 research, never the seed; `no_trade_reason` skeleton)
-- [ ] `reconcile.py` — idempotent `CLOSED_BY_BROKER` P&L catch-up (reuse `reconcile_startup` + `reward_sink.reconcile_open_trades`)
-- [ ] `runner.py` — the loop/daemon + fail-closed keyring preflight + graceful shutdown
-- [ ] `scripts/` — wiring (full P1–P7 stack), `run.py` entry, `run_scheduler.sh`, smoke_test, live_test
-- [ ] Web-UI (`webui/`, FastAPI read-mostly + static dashboard) — **built last**
+- [x] `clock.py` — market-hours phases (reuse `is_market_open` + Gate-1 window), injectable `now_fn`/`sleep_fn`
+- [x] `state.py` — `scheduler_state.json` (trade count, daily loss, backoff, kill-reason), Europe/Berlin rollover
+- [x] `safety.py` — Auto-Confirm `confirm_fn` (demo-only fail-closed + caps + loss-breaker + budget)
+- [x] `killswitch.py` — file-based KILL (UI-independent); `backoff.py` — consecutive-failure trip; `budget.py` — token budget (armed by default, 200k ≈ €0.8/day)
+- [x] `research_tick.py` — autonomous candidates (real P4 research, never the seed; `no_trade_reason` skeleton)
+- [x] `reconcile.py` — idempotent `CLOSED_BY_BROKER` P&L catch-up (reuse `reconcile_startup` + `reward_sink.reconcile_open_trades`)
+- [x] `runner.py` — the loop/daemon + fail-closed keyring preflight + graceful shutdown
+- [x] `scripts/` — wiring (full P1–P7 stack), `run.py` entry, `run_scheduler.sh`, smoke_test, live_test
+- [x] Web-UI (`webui/`, FastAPI read-mostly + static dashboard) — **built last**
 
-**Done when:** `live_test.py` runs unattended vs IG Demo — real research → full cycle →
-**either** a real demo trade (`trade_outcomes` CLOSED + `reward_pts`) **or** a documented
-`no_trade_reason`; idempotent broker-close reconcile; clean stop. Kill-switch + backoff-trip
-+ daily-loss-breaker demonstrable. ≥50 unit tests; no prior-phase regression.
+**Status (honest):** All 12 modules built, **181 unit tests green**, merged to `main`
+(2026-06-30). ✅ **Proven** (operator run 2026-06-29 + mocks): daemon lifecycle (preflight →
+bounded loop → clean shutdown), state persistence, autonomous **real** P4 research with a
+correct fail-safe abstain, reconcile+reward loop on **2 real prior demo trades**. ⚠ **NOT
+proven** (merged with this honest flag to carry the build forward): a **net-new autonomous
+trade** opened *and* closed in one clean run; the safety breakers **actually tripping**;
+multi-day behaviour; edge/profitability (never in scope).
 
-**Directory:** `phase8_scheduler/` *(to be created)*
+**Why the gap + next track:** the bot **abstains** almost every cycle (single-instrument
+universe + a double-clamp below score 50). The next track is a **v1.5 hotfix** (variety +
+clamp/floor + real lessons) — see `phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`. The
+original "Done when" (a live net-new autonomous open→close + a demonstrable breaker trip)
+is **carried into v1.5**, not claimed here.
+
+**Directory:** [`phase8_scheduler/`](./phase8_scheduler/) *(pkg `scheduler` + `webui`)*
 **Concept:** [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md)
 
 ---

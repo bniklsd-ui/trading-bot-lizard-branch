@@ -20,7 +20,7 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 5     | ig_bot.py Gates 1–5 + 4 VETOs + place/monitor/close | ✅ Abgeschlossen — live-**verifiziert** (Order-/Monitor-Pfad, Demo), noch nicht profit-validiert ² |
 | 6     | Bull/Bear/Judge Debate              | ✅ Abgeschlossen — live-**verifiziert** (Debatte-Pfad, Demo), noch nicht profit-validiert ³ |
 | 7     | Reward/Punishment + Brain           | ✅ live-verifiziert (Demo, 2026-06-26) — `live_test.py` 5/5; 128 Unit-Tests ⁴ |
-| 8     | Scheduler                           | 🔄 In Umsetzung (seit 2026-06-27) ⁵                 |
+| 8     | Scheduler                           | 🟡 Code-complete + gemerged (2026-06-30) — mechanisch bewiesen (181 Tests), **autonomer Trade noch nicht live-bewiesen** ⁵ |
 | 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert)       |
 
 ¹ **Live-getestet ≠ profit-validiert.** Die Research-Pipeline läuft nachweislich
@@ -57,12 +57,21 @@ Lesson-Extraktion (`reflect()`, ein Haiku-Call, best-effort); Confidence ist **o
 gatet nichts** (keine VETO-Berührung — Instinct→VETO ist Phase 9f). ⚠ Nur **ein** Trade beweist den
 Pfad, **nicht** die Profitabilität (Edge = Live-Betrieb). Demo only, manueller Trigger.
 
-⁵ **Phase 8 (Scheduler) — in Umsetzung.** „Scheduler" ist nur der Name; das Ziel ist die **autonome,
-unbeaufsichtigte Erzeugung echter Demo-Trades** (der Datennachschub, auf den P9 gegatet ist). Der harte
-Pfad ist die **autonome Kandidaten-Generierung** über echtes P4-Research (nie der manuelle Seed).
-**Keine neue AI** — reine Mechanik: Daemon mit Marktzeiten-Phasen, Auto-Confirm (demo-only, fail-closed),
-Datei-Kill-Switch, Tages-Loss-Breaker, Token-Budget, idempotenter Reconcile, zuletzt eine read-mostly
-Web-UI. Konzept fertig (`docs/concepts/phase8_scheduler_concept.md`); Initial-Steps laufen.
+⁵ **Phase 8 (Scheduler) — code-complete + gemerged (2026-06-30), aber NICHT live-bewiesen für einen
+autonomen Trade.** „Scheduler" ist nur der Name; das Ziel ist die **autonome, unbeaufsichtigte Erzeugung
+echter Demo-Trades** (der Datennachschub, auf den P9 gegatet ist). Der harte Pfad ist die **autonome
+Kandidaten-Generierung** über echtes P4-Research (nie der manuelle Seed). **Keine neue AI** — reine
+Mechanik: Daemon mit Marktzeiten-Phasen, Auto-Confirm (demo-only, fail-closed), Datei-Kill-Switch,
+Tages-Loss-Breaker, Token-Budget, idempotenter Reconcile, read-mostly Web-UI. **Alle 12 Module gebaut,
+181 Unit-Tests grün; nach `main` gemerged.** ✅ **Bewiesen** (Operator-Lauf 2026-06-29 + Mocks):
+Daemon-Lifecycle, State-Persistenz, autonomes echtes P4-Research mit korrektem Fail-Safe-Abstain,
+Reconcile+Reward-Loop auf **realen** früheren Demo-Trades. ⚠ **NOCH NICHT bewiesen** (gemerged mit
+diesem ehrlichen Flag, um den Build weiterzutragen): ein **netto-neuer autonomer Trade** in einem
+sauberen Lauf geöffnet **und** geschlossen, die Safety-Breaker, die **tatsächlich auslösen**,
+Mehr-Tage-Verhalten, Edge/Profitabilität (nie im Scope). **Ursache des Gaps + Fix-Vorschlag:** der Bot
+**abstained** fast immer (1-Instrument-Universe + Doppel-Clamp unter Score 50) → der nächste Track ist
+ein **v1.5-Hotfix** (Variety + Clamp/Floor + echte Lessons), siehe
+`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`. Konzept: `docs/concepts/phase8_scheduler_concept.md`.
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)

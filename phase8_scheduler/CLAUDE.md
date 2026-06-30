@@ -32,12 +32,14 @@ Wer hier ein LLM „entscheiden/sizen/timen/vetoen" lassen will → **stop**, da
 ## Build-Reihenfolge (verbindlich)
 Cleanup → Verify → **autonome Candidates** → Auto-Confirm/Safety → Reconcile →
 Loop/Daemon → **zuletzt** Web-UI. Unter Zeit-/Token-Druck fällt die UI weg, **nie** die
-Safety. **Stand 2026-06-29: Module 1–12 gebaut + grün — Phase 8 code-complete; erster
-Operator-`live_test`-Lauf grün (3/3), aber NUR teilweise live-bewiesen** (s. `## Session
-stopped — 2026-06-29`). **Kein Doku-Flip auf ✅** — es fehlt ein echter Mehr-Zyklen-/Mehr-Tage-
-Lauf, der (a) einen netto-neuen autonomen Trade in **einem** sauberen Lauf öffnet+schließt und
-(b) die Safety-Breaker tatsächlich auslösen sieht. **Token-Budget jetzt by-default scharf**
-(Default `200_000` ≈ €0.8/Tag; vorher `None`/aus).
+Safety. **Stand 2026-06-30: Module 1–12 gebaut + grün (181 Tests) — Phase 8 code-complete +
+🟡 nach `main` gemerged** (ehrlich geflaggt, s. `## Session stopped — 2026-06-30`). **Bewusst
+KEIN ✅-„live-verifiziert"-Flip** wie P5/P6/P7 — gemerged mit dem ehrlichen Flag „mechanisch
+bewiesen, autonomer Trade noch NICHT live-bewiesen", um den Build weiterzutragen. Es fehlt ein
+echter Mehr-Zyklen-/Mehr-Tage-Lauf, der (a) einen netto-neuen autonomen Trade in **einem** sauberen
+Lauf öffnet+schließt und (b) die Safety-Breaker tatsächlich auslösen sieht — **beides carried in den
+v1.5-Hotfix** (`PHASE8_V1.5_HOTFIX_HANDOVER.md`: der Bot abstained fast immer → Variety + Clamp/Floor
++ echte Lessons). **Token-Budget by-default scharf** (Default `200_000` ≈ €0.8/Tag; vorher `None`/aus).
 
 ## Harte Regeln (nicht verhandelbar)
 - **Demo-only strukturell, fail-closed.** Auto-Confirm gibt `True` **nur** bei: `account
@@ -208,6 +210,67 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-06-30 (v1.5-Hotfix-Handover geschrieben — der ✅-Gate-Blocker analysiert, KEINE Code-Änderung)
+
+> **Auslöser:** der Nikinger — Phase 8 ist code-complete und KÖNNTE gemerged werden, wartet aber auf
+> einen „echten" autonomen Demo-Trade, der **nie oder sehr spät** kommt. Auftrag: **read-only Analyse +
+> ein Handover-File** (kein Code), das die drei Ursachen benennt + Lösungsrichtungen vorschlägt, für eine
+> **Claude-Web-Planungssession** (→ detaillierter v1.5-Plan). Phase 8 darf mit ehrlichen Flags gemerged
+> werden. **Auto-Modus** (die Aufgabe IST das Schreiben eines Plans). **Kein Code geändert** (nur read-only
+> grep/Read + ein neues `.md`).
+
+### Completed
+- **`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`** (NEU) — der Handover für die Web-Planungssession.
+  Struktur: TL;DR-Tabelle · Phase-8-Ist-Stand (verified/unverified) · §2 Issue C · §3 Issue B · §4 Issue A
+  (je code-anchored Diagnose + Optionen + offene Fragen) · §5 Cross-Cutting-Constraints · §6 Merge-Empfehlung
+  mit ehrlichen Flags · §7 v1.5-Sequencing · §8 Datei/Zeilen-Anker. **Diagnose + Optionen, kein fertiger
+  Plan** (das ist die Web-Session).
+- **Memory** geschrieben: `project_phase8_v15_hotfix.md` (+ MEMORY.md-Index-Zeile) — v1.5 = vereinbarter
+  nächster Track.
+
+### Die drei Ursachen (code = source of truth, alle im Handover verankert)
+- **C (Hauptblocker) — Variety:** Universe = EIN Instrument `epic_allowlist = ("IX.D.DAX.IFMM.IP",)`
+  (`research/models.py:320`). Jedes neue Epic braucht P4-Allow-list **+** P3-`TickerMapper`-Eintrag
+  (`external_data/ticker_map.py`) **+** Volume-Proxy **+** Sizing-Sanity. Größter Hebel.
+- **B — Richtungssignal zu stark:** unter `bot_score < 50` feuern ZWEI Clamps zusammen — Long-Bias →
+  BUY-only (`candidate_filter.py:70+`) **und** Confidence-Floor springt 55→70 (`candidate_filter.py:47-66`,
+  `models.py:328-329`). Genau das hat den 2026-06-29-Lauf abstained (Score 45.83). Fix: lockern/entkoppeln,
+  damit überhaupt ein Candidate entsteht → die **bestehende P6-Debatte + die 4 VETOs** differenzieren
+  (kein neues AI).
+- **A — Lessons unecht:** Verifikations-Trades speisen `get_recent_lessons(5)` in den P4-Prompt
+  (`context_builder.py:184`), keine Provenance-Filterung. P7 hat den `account`-Tag (demo/live,
+  `models.py:145`), aber KEIN „Verifikations-Trade"-Flag. Quarantäne/Purge — aber echte Lessons fließen
+  erst, nachdem C/B echte Trades erzeugen (Sequencing).
+
+### Merge-Empfehlung (im Handover §6, ehrliche Flags)
+- **Merge `phase8-scheduler` → `main` jetzt**, geflaggt „code-complete, mechanisch bewiesen (181 Tests),
+  autonomer-Trade-unverifiziert". Der Rest-Live-Beweis ist von der **Research-Überkonservativität** (C/B)
+  geblockt — eine Strategie-Schicht-Sorge, sauberer als eigener v1.5-Hotfix auf frischem Branch getrackt
+  als am Phase-8-Tail. v1.5 NICHT in `phase8-scheduler`.
+- ✅ verified: Daemon-Lifecycle · State · autonomes echtes P4-Research mit korrektem Fail-Safe-Abstain ·
+  Reconcile+Reward auf realen früheren Trades · scharfes Token-Budget · read-only Web-UI.
+- ⚠ NOT verified: netto-neuer autonomer open→close in einem sauberen Lauf · Safety-Breaker, die
+  **tatsächlich auslösen** · Mehr-Tage-Verhalten · Edge/Profit (nie im Scope).
+
+### Verifiziert
+- **Kein Code geändert** — `git status` zeigt nur das neue `.md` (+ die Memory-Dateien außerhalb des Repos).
+  Bestands-Tests unberührt (P1 52 · P2 62 · P4 94/96 · P5 146 · P6 70 · P7 128 · P8 181). Read-only Analyse.
+
+### Next
+- **Nikinger / Claude Web:** aus dem Handover (§2–§4 + §5 + §7) den detaillierten v1.5-Plan bauen, dann
+  zurück zu Claude Code zur Umsetzung. Empfohlene Reihenfolge: **erst messen** (live `bot_score`-Verteilung,
+  wie oft < 50?) → **C** (1–2 kuratierte Instrumente) → **B** (Clamp/Floor entkoppeln/lockern für die
+  Datensammlung) → **A** (Lesson-Provenance) → Operator-Live-Lauf fängt den netto-neuen open→close + einen
+  auslösenden Safety-Breaker.
+- **Merge:** wenn der Nikinger ihn triggert (Phase 8 mit ehrlichen Flags → `main`).
+
+### Offene Punkte / blockers
+- Keine technischen Blocker fürs Handover. Offene **Entscheidungen** für die Web-Session (im Handover als
+  „Open questions" gelistet): welche IG-Demo-Epics confirmt der Operator? Permanente vs. temporäre
+  „Data-Collection-Mode"-Lockerung? Lesson-Provenance per Spalte (Migration 003) oder Heuristik?
 
 ---
 

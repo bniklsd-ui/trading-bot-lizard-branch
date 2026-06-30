@@ -77,7 +77,11 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-**Active phase:** Phase 8 — Scheduler (`phase8_scheduler/`, Paket `scheduler`): 🔄 **in Umsetzung**
+**Active phase:** Phase 8 — Scheduler (`phase8_scheduler/`, Paket `scheduler`): 🟡 **code-complete +
+gemerged nach `main` (2026-06-30)** — mechanisch bewiesen (181 Tests), **autonomer Trade noch NICHT
+live-bewiesen** (ehrlich geflaggt gemerged, um den Build weiterzutragen). **Nächster Track = v1.5-Hotfix**
+(Variety + Clamp/Floor + echte Lessons), Plan-Handover: `phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`
+→ in Claude Web zum Detailplan, dann zurück zu Claude Code.
 (gestartet 2026-06-27). **Mission (zuerst lesen):** Phase 8 heißt „Scheduler", aber das Ziel ist
 **autonome, unbeaufsichtigte Erzeugung echter Demo-Trades** — alles danach (Confidence aus
 `INSUFFICIENT`, P9-Instinct-Promotion) ist auf reale Outcomes gegatet. Der harte Pfad ist die
@@ -133,7 +137,15 @@ Pause** (neues `scheduler/command.py` + additiver Runner-Command-Poll, konzept �
 (+ `run_webui.sh`), um einen **netto-neuen autonomen open→close in einem sauberen Lauf** zu fangen +
 die Safety-Breaker auslösen zu sehen (die WARNING „token budget is DISABLED" muss weg sein); **erst
 danach** Doku-Flip auf ✅ + Merge. Detail-Analyse + proven/unproven: `phase8_scheduler/CLAUDE.md`
-→ `## Session stopped — 2026-06-29`.
+→ `## Session stopped — 2026-06-29`. **Update (2026-06-30):** weil der „echte" autonome Trade nie/spät
+kommt (der Bot **abstained** quasi immer), ist die Diagnose + ein v1.5-Hotfix-Vorschlag in
+`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md` (für eine Claude-Web-Planungssession) festgehalten —
+drei Ursachen: **(C, Hauptblocker)** 1-Instrument-Universe (`research/models.py:320`), **(B)** Doppel-Clamp
+unter Score 50 (BUY-only + Floor 55→70, `candidate_filter.py:47-66,70+`), **(A)** Verifikations-Trade-Lessons
+im P4-Prompt (`context_builder.py:184`). **Empfehlung: Phase 8 mit ehrlichen Flags nach `main` mergen**
+(verified = Mechanik/State/Reconcile+Reward; NOT verified = netto-neuer autonomer open→close + auslösende
+Safety-Breaker), **v1.5 auf frischem Branch**. Voller Befund: `phase8_scheduler/CLAUDE.md` →
+`## Session stopped — 2026-06-30`.
 
 **Phase 7** bleibt ✅ **live-verifiziert (2026-06-26) + gemerged nach `main`** — der Reward-Loop läuft
 end-to-end live (place → monitor → lag-freie Close-Confirm-P&L → score → reward → lesson); ⚠
