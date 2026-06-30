@@ -213,7 +213,93 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
-## Session stopped — 2026-06-30 (v1.5-Hotfix-Handover geschrieben — der ✅-Gate-Blocker analysiert, KEINE Code-Änderung)
+## Session stopped — 2026-06-30 (v1.5-Hotfix: initiales Housekeeping — Step 0 + Step 0b, KEINE Trading-Code-Änderung)
+
+> **Auslöser:** der Nikinger startet die v1.5-Hotfix-Implementierung (`docs/concepts/
+> phase8_v1.5_hotfix_plan.md`, der Browser-Planungs-Output). Erste Aktion gemäß Plan: **Step 0
+> (Cleanup + Verify-Baseline)** + **Step 0b (Doku-Reconciliation)**, „ein Schritt nach dem
+> anderen" — Step 1 (Diagnostic-Script) und die echten Fixes (C/B/A) sind explizit **nicht**
+> Teil dieser Session. Reine **Docs + git-hygiene**, kein Trading-Code berührt.
+
+### Completed
+- **Branch:** `phase8-v1.5-hotfix` von `main` (HEAD `457dc9e`) erstellt — alle v1.5-Commits
+  laufen hier, nicht auf `main`.
+- **Step 0a (Turbo-Cleanup) — bestätigter No-Op.** `grep` nach `turbo_research|
+  pre_trade_option_check|strike|otm|issuer` über `*.py` → **0 Treffer**. Alle `CALL`/`PUT`-Treffer
+  sind Guard-Kommentare/Tests, die die Options-Vokabel **ablehnen**, oder der HTTP-Verb `PUT`.
+  Nichts zu entfernen — wie schon am 2026-06-27 dokumentiert, jetzt erneut bestätigt.
+- **Step 0c (Verify-Baseline) — grün, wahre Testzahlen ausgelesen** (nicht geraten): `pytest`
+  pro Phase separat (gleicher `tests.conftest`-Namenskollisions-Grund wie immer) →
+  **P1 52 · P2 62 · P3 70 · P4 96 · P5 146 · P6 70 · P7 128 · P8 181** — alle grün. Damit
+  **P8 = 181** (nicht 173) und **P4 = 96** (nicht 94) als wahre aktuelle Werte bestätigt.
+- **git-Hygiene (`.gitignore`):**
+  - P8-Laufzeit-State ergänzt: `data/state/scheduler_state.json`,
+    `data/state/scheduler_command.json`, `data/state/KILL` (gleiches Reconciliation-Muster wie
+    P3/P4/P5/P6 zuvor — diese drei waren schlicht nie ergänzt worden).
+  - Harness-Artefakte ergänzt: `.claude/`, `.agents/`, `skills-lock.json` (lokales Dev-Tooling,
+    kein Projekt-Source — Operator-Entscheidung diese Session).
+- **Architektur-Diagramm an den „Right Place" verschoben** (Operator-Entscheidung): die
+  untracked `docs/concepts/tradingbot_v2_architecture_concept.svg/.pdf` (byte-identisch mit dem
+  zuvor gelöschten `docs/concepts/tradingbot_v2_architecture.svg/.pdf`, 45142 Bytes SVG bestätigt)
+  → `docs/architecture/tradingbot_v2_architecture.svg/.pdf` (der von README/ARCHITECTURE.md/
+  root-`CLAUDE.md` referenzierte, zuvor **tote** Pfad — `docs/architecture/` war leer). Git
+  erkannte es automatisch als Rename. Die per-Phase `*_konzept`/`*_architecture`-SVG/PDF-Exports
+  bleiben in `docs/concepts/` (Konvention: sibling zur `.md`) und wurden dort getrackt.
+  **`ROADMAP.md`** (stale getrackte Kopie) entfernt, **`ROADMAP(updated).md`** (die as-built-
+  Ersatzfassung aus der Browser-Session) an ihre Stelle umbenannt.
+- **`ARCHITECTURE.md` auf as-built gebracht** (war seit 2026-06-16 stale, vor-Phase-5-Vokabular):
+  `turbo_research.py`→`research.py` (mit Hinweis: `turbo_candidates.json` behält den
+  eingefrorenen Legacy-Namen); `pre_trade_option_check()`→die echten 4 VETOs (`status_window`/
+  `spread`/`momentum`/`position_conflict`, `execution/vetos.py`); Gate-5 `CALL/PUT`→**BUY/SELL**;
+  Gate-1-Fenster `09:30–11:19`→**`09:00–17:30`** (echte `ExecutionConfig`); Gate-4-Sizing auf
+  **risk-per-trade ÷ stop-distance**; Friend-Bot-Reward-Formel (`base+gain×10`) durch das echte
+  **Phase-7-Prozess-Score-Modell** ersetzt; `longterm_pre_trade_check() ≥120 Tage`-VETO als
+  **deferred auf Phase 9f** markiert (nicht aktuell); **Phase 7 + 8 zu Komponenten + Per-Phase-
+  Link-Liste ergänzt** (stoppte vorher bei P6); Risk-Liste #2 („Score-as-emotion") auf „durch
+  Phase 7 adressiert" aktualisiert; #1 (Force Trigger) um den Fund ergänzt, dass das P2-Schema-
+  Feld `force_trigger_locked` existiert, aber **keine** Force-Trigger-Funktion es bisher
+  durchsetzt (kein neuer Scope — nur ehrlich dokumentiert). Alle Edits halten die
+  Ehrlichkeits-Leitplanke: keine Produktions-Autonomie-, Lessons-Qualitäts- oder Edge-Behauptung.
+- **README.md / root `CLAUDE.md` / `ROADMAP.md`: KEIN Edit nötig.** Die ursprünglich vermutete
+  „181 vs. 173"-/„94 vs. 96"-Inkonsistenz erwies sich bei genauerem Lesen als **falscher Alarm**:
+  die „Current state"/„Stand"-Header-Abschnitte (die **aktuell geltenden** Aussagen) sagen in
+  allen drei Dateien bereits korrekt **181**; die `173`-/`94`-Vorkommen liegen ausschließlich in
+  **datierten historischen `## Session stopped`-Journal-Blöcken**, die den Zustand zum jeweiligen
+  damaligen Zeitpunkt korrekt beschreiben (z. B. der 2026-06-29-Block, bevor die UI-Runden 2–6
+  fünf weitere Tests addierten: 173→178→181). Diese rückwirkend zu „korrigieren" wäre
+  revisionistisch und würde der eigenen Journal-Konvention des Projekts widersprechen. **Hygiene-
+  Prinzip angewandt: keine Aktion, wo keine nötig ist** — dem Nikinger hiermit ehrlich gemeldet
+  statt erzwungener Edits.
+
+### Verifiziert
+- `pytest phase8_scheduler/tests -q` → **181 passed** (re-run nach allen Doc-Edits — unverändert,
+  da kein Code berührt wurde). Alle Phasen P1–P8 separat grün (s. o.).
+- `git status --short` ist sauber: `ROADMAP.md` getrackt (nicht „(updated)"), Harness-Dirs +
+  P8-State-Dateien ignoriert (`git check-ignore` bestätigt alle sechs Pfade), Architektur-Diagramm
+  unter `docs/architecture/`, kein toter Link mehr (`grep` über README/ARCHITECTURE/CLAUDE.md
+  bestätigt: alle drei zeigen auf den jetzt existierenden Pfad, keine Reste auf den alten).
+- Kein Legacy-/Options-Vokabular mehr als *aktuelle* Aussage in `ARCHITECTURE.md` (nur die
+  Reconciliation-Notiz + ein „kein CALL/PUT"-Guard-Satz bleiben — beide gewollt).
+
+### Next
+- **Step 1 (operator-run, danach):** `scripts/diag_score_distribution.py` (read-only
+  `bot_score`-Verteilungs-Diagnostic) bauen + vom Nikinger laufen lassen — die Werte gaten die
+  Floor-Tuning-Entscheidung in Step 3 (B).
+- **Danach Steps 2–4** (der eigentliche Fix): C (Universum als `InstrumentSpec`-Liste, größter
+  Hebel) → B (Clamp/Floor entkoppeln + relaxen) → A (Lesson-Provenance). Plan:
+  `docs/concepts/phase8_v1.5_hotfix_plan.md`.
+- **Commit:** zwei vorgeschlagene atomare Commits warten auf Trigger durch den Nikinger (siehe
+  Plan-Datei `~/.claude/plans/hello-claude-and-welcome-bubbly-barto.md`):
+  1. `chore: gitignore P8 state + harness artifacts; move arch diagram to docs/architecture`
+  2. `docs: reconcile ARCHITECTURE.md to Phase-8 as-built`
+
+### Offene Punkte / blockers
+- Keine technischen Blocker. Eine Stilfrage für den Nikinger (nicht blockierend, nur notiert):
+  das P2-Schema-Feld `force_trigger_locked` existiert seit Phase 2, wird aber von keiner
+  Funktion durchgesetzt — kein v1.5-Scope, aber ein Hard-Rule-5-relevanter Gap, falls Force
+  Trigger je gebaut wird (P9+).
+
+---
 
 > **Auslöser:** der Nikinger — Phase 8 ist code-complete und KÖNNTE gemerged werden, wartet aber auf
 > einen „echten" autonomen Demo-Trade, der **nie oder sehr spät** kommt. Auftrag: **read-only Analyse +
