@@ -13,6 +13,7 @@ import dataclasses
 import pytest
 
 from research.models import (
+    EXTENDED_UNIVERSE,
     InstrumentSpec,
     ResearchConfig,
     _DEFAULT_UNIVERSE,
@@ -131,3 +132,25 @@ def test_legacy_epic_allowlist_derives_universe() -> None:
 def test_explicit_universe_with_all_invalid_fails_closed() -> None:
     with pytest.raises(ValueError):
         ResearchConfig(universe=(_spec("X", currency="USD"),))
+
+
+# --------------------------------------------------------------------------- #
+# EXTENDED_UNIVERSE (v1.5 Step 2B — confirmed via resolve_epics.py 2026-07-01)  #
+# --------------------------------------------------------------------------- #
+def test_extended_universe_is_valid_and_dax_unchanged() -> None:
+    # Passes through the same validation ResearchConfig(universe=...) applies.
+    validated = load_universe(EXTENDED_UNIVERSE)
+    assert [s.epic for s in validated] == [s.epic for s in EXTENDED_UNIVERSE]
+    assert EXTENDED_UNIVERSE[0] is _DEFAULT_UNIVERSE[0]  # DAX spec reused, not duplicated
+
+
+def test_extended_universe_has_two_eur_instruments() -> None:
+    epics = [s.epic for s in EXTENDED_UNIVERSE]
+    assert epics == ["IX.D.DAX.IFMM.IP", "IX.D.STXE.IFM.IP"]
+    assert all(s.currency == "EUR" for s in EXTENDED_UNIVERSE)
+
+
+def test_config_can_opt_into_extended_universe() -> None:
+    cfg = ResearchConfig(universe=EXTENDED_UNIVERSE)
+    assert cfg.epic_allowlist == ("IX.D.DAX.IFMM.IP", "IX.D.STXE.IFM.IP")
+    assert cfg.universe[1].point_value == 2.0

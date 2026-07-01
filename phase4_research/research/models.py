@@ -322,6 +322,49 @@ _DEFAULT_UNIVERSE: tuple[InstrumentSpec, ...] = (
     ),
 )
 
+# v1.5 Issue C, Step 2B (2026-07-01) — the confirmed multi-instrument universe. Public
+# (unlike ``_DEFAULT_UNIVERSE``) so the wiring layer — the only place cross-phase config
+# choices belong — can opt the daemon/live builds into it explicitly. A bare
+# ``ResearchConfig()`` still defaults to ``_DEFAULT_UNIVERSE`` (DAX-only, unchanged), so
+# no existing caller/test needs to change; only ``scripts/wiring.py`` (P4 + P8) passes
+# ``universe=EXTENDED_UNIVERSE`` in.
+#
+# DAX epic/point_value/min_deal_size/ticker/proxy are the pre-v1.5 values, reused as-is.
+# Euro Stoxx 50 (``IX.D.STXE.IFM.IP``) was resolved via the operator's
+# ``scripts/resolve_epics.py`` run against IG demo (2026-07-01): currency/min_deal_size/
+# market_status=TRADEABLE/ohlcv_available=True are all **live-confirmed**. Two fields are
+# NOT independently confirmed, flagged below — re-verify before trusting this instrument
+# in a live run:
+#   - point_value=2.0 is INFERRED from IG's "(2€)" cash-instrument name, by analogy with
+#     the verified DAX pattern (name "(1€)" <-> point_value=1.0, and lot_size==1.0 matches
+#     it exactly). Not independently confirmed via a contract-spec page or a manual trade.
+#   - yf_ticker="^STOXX50E" / volume_proxy="EXW1.DE" are the well-known public Yahoo
+#     Finance / iShares Core EURO STOXX 50 UCITS ETF symbols (by analogy with DAX's
+#     ^GDAXI / EXS1.DE), NOT live-verified against yfinance. Operator: verify with
+#     `python phase3_external_data/scripts/smoke_test.py --epic IX.D.STXE.IFM.IP
+#     --volume-proxy EXW1.DE` before trusting the brain-context signal for this epic.
+#
+# CAC 40 / AEX / IBEX 35 are deliberately NOT added yet — the 2026-07-01 resolve_epics.py
+# run's tail (France 40 onward) shows a rate-limiting cascade (get_market_info failing
+# outright for 3/4 CAC hits, ohlcv_available=False for the one that resolved, both
+# remaining search terms failing outright) after ~35 unthrottled back-to-back broker
+# calls. Confirming CAC 40's `ohlcv_available` matters: VETO 3 fails closed on missing
+# bars, so an epic without real-time OHLCV would never clear the momentum VETO and could
+# never actually trade — a silent "phantom" instrument. resolve_epics.py now paces itself
+# (see its module docstring); re-run it for a clean read before adding these.
+EXTENDED_UNIVERSE: tuple[InstrumentSpec, ...] = (
+    _DEFAULT_UNIVERSE[0],  # DAX, unchanged
+    InstrumentSpec(
+        epic="IX.D.STXE.IFM.IP",
+        yf_ticker="^STOXX50E",
+        volume_proxy="EXW1.DE",
+        point_value=2.0,
+        min_deal_size=0.5,
+        currency="EUR",
+        source="curated",
+    ),
+)
+
 
 def _validate_spec(spec: InstrumentSpec) -> list[str]:
     """Return a list of problems with ``spec`` (empty list = valid)."""
