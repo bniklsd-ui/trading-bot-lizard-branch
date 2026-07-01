@@ -213,6 +213,73 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-01 (v1.5-Hotfix: Step 2A (C) — typisiertes Universum + per-Epic Brain-Context + P5-point_value-Naht + resolve_epics.py)
+
+> **Auslöser:** der Nikinger startet Step 2 (C — Variety, der größte Hebel) nach dem erledigten B.
+> Plan-Freigabe (`~/.claude/plans/hello-claude-and-welcome-pure-kernighan.md`): **Step 2 splittet in
+> 2A (jetzt, deterministisches Gerüst, DAX-only bit-identisch) + 2B (nachdem der Operator
+> `resolve_epics.py` gegen IG-Demo läuft → echte Epic-Strings)**. Zwei gelockte Operator-Entscheidungen
+> (AskUserQuestion): (1) „Framework now, populate later"; (2) **point_value JETZT in P5 Gate-4 threaden**
+> (mit ehrlicher Doku). **Kein neues AI, kein VETO/Gate berührt.**
+
+### Completed (Cross-Phase, alle additiv — Default-/DAX-Pfad bit-identisch)
+- **2A.1 — typisiertes Universum (P4 `research/models.py`):** neues frozen `InstrumentSpec`
+  (`epic`/`yf_ticker`/`volume_proxy`/`point_value`/`min_deal_size`/`currency`/`source`) + validierender
+  `load_universe()` (EUR-only, epic non-empty, `point_value>0`/`min_deal_size>0`; malformed → drop+warn,
+  alles invalid/leer → `ValueError` fail-closed) + `_DEFAULT_UNIVERSE` (DAX). `ResearchConfig` trägt jetzt
+  `universe` als **Single Source of Truth**; `__post_init__` versöhnt: `universe=None` → aus dem Legacy
+  `epic_allowlist`/`volume_proxy` **abgeleitet** (Backward-Compat für `epic_allowlist=(...)`-Konstruktion),
+  `universe` gesetzt → `load_universe` + `epic_allowlist` daraus **re-derived**. `__init__.py` exportiert
+  `InstrumentSpec`/`load_universe`. **+13 Tests** (`tests/test_universe.py`).
+- **2A.2 — per-Epic Brain-Context (das Herz von C):** vorher bekam **nur** der Anchor-Epic Brain-Context.
+  `ResearchContext.brain_contexts: dict[epic → dict|None]` (default `{}`, Back-Compat); `context_builder`
+  holt jetzt einen Snapshot je tradeable Epic (∪ Anchor, order-preserving, deduped; degradiert je Epic
+  einzeln zu `None`). `prompt._render_per_epic_snapshots` rendert die **Nicht-Anchor**-Snapshots (leer bei
+  1 Epic → Prompt bit-identisch). `candidate_filter.apply_filter` Drift-Kohärenz keyt jetzt auf die
+  **Kandidaten-eigene** `brain_contexts[epic]` (Fallback `brain_context` für pre-v1.5-Caller); `research.py`
+  `drift_at_pick` aus dem **gepickten** Epic. **+5 Tests** (2 context_builder, 2 prompt, 1 candidate_filter).
+- **2A.3 — `scripts/resolve_epics.py` (NEU, repo-root, phasenlos, read-only):** löst die kuratierte
+  Shortlist (DAX+EuroStoxx50+CAC40[+AEX/IBEX]) via `search_markets`→`get_market_info`→`get_ohlcv`-Probe zu
+  echten IG-Demo-Epic-Strings + Facts auf. **Nur GETs — keine Order, kein Write.** Broker-injiziert (offline
+  testbar); `main()` baut den echten `ig_demo` lazy. ⚠ **point_value wird NICHT resolved** (IG exponiert es
+  nicht — `lot_size` nur als Hinweis; Operator bestätigt manuell). stderr-Narrative/stdout-JSON. **+6 Tests**
+  (`tests/test_resolve_epics.py`).
+- **2A.4 — Wiring (P4 `scripts/wiring.py` + P8 `scripts/wiring.py`):** registrieren jetzt je
+  `InstrumentSpec` aus `config.universe` das `yf_ticker`-Mapping + den Volume-Proxy (statt einmalig nur den
+  Anchor). DAX-Default unverändert (^GDAXI ist TickerMapper-Builtin; Proxy = pre-v1.5).
+- **2A.5 — point_value in P5 Gate-4 (Operator-entschieden „jetzt, ehrlich dokumentiert"):** `Candidate`-
+  Kontrakt ist **frozen** + IG `get_market_info` exponiert **keinen** Point-Value → die Naht ist **P5-seitig**:
+  `ExecutionConfig.point_values: dict[epic→float]` (default `{}`) + `point_value_for(epic)` (→ 1.0 default).
+  `sizing.compute_size(..., epic=None)` nutzt `config.point_value_for(epic)` (Fallback: market_info-echoed
+  epic → 1.0); `executor` reicht `epic` durch + `build_opened(..., point_value=config.point_value_for(plan.epic))`
+  für konsistentes `initial_risk`. **Default `{}` → alles 1.0 → DAX bit-identisch.** ⚠ **Zwei SoTs** (P4
+  `InstrumentSpec.point_value` ↔ P5 `point_values`) bewusst — der frozen Cross-Phase-Kontrakt trägt keinen
+  Point-Value; beide non-DAX-Werte **provisorisch** bis `resolve_epics.py` (2B), Kommentar an beiden Stellen.
+  Gate-4-Sizing, **kein VETO** (Leitplanke 3 intakt). **+7 Tests** (4 sizing, 2 config, 1 executor build_opened).
+
+### Verifiziert (gemockt/offline — Live = Operator)
+- **P4 99→117**, **P5 146→153**, root-`tests` 20→**26**. Regression unberührt: **P6 70 · P7 128 · P8 181**
+  (P8 mockt Research; die neuen P4/P5-Felder sind alle additiv default-unchanged). `py_compile` clean auf
+  allen berührten Dateien + `resolve_epics.py` + beiden Wirings.
+- **Import-Isolation gewahrt:** `import research.models/candidate_filter/context_builder/prompt` zieht
+  **NONE** broker_wrapper/external_data/persistence/anthropic (models.py fügte nur stdlib `logging` hinzu).
+
+### Next
+- **Operator (blockt 2B):** `python scripts/resolve_epics.py` gegen IG-Demo laufen (im Fenster; Keyring
+  entsperrt) → die echten Epic-Strings + currency/min_deal_size/lot_size/ohlcv je Instrument zurückmelden.
+  point_value je Instrument aus den IG-Kontraktdetails / einem manuellen Demo-Trade bestätigen.
+- **Step 2B (nach Operator-Daten):** die bestätigten `InstrumentSpec`-Einträge (EuroStoxx50/CAC40[+AEX/IBEX])
+  in die kuratierte Universe-Liste; P3 `TickerMapper._MAP`-Einträge (IG-Epic→yFinance) + Volume-Proxies
+  (cross-phase P3-Edit, dated Note; DAX unverändert); `ExecutionConfig.point_values` je Epic füllen; per-Epic
+  Sizing-Sanity + VETO-Quelle (`get_ohlcv`) verifizieren. **Danach Step 4 (A — Lesson-Provenance).**
+- **Commit:** vorgeschlagen (atomar: (1) P4 universe+brain+tests, (2) P5 point_value+tests, (3) resolve_epics.py+test+wiring, (4) docs), wartet auf Nikinger-Trigger.
+
+### Offene Punkte / blockers
+- Keine technischen. ⚠ point_value-Doppel-SoT (P4/P5) ist bewusst + dokumentiert; bei Live-Go-Live
+  re-baselinen. resolve_epics.py-Live-Lauf steht aus (Operator).
+
+---
+
 ## Session stopped — 2026-07-01 (v1.5-Hotfix: Step 3 (B) — Clamp/Floor entkoppelt + relaxt; **VOR Step 2 gebaut**)
 
 > **Auslöser:** die Step-1-Messung (`scripts/diag_score_distribution.py` gegen die echte DB) ergab

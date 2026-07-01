@@ -111,8 +111,13 @@ def _build_research(broker: Any, db: Any, state: Any) -> Any:
 
     config = ResearchConfig()
     mapper = TickerMapper()
-    if config.volume_proxy:
-        mapper.register_volume_proxy(config.epic_allowlist[0], config.volume_proxy)
+    # v1.5 (Issue C): register each curated instrument's yFinance ticker + volume proxy
+    # from the typed universe (SoT). DAX default unchanged → daemon behaviour identical.
+    for spec in config.universe or ():
+        if spec.yf_ticker:
+            mapper.register(spec.epic, spec.yf_ticker)
+        if spec.volume_proxy:
+            mapper.register_volume_proxy(spec.epic, spec.volume_proxy)
     market_data = MarketDataFetcher(mapper, FileCache(str(_CACHE_DIR)))
     llm = LLMClient(
         model=config.model,
