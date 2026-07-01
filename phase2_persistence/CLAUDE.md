@@ -46,6 +46,16 @@ Two stores. **100% deterministic code — no LLM calls anywhere in Phase 2.**
 - V2 tables (`market_regime_snapshots`, `decision_context`) are created empty;
   Phase 9 fills them.
 
+> 🔁 **Phase-8 v1.5-hotfix edit (2026-07-01, Issue A — lesson provenance, code = source of truth):**
+> new **read-only** method `get_recent_lessons_for_prompt(n=5, *, min_hold_min=None,
+> quarantine_before=None, exclude_provenance=())` — a parameterised sibling of `get_recent_lessons`
+> (which is **untouched**) that the P4 research prompt uses to drop verification-trade lessons. Filters
+> **in the query** (newest N *survivors*): NULL-safe `json_extract(market_context_json, '$.provenance')
+> IS NOT <tag>` (precise; needs SQLite JSON1, bundled in 3.11+), a `hold_duration_min` subquery
+> (fallback, NULL hold → kept), and an `extracted_at` cutoff (reversible reset). **No schema change, no
+> migration.** P2 stays a dumb parameterised store — the excluded values + thresholds are the caller's
+> (P4) policy. +5 tests (**62 → 67**). Detail: `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
+
 ## Conventions
 - All timestamps ISO 8601 UTC, ms precision, `Z` suffix.
 - All money REAL + explicit `currency` column.

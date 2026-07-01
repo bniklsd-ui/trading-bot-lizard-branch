@@ -329,6 +329,11 @@ Prüfreihenfolge (jeder Fail → `valid=False` + `rejected_reason`):
   (Envelope immer zuerst `env.ok` checken).
 - **Phase-2-Kontext:** `get_recent_trades(8)`, `get_recent_lessons(5)`,
   `get_current_score()`, `get_risk_level()`.
+  > 🔁 **v1.5 (Phase-8 hotfix Step 4 A, 2026-07-01):** die Lesson-Auswahl für den Prompt läuft jetzt
+  > über `db.get_recent_lessons_for_prompt(5, exclude_provenance=("verification",), min_hold_min=2.0,
+  > quarantine_before=None)` (drei neue `ResearchConfig`-Felder) statt `get_recent_lessons(5)` — hält
+  > Verifikations-Trade-Lessons aus dem Prompt (Provenance-Tag + Hold-Time + Datum). Reward-Pfad
+  > unberührt; Lessons gaten nichts. Detail: `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
 - **Phase-3-Kontext:** `get_brain_context(epic).to_prompt_dict()` für das Anker-Epic;
   `None`-Werte transparent durchreichen. ⚠ **Verifiziert (Step 0.5):** in
   `try/except EpicNotMappedError` kapseln (ungemapptes Epic) + defensiver `is None`-

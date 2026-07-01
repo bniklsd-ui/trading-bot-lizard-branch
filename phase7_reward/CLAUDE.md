@@ -21,6 +21,20 @@ ist ein **separater, späterer Step** (**Phase 9f** / Konzept §7b), gated auf r
 Promotion auf null validierten Outcomes würde Risiko zurück in die Safety-Schicht importieren.
 P7 baut nur das **Substrat** (`trade_lessons` + `reward_pts`).
 
+> 🔁 **Phase-8 v1.5-hotfix edit (2026-07-01, Issue A — lesson provenance, code = source of truth):**
+> `OpenedTrade` gained `provenance: str = "autonomous"` (`reward/models.py`; **default** keeps every
+> existing construction valid + it stays the trailing field), and `recorder._extract_lesson` writes
+> `opened.provenance` (cold reconcile without a stash → `"unknown"`) into the lesson's `market_context`
+> → persisted verbatim into the existing `trade_lessons.market_context_json` blob — **no migration / no
+> schema change**. **Why:** verification-trade lessons (seeded, sub-minute time-stops) pollute the P4
+> research prompt, and the seed marker is otherwise never persisted; a schema touch is out of hotfix
+> scope, so the free-form context JSON is the honest home for a precise tag. The tag is set at open by
+> the **P5 executor seam** (`build_opened`, from the candidate seed marker — deterministic, no AI) and
+> read by the **P4** prompt filter (new P2 `get_recent_lessons_for_prompt`). **The reward/score math is
+> provably untouched** — `provenance` rides only in the lesson's context, never in a score input, and
+> lessons gate nothing (root rule 3, Decision C/J intact). +3 P7 tests (**128 → 131**). Detail:
+> `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
+
 ## Harte Regeln (nicht verhandelbar)
 - **`confidence` ist observe-only und gatet NICHTS** (Decision C). N < `n_min=10` → `INSUFFICIENT`
   (fließt in NICHTS). Moduliert in v1 **nicht** `risk_pct`. Wer eine Confidence-Schwelle einbaut →

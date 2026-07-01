@@ -140,6 +140,19 @@ Hand-off „Candidate → Gates → Order" so bauen, dass P6 die Richtungs-/Size
 > confirms them via `scripts/resolve_epics.py` (v1.5 Step 2B) — comment flags at both sites; re-baseline before
 > live. Detail: `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 2A.5 + `phase8_scheduler/CLAUDE.md`.
 
+> 🔁 **Phase-8 v1.5-hotfix edit (2026-07-01, Issue A — lesson provenance, code = source of truth):**
+> `build_opened` (`executor.py`) now stamps the trade's **lesson provenance** onto the `OpenedTrade` so
+> the P4 research prompt can later exclude verification-trade lessons. **Why:** lessons from code-
+> verification trades (seeded, sub-minute forced time-stops) pollute the single AI decision's input, and
+> the literal seed marker `"MANUAL SEED (not a real research pick)"` (`scripts/seed_candidate.py:62`) is
+> otherwise **never persisted** (only `llm_confidence` was). **What:** a **deterministic** check (no AI)
+> — `provenance = "verification" if candidate.reasoning.startswith(_SEED_MARKER_PREFIX) else
+> "autonomous"` (new module const, intra-phase coupling to the seed tool). It flows into the new
+> `OpenedTrade.provenance` field (P7), which the P7 recorder writes into `market_context_json` at close.
+> **Additive, `reward_sink=None` bit-identical** (`build_opened` only runs when a sink is wired). Gate-
+> path/VETOs/sizing untouched; lessons gate nothing (root rule 3). +1 seam test (**153 → 154**). Detail:
+> `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
+
 ## Datei-/Modul-Übersicht (Soll, Konzept §"Modul-Plan")
 ```
 phase5_execution/

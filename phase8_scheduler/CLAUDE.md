@@ -213,6 +213,69 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-01 (v1.5-Hotfix: **Step 4 (A — Lesson-Provenance) ABGESCHLOSSEN** — präziser Provenance-Tag + Read-Path-Filter, kein Schema-Touch)
+
+> **Auslöser:** der Nikinger startete Step 4 (A — Lesson-Provenance), den letzten Code-Step vor den
+> Operator-Live-Läufen (Step 5). Plan-Freigabe: `~/.claude/plans/hello-claude-and-welcome-moonlit-waffle.md`.
+> Eine gelockte Operator-Entscheidung (AskUserQuestion): **„Provenance-Tag persistieren, mit detaillierter
+> Doku warum + was"** (Option B statt read-only-minimal). **Kein neues AI, kein VETO/Gate berührt, keine
+> Migration.**
+
+### Kern-Befund (⚠ warum der naive Plan nicht 1:1 baubar war — Code = Wahrheit)
+Der literale Seed-Marker `"MANUAL SEED (not a real research pick)"` (`seed_candidate.py:62`) wird **nie
+persistiert**: `build_opened` (`phase5_execution/execution/executor.py`) speicherte nur
+`candidate["llm_confidence"]`; `OpenedTrade`/`trade_outcomes` haben **kein** `reasoning`-Feld. Ohne
+Migration (Plan-Verbot) ist der Marker aus der DB für bestehende Lessons **nicht lesbar**. → Lösung:
+präziser Tag **vorwärts** in den bestehenden `market_context_json`-Blob (kein Schema-Touch) + Hold-Time/
+Datum als Fallback für die schon verschmutzten Lessons.
+
+### Completed (alle additiv, Default-Pfad bit-identisch — Cross-Phase, jede Datei dated dokumentiert)
+- **P7 `reward/models.py`:** `OpenedTrade.provenance: str = "autonomous"` (Default hält jede Bestands-
+  Konstruktion gültig, trailing field). **P7 `reward/recorder.py`:** `_extract_lesson` schreibt
+  `opened.provenance` (Cold-Reconcile ohne Stash → `"unknown"`) in `market_context` → `market_context_json`.
+- **P5 `execution/executor.py`:** `build_opened` leitet `provenance` **deterministisch** (Modul-Const
+  `_SEED_MARKER_PREFIX`, `reasoning.startswith(...)`, **kein AI**) ab — `"verification"` für Seeds, sonst
+  `"autonomous"`. Nur mit `reward_sink`; `reward_sink=None` bit-identisch.
+- **P2 `persistence/db.py`:** **neue** `get_recent_lessons_for_prompt(n, *, min_hold_min, quarantine_before,
+  exclude_provenance)` — in-query Filter (JSON1 `json_extract … IS NOT` NULL-safe für den Tag + Hold-Time-
+  Subquery + Datum), neueste N **Überlebende**. `get_recent_lessons` **unberührt**. P2 bleibt dummer
+  parametrisierter Store.
+- **P4 `research/models.py` + `context_builder.py`:** drei provisorische `ResearchConfig`-Felder
+  (`lesson_exclude_provenance=("verification",)`, `lesson_min_hold_min=2.0`, `lesson_quarantine_before=None`
+  — reversibler Reset, aus); `build_context` ruft den gefilterten Getter. Downstream automatisch
+  (`_mark_lessons_used` markiert nur Überlebende, `prompt` rendert nur sie).
+- **Reward-Pfad bewiesen unberührt:** `reward/*` ruft `get_recent_lessons*` nie; der Tag landet nur im
+  Lesson-Context-JSON, nicht in einem Score-Input. Lessons gaten nichts (root rule 3).
+
+### Verifiziert (gemockt/offline — Live = Operator)
+- **P2 62→67 · P4 120→122 · P5 153→154 · P7 128→131.** Regression unberührt: **P1 52 · P3 72 · P6 70 ·
+  P8 181.** `py_compile` clean; P4-Import-Isolation gewahrt (`import research.context_builder` zieht NONE
+  cross-phase). Doku: hotfix-Plan Step 4 auf ✅ + Cross-Phase-Register erweitert; `🔁`-Notes in P2/P4/P5/P7
+  CLAUDE.md; P2/P4-Konzept-Annotationen.
+
+### Step 4 (A) ist damit ABGESCHLOSSEN
+Damit sind **alle drei v1.5-Code-Fixes fertig** (B ✅ Clamp/Floor, C ✅ 4-Instrument-Universum, A ✅
+Lesson-Provenance). Übrig ist **nur noch Step 5 (Operator-Live-Läufe)** — der ✅-Beweis, nicht mehr Code.
+
+### Next (nächste Session / Operator)
+1. **Step 5a — Varietäts-Run** (mehrere Demo-Tage, normalere Caps): den ersten **netto-neuen autonomen
+   open→close** in einem sauberen Lauf einfangen (jetzt möglich: 4 Instrumente + gelockerter Clamp/Floor).
+2. **Step 5b — Breaker-Fire-Run** (separat, enger Cap / kleiner `daily_loss_cap`): einen Safety-Breaker
+   **tatsächlich auslösen** sehen. Diese zwei schließen das Phase-8-✅-Gate → dann Step 6 (Doku-Flip ✅,
+   ROADMAP/README, Merge).
+3. **Operator, nicht blockierend (aus der letzten Session getragen):** `smoke_test.py` für `^FCHI`/`^IBEX`
+   (CAC/IBEX Basis-Ticker) + point_value-Bestätigung der drei Nicht-DAX-Instrumente vor echtem Live-Konto.
+- **Commit:** vorgeschlagen (atomar: (1) P7+P5 write-path, (2) P2 getter + P4 filter/config, (3) docs),
+  wartet auf Nikinger-Trigger.
+
+### Offene Punkte / blockers
+- Keine technischen. ⚠ Hold-Time (2.0 min) + Provenance-Tag sind **provisorische** v1.5-Data-Collection-
+  Werte — vor Live re-baselinen. Bestehende (pre-tag) verschmutzte Lessons werden von der Hold-Time-
+  Heuristik erfasst; die Datums-Quarantäne (`lesson_quarantine_before`) ist der optionale, reversible
+  Hard-Reset-Hebel (default aus).
+
+---
+
 ## Session stopped — 2026-07-01 (v1.5-Hotfix: **Step 2 (C — Variety) VOLLSTÄNDIG ABGESCHLOSSEN** — CAC 40 + IBEX 35 bestätigt, STXE voll live-verifiziert)
 
 > **Auslöser:** der Nikinger hat die zwei angeforderten Operator-Schritte gelaufen (P3-`smoke_test.py`

@@ -89,6 +89,21 @@ is kicked off in the browser concept session, not here.
 > tests broadened, not added). Detail: `phase8_scheduler/CLAUDE.md` -> `## Session stopped` (Step 2
 > complete).
 
+> 🔁 **Phase-8 v1.5-hotfix edit (2026-07-01, Issue A — lesson provenance, code = source of truth):**
+> the research prompt is fed the newest `trade_lessons`; every lesson today came from a **code-
+> verification trade** (seeded, sub-minute forced time-stop) → it describes the test harness, not a
+> market decision, and pollutes the single AI decision's input. **Fix (read-path here):**
+> `context_builder.build_context` now calls a **new** P2 method `db.get_recent_lessons_for_prompt(5,
+> …)` instead of `get_recent_lessons(5)`, driven by three new **provisional** `ResearchConfig` fields
+> — `lesson_exclude_provenance=("verification",)` (precise tag written since v1.5), `lesson_min_hold_min
+> =2.0` (fallback that catches the pre-tag polluted lessons — all sub-minute), `lesson_quarantine_before
+> =None` (reversible one-time date reset, off by default). Downstream is automatic: `research.py`'s
+> `_mark_lessons_used(context.recent_lessons)` now marks only the surviving (real) lessons; `prompt`
+> renders only them. **Lessons still gate nothing** (root rule 3); the reward/score math never reads
+> these getters (untouched). The write-side (who stamps `provenance`) is the P5 executor seam + P7
+> recorder — see those phases. +2 P4 tests (**120 → 122**; `FakeDB` gained the new method). Detail:
+> `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
+
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which
 candidate?"). Everything else is plain code:

@@ -71,7 +71,7 @@ Step 0b  Doku-Reconciliation (eigener Commit)                                   
 Step 1   MESSEN: bot_score-Verteilung (read-only Diagnostic; Operator läuft)           ✅
 Step 2   C — Universum als typisiertes Config-Objekt + 3–4 Epics integrieren   ✅ (4 Instrumente)
 Step 3   B — Clamp/Floor entkoppeln + relaxen (data-collection mode; Werte aus Step 1) ✅
-Step 4   A — Lesson-Provenance (Seed-Marker + Hold-Time; Prompt-Filter + Quarantäne)   ← NEXT
+Step 4   A — Lesson-Provenance (Provenance-Tag + Hold-Time; Prompt-Filter + Quarantäne)  ✅
 Step 5   Operator-Live-Runs: 5a Varietät (open→close)  +  5b Breaker-Fire (separat, eng)
 Step 6   Doku/Note-Update: Phase 8 → ✅, CLAUDE.md Session stopped, ROADMAP
 ```
@@ -354,6 +354,39 @@ reversibel; **Reward-Pfad unberührt** (rechnet weiter auf allen Lessons).
 **Akzeptanz:** Research-Prompt bekommt keine Verifikations-Trade-Lessons mehr; echte Post-C/B-Lessons
 fließen normal; Reward unverändert.
 
+> **✅ ERLEDIGT (2026-07-01, Claude Code — Code = Source of Truth). Operator-Entscheidung (AskUserQuestion):
+> „Provenance-Tag persistieren, mit detaillierter Doku warum + was" (Option B statt read-only-Minimal).**
+> Umsetzung wich in **Details** vom Plan ab (die Anker stimmten, aber ein Befund formte den Bau):
+> - **⚠ Kern-Befund (der Grund, warum A.1 nicht 1:1 baubar war):** der literale Seed-Marker
+>   `"MANUAL SEED (not a real research pick)"` wird **nie persistiert** — `build_opened`
+>   (`executor.py`) speichert nur `candidate["llm_confidence"]`; `OpenedTrade`/`trade_outcomes` haben
+>   kein `reasoning`-Feld. Ohne Migration (Plan-Verbot) ist der Marker aus der DB für bestehende
+>   Lessons **nicht lesbar**. → Der Nikinger wählte, einen **präzisen Provenance-Tag vorwärts** in den
+>   **bestehenden `market_context_json`-Blob** zu schreiben (kein Schema-Touch), plus Hold-Time +
+>   reversible Datums-Quarantäne als Fallback für die schon verschmutzten (pre-tag) Lessons.
+> - **A.1/Write-Path (neu, additiv):** `OpenedTrade.provenance: str = "autonomous"` (P7 `models.py`,
+>   Default hält jede Bestands-Konstruktion gültig); `build_opened` leitet **deterministisch** (Marker-
+>   `startswith`, **kein AI**) `"verification"|"autonomous"` ab (P5 `executor.py`, Modul-Const
+>   `_SEED_MARKER_PREFIX`); `recorder._extract_lesson` schreibt den Tag in `market_context` →
+>   `market_context_json` (P7 `recorder.py`; Cold-Reconcile ohne Stash → `"unknown"`).
+> - **A.2/Read-Path:** **neue** P2-Methode `get_recent_lessons_for_prompt(n, *, min_hold_min,
+>   quarantine_before, exclude_provenance)` (`db.py`) — filtert **in-query** (JSON1
+>   `json_extract(...) IS NOT` NULL-safe für den Tag + Hold-Time-Subquery + Datum), liefert die
+>   neuesten N **Überlebenden**. `get_recent_lessons` bleibt **unberührt** (Register nennt es; eine
+>   dedizierte Methode ist sauberer — dokumentierte Abweichung). P2 bleibt ein dummer parametrisierter
+>   Store (die Policy/Werte kommen vom Caller).
+> - **A.3/Config-Wiring:** drei provisorische `ResearchConfig`-Felder (`lesson_exclude_provenance=
+>   ("verification",)`, `lesson_min_hold_min=2.0`, `lesson_quarantine_before=None` — reversibler
+>   Reset, default aus); `context_builder.build_context` ruft die gefilterte Methode. Downstream
+>   automatisch: `research._mark_lessons_used` markiert nur noch Überlebende; `prompt` rendert nur sie.
+> - **Reward-Pfad bewiesen unberührt:** `reward/*` ruft `get_recent_lessons*` nie; der Tag landet **nur**
+>   im Lesson-Context-JSON, nicht in einem Score-Input. Lessons gaten nichts (root rule 3).
+> - **Tests (gemockt):** P2 62→**67** (Getter: no-filter==alt, Tag-/Hold-/Datum-Ausschluss, Kombination
+>   +LIMIT-Überlebende), P4 120→**122** (context_builder ruft mit Config-Werten, Überlebende in
+>   `recent_lessons`), P5 153→**154** (build_opened Seed→verification/real→autonomous), P7 128→**131**
+>   (OpenedTrade-Default, recorder schreibt Tag, Cold→unknown). Regression unberührt: P1 52 · P3 72 ·
+>   P6 70 · P8 181. **Live-Wirkung (Prompt sieht keine Verifikations-Lessons) = Operator-Lauf Step 5.**
+
 ---
 
 ## Step 5 — Operator-Live-Runs (zwei getrennte Beweise)
@@ -392,7 +425,10 @@ Safety-Breaker).
 |---|---|---|---|
 | P4 | `research/models.py`, `candidate_filter.py`, neuer `load_universe()`/`InstrumentSpec` | Universum-Config + Clamp/Floor entkoppeln/relaxen | DAX-only-Pfad bit-identisch |
 | P3 | `TickerMapper` | je Epic Ticker/Volume-Proxy-Eintrag | DAX-Mapping unverändert |
-| P7/P4 | `context_builder.py`, `get_recent_lessons` | Provenance-Prompt-Filter | Reward-Pfad unberührt |
+| P7 | `reward/models.py` (`OpenedTrade.provenance`), `recorder.py` (`_extract_lesson`) | Provenance-Tag in `market_context_json` (write-path) | Default `"autonomous"` → bit-identisch; Reward-Pfad unberührt |
+| P5 | `execution/executor.py` (`build_opened`) | leitet Provenance aus dem Seed-Marker ab (kein AI) | nur mit `reward_sink`; `reward_sink=None` bit-identisch |
+| P2 | `persistence/db.py` (neu `get_recent_lessons_for_prompt`) | in-query Provenance-/Hold-/Datum-Filter | `get_recent_lessons` unberührt |
+| P4 | `research/models.py` (3 Config-Felder), `context_builder.py` | ruft den gefilterten Getter (Prompt-Filter) | Reward-Pfad unberührt |
 | — | `scripts/diag_score_distribution.py` (neu) | read-only Diagnostic | n/a |
 | — | `scripts/resolve_epics.py` (neu) | read-only IG-demo Epic-Resolver (C.0) | n/a |
 | docs | ROADMAP/ARCHITECTURE/README/CLAUDE.md/SVG | As-Built-Reconciliation | n/a |
