@@ -79,6 +79,18 @@ Step 6   Doku/Note-Update: Phase 8 → ✅, CLAUDE.md Session stopped, ROADMAP
 **Token-/Zeit-Fallback:** Wenn knapp → **C, dann B** ist das Minimum für autonome Trades.
 A (Lessons) + Breaker-Test folgen. Step 0/0b/1 sind billig und zuerst.
 
+> **⚠ Reihenfolge-Update (2026-07-01, Claude Code, Nikinger-freigegeben — Code = Source of Truth):**
+> **Ausführungsreihenfolge auf B-vor-C gedreht** (Step 3 vor Step 2). Der Plan blieb inhaltlich
+> unverändert; nur die *Reihenfolge* wurde nach der Step-1-Messung angepasst. **Das Warum
+> (datengetrieben):** die Messung ergab **alle 3 real gescorten Trades < 50** (100 %; s. Step-1-Block
+> unten). Der below-50-Doppel-Clamp feuert also **jeden** Zyklus, nicht nur im Ausnahmefall — B ist ein
+> *konstanter* Blocker. Zudem ist **C's Nutzen bis B gelockert ist gedämpft**: solange unter Score 50
+> alles auf BUY-only + Floor 70 geklemmt wird und der Bot strukturell < 50 lebt, kann ein breiteres
+> Universum keinen differenzierten Kandidaten erzeugen. **B ist der Unlock, der C's Varietät erst
+> nutzbar macht.** B ist außerdem klein, in `phase4_research/` isoliert und **ohne Operator-
+> Prerequisite**, während C den per-Epic-Brain-Context-Refactor + die Operator-Epic-Auflösung braucht.
+> C folgt unverändert nach B. **✅ B umgesetzt 2026-07-01** (s. Step-3-Block).
+
 ---
 
 ## Step 0 — Cleanup + Verify-Baseline
@@ -136,6 +148,29 @@ quantitativ dominiert und welche Floor-Schwelle sinnvoll ist.
 - **Operator** läuft das Script und gibt dir die Verteilung → fließt in die Floor-Werte in Step 3.
 - Akzeptanz: lauffähiges read-only Script; gemockter Unit-Test (kein echtes DB-Netz); Output liegt
   vor, bevor Step 3 die Floor-Werte fixiert.
+
+> **✅ ERLEDIGT (2026-07-01). Script `scripts/diag_score_distribution.py` (repo-root, phasenlos, 20
+> Tests) gebaut; Operator lief es gegen die echte `data/trading_bot.sqlite`. Gemessene Verteilung:**
+>
+> | Metrik | Wert |
+> |---|---|
+> | n (gescorte Trades) | **3** (small sample, n<10) |
+> | current_score | **45.83** |
+> | Bereich (min–max) | **45.83 – 49.86** |
+> | Median / Mean | **47.45 / 47.71** |
+> | p25 / p75 | 46.64 / 48.65 |
+> | **Anteil < 50** | **3/3 = 100 %** |
+> | Anteil < 35 | 0/3 = 0 % |
+> | Accounts | demo: 3 |
+> | Zeitraum | 2026-06-26 .. 2026-06-29 |
+>
+> **Befund (der Grund für die B-vor-C-Reihenfolge, s. §2):** der Bot lebt **strukturell unter Score 50**
+> — jeder je gescorte Trade liegt darunter. Der below-50-Doppel-Clamp (BUY-only + Floor 55→70) ist damit
+> das **Default-Regime, nicht die Ausnahme** → er force-abstained jeden Zyklus (genau der 2026-06-29-Lauf,
+> Score 45.83). ⚠ n=3 ist ein **sehr kleines Sample** — die Verteilung ist ein grober Hinweis, kein hartes
+> Signal; teils lebt der Score auch deshalb niedrig, *weil* der Bot kaum tradet (Henne-Ei mit C). Für Step 3
+> (B) reicht der Befund: der Floor-70-Sprung ist bei diesen Scores **unerreichbar** → auf 55 (= Default)
+> kollabiert.
 
 ---
 
@@ -228,6 +263,28 @@ kommentieren, sodass das Go-Live-Re-Baselining unmissable ist.
 
 **Akzeptanz:** P4 emittiert einen Kandidaten, wo es vorher force-abstainte; P6+VETOs bleiben der echte
 Richtungs-Check; **kein VETO/Gate angefasst**; Regression grün.
+
+> **✅ ERLEDIGT (2026-07-01, Claude Code — Code = Source of Truth). Umgesetzt VOR Step 2 (s. §2-Reorder).**
+> Umsetzung wich in **Details** vom Plan ab (Anker-Zeilen hatten sich verschoben; hier die Ist-Werte):
+> - **B.1 Entkoppeln:** die Floor-Grenze war **kein** Config-Feld, sondern das hartcodierte Modul-Literal
+>   `candidate_filter._NEUTRAL_SCORE = 50.0` (die Clamp-Grenze war das Config-Feld `long_bias_below_score`).
+>   Neues Feld **`ResearchConfig.confidence_floor_below_score = 50.0`** (`models.py`), `confidence_threshold`
+>   liest es jetzt; das Literal ist entfernt. → Floor-Grenze und Clamp-Grenze sind zwei unabhängige Knobs.
+> - **B.2 Relaxen (Defaults geändert — Wiring überschreibt sie nie, also ist der Dataclass-Default der Hebel):**
+>   `enable_long_bias_clamp: True → **False**` (SELL unter neutral erlaubt; P6-Debatte + 4 VETOs sind der
+>   Richtungs-Check). `confidence_floor_low_score: 70.0 → **55.0**` (= Default; der 70-Floor war bei den
+>   gemessenen Sub-50-Scores unerreichbar). **B4 verworfen** (Clamp nicht auf `<35` verschoben, sondern
+>   schlicht abgeschaltet — sauberer/reversibler; Messung zeigt 0 % unter 35, also für aktuelle Daten ohnehin
+>   äquivalent).
+> - **B.3 Provisorisch markiert:** beide geänderten Defaults tragen einen `# v1.5 data-collection mode —
+>   re-baseline before live`-Kommentar; der `ResearchConfig`-Docstring erklärt Entkopplung + provisorische Werte.
+> - **Tests:** `phase4_research/tests/test_candidate_filter.py` von 15 → 18 (Default-Verhalten neu asserted +
+>   ein **Entkopplungs-Beweis** + der Clamp-*Mechanismus* via explizitem `clamped_config()` weiter gedeckt).
+>   **P4 96 → 99 grün**, `test_research.py` (17) unberührt (keine clamp-abhängige Assertion), **P8 181 grün**.
+>   `enable_long_bias_clamp is False`, `confidence_threshold(40.0, ResearchConfig()) == 55.0`,
+>   `resolve_allowed_directions(40.0, ResearchConfig()) == ("BUY","SELL")` direkt verifiziert.
+> - **Kein VETO/Gate angefasst** (nur `phase4_research/` + Doku). Live-Beweis (Kandidat wird erzeugt statt
+>   force-abstain) = Operator-Lauf des P8-Daemons/`live_test.py` im Handelsfenster.
 
 ---
 

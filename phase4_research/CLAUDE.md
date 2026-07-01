@@ -41,6 +41,19 @@ is kicked off in the browser concept session, not here.
 > unchanged. Phase 8 reads it (`scheduler/research_tick.py`) into `scheduler_state.last_no_trade_detail`
 > for the UI. +2 P4 tests (**94 → 96**). Detail: `phase8_scheduler/CLAUDE.md` → `## UI-Erweiterung — 2026-06-29`.
 
+> 🔁 **Phase-8 v1.5-hotfix edit (2026-07-01, Issue B — clamp/floor relax, code = source of truth):**
+> Step-1 measurement found **100% of scored `bot_score`s below 50** → the below-50 double-clamp
+> force-abstained every cycle. Two `ResearchConfig` **defaults were relaxed for demo data-collection**
+> and the floor boundary was **decoupled**: `enable_long_bias_clamp` **True → False** (⚠ reverses
+> Decision 7 — the long-bias clamp is off; the P6 debate + 4 VETOs are now the direction check),
+> `confidence_floor_low_score` **70.0 → 55.0** (the 70 floor was unreachable at sub-50 scores), and a
+> new field `confidence_floor_below_score = 50.0` replaced the hardcoded `candidate_filter._NEUTRAL_SCORE`
+> literal so the floor boundary is independent of the clamp boundary. **All provisional — re-baseline
+> before live** (Phase-7 outcome-anchored confidence replaces the blunt floor); every changed default
+> carries a loud inline comment. **No VETO/gate touched**; only `phase4_research/`. +3 candidate_filter
+> tests (**96 → 99**; the clamp *mechanism* stays covered via an explicit `clamped_config()`). Detail:
+> `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 3 + `phase8_scheduler/CLAUDE.md`.
+
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which
 candidate?"). Everything else is plain code:
@@ -77,7 +90,9 @@ but is **not** the gate (uncalibrated; Phase 7 anchors it to outcomes).
    `SERVICE_NAME="tradingbot"`). Key: `anthropic_api_key`. A thin Phase-4 shim
    documents the deliberate isolation exception.
 7. **`allowed_directions`** config flag, default both; **long-bias clamp to
-   `("BUY",)` when `bot_score < 50`** is ON by default.
+   `("BUY",)` when `bot_score < 50`** — was ON by default; ⚠ **v1.5 (2026-07-01):
+   OFF by default** for demo data-collection (see the Phase-8 v1.5 note above;
+   re-baseline before live).
 8. **LLM error behaviour: exactly 1 retry**, only on *transient* faults
    (network/5xx/timeout/parse-/schema-fail). **No** retry on a valid `abstain` or
    a validator REJECT (those are content answers, not transport faults). Any final

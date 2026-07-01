@@ -235,6 +235,16 @@ Netzwerk/echtes LLM, atomic commits, kein Subtask „done" ohne grünes `pytest`
   `long_bias_below_score: float = 50.0`, `enable_long_bias_clamp: bool = True`,
   `max_spread_pct: float = 0.5`, `volume_proxy: str | None = "EXS1.DE"`,
   `confidence_floor_default: float = 55.0`, `confidence_floor_low_score: float = 70.0`.
+  > **⚠ v1.5-Hotfix-Änderung (2026-07-01, Phase-8 Issue B — Code = Source of Truth):** für die
+  > **Demo-Datensammlung** wurden zwei Defaults gelockert und die Floor-Grenze entkoppelt (Messung:
+  > jeder je gescorte `bot_score` < 50 → der Clamp/Floor feuerte jeden Zyklus, force-abstain).
+  > **Ist-Stand im Code:** `enable_long_bias_clamp = **False**` (war `True`, Decision 7 — der Clamp ist
+  > abgeschaltet; P6-Debatte + 4 VETOs sind der Richtungs-Check); `confidence_floor_low_score = **55.0**`
+  > (war `70.0` — auf den Default kollabiert); **neues Feld** `confidence_floor_below_score: float = 50.0`
+  > (die Floor-Grenze ist jetzt ein eigenes Config-Feld, **entkoppelt** vom Clamp-Feld `long_bias_below_score`
+  > — vorher das hartcodierte `candidate_filter._NEUTRAL_SCORE = 50.0`-Literal). **Provisorisch, vor Live
+  > re-baselinen** (Phase-7-Outcome-Anchoring ersetzt den blunt Floor). Detail:
+  > `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 3 (B).
 - Eigene Exceptions: `LLMResponseError`, `ResearchAbort` (Session-Health-Fail).
 
 ### 2. `validator.py` + `test_validator.py` ZUERST (Sicherheits-Kern)
@@ -458,7 +468,12 @@ Hier sitzt die Gating-Last (Entscheidung 4 + 7), nicht bei der LLM-Confidence.
 > (Phasen-Isolation, konsistent mit Validator/Context-Builder). (b) Die Floor-Grenze
 > nutzt das **Literal `50.0`** aus dem §6-Stub (Modul-Konstante `_NEUTRAL_SCORE`),
 > bewusst **getrennt** von `config.long_bias_below_score` (der Direction-Clamp-Grenze) —
-> zwei eigenständige Knöpfe, die zufällig denselben Default 50 haben. (c) Die **weiche**
+> zwei eigenständige Knöpfe, die zufällig denselben Default 50 haben. **⚠ v1.5-Update
+> (2026-07-01):** das Literal wurde durch das neue Config-Feld
+> `config.confidence_floor_below_score` ersetzt (die Entkopplung ist jetzt strukturell, nicht
+> nur konzeptionell) — der Stub unten (`bot_score < 50.0`) ist entsprechend stale; s. die
+> v1.5-Annotation bei den `ResearchConfig`-Feldern oben + `phase8_v1.5_hotfix_plan.md` Step 3.
+> (c) Die **weiche**
 > Drift-Kohärenz-Sanity verwendet eine dokumentierte Modul-Konstante
 > `_DRIFT_COHERENCE_PCT = 0.5` (% Drift): SELL bei Drift `> +0.5` bzw. BUY bei Drift
 > `< -0.5` → **`FilterVerdict(ok=True, rule="drift_coherence_warn")`** (passiert mit

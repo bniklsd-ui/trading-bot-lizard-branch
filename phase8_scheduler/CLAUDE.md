@@ -213,6 +213,65 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-01 (v1.5-Hotfix: Step 3 (B) — Clamp/Floor entkoppelt + relaxt; **VOR Step 2 gebaut**)
+
+> **Auslöser:** die Step-1-Messung (`scripts/diag_score_distribution.py` gegen die echte DB) ergab
+> **alle 3 gescorten Trades < 50** (100 %; current 45.83, Median 47.45, 0 % < 35). Der below-50-
+> Doppel-Clamp feuert damit **jeden** Zyklus. Der Nikinger gab frei, **B vor C** zu ziehen (Plan-Reorder,
+> ehrlich dokumentiert), weil (a) die Daten B als *konstanten* Blocker beweisen, (b) B klein/isoliert/
+> ohne Operator-Prerequisite ist, (c) **C's Varietät bis B gelockert ist gedämpft** bleibt (unter Score 50
+> ist ohne B alles BUY-only + Floor 70). **Kein neues AI, kein VETO/Gate berührt** — nur `phase4_research/`.
+
+### Completed (nur `phase4_research/` + Doku — kein Trading-/Scheduler-Code)
+- **Entkoppelt:** neues `ResearchConfig.confidence_floor_below_score = 50.0` (`research/models.py`);
+  `candidate_filter.confidence_threshold` liest es statt des entfernten Modul-Literals
+  `_NEUTRAL_SCORE = 50.0`. → Floor-Grenze und Direction-Clamp-Grenze (`long_bias_below_score`) sind jetzt
+  **unabhängige Knobs** (vorher teilten sie zufällig 50.0 über zwei Mechanismen).
+- **Relaxt (Defaults — Wiring überschreibt sie nie, s. `scripts/wiring.py:112/147/194` bare `ResearchConfig()`):**
+  `enable_long_bias_clamp: True → **False**` (SELL unter neutral erlaubt; P6-Debatte + 4 VETOs = Richtungs-
+  Check) und `confidence_floor_low_score: 70.0 → **55.0**` (der 70-Floor war bei Sub-50-Scores unerreichbar).
+  Beide mit lautem `# v1.5 data-collection mode — re-baseline before live`-Kommentar; Docstring erklärt Entkopplung
+  + provisorische Werte.
+- **Tests:** `test_candidate_filter.py` 15 → 18 — neues Default-Verhalten asserted (Clamp off / Floor 55
+  beidseitig / SELL unter neutral passiert), der Clamp-*Mechanismus* weiter gedeckt via explizitem
+  `clamped_config()` (stellt die pre-v1.5-Werte her), + ein **Entkopplungs-Beweis** (Floor-Grenze 60 ≠
+  Clamp-Grenze 50 → feuern unabhängig).
+
+### Verifiziert (gemockt/offline — Live = Operator)
+- `pytest phase4_research/tests -q` → **99 passed** (96 → 99; `--collect-only` bestätigte die wahre
+  Startzahl 96, nicht die Grep-Schätzung 94). `test_research.py` (17) **unberührt** — keine clamp-abhängige
+  Assertion brach. Direkt verifiziert: `ResearchConfig().enable_long_bias_clamp is False`,
+  `confidence_threshold(40.0, ResearchConfig()) == 55.0`, `resolve_allowed_directions(40.0, ResearchConfig())
+  == ("BUY","SELL")`.
+- **Regression unberührt:** `pytest phase8_scheduler/tests -q` → **181 passed** (P8 mockt Research). Andere
+  Phasen konsumieren diese Werte nicht asserted.
+
+### Doku (der „ehrlich das Warum + Was"-Auftrag)
+- `docs/concepts/phase8_v1.5_hotfix_plan.md`: Step-1-Messwerte-Tabelle eingetragen; §2-Sequenz mit der
+  **B-vor-C-Reorder-Begründung** annotiert (Original sichtbar gelassen, nicht überschrieben); Step-3-Block
+  mit dem Ist-Stand (inkl. der Detail-Abweichungen: Literal statt Config-Feld, B4 verworfen) auf ✅ geflippt.
+- `docs/concepts/phase4_research_plan_konzept.md`: v1.5-Annotation an den `ResearchConfig`-Feldern + am
+  stale `confidence_threshold`-Stub. `phase4_research/CLAUDE.md`: 🔁-Cross-Phase-Note + Decision-7-Bullet
+  („ON by default" → „v1.5 OFF by default") aktualisiert.
+
+### Next
+- **Operator (optional, wann immer):** P8-Daemon / `phase4_research/scripts/live_test.py` im Handelsfenster
+  laufen lassen → beobachten, dass jetzt ein **Kandidat erzeugt** wird (und in die Debatte läuft), wo vorher
+  force-abstained wurde. Das ist der Live-Beleg für B (kein Doku-Flip nötig — B ist Mittel, nicht Ziel).
+- **Step 2 (C — Universum, größter Hebel):** `InstrumentSpec`-Liste + validierender Loader + **per-Epic
+  Brain-Context-Refactor** in `context_builder` (heute nur der Anchor-Epic bekommt Brain-Context!) + P3-
+  `TickerMapper`-Eintrag + Volume-Proxy + `point_value`/`currency` je Instrument (Sizing hardcodet `1.0`/EUR)
+  + Operator-Prerequisite `resolve_epics.py` (IG-Demo-Epic-Strings auflösen). Danach Step 4 (A — Lessons).
+- **Commit:** vorgeschlagen (zwei atomare: Code+Tests, dann Doku), wartet auf Nikinger-Trigger.
+
+### Offene Punkte / blockers
+- Keine technischen. ⚠ n=3 ist ein winziges Sample — die Floor-55-Wahl ist ein grober,
+  provisorischer Startwert für die Datensammlung, kein getunter Wert. Sobald mehr reale Outcomes da sind
+  (nach C + Live-Läufen), gehört der Floor re-baselined (idealerweise durch Phase-7-Outcome-Anchoring ersetzt,
+  nicht nur neu geraten).
+
+---
+
 ## Session stopped — 2026-07-01 (v1.5-Hotfix: Step 1 — `bot_score`-Verteilungs-Diagnostic, read-only)
 
 > **Auslöser:** der Nikinger bat um den nächsten Schritt nach dem Housekeeping. Gemäß Plan
