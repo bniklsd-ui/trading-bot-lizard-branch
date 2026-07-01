@@ -4,9 +4,11 @@ Loaded via ``importlib`` by file path — root ``scripts/`` is deliberately **no
 importable package (the phases already collide on a ``scripts.wiring`` module name), so this
 phase-less resolver is loaded the same way as ``test_diag_score_distribution.py``.
 
-All offline: the broker is a duck-typed fake returning ``.ok``/``.data`` envelopes — no
-network, no keyring, no real order. The resolution functions are broker-injected precisely so
-they can be exercised without ``main()`` ever building the real ``ig_demo`` broker.
+All offline: the broker is a duck-typed fake returning ``.ok``/``.data``/``.error``
+envelopes — no network, no keyring, no real order, no real sleep (a no-op ``sleep_fn`` is
+injected everywhere so the pacing added after the first live run doesn't slow the suite).
+The resolution functions are broker-injected precisely so they can be exercised without
+``main()`` ever building the real ``ig_demo`` broker.
 """
 
 from __future__ import annotations
@@ -23,10 +25,15 @@ resolve_epics = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(resolve_epics)
 
 
+def _no_sleep(_seconds: float) -> None:
+    """A sleep_fn stand-in that does nothing — keeps tests instant."""
+
+
 @dataclass
 class _Env:
     ok: bool
     data: dict[str, Any] | None = None
+    error: dict[str, Any] | None = None
 
 
 class _FakeBroker:
@@ -37,13 +44,17 @@ class _FakeBroker:
         *,
         search_results: dict[str, list[dict[str, Any]]] | None = None,
         search_ok: bool = True,
+        search_error: dict[str, Any] | None = None,
         info_ok: bool = True,
+        info_error: dict[str, Any] | None = None,
         ohlcv_bars: bool = True,
         ohlcv_ok: bool = True,
     ) -> None:
         self._search_results = search_results or {}
         self._search_ok = search_ok
+        self._search_error = search_error
         self._info_ok = info_ok
+        self._info_error = info_error
         self._ohlcv_bars = ohlcv_bars
         self._ohlcv_ok = ohlcv_ok
         # Prove the resolver never writes/orders: only these three are ever called.
@@ -52,13 +63,13 @@ class _FakeBroker:
     def search_markets(self, term: str) -> _Env:
         self.calls.append(f"search:{term}")
         if not self._search_ok:
-            return _Env(ok=False)
+            return _Env(ok=False, error=self._search_error)
         return _Env(ok=True, data={"query": term, "results": self._search_results.get(term, [])})
 
     def get_market_info(self, epic: str) -> _Env:
         self.calls.append(f"info:{epic}")
         if not self._info_ok:
-            return _Env(ok=False)
+            return _Env(ok=False, error=self._info_error)
         return _Env(ok=True, data={
             "epic": epic, "name": f"{epic} Cash", "instrument_type": "INDICES",
             "currency": "EUR", "min_deal_size": 1.0, "lot_size": 1.0, "market_status": "TRADEABLE",
@@ -74,9 +85,10 @@ class _FakeBroker:
 
 def test_resolve_epic_shapes_all_fields() -> None:
     broker = _FakeBroker()
-    out = resolve_epics.resolve_epic(broker, "IX.D.STXE.IFMM.IP")
+    out = resolve_epics.resolve_epic(broker, "IX.D.STXE.IFMM.IP", sleep_fn=_no_sleep)
     assert out["epic"] == "IX.D.STXE.IFMM.IP"
     assert out["market_info_ok"] is True
+    assert out["market_info_error"] is None
     assert out["currency"] == "EUR"
     assert out["min_deal_size"] == 1.0
     assert out["lot_size"] == 1.0
@@ -84,32 +96,54 @@ def test_resolve_epic_shapes_all_fields() -> None:
     assert out["ohlcv_available"] is True
 
 
+def test_resolve_epic_surfaces_market_info_error() -> None:
+    broker = _FakeBroker(info_ok=False, info_error={"code": "RATE_LIMIT", "message": "429 rate limited"})
+    out = resolve_epics.resolve_epic(broker, "IX.D.CAC.IFM.IP", sleep_fn=_no_sleep)
+    assert out["market_info_ok"] is False
+    assert out["market_info_error"] == "429 rate limited"
+    assert out["name"] is None  # degrades, does not crash
+
+
 def test_probe_ohlcv_false_on_no_bars() -> None:
-    assert resolve_epics.probe_ohlcv(_FakeBroker(ohlcv_bars=False), "X") is False
-    assert resolve_epics.probe_ohlcv(_FakeBroker(ohlcv_ok=False), "X") is False
+    assert resolve_epics.probe_ohlcv(_FakeBroker(ohlcv_bars=False), "X", sleep_fn=_no_sleep) is False
+    assert resolve_epics.probe_ohlcv(_FakeBroker(ohlcv_ok=False), "X", sleep_fn=_no_sleep) is False
 
 
 def test_resolve_term_resolves_every_hit() -> None:
     broker = _FakeBroker(search_results={
         "EU Stocks 50": [{"epic": "IX.D.STXE.IFMM.IP"}, {"epic": "IX.D.STXE.DAILY.IP"}],
     })
-    block = resolve_epics.resolve_term(broker, "EU Stocks 50")
+    block = resolve_epics.resolve_term(broker, "EU Stocks 50", sleep_fn=_no_sleep)
     assert block["search_ok"] is True
     assert [h["epic"] for h in block["hits"]] == ["IX.D.STXE.IFMM.IP", "IX.D.STXE.DAILY.IP"]
 
 
-def test_resolve_term_failed_search_is_soft() -> None:
-    block = resolve_epics.resolve_term(_FakeBroker(search_ok=False), "France 40")
+def test_resolve_term_failed_search_is_soft_and_surfaces_error() -> None:
+    broker = _FakeBroker(search_ok=False, search_error={"code": "RATE_LIMIT", "message": "429 rate limited"})
+    block = resolve_epics.resolve_term(broker, "France 40", sleep_fn=_no_sleep)
     assert block["search_ok"] is False
     assert block["hits"] == []
+    # v1.5 fix: the real broker error message surfaces, not a hardcoded None.
+    assert block["error"] == "429 rate limited"
 
 
 def test_resolve_all_covers_terms_and_only_reads() -> None:
     broker = _FakeBroker(search_results={"France 40": [{"epic": "IX.D.CAC.IFMM.IP"}]})
-    report = resolve_epics.resolve_all(broker, ("France 40",))
+    report = resolve_epics.resolve_all(broker, ("France 40",), sleep_fn=_no_sleep)
     assert len(report) == 1 and report[0]["hits"][0]["epic"] == "IX.D.CAC.IFMM.IP"
     # Read-only proof: no order/close/persistence method was ever invoked.
     assert all(c.split(":")[0] in {"search", "info", "ohlcv"} for c in broker.calls)
+
+
+def test_resolve_all_paces_every_broker_call() -> None:
+    """v1.5 fix: a sleep follows every broker call (the rate-limit-cascade fix)."""
+    broker = _FakeBroker(search_results={"Germany 40": [{"epic": "IX.D.DAX.IFMM.IP"}]})
+    sleeps: list[float] = []
+    resolve_epics.resolve_all(broker, ("Germany 40",), sleep_fn=sleeps.append, pace_s=0.6)
+
+    # 1 search + 1 get_market_info + 1 get_ohlcv = 3 broker calls -> 3 paced sleeps.
+    assert len(broker.calls) == 3
+    assert sleeps == [0.6, 0.6, 0.6]
 
 
 def test_main_handles_connect_failure_gracefully(monkeypatch, capsys) -> None:

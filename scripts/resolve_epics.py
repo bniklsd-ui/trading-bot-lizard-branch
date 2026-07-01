@@ -23,6 +23,16 @@ account-currency value of one index point; ``lot_size`` is surfaced as a hint on
 operator confirms each instrument's point value from IG's contract details / a manual demo
 trade and enters it into ``InstrumentSpec.point_value`` + ``ExecutionConfig.point_values``.
 
+⚠ **Paced by default (fixed 2026-07-01, found via the first live run).** ``IGAdapter`` raises
+``RateLimitError`` on HTTP 429 with no built-in retry/backoff (the caller decides), and a
+5-term run makes ~35+ back-to-back REST calls (search + get_market_info + get_ohlcv per hit).
+The first unpaced run showed exactly the rate-limit failure signature at the tail: 3/4 hits
+for "France 40" failed ``get_market_info`` outright, the one that resolved had
+``ohlcv_available=False``, and the next two search terms failed completely. A short sleep
+between every broker call (``--pace-s``, default 0.6s — matches Phase-3's own
+``RateLimiter`` minimum spacing convention) fixes this; injectable ``sleep_fn`` keeps unit
+tests instant.
+
 The live run is the **operator's** job (keyring + network — project rule). This module's
 resolution functions take a **duck-typed broker** so they are unit-testable offline with a
 fake; only ``main()`` builds the real ``ig_demo`` broker (imported lazily).
@@ -33,7 +43,8 @@ always. Exit 0 in every expected case (a report tool); an unexpected error is no
 
 Usage:
     python scripts/resolve_epics.py
-    python scripts/resolve_epics.py --broker ig_demo --term "Euro Stoxx 50" --term "CAC 40"
+    python scripts/resolve_epics.py --term "France 40" --term "Netherlands 25" --term "Spain 35"
+    python scripts/resolve_epics.py --pace-s 1.0   # slower, if 0.6s still trips a limit
 """
 
 from __future__ import annotations
@@ -41,7 +52,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any
+import time
+from typing import Any, Callable
 
 # The locked v1.5 shortlist (concept: 3-4 curated liquid EUR index CFDs). DAX is already
 # confirmed (IX.D.DAX.IFMM.IP) — included so the operator sees it resolve the same way.
@@ -58,6 +70,11 @@ _DEFAULT_TERMS: tuple[str, ...] = (
 _OHLCV_RESOLUTION = "MINUTE_5"
 _OHLCV_COUNT = 3
 
+# Default pacing between broker calls — matches Phase-3's own RateLimiter minimum spacing
+# (external_data/fetcher.py) as the repo's established "be gentle with a broker/data API"
+# convention. See the module docstring for why this exists.
+_DEFAULT_PACE_S = 0.6
+
 
 def _eprint(message: str = "") -> None:
     print(message, file=sys.stderr)
@@ -71,55 +88,87 @@ def _data(env: Any) -> dict[str, Any]:
     return getattr(env, "data", None) or {}
 
 
-def probe_ohlcv(broker: Any, epic: str) -> bool:
+def _error_message(env: Any) -> str | None:
+    """Best-effort human-readable message from a not-ok Envelope's ``.error``."""
+    err = getattr(env, "error", None)
+    if err is None:
+        return None
+    if isinstance(err, dict):
+        return err.get("message") or err.get("code") or str(err)
+    return str(err)
+
+
+def probe_ohlcv(
+    broker: Any, epic: str, *, sleep_fn: Callable[[float], None] = time.sleep, pace_s: float = _DEFAULT_PACE_S
+) -> bool:
     """Return True if a small ``get_ohlcv`` probe yields at least one bar (fail-soft)."""
     try:
         env = broker.get_ohlcv(epic, _OHLCV_RESOLUTION, _OHLCV_COUNT)
     except Exception:  # noqa: BLE001 — a resolver probe must never crash the run
         return False
+    finally:
+        sleep_fn(pace_s)
     if not _ok(env):
         return False
     return bool(_data(env).get("bars"))
 
 
-def resolve_epic(broker: Any, epic: str) -> dict[str, Any]:
+def resolve_epic(
+    broker: Any, epic: str, *, sleep_fn: Callable[[float], None] = time.sleep, pace_s: float = _DEFAULT_PACE_S
+) -> dict[str, Any]:
     """Resolve one epic's tradeable facts via ``get_market_info`` + an OHLCV probe.
 
     Read-only. Returns a stable dict; missing/failed fields degrade to ``None``/``False``
-    rather than raising, so one bad epic never aborts the whole resolution.
+    rather than raising, so one bad epic never aborts the whole resolution. Paced (see
+    module docstring) — a sleep follows both broker calls this makes.
     """
     info_env = broker.get_market_info(epic)
+    sleep_fn(pace_s)
     info = _data(info_env)
     return {
         "epic": epic,
         "market_info_ok": _ok(info_env),
+        "market_info_error": None if _ok(info_env) else _error_message(info_env),
         "name": info.get("name"),
         "instrument_type": info.get("instrument_type"),
         "currency": info.get("currency"),
         "min_deal_size": info.get("min_deal_size"),
         "lot_size": info.get("lot_size"),  # hint only — NOT the point value (see docstring)
         "market_status": info.get("market_status"),
-        "ohlcv_available": probe_ohlcv(broker, epic),
+        "ohlcv_available": probe_ohlcv(broker, epic, sleep_fn=sleep_fn, pace_s=pace_s),
     }
 
 
-def resolve_term(broker: Any, term: str) -> dict[str, Any]:
+def resolve_term(
+    broker: Any, term: str, *, sleep_fn: Callable[[float], None] = time.sleep, pace_s: float = _DEFAULT_PACE_S
+) -> dict[str, Any]:
     """Search one term and resolve every hit (read-only). Fail-soft on a bad search."""
     try:
         search_env = broker.search_markets(term)
     except Exception as exc:  # noqa: BLE001
         return {"term": term, "search_ok": False, "error": str(exc), "hits": []}
+    finally:
+        sleep_fn(pace_s)
     if not _ok(search_env):
-        return {"term": term, "search_ok": False, "error": None, "hits": []}
+        return {"term": term, "search_ok": False, "error": _error_message(search_env), "hits": []}
 
     results = _data(search_env).get("results", []) or []
-    hits = [resolve_epic(broker, r["epic"]) for r in results if r.get("epic")]
+    hits = [
+        resolve_epic(broker, r["epic"], sleep_fn=sleep_fn, pace_s=pace_s)
+        for r in results if r.get("epic")
+    ]
     return {"term": term, "search_ok": True, "error": None, "hits": hits}
 
 
-def resolve_all(broker: Any, terms: tuple[str, ...]) -> list[dict[str, Any]]:
-    """Resolve every search term into its hits (read-only)."""
-    return [resolve_term(broker, term) for term in terms]
+def resolve_all(
+    broker: Any,
+    terms: tuple[str, ...],
+    *,
+    sleep_fn: Callable[[float], None] = time.sleep,
+    pace_s: float = _DEFAULT_PACE_S,
+) -> list[dict[str, Any]]:
+    """Resolve every search term into its hits (read-only, paced)."""
+    return [resolve_term(broker, term, sleep_fn=sleep_fn, pace_s=pace_s) for term in terms]
 
 
 def _format_report(report: list[dict[str, Any]]) -> str:
@@ -135,6 +184,9 @@ def _format_report(report: list[dict[str, Any]]) -> str:
             continue
         lines.append(f"[resolve] {term!r}: {len(block['hits'])} hit(s)")
         for h in block["hits"]:
+            if not h["market_info_ok"]:
+                lines.append(f"    {h['epic']}  | get_market_info FAILED ({h.get('market_info_error')})")
+                continue
             lines.append(
                 f"    {h['epic']}  | {h.get('name')!r} | {h.get('currency')} | "
                 f"min={h.get('min_deal_size')} lot={h.get('lot_size')} | "
@@ -151,6 +203,12 @@ def main(argv: list[str] | None = None) -> int:
         "--term", action="append", dest="terms", default=None,
         help="a search term to resolve (repeatable); defaults to the curated shortlist",
     )
+    parser.add_argument(
+        "--pace-s", type=float, default=_DEFAULT_PACE_S,
+        help=f"seconds to sleep between broker calls (default: {_DEFAULT_PACE_S}) — raise this "
+             "if a run still shows rate-limit-shaped failures (get_market_info FAILED / "
+             "ohlcv=no / search FAILED clustered near the end of the run)",
+    )
     args = parser.parse_args(argv)
     terms = tuple(args.terms) if args.terms else _DEFAULT_TERMS
 
@@ -164,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"broker": args.broker, "connected": False, "report": []}, indent=2))
         return 0
 
-    report = resolve_all(broker, terms)
+    report = resolve_all(broker, terms, pace_s=args.pace_s)
     _eprint(_format_report(report))
     print(json.dumps({"broker": args.broker, "connected": True, "report": report}, indent=2, default=str))
     return 0
