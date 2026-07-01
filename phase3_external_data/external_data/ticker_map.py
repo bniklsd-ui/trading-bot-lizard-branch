@@ -34,11 +34,20 @@ class TickerMapper:
         "CS.D.EURUSD.MINI.IP": "EURUSD=X",
         "IX.D.DOW.DAILY.IP": "^DJI",
         # v1.5 Issue C, Step 2B (2026-07-01): epic confirmed live via resolve_epics.py
-        # against IG demo; the "^STOXX50E" yfinance ticker itself is the well-known
-        # public symbol (by analogy with DAX's ^GDAXI), NOT yet live-verified — operator
-        # should confirm via `python scripts/smoke_test.py --epic IX.D.STXE.IFM.IP
-        # --volume-proxy EXW1.DE` before trusting the brain-context signal for it.
-        "IX.D.STXE.IFM.IP": "^STOXX50E",  # Euro Stoxx 50 Kassa (2€)
+        # against IG demo; "^STOXX50E" itself is now FULLY LIVE-VERIFIED too, via
+        # `python scripts/smoke_test.py --epic IX.D.STXE.IFM.IP --volume-proxy EXW1.DE`
+        # (real drift/momentum/history/volume returned, EXW1.DE gave genuine non-zero
+        # volume).
+        "IX.D.STXE.IFM.IP": "^STOXX50E",  # Euro Stoxx 50 Kassa (2€) — live-verified
+        # CAC 40 / IBEX 35: epics confirmed live via a second, paced resolve_epics.py run
+        # (2026-07-01, ohlcv_available=True for both). "^FCHI"/"^IBEX" are the well-known
+        # public Yahoo Finance index symbols, NOT yet live-verified — operator should
+        # confirm via `python scripts/smoke_test.py --epic <epic>` before trusting the
+        # brain-context signal for either. No volume-proxy entries (deliberately — no
+        # confidently-known ETF ticker guessed for either; degrades to reduced-signal,
+        # concept C3-tolerated, not a crash).
+        "IX.D.CAC.IFE.IP": "^FCHI",     # Frankreich 40 Kassa (1€)
+        "IX.D.IBEX.IFM.IP": "^IBEX",    # Spanien 35 Kassa (2€)
     }
     _VOLUME_MAP: dict[str, str] = {}  # empty default → ^GDAXI degrades (no proxy)
 

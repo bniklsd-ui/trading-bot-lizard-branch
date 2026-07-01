@@ -322,42 +322,74 @@ _DEFAULT_UNIVERSE: tuple[InstrumentSpec, ...] = (
     ),
 )
 
-# v1.5 Issue C, Step 2B (2026-07-01) — the confirmed multi-instrument universe. Public
-# (unlike ``_DEFAULT_UNIVERSE``) so the wiring layer — the only place cross-phase config
-# choices belong — can opt the daemon/live builds into it explicitly. A bare
-# ``ResearchConfig()`` still defaults to ``_DEFAULT_UNIVERSE`` (DAX-only, unchanged), so
-# no existing caller/test needs to change; only ``scripts/wiring.py`` (P4 + P8) passes
-# ``universe=EXTENDED_UNIVERSE`` in.
+# v1.5 Issue C, Step 2B (2026-07-01, COMPLETE) — the confirmed multi-instrument universe.
+# Public (unlike ``_DEFAULT_UNIVERSE``) so the wiring layer — the only place cross-phase
+# config choices belong — can opt the daemon/live builds into it explicitly. A bare
+# ``ResearchConfig()`` still defaults to ``_DEFAULT_UNIVERSE`` (DAX-only, unchanged), so no
+# existing caller/test needs to change; only ``scripts/wiring.py`` (P4 + P8) passes
+# ``universe=EXTENDED_UNIVERSE`` in. Four curated EUR index CFDs — matches the locked
+# decision's "3-4 curated liquid EUR index CFDs".
 #
 # DAX epic/point_value/min_deal_size/ticker/proxy are the pre-v1.5 values, reused as-is.
-# Euro Stoxx 50 (``IX.D.STXE.IFM.IP``) was resolved via the operator's
-# ``scripts/resolve_epics.py`` run against IG demo (2026-07-01): currency/min_deal_size/
-# market_status=TRADEABLE/ohlcv_available=True are all **live-confirmed**. Two fields are
-# NOT independently confirmed, flagged below — re-verify before trusting this instrument
-# in a live run:
-#   - point_value=2.0 is INFERRED from IG's "(2€)" cash-instrument name, by analogy with
-#     the verified DAX pattern (name "(1€)" <-> point_value=1.0, and lot_size==1.0 matches
-#     it exactly). Not independently confirmed via a contract-spec page or a manual trade.
-#   - yf_ticker="^STOXX50E" / volume_proxy="EXW1.DE" are the well-known public Yahoo
-#     Finance / iShares Core EURO STOXX 50 UCITS ETF symbols (by analogy with DAX's
-#     ^GDAXI / EXS1.DE), NOT live-verified against yfinance. Operator: verify with
-#     `python phase3_external_data/scripts/smoke_test.py --epic IX.D.STXE.IFM.IP
-#     --volume-proxy EXW1.DE` before trusting the brain-context signal for this epic.
 #
-# CAC 40 / AEX / IBEX 35 are deliberately NOT added yet — the 2026-07-01 resolve_epics.py
-# run's tail (France 40 onward) shows a rate-limiting cascade (get_market_info failing
-# outright for 3/4 CAC hits, ohlcv_available=False for the one that resolved, both
-# remaining search terms failing outright) after ~35 unthrottled back-to-back broker
-# calls. Confirming CAC 40's `ohlcv_available` matters: VETO 3 fails closed on missing
-# bars, so an epic without real-time OHLCV would never clear the momentum VETO and could
-# never actually trade — a silent "phantom" instrument. resolve_epics.py now paces itself
-# (see its module docstring); re-run it for a clean read before adding these.
+# Euro Stoxx 50 (``IX.D.STXE.IFM.IP``): resolved via ``scripts/resolve_epics.py`` against
+# IG demo (2026-07-01) — currency/min_deal_size/market_status=TRADEABLE/ohlcv_available=True
+# all live-confirmed. ``yf_ticker="^STOXX50E"`` + ``volume_proxy="EXW1.DE"`` are now **fully
+# live-verified** too, via `python phase3_external_data/scripts/smoke_test.py --epic
+# IX.D.STXE.IFM.IP --volume-proxy EXW1.DE` (2026-07-01): real drift/momentum/history/
+# `volume_available=True` with a genuine non-zero `today_volume` from EXW1.DE. Only
+# ``point_value=2.0`` remains an INFERENCE (from IG's "(2€)" cash-instrument name, by
+# analogy with the verified DAX pattern name "(1€)" <-> point_value=1.0, lot_size match) —
+# smoke_test never touches sizing, so this needs a contract-spec/manual-trade confirmation
+# before a live run.
+#
+# CAC 40 (``IX.D.CAC.IFE.IP``, "Frankreich 40 Kassa (1€)") and IBEX 35
+# (``IX.D.IBEX.IFM.IP``, "Spanien 35 Kassa (2€)"): resolved via a second, PACED
+# ``resolve_epics.py`` run (2026-07-01, ``--pace-s 1.0``) — the first unpaced run's tail
+# failures for these two were confirmed rate-limit noise (see the module CHANGELOG-style
+# note in `scripts/resolve_epics.py`), not real unavailability: this clean re-run shows
+# currency=EUR/market_status=TRADEABLE/**ohlcv_available=True** for every hit on both
+# terms. Picked the smallest-lot "Kassa" (cash, non-forward) variant of each, mirroring the
+# DAX/STXE selection pattern:
+#   - CAC 40 point_value=1.0 INFERRED from "(1€)" naming (matches lot_size=1.0).
+#     yf_ticker="^FCHI" is the well-known public Yahoo Finance CAC 40 index symbol,
+#     NOT live-verified. volume_proxy=None (deliberately — no ETF ticker guessed with
+#     enough confidence; degrades to reduced-signal per concept C3, not a crash).
+#   - IBEX 35 point_value=2.0 INFERRED from "(2€)" naming (matches lot_size=2.0; no 1€
+#     Kassa variant exists for this instrument). yf_ticker="^IBEX" is the well-known public
+#     Yahoo Finance IBEX 35 index symbol, NOT live-verified. volume_proxy=None (same
+#     reasoning as CAC 40).
+#   Operator: verify both via `python phase3_external_data/scripts/smoke_test.py --epic
+#   IX.D.CAC.IFE.IP` / `--epic IX.D.IBEX.IFM.IP` before trusting their brain-context signal.
+#
+# AEX (searched as "Netherlands 25") returned a genuine empty result (``search_ok=True``,
+# zero hits) in the same clean paced run — not a rate-limit artifact, just no market under
+# that search term on this account. Left out deliberately (it was always bracketed
+# "optional" in the locked decision; four confirmed instruments already satisfy "3-4").
 EXTENDED_UNIVERSE: tuple[InstrumentSpec, ...] = (
     _DEFAULT_UNIVERSE[0],  # DAX, unchanged
     InstrumentSpec(
         epic="IX.D.STXE.IFM.IP",
         yf_ticker="^STOXX50E",
         volume_proxy="EXW1.DE",
+        point_value=2.0,
+        min_deal_size=0.5,
+        currency="EUR",
+        source="curated",
+    ),
+    InstrumentSpec(
+        epic="IX.D.CAC.IFE.IP",
+        yf_ticker="^FCHI",
+        volume_proxy=None,
+        point_value=1.0,
+        min_deal_size=1.0,
+        currency="EUR",
+        source="curated",
+    ),
+    InstrumentSpec(
+        epic="IX.D.IBEX.IFM.IP",
+        yf_ticker="^IBEX",
+        volume_proxy=None,
         point_value=2.0,
         min_deal_size=0.5,
         currency="EUR",

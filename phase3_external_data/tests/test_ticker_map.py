@@ -20,11 +20,21 @@ def test_epic_to_yf_known_epics():
 
 
 def test_epic_to_yf_euro_stoxx_50():
-    # v1.5 Step 2B: static entry only — asserts the mapping is registered, NOT that
-    # ^STOXX50E is a live yfinance ticker (that's the operator's smoke_test.py job).
+    # v1.5 Step 2B: static entry only — asserts the mapping is registered. ^STOXX50E was
+    # separately live-verified via smoke_test.py (2026-07-01), including its EXW1.DE proxy.
     m = TickerMapper()
     assert m.epic_to_yf("IX.D.STXE.IFM.IP") == "^STOXX50E"
     assert m.epic_to_volume_yf("IX.D.STXE.IFM.IP") is None  # no static proxy (DAX pattern)
+
+
+def test_epic_to_yf_cac40_and_ibex35():
+    # v1.5 Step 2B: static entries only — asserts registration, NOT that ^FCHI/^IBEX are
+    # live yfinance tickers (that's the operator's smoke_test.py job, not yet run).
+    m = TickerMapper()
+    assert m.epic_to_yf("IX.D.CAC.IFE.IP") == "^FCHI"
+    assert m.epic_to_yf("IX.D.IBEX.IFM.IP") == "^IBEX"
+    assert m.epic_to_volume_yf("IX.D.CAC.IFE.IP") is None
+    assert m.epic_to_volume_yf("IX.D.IBEX.IFM.IP") is None
 
 
 def test_unknown_epic_raises():

@@ -144,13 +144,30 @@ def test_extended_universe_is_valid_and_dax_unchanged() -> None:
     assert EXTENDED_UNIVERSE[0] is _DEFAULT_UNIVERSE[0]  # DAX spec reused, not duplicated
 
 
-def test_extended_universe_has_two_eur_instruments() -> None:
+def test_extended_universe_has_four_eur_instruments() -> None:
+    # v1.5 Step 2B complete (2026-07-01): DAX + Euro Stoxx 50 + CAC 40 + IBEX 35 — matches
+    # the locked decision's "3-4 curated liquid EUR index CFDs" (AEX genuinely not found
+    # under the tried search term, deliberately left out per the same decision's bracket).
     epics = [s.epic for s in EXTENDED_UNIVERSE]
-    assert epics == ["IX.D.DAX.IFMM.IP", "IX.D.STXE.IFM.IP"]
+    assert epics == [
+        "IX.D.DAX.IFMM.IP",
+        "IX.D.STXE.IFM.IP",
+        "IX.D.CAC.IFE.IP",
+        "IX.D.IBEX.IFM.IP",
+    ]
     assert all(s.currency == "EUR" for s in EXTENDED_UNIVERSE)
 
 
 def test_config_can_opt_into_extended_universe() -> None:
     cfg = ResearchConfig(universe=EXTENDED_UNIVERSE)
-    assert cfg.epic_allowlist == ("IX.D.DAX.IFMM.IP", "IX.D.STXE.IFM.IP")
-    assert cfg.universe[1].point_value == 2.0
+    assert cfg.epic_allowlist == (
+        "IX.D.DAX.IFMM.IP", "IX.D.STXE.IFM.IP", "IX.D.CAC.IFE.IP", "IX.D.IBEX.IFM.IP",
+    )
+    by_epic = {s.epic: s for s in cfg.universe}
+    assert by_epic["IX.D.STXE.IFM.IP"].point_value == 2.0
+    assert by_epic["IX.D.CAC.IFE.IP"].point_value == 1.0
+    assert by_epic["IX.D.IBEX.IFM.IP"].point_value == 2.0
+    # CAC/IBEX volume proxies deliberately unset (no confidently-known ETF ticker) —
+    # reduced-signal, tolerated (concept C3), not a crash.
+    assert by_epic["IX.D.CAC.IFE.IP"].volume_proxy is None
+    assert by_epic["IX.D.IBEX.IFM.IP"].volume_proxy is None
