@@ -232,6 +232,27 @@ Quelle je Epic auflöst.
 **Akzeptanz:** Research kann für **jeden** Epic im Universum einen Kandidaten emittieren; Gates/VETOs
 laufen per-Epic; malformed Eintrag failt closed; Regression grün.
 
+> **✅ Step 2A ERLEDIGT (2026-07-01, Claude Code — Code = Source of Truth). Zwei Operator-Entscheidungen
+> (AskUserQuestion): „Framework now, populate later"; point_value JETZT in P5 threaden (ehrlich dokumentiert).**
+> Umsetzung wich in **Details** vom Plan ab (Anker-Zeilen verschoben; Ist-Stand):
+> - **C.1 (models.py):** `InstrumentSpec` + `load_universe()` gebaut; `ResearchConfig.universe` ist SoT,
+>   `__post_init__` versöhnt mit dem Legacy `epic_allowlist` (beide Konstruktions-Stile funktionieren).
+>   Default-Universum = 1 DAX-Spec = bit-identisch zum alten `epic_allowlist`. +13 Tests.
+> - **C.1+ per-Epic-Brain-Context (war im Plan als „Herz" markiert, hier explizit):** vorher bekam **nur**
+>   der Anchor Brain-Context. Jetzt `ResearchContext.brain_contexts` (je Epic), `context_builder` holt je
+>   tradeable Epic, `prompt` rendert die Nicht-Anchor-Snapshots, `candidate_filter`/`research.py`
+>   Drift/`drift_at_pick` keyen auf den **Kandidaten-Epic** (Fallback Anchor). +5 Tests.
+> - **C.0 (resolve_epics.py):** read-only Operator-Resolver gebaut (broker-injiziert, offline-testbar,
+>   nur GETs). ⚠ **point_value NICHT resolvebar** (IG exponiert es nicht → `lot_size`-Hinweis + manuelle
+>   Bestätigung). +6 Tests (repo-root `tests/`).
+> - **C.2/C.3 Reconciliation:** **C.3-Sizing (point_value) VORGEZOGEN nach 2A** (Operator wollte es jetzt);
+>   Naht **P5-seitig** (`ExecutionConfig.point_values` + `point_value_for`, frozen Candidate + IG ohne
+>   Point-Value → zwei bewusste SoTs). **C.2 (P3 TickerMapper) + die echten Epic-Werte bleiben 2B**
+>   (operator-gated). C.4 (VETO-Quelle je Epic) in 2B verifizieren. +7 P5 Tests.
+> - **Wiring (P4+P8):** registriert je `InstrumentSpec` Ticker+Proxy aus dem Universum. DAX-Default unverändert.
+> - **Grün:** P4 99→**117**, P5 146→**153**, root `tests` 20→**26**; Regression P6 70 · P7 128 · P8 181 unberührt.
+>   Import-Isolation gewahrt. **2B (echte Epics) + Step 4 (A) offen.** Detail: `phase8_scheduler/CLAUDE.md`.
+
 ---
 
 ## Step 3 — B: Clamp/Floor entkoppeln + relaxen (data-collection mode)
