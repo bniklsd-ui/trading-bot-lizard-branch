@@ -180,3 +180,32 @@ def test_multi_epic_allowlist_partial_tradeable(db: FakeDB, fetcher: FakeFetcher
 
     assert [e["epic"] for e in ctx.tradeable_epics] == [DEFAULT_EPIC, sibling]
     assert ctx.anchor_epic == DEFAULT_EPIC
+
+
+def test_brain_context_fetched_per_tradeable_epic(db: FakeDB, fetcher: FakeFetcher) -> None:
+    """v1.5 (Issue C): each tradeable epic gets its own brain snapshot, keyed by epic."""
+    broker = FakeBroker()
+    sibling = "IX.D.DAX.DAILY.IP"
+    ctx = build_context(broker, db, fetcher, _config(epic_allowlist=(DEFAULT_EPIC, sibling)))
+
+    # Both epics fetched (order-preserving), both keyed into brain_contexts.
+    assert fetcher.calls == [DEFAULT_EPIC, sibling]
+    assert set(ctx.brain_contexts) == {DEFAULT_EPIC, sibling}
+    assert ctx.brain_contexts[DEFAULT_EPIC] is not None
+    assert ctx.brain_contexts[sibling] is not None
+    # The anchor view stays populated and equals the anchor's per-epic entry.
+    assert ctx.brain_context == ctx.brain_contexts[DEFAULT_EPIC]
+
+
+def test_brain_context_anchor_fetched_even_if_untradeable(db: FakeDB, fetcher: FakeFetcher) -> None:
+    """The anchor's brain is still fetched (brain_context populated) when it's untradeable.
+
+    A closed market drops every epic from the universe, but the anchor snapshot is
+    still fetched so ``brain_context`` (the anchor view) is not silently lost.
+    """
+    broker = FakeBroker(market_status="CLOSED")
+    ctx = build_context(broker, db, fetcher, _config())
+
+    assert ctx.tradeable_epics == []
+    assert DEFAULT_EPIC in ctx.brain_contexts
+    assert ctx.brain_context == ctx.brain_contexts[DEFAULT_EPIC]

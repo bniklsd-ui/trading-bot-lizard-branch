@@ -185,14 +185,27 @@ def build_context(
     bot_score = db.get_current_score()
     risk_level = db.get_risk_level()
 
-    brain_context = _safe_brain_context(market_data, anchor_epic)
+    # v1.5 (Issue C): fetch a delayed brain snapshot for EACH tradeable epic (plus the
+    # anchor, so ``brain_context`` stays populated even when the anchor is untradeable
+    # this cycle). Order-preserving, de-duplicated. Each fetch degrades to ``None`` on
+    # its own (unmapped epic / off-hours) — one epic's missing data never blocks another
+    # (concept C3 reduced-signal, tolerated).
+    epics_needing_brain = list(
+        dict.fromkeys([e["epic"] for e in tradeable_epics] + [anchor_epic])
+    )
+    brain_contexts: dict[str, dict[str, Any] | None] = {
+        epic: _safe_brain_context(market_data, epic) for epic in epics_needing_brain
+    }
+    brain_context = brain_contexts.get(anchor_epic)
 
+    n_present = sum(1 for v in brain_contexts.values() if v is not None)
     log.info(
-        "context built: %d tradeable epic(s), score=%s, risk=%s, brain=%s",
+        "context built: %d tradeable epic(s), score=%s, risk=%s, brain=%d/%d present",
         len(tradeable_epics),
         bot_score,
         risk_level,
-        "present" if brain_context is not None else "None",
+        n_present,
+        len(brain_contexts),
     )
 
     return ResearchContext(
@@ -203,4 +216,5 @@ def build_context(
         risk_level=risk_level,
         brain_context=brain_context,
         anchor_epic=anchor_epic,
+        brain_contexts=brain_contexts,
     )

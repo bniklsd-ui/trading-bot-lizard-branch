@@ -94,6 +94,30 @@ def _render_market_state(brain_context: dict[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _render_per_epic_snapshots(
+    tradeable_epics: list[dict[str, Any]],
+    brain_contexts: dict[str, dict[str, Any] | None],
+    anchor_epic: str,
+) -> str:
+    """Render delayed snapshots for the **non-anchor** tradeable instruments (v1.5).
+
+    The anchor's snapshot is already rendered by :func:`_render_market_state`; this
+    adds one block per *other* tradeable epic so a multi-instrument universe hands the
+    model each candidate's own delayed picture (Issue C — the LLM can differentiate).
+    Returns ``""`` when there are no other tradeable epics (single-DAX universe) — the
+    caller drops empty sections, so the default prompt is unchanged.
+    """
+    others = [e for e in tradeable_epics if e.get("epic") != anchor_epic]
+    if not others or not brain_contexts:
+        return ""
+    blocks = ["Other tradeable instruments — delayed snapshots (sentiment, not real-time):"]
+    for e in others:
+        epic = e.get("epic")
+        blocks.append(f"[{epic} — {e.get('name', _NA)}]")
+        blocks.append(_render_market_state(brain_contexts.get(epic)))
+    return "\n".join(blocks)
+
+
 def _render_trades(trades: list[dict[str, Any]]) -> str:
     """Render up to the last trades as a compact table (defensive ``.get()``)."""
     if not trades:
@@ -208,18 +232,22 @@ def build_prompt(
         f"- permitted directions: {directions_txt}"
     )
 
-    user = "\n\n".join(
-        [
-            _render_market_state(context.brain_context),
-            _render_trades(context.recent_trades),
-            _render_lessons(context.recent_lessons),
-            decision_block,
-            _render_universe(context.tradeable_epics),
-            "Answer format: respond with abstain, epic, direction, confidence, "
-            "reasoning per the structured schema. epic must come from the list above; "
-            f"direction must be one of [{directions_txt}].",
-        ]
-    )
+    # Sections are joined with a blank line; empty ones are dropped so a single-epic
+    # universe (no non-anchor snapshots) renders exactly as before v1.5.
+    sections = [
+        _render_market_state(context.brain_context),
+        _render_per_epic_snapshots(
+            context.tradeable_epics, context.brain_contexts, context.anchor_epic
+        ),
+        _render_trades(context.recent_trades),
+        _render_lessons(context.recent_lessons),
+        decision_block,
+        _render_universe(context.tradeable_epics),
+        "Answer format: respond with abstain, epic, direction, confidence, "
+        "reasoning per the structured schema. epic must come from the list above; "
+        f"direction must be one of [{directions_txt}].",
+    ]
+    user = "\n\n".join(s for s in sections if s)
 
     schema = _build_schema(epics, allowed_directions)
 

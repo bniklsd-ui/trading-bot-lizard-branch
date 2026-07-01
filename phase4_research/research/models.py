@@ -25,8 +25,11 @@ CALL/PUT anywhere: this is a DAX CFD bot, the options terminology is dead.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict, dataclass, field
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +167,12 @@ class ResearchContext:
             could not be built (e.g. unmapped epic degraded).
         anchor_epic: The epic the brain context describes (default-allowlist
             anchor, ``IX.D.DAX.IFMM.IP``).
+        brain_contexts: v1.5 (Issue C) — the per-epic delayed snapshots, keyed by
+            epic (each value is a ``to_prompt_dict()`` or ``None`` when unavailable
+            / unmapped). ``brain_context`` above stays the **anchor** view for
+            back-compat; multi-epic consumers (prompt render, drift-coherence) read
+            the candidate's own epic from here. Defaults to ``{}`` so callers built
+            before v1.5 keep working (they fall back to ``brain_context``).
     """
 
     tradeable_epics: list[dict[str, Any]]
@@ -173,6 +182,7 @@ class ResearchContext:
     risk_level: str
     brain_context: dict[str, Any] | None
     anchor_epic: str
+    brain_contexts: dict[str, dict[str, Any] | None] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +250,151 @@ class FilterVerdict:
     rule: str | None = None
     reason: str | None = None
     details: dict[str, Any] = field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# InstrumentSpec + load_universe — the typed, validated research universe (v1.5)
+# ---------------------------------------------------------------------------
+#
+# ⚠ This module is otherwise "types only — no logic, no I/O" (see the module
+# docstring). ``load_universe`` is a small, pure **validating loader** (its only
+# side effect is a stderr ``logger.warning`` on a dropped entry) added in the
+# Phase-8 v1.5 hotfix (Issue C — variety). It lives here so the universe type and
+# its validation are single-sourced next to ``ResearchConfig`` (which consumes it),
+# and so there is no circular import between a separate module and ``ResearchConfig``.
+
+
+@dataclass(frozen=True)
+class InstrumentSpec:
+    """One curated tradeable instrument in the research universe (v1.5 Issue C).
+
+    Replaces the bare ``epic_allowlist`` tuple with a typed, validated entry so the
+    universe can grow beyond the single DAX epic. This is the **deterministic seam**
+    a future P9 research step will extend (validated ``source="research_promoted"``
+    entries appended via a deterministic validate→promote path, mirroring the
+    Instinct→VETO ECC) — **no AI is wired into universe selection in v1.5**; the
+    universe stays code-curated (concept Decision 5, "no ``search_markets`` dragnet").
+
+    Attributes:
+        epic: IG epic string (demo-account-specific; resolved once via the operator
+            ``scripts/resolve_epics.py`` read-only resolver — never guessed).
+        yf_ticker: yFinance symbol for the P3 brain context, or ``None``. Registered
+            on the ``TickerMapper`` in wiring. ``None`` → no brain context for this
+            epic (reduced-signal, tolerated — concept C3), never a crash.
+        volume_proxy: ETF symbol supplying volume for an index that reports none
+            (e.g. DAX ``^GDAXI`` → ``EXS1.DE``), or ``None`` (``volume_z_score``
+            stays ``None`` — tolerated).
+        point_value: Account-currency value of one index point (DAX cash CFD =
+            1 €/pt). Used by P5 Gate-4 sizing (``risk / (stop_pts × point_value)``).
+            **Provisional for non-DAX until confirmed via ``resolve_epics.py``.**
+        min_deal_size: Curated sanity value for the minimum tradeable size. Advisory
+            — P5 sizing reads the authoritative ``min_deal_size`` from the broker's
+            ``get_market_info`` at runtime; this documents the expected floor.
+        currency: Must be ``"EUR"`` (root hard rule — EUR account; concept C2).
+        source: Provenance — ``"curated"`` now; ``"research_promoted"`` reserved
+            for P9. Documents where an entry came from; no behaviour attached in v1.5.
+    """
+
+    epic: str
+    yf_ticker: str | None
+    volume_proxy: str | None
+    point_value: float
+    min_deal_size: float
+    currency: str = "EUR"
+    source: str = "curated"
+
+
+_REQUIRED_UNIVERSE_CURRENCY = "EUR"
+
+# The default code-curated universe: the single confirmed DAX-CFD epic, matching the
+# pre-v1.5 ``epic_allowlist``/``volume_proxy`` defaults exactly (default path
+# bit-identical). Siblings (Euro Stoxx 50 / CAC 40 …) are appended in v1.5 Step 2B
+# once the operator confirms their epic strings on IG demo.
+_DEFAULT_UNIVERSE: tuple[InstrumentSpec, ...] = (
+    InstrumentSpec(
+        epic="IX.D.DAX.IFMM.IP",
+        yf_ticker="^GDAXI",
+        volume_proxy="EXS1.DE",
+        point_value=1.0,
+        min_deal_size=0.5,
+        currency="EUR",
+        source="curated",
+    ),
+)
+
+
+def _validate_spec(spec: InstrumentSpec) -> list[str]:
+    """Return a list of problems with ``spec`` (empty list = valid)."""
+    problems: list[str] = []
+    if not isinstance(spec.epic, str) or not spec.epic.strip():
+        problems.append("epic empty")
+    if spec.currency != _REQUIRED_UNIVERSE_CURRENCY:
+        problems.append(f"currency {spec.currency!r} != {_REQUIRED_UNIVERSE_CURRENCY} (EUR-only)")
+    if not (isinstance(spec.point_value, (int, float)) and spec.point_value > 0):
+        problems.append(f"point_value {spec.point_value!r} not > 0")
+    if not (isinstance(spec.min_deal_size, (int, float)) and spec.min_deal_size > 0):
+        problems.append(f"min_deal_size {spec.min_deal_size!r} not > 0")
+    return problems
+
+
+def load_universe(specs: Any) -> tuple[InstrumentSpec, ...]:
+    """Validate a sequence of :class:`InstrumentSpec` into the runnable universe.
+
+    Fail-closed per entry: a malformed spec (non-EUR, empty epic, non-positive
+    ``point_value``/``min_deal_size``) is **dropped** with a ``logger.warning`` —
+    never silently passed, never used. If **every** entry drops (or the input is
+    empty) a :class:`ValueError` is raised: an empty universe is a configuration
+    error the caller must see, not a silent no-trade forever.
+
+    Args:
+        specs: An iterable of :class:`InstrumentSpec`.
+
+    Returns:
+        The validated, order-preserving universe tuple (at least one entry).
+
+    Raises:
+        ValueError: if no valid instrument remains.
+    """
+    validated: list[InstrumentSpec] = []
+    for spec in specs:
+        problems = _validate_spec(spec)
+        if problems:
+            log.warning(
+                "load_universe: dropping malformed InstrumentSpec %r: %s",
+                getattr(spec, "epic", "?"),
+                "; ".join(problems),
+            )
+            continue
+        validated.append(spec)
+    if not validated:
+        raise ValueError("load_universe: no valid instruments in the universe (all dropped / empty)")
+    return tuple(validated)
+
+
+def _derive_universe(
+    epic_allowlist: tuple[str, ...], volume_proxy: str | None
+) -> tuple[InstrumentSpec, ...]:
+    """Build a validated universe from the legacy ``epic_allowlist``/``volume_proxy``.
+
+    Backward-compat path for callers that still construct ``ResearchConfig`` with
+    ``epic_allowlist=(...)`` (scripts, tests). The known DAX anchor keeps its
+    ``^GDAXI`` / ``EXS1.DE`` mapping; any other epic degrades to ``yf_ticker=None``
+    (reduced-signal, tolerated) with the configured ``volume_proxy`` applied only to
+    the first (anchor) epic — mirroring the pre-v1.5 wiring behaviour exactly.
+    """
+    specs: list[InstrumentSpec] = []
+    for i, epic in enumerate(epic_allowlist):
+        if epic == "IX.D.DAX.IFMM.IP":
+            specs.append(
+                InstrumentSpec(epic, "^GDAXI", volume_proxy, 1.0, 0.5, "EUR", "curated")
+            )
+        else:
+            specs.append(
+                InstrumentSpec(
+                    epic, None, volume_proxy if i == 0 else None, 1.0, 0.5, "EUR", "curated"
+                )
+            )
+    return load_universe(specs)
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +494,12 @@ class ResearchConfig:
     enable_long_bias_clamp: bool = False
     max_spread_pct: float = 0.5
     volume_proxy: str | None = "EXS1.DE"
+    # v1.5 (Issue C): the typed, validated universe is the single source of truth.
+    # Default ``None`` → derived from ``epic_allowlist``/``volume_proxy`` in
+    # ``__post_init__`` (default path bit-identical). Pass a list/tuple of
+    # ``InstrumentSpec`` to widen the universe; ``epic_allowlist`` is then re-derived
+    # from it so every consumer sees a consistent epic list.
+    universe: tuple[InstrumentSpec, ...] | None = None
 
     # --- confidence floor (provisional — Decision 4; Phase 7 outcome-anchoring replaces it) ---
     confidence_floor_below_score: float = 50.0  # boundary below which the low-score floor applies
@@ -354,3 +515,19 @@ class ResearchConfig:
     )
     usd_to_eur: float = 0.92
     usage_log_path: str | None = None
+
+    def __post_init__(self) -> None:
+        """Reconcile the typed ``universe`` with the derived ``epic_allowlist`` (v1.5).
+
+        Single source of truth = ``universe``. If it was not supplied, derive it from
+        the legacy ``epic_allowlist``/``volume_proxy`` (backward compat for callers
+        that still construct with ``epic_allowlist=(...)``). If it *was* supplied,
+        validate it (``load_universe`` — fail-closed) and re-derive ``epic_allowlist``
+        from it so every consumer (``context_builder``, ``research._preflight``,
+        wiring) sees a consistent epic list.
+        """
+        if self.universe is None:
+            self.universe = _derive_universe(self.epic_allowlist, self.volume_proxy)
+        else:
+            self.universe = load_universe(self.universe)
+            self.epic_allowlist = tuple(spec.epic for spec in self.universe)

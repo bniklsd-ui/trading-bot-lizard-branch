@@ -84,8 +84,15 @@ def build_research(config: ResearchConfig | None = None) -> Research:
     from external_data import FileCache, MarketDataFetcher, TickerMapper  # noqa: E402
 
     mapper = TickerMapper()
-    if config.volume_proxy:
-        mapper.register_volume_proxy(config.epic_allowlist[0], config.volume_proxy)
+    # v1.5 (Issue C): register each curated instrument's yFinance ticker + volume proxy
+    # from the typed universe (single source of truth). The DAX default is unchanged
+    # (^GDAXI is already a TickerMapper built-in; the volume proxy matches the pre-v1.5
+    # single registration), so the default path behaves identically.
+    for spec in config.universe or ():
+        if spec.yf_ticker:
+            mapper.register(spec.epic, spec.yf_ticker)
+        if spec.volume_proxy:
+            mapper.register_volume_proxy(spec.epic, spec.volume_proxy)
     market_data = MarketDataFetcher(mapper, FileCache(str(_CACHE_DIR)))
 
     # Phase-4 LLM client — the single AI call site. Key from the keyring shim.

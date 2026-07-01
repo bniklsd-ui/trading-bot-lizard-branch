@@ -101,6 +101,21 @@ def _find_universe_entry(
     return None
 
 
+def _resolve_brain(
+    context: ResearchContext, epic: str
+) -> dict[str, Any] | None:
+    """Return the delayed brain snapshot for ``epic`` (v1.5 per-epic, back-compat).
+
+    Prefers the per-epic ``context.brain_contexts[epic]``; when that mapping is
+    unpopulated (a pre-v1.5 ``ResearchContext``), falls back to the anchor-only
+    ``context.brain_context`` so existing single-epic callers behave identically.
+    """
+    brain_contexts = context.brain_contexts
+    if brain_contexts:
+        return brain_contexts.get(epic, context.brain_context)
+    return context.brain_context
+
+
 def _fail(rule: str, reason: str, **details: Any) -> FilterVerdict:
     """Build a hard-reject verdict and log it to stderr (never swallow)."""
     log.info("candidate_filter REJECT [%s]: %s", rule, reason)
@@ -179,7 +194,10 @@ def apply_filter(
         )
 
     # 5. Soft drift-coherence sanity — warn, NEVER hard-reject (delayed data).
-    brain = context.brain_context or {}
+    # v1.5 (Issue C): key on the CANDIDATE's own epic snapshot (not the single
+    # anchor) so a multi-instrument pick is checked against its own drift. Falls back
+    # to ``brain_context`` when ``brain_contexts`` is unpopulated (pre-v1.5 callers).
+    brain = _resolve_brain(context, candidate.epic) or {}
     drift_pct = brain.get("drift_pct")
     if drift_pct is not None:
         incoherent = (

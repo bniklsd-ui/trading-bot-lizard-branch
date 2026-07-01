@@ -54,6 +54,22 @@ is kicked off in the browser concept session, not here.
 > tests (**96 → 99**; the clamp *mechanism* stays covered via an explicit `clamped_config()`). Detail:
 > `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 3 + `phase8_scheduler/CLAUDE.md`.
 
+> 🔁 **Phase-8 v1.5-hotfix edit (2026-07-01, Issue C — variety / typed universe, code = source of truth):**
+> Step 2A widened the research universe from a single hardcoded epic to a typed, validated list — **no new
+> AI**, DAX-only path bit-identical. `research/models.py` gained `InstrumentSpec` (epic/yf_ticker/volume_proxy/
+> point_value/min_deal_size/currency/source) + `load_universe()` (EUR-only, fail-closed drop+warn, empty →
+> ValueError); `ResearchConfig.universe` is now the **single source of truth** (reconciled with the legacy
+> `epic_allowlist` in `__post_init__` — pass `universe=[InstrumentSpec…]` to widen, or keep constructing with
+> `epic_allowlist=(...)` and it derives). **Per-epic brain context (the heart):** `ResearchContext.brain_contexts`
+> keyed by epic; `context_builder` fetches a snapshot per tradeable epic; `prompt` renders each non-anchor
+> snapshot; `candidate_filter`/`research.py` drift-coherence + `drift_at_pick` key on the candidate's OWN epic
+> (fallback to the anchor `brain_context` for pre-v1.5 callers). `scripts/wiring.py` registers per-epic
+> ticker/proxy from the universe. **Cross-phase companions:** P5 got a per-epic `point_value` seam
+> (`ExecutionConfig.point_values`) and a new read-only operator resolver `scripts/resolve_epics.py`
+> (repo-root). +18 P4 tests (**99 → 117**). Real epic strings (Euro Stoxx 50 / CAC 40) land in **Step 2B**
+> after the operator runs `resolve_epics.py`. Detail: `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 2 +
+> `phase8_scheduler/CLAUDE.md` → `## Session stopped — 2026-07-01 (Step 2A)`.
+
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which
 candidate?"). Everything else is plain code:

@@ -189,7 +189,16 @@ class Research:
         self._mark_lessons_used(context.recent_lessons)
 
         # 6. Independent hallucination guard + live-spread recheck.
-        drift = (context.brain_context or {}).get("drift_pct")
+        # v1.5 (Issue C): drift_at_pick comes from the PICKED epic's snapshot (multi-
+        # instrument), falling back to the anchor ``brain_context`` when the per-epic
+        # map is empty or the pick has no epic (abstain/malformed raw).
+        picked_epic = raw.get("epic")
+        brain_for_pick = context.brain_contexts.get(picked_epic) if (
+            context.brain_contexts and picked_epic
+        ) else None
+        if brain_for_pick is None:
+            brain_for_pick = context.brain_context
+        drift = (brain_for_pick or {}).get("drift_pct")
         vr = validate_candidate(
             raw,
             context.tradeable_epics,

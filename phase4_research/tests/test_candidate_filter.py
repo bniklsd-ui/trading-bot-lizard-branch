@@ -222,6 +222,38 @@ def test_drift_incoherent_buy_warns_but_passes(
     assert verdict.rule == "drift_coherence_warn"
 
 
+def test_drift_coherence_keys_on_candidate_epic(
+    research_context: ResearchContext, config: ResearchConfig
+) -> None:
+    """v1.5 (Issue C): drift-coherence uses the CANDIDATE's epic snapshot, not the anchor.
+
+    Two tradeable epics: the anchor drifts +0.1 (coherent with a BUY), the sibling
+    drifts -1.5 (incoherent with a BUY). A BUY on the *sibling* must warn (its own
+    drift), proving the check does not read the anchor's snapshot.
+    """
+    sibling = "IX.D.CAC.IFMM.IP"
+    universe = list(research_context.tradeable_epics) + [
+        dict(research_context.tradeable_epics[0], epic=sibling)
+    ]
+    ctx = dataclasses.replace(
+        research_context,
+        tradeable_epics=universe,
+        brain_context={"drift_pct": 0.1},  # anchor: coherent with BUY
+        brain_contexts={
+            DEFAULT_EPIC: {"drift_pct": 0.1},
+            sibling: {"drift_pct": -1.5},  # sibling: incoherent with BUY
+        },
+    )
+    # BUY on the sibling → warn on the sibling's own (-1.5) drift.
+    v_sibling = apply_filter(make_candidate(epic=sibling, direction="BUY"), ctx, config)
+    assert v_sibling.ok is True and v_sibling.rule == "drift_coherence_warn"
+    assert v_sibling.details["drift_pct"] == -1.5
+    # BUY on the anchor → coherent with its +0.1 drift → clean pass (proves it did
+    # NOT borrow the sibling's incoherent drift).
+    v_anchor = apply_filter(make_candidate(epic=DEFAULT_EPIC, direction="BUY"), ctx, config)
+    assert v_anchor.ok is True and v_anchor.rule is None
+
+
 def test_drift_none_no_warn(
     research_context: ResearchContext, config: ResearchConfig
 ) -> None:

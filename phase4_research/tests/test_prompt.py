@@ -138,6 +138,43 @@ def test_floor_and_score_in_user(research_context: ResearchContext) -> None:
     assert "AGGRESSIV" in user
 
 
+def test_single_epic_has_no_per_epic_snapshot_section(research_context: ResearchContext) -> None:
+    """A single-epic universe renders no 'Other tradeable instruments' block (bit-identical)."""
+    _, user, _ = build_prompt(research_context, THRESHOLD, BOTH)
+    assert "Other tradeable instruments" not in user
+
+
+def test_multi_epic_renders_per_epic_snapshots() -> None:
+    """v1.5 (Issue C): each non-anchor tradeable epic gets its own delayed snapshot."""
+    sibling = "IX.D.CAC.IFMM.IP"
+    ctx = ResearchContext(
+        tradeable_epics=[
+            {"epic": DEFAULT_EPIC, "name": "Germany 40 Cash", "spread_pct": 0.03,
+             "market_status": "TRADEABLE", "min_deal_size": 0.5},
+            {"epic": sibling, "name": "France 40 Cash", "spread_pct": 0.05,
+             "market_status": "TRADEABLE", "min_deal_size": 1.0},
+        ],
+        recent_trades=[],
+        recent_lessons=[],
+        bot_score=55.0,
+        risk_level="AGGRESSIV",
+        brain_context=_make_prompt_dict(ticker=DEFAULT_EPIC, drift_pct=0.42),
+        anchor_epic=DEFAULT_EPIC,
+        brain_contexts={
+            DEFAULT_EPIC: _make_prompt_dict(ticker=DEFAULT_EPIC, drift_pct=0.42),
+            sibling: _make_prompt_dict(ticker=sibling, drift_pct=-0.77),
+        },
+    )
+    _, user, schema = build_prompt(ctx, THRESHOLD, BOTH)
+
+    # The per-epic section names the sibling and renders its (distinct) drift.
+    assert "Other tradeable instruments" in user
+    assert sibling in user
+    assert "-0.77%" in user  # the sibling's own drift, not the anchor's 0.42
+    # Both epics are pickable in the schema enum.
+    assert schema["properties"]["epic"]["anyOf"][0]["enum"] == [DEFAULT_EPIC, sibling]
+
+
 def test_empty_universe_edge() -> None:
     """Empty universe → schema epic enum [None], no instruments table, no crash."""
     _, user, schema = build_prompt(_empty_context(), THRESHOLD, BOTH)
