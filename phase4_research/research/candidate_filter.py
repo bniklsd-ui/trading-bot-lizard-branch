@@ -31,11 +31,6 @@ log = logging.getLogger(__name__)
 
 _TRADEABLE = "TRADEABLE"
 
-# Neutral-score boundary for the confidence floor (concept §6 stub literal).
-# Deliberately distinct from ``config.long_bias_below_score`` (the *direction*
-# clamp boundary), even though both default to 50.0 — they are separate knobs.
-_NEUTRAL_SCORE = 50.0
-
 # Soft drift-coherence threshold (% drift). A pick whose direction opposes a
 # drift of larger magnitude than this is *flagged* (warn), never rejected:
 # Phase-3 drift is ~15 min delayed, so it is a sentiment signal, not ground
@@ -47,22 +42,28 @@ _DRIFT_COHERENCE_PCT = 0.5
 def confidence_threshold(bot_score: float, config: ResearchConfig) -> float:
     """Return the coarse confidence floor for the current bot score.
 
-    Below the neutral score → the stricter floor; otherwise the default. This is
-    a **provisional, coarse self-report floor** (concept Decision 4), **not** a
+    Below ``config.confidence_floor_below_score`` → the stricter
+    ``confidence_floor_low_score``; otherwise ``confidence_floor_default``. This
+    is a **provisional, coarse self-report floor** (concept Decision 4), **not** a
     probability and **not** the real gate (:func:`apply_filter` is). Phase 7
     replaces it with outcome-anchored confidence.
 
+    The floor boundary (``confidence_floor_below_score``) is **decoupled** from
+    the direction-clamp boundary (``long_bias_below_score``) — v1.5 gave it its
+    own config field (it was a hardcoded ``_NEUTRAL_SCORE = 50.0`` literal that
+    merely shared the clamp's default). They are independent knobs.
+
     Args:
         bot_score: Current bot score.
-        config: Carries ``confidence_floor_default`` (55) and
-            ``confidence_floor_low_score`` (70).
+        config: Carries ``confidence_floor_below_score`` (50), ``confidence_floor_default``
+            (55) and ``confidence_floor_low_score`` (55 in v1.5 data-collection mode).
 
     Returns:
-        The applicable floor (e.g. 55.0 or 70.0).
+        The applicable floor.
     """
     return (
         config.confidence_floor_low_score
-        if bot_score < _NEUTRAL_SCORE
+        if bot_score < config.confidence_floor_below_score
         else config.confidence_floor_default
     )
 

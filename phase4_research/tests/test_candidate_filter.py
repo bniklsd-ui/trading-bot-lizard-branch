@@ -46,21 +46,55 @@ def config() -> ResearchConfig:
     return ResearchConfig()
 
 
+def clamped_config(**overrides: Any) -> ResearchConfig:
+    """The pre-v1.5 conservative gate, restored explicitly for mechanism tests.
+
+    v1.5 relaxed the *defaults* (clamp off, low-score floor collapsed to 55) for demo
+    data-collection; these mechanism tests re-enable the clamp and the 70 floor so the
+    underlying logic stays covered independent of the default values.
+    """
+    base: dict[str, Any] = {
+        "enable_long_bias_clamp": True,
+        "confidence_floor_low_score": 70.0,
+    }
+    base.update(overrides)
+    return ResearchConfig(**base)
+
+
 # --------------------------------------------------------------------------- #
 # confidence_threshold                                                         #
 # --------------------------------------------------------------------------- #
 
 
-def test_floor_default_at_or_above_neutral(config: ResearchConfig) -> None:
-    """Score >= 50 → the default (looser) floor of 55."""
+def test_floor_default_at_or_above_boundary(config: ResearchConfig) -> None:
+    """Score >= the floor boundary → the default floor of 55."""
     assert confidence_threshold(55.0, config) == 55.0
     assert confidence_threshold(50.0, config) == 55.0  # boundary is inclusive of default
 
 
-def test_floor_strict_below_neutral(config: ResearchConfig) -> None:
-    """Score < 50 → the stricter floor of 70."""
-    assert confidence_threshold(40.0, config) == 70.0
-    assert confidence_threshold(49.999, config) == 70.0
+def test_floor_default_below_boundary_in_v15_data_collection(config: ResearchConfig) -> None:
+    """v1.5 default: the low-score floor is collapsed to 55, so below-neutral is also 55."""
+    assert confidence_threshold(40.0, config) == 55.0
+    assert confidence_threshold(49.999, config) == 55.0
+
+
+def test_floor_strict_below_boundary_mechanism() -> None:
+    """The stricter low-score floor still applies below the boundary when configured."""
+    cfg = clamped_config()  # low-score floor restored to 70
+    assert confidence_threshold(40.0, cfg) == 70.0
+    assert confidence_threshold(49.999, cfg) == 70.0
+
+
+def test_floor_boundary_is_configurable_and_decoupled_from_clamp() -> None:
+    """The floor boundary is its own knob, independent of the direction-clamp boundary.
+
+    Set the floor boundary (60) distinct from the clamp boundary (default 50). At score 55:
+    below the floor boundary (→ low floor 70) but at/above the clamp boundary — proving the
+    two boundaries no longer move together.
+    """
+    cfg = clamped_config(confidence_floor_below_score=60.0, long_bias_below_score=50.0)
+    assert confidence_threshold(55.0, cfg) == 70.0  # 55 < 60 → low floor
+    assert resolve_allowed_directions(55.0, cfg) == ("BUY", "SELL")  # 55 >= 50 → not clamped
 
 
 # --------------------------------------------------------------------------- #
@@ -68,19 +102,18 @@ def test_floor_strict_below_neutral(config: ResearchConfig) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_clamp_to_buy_only_below_threshold(config: ResearchConfig) -> None:
-    """Clamp on + score below long_bias_below_score → only BUY."""
-    assert resolve_allowed_directions(40.0, config) == ("BUY",)
+def test_clamp_to_buy_only_below_threshold_when_enabled() -> None:
+    """Clamp enabled + score below long_bias_below_score → only BUY (mechanism)."""
+    assert resolve_allowed_directions(40.0, clamped_config()) == ("BUY",)
 
 
-def test_no_clamp_above_threshold(config: ResearchConfig) -> None:
-    """Score at/above the clamp threshold → both directions stand."""
-    assert resolve_allowed_directions(55.0, config) == ("BUY", "SELL")
+def test_no_clamp_above_threshold_when_enabled() -> None:
+    """Clamp enabled but score at/above the clamp threshold → both directions stand."""
+    assert resolve_allowed_directions(55.0, clamped_config()) == ("BUY", "SELL")
 
 
-def test_clamp_disabled_keeps_both_at_low_score() -> None:
-    """Clamp disabled → both directions even at a low score."""
-    config = ResearchConfig(enable_long_bias_clamp=False)
+def test_default_config_clamp_off_allows_sell_below_neutral(config: ResearchConfig) -> None:
+    """v1.5 default: clamp OFF → both directions even at a low score."""
     assert resolve_allowed_directions(40.0, config) == ("BUY", "SELL")
 
 
@@ -98,20 +131,32 @@ def test_clean_buy_passes(
     assert verdict.rule is None
 
 
-def test_sell_filtered_when_clamped(
-    research_context: ResearchContext, config: ResearchConfig
-) -> None:
-    """SELL at score < 50 is rejected by the long-bias clamp."""
+def test_sell_filtered_when_clamped(research_context: ResearchContext) -> None:
+    """SELL at score < 50 is rejected by the long-bias clamp when it is enabled (mechanism)."""
     ctx = dataclasses.replace(research_context, bot_score=40.0)
-    verdict = apply_filter(make_candidate(direction="SELL"), ctx, config)
+    verdict = apply_filter(make_candidate(direction="SELL"), ctx, clamped_config())
     assert verdict.ok is False
     assert verdict.rule == "direction_not_allowed"
+
+
+def test_sell_allowed_below_neutral_with_default_clamp_off(
+    research_context: ResearchContext, config: ResearchConfig
+) -> None:
+    """v1.5 default (clamp off): a below-neutral SELL passes the direction check.
+
+    This is the case that force-abstained pre-v1.5 — the whole point of Issue B.
+    research_context drift_pct is 0.42 (< 0.5 threshold) → no drift warn either.
+    """
+    ctx = dataclasses.replace(research_context, bot_score=40.0)
+    verdict = apply_filter(make_candidate(direction="SELL"), ctx, config)
+    assert verdict.ok is True
+    assert verdict.rule is None
 
 
 def test_sell_allowed_at_neutral_score(
     research_context: ResearchContext, config: ResearchConfig
 ) -> None:
-    """SELL passes at neutral score (clamp not engaged); drift not opposed enough."""
+    """SELL passes at neutral score; drift not opposed enough."""
     # research_context drift_pct is 0.42 (< 0.5 threshold) → no warn either.
     verdict = apply_filter(make_candidate(direction="SELL"), research_context, config)
     assert verdict.ok is True

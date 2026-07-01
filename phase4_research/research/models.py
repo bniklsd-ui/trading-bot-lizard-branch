@@ -285,20 +285,33 @@ class ResearchConfig:
             epic; room for 1-2 curated siblings (which then also need a
             ``TickerMapper`` entry — see concept Step 0.5).
         allowed_directions: Default both. Clamped to ``("BUY",)`` by the
-            long-bias rule below.
+            long-bias rule below **only when that clamp is enabled** (v1.5:
+            disabled by default — see ``enable_long_bias_clamp``).
         long_bias_below_score / enable_long_bias_clamp: when the clamp is on and
-            ``bot_score < long_bias_below_score``, only ``BUY`` is allowed.
+            ``bot_score < long_bias_below_score``, only ``BUY`` is allowed. ⚠
+            **v1.5 (2026-07-01): the clamp is OFF by default** (was Decision-7
+            ON) for demo data-collection — every observed ``bot_score`` sits
+            below 50, so the clamp force-abstained every cycle. With it off, the
+            P6 debate + the 4 VETOs do the direction check. Re-baseline (re-enable)
+            before any live account.
         max_spread_pct: live-spread rejection threshold (% of ask).
         volume_proxy: ETF symbol supplying volume for ``^GDAXI`` (which reports
             none natively); registered on the fetcher in wiring (Step 8). ``None``
             disables the proxy → ``volume_z_score`` stays ``None``.
 
-    Confidence floor (PROVISIONAL — Decision 4):
+    Confidence floor (PROVISIONAL — Decision 4; Phase-7 outcome-anchoring replaces it):
+        confidence_floor_below_score: the score boundary below which the stricter
+            ``confidence_floor_low_score`` applies (else ``confidence_floor_default``).
+            v1.5 made this its **own config field** so the floor boundary is now
+            **decoupled** from the direction-clamp boundary (``long_bias_below_score``) —
+            previously it was a hardcoded ``candidate_filter._NEUTRAL_SCORE`` literal that
+            happened to share 50.0. The two are independent knobs.
         confidence_floor_default / confidence_floor_low_score: the coarse
-            self-report floor (55 normally, 70 when ``bot_score < 50``). This is
-            **not** a probability and **not** the real gate — the deterministic
-            ``candidate_filter`` is. Replaced by Phase-7 outcome-anchored
-            confidence; kept deliberately blunt here.
+            self-report floor. ⚠ **v1.5 (2026-07-01): the low-score floor was
+            collapsed 70 → 55** (= default) for demo data-collection — a 70 floor
+            is unreachable given the observed sub-50 scores. This is **not** a
+            probability and **not** the real gate — the deterministic
+            ``candidate_filter`` is. Re-baseline before live.
 
     Token meter (Step 5 consumes these — USD + EUR, per this session's decision):
         pricing_usd_per_mtok: per-model ``(input, output)`` USD per Mtok. See the
@@ -320,13 +333,20 @@ class ResearchConfig:
     epic_allowlist: tuple[str, ...] = ("IX.D.DAX.IFMM.IP",)
     allowed_directions: tuple[str, ...] = ("BUY", "SELL")
     long_bias_below_score: float = 50.0
-    enable_long_bias_clamp: bool = True
+    # v1.5 data-collection mode — re-baseline before live. Disabled so a below-neutral
+    # SELL can be *generated*; the P6 debate (can flip BUY<->SELL) + the 4 hard VETOs are
+    # the real direction check. Was True (Decision 7). See phase8 v1.5 hotfix, Issue B.
+    enable_long_bias_clamp: bool = False
     max_spread_pct: float = 0.5
     volume_proxy: str | None = "EXS1.DE"
 
-    # --- confidence floor (provisional — Decision 4) ---
+    # --- confidence floor (provisional — Decision 4; Phase 7 outcome-anchoring replaces it) ---
+    confidence_floor_below_score: float = 50.0  # boundary below which the low-score floor applies
     confidence_floor_default: float = 55.0
-    confidence_floor_low_score: float = 70.0
+    # v1.5 data-collection mode — re-baseline before live. Collapsed to the default (was 70.0):
+    # every real bot_score has been < 50, so a 70 floor is unreachable and force-abstains. 55
+    # keeps a meaningful self-report bar while letting a genuine pick through. See Issue B.
+    confidence_floor_low_score: float = 55.0
 
     # --- token meter (USD + EUR) ---
     pricing_usd_per_mtok: dict[str, tuple[float, float]] = field(
