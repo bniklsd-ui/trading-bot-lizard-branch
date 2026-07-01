@@ -246,6 +246,63 @@ class Database:
         )
         return self._rows(cur)
 
+    def get_recent_lessons_for_prompt(
+        self,
+        n: int = 5,
+        *,
+        min_hold_min: float | None = None,
+        quarantine_before: str | None = None,
+        exclude_provenance: tuple[str, ...] = (),
+    ) -> list[dict[str, Any]]:
+        """The ``n`` newest lessons **after** dropping verification-trade noise (v1.5 Step 4 A).
+
+        A parameterised variant of :meth:`get_recent_lessons` for the Phase-4 research prompt.
+        With all filters unset it is identical to ``get_recent_lessons``; ``get_recent_lessons``
+        itself is left untouched for other callers. Filtering happens **in the query** (fetch the
+        newest ``n`` *survivors*, not fetch-``n``-then-drop). Phase 2 stays a dumb parameterised
+        store — the excluded provenance values + thresholds are the caller's policy (Phase-4
+        config), not baked in here.
+
+        **Why this exists:** lessons distilled from code-verification trades (seeded, sub-minute
+        forced time-stops) describe the test harness, not a market decision, and pollute the single
+        AI decision's input. Three signals, in precision order:
+
+        - ``exclude_provenance`` (**precise**, for lessons written since the v1.5 write-path): drops a
+          lesson whose ``market_context_json.$.provenance`` is one of the given tags (e.g.
+          ``("verification",)``). Uses SQLite's NULL-safe ``IS NOT`` so a **missing** tag (old
+          lessons → ``json_extract`` returns ``NULL``) is **kept** here and handled by the fallbacks
+          below. Requires the SQLite JSON1 extension — bundled in CPython 3.11+ ``sqlite3``.
+        - ``min_hold_min`` (**fallback**, catches the pre-tag polluted lessons): drops a lesson whose
+          trade was held < this many minutes (a forced sub-minute time-stop). ``LEFT JOIN`` +
+          ``hold_duration_min IS NULL → keep`` = fail-open toward keeping real lessons.
+        - ``quarantine_before`` (**reversible reset**): drops lessons with ``extracted_at`` before
+          this ISO timestamp — a one-time hard reset the operator can enable; ``None`` = off.
+
+        Provenance/quality here only shapes the **prompt**; it never touches the reward/score math.
+        """
+        clauses: list[str] = []
+        params: list[Any] = []
+        for tag in exclude_provenance:
+            # NULL-safe: keep rows with no provenance tag (json_extract → NULL); drop only exact tag.
+            clauses.append("json_extract(market_context_json, '$.provenance') IS NOT ?")
+            params.append(tag)
+        if min_hold_min is not None:
+            clauses.append(
+                "(trade_id IS NULL OR trade_id NOT IN ("
+                "SELECT id FROM trade_outcomes WHERE hold_duration_min IS NOT NULL "
+                "AND hold_duration_min < ?))"
+            )
+            params.append(min_hold_min)
+        if quarantine_before is not None:
+            clauses.append("extracted_at >= ?")
+            params.append(quarantine_before)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(n)
+        cur = self.conn.execute(
+            f"SELECT * FROM trade_lessons{where} ORDER BY id DESC LIMIT ?", params
+        )
+        return self._rows(cur)
+
     def mark_lesson_used(self, lesson_id: int) -> None:
         """Increment ``used_in_research`` and stamp ``last_used_ts`` for a lesson."""
         self.conn.execute(

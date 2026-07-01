@@ -209,3 +209,45 @@ def test_brain_context_anchor_fetched_even_if_untradeable(db: FakeDB, fetcher: F
     assert ctx.tradeable_epics == []
     assert DEFAULT_EPIC in ctx.brain_contexts
     assert ctx.brain_context == ctx.brain_contexts[DEFAULT_EPIC]
+
+
+def test_lesson_prompt_filter_uses_config_values(
+    broker: FakeBroker, fetcher: FakeFetcher
+) -> None:
+    """v1.5 (Step 4 A): build_context selects lessons via the provenance-filtered getter,
+    passing the three ResearchConfig knobs, and returns exactly its survivors.
+
+    The verification-vs-real filtering itself is SQL and proven against a real DB in the
+    Phase-2 test_db suite; here we assert the wiring (correct method + config args flow through).
+    """
+    survivors = [{"id": 9, "lesson_text": "a real, autonomous-trade lesson"}]
+    db = FakeDB(for_prompt_lessons=survivors)
+    cfg = _config(
+        lesson_exclude_provenance=("verification",),
+        lesson_min_hold_min=3.0,
+        lesson_quarantine_before="2026-07-01T00:00:00.000Z",
+    )
+
+    ctx = build_context(broker, db, fetcher, cfg)
+
+    assert ctx.recent_lessons == survivors
+    assert db.for_prompt_calls == [
+        {
+            "n": 5,
+            "min_hold_min": 3.0,
+            "quarantine_before": "2026-07-01T00:00:00.000Z",
+            "exclude_provenance": ("verification",),
+        }
+    ]
+
+
+def test_lesson_prompt_filter_defaults(broker: FakeBroker, fetcher: FakeFetcher) -> None:
+    """A default config still routes through the filtered getter with the default knobs
+    (exclude 'verification', 2.0-min hold floor, quarantine off)."""
+    db = FakeDB(for_prompt_lessons=[{"id": 1, "lesson_text": "kept"}])
+    ctx = build_context(broker, db, fetcher, _config())
+
+    assert len(ctx.recent_lessons) == 1
+    assert db.for_prompt_calls[0]["exclude_provenance"] == ("verification",)
+    assert db.for_prompt_calls[0]["min_hold_min"] == 2.0
+    assert db.for_prompt_calls[0]["quarantine_before"] is None

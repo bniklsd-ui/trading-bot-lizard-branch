@@ -584,6 +584,21 @@ class ResearchConfig:
     # keeps a meaningful self-report bar while letting a genuine pick through. See Issue B.
     confidence_floor_low_score: float = 55.0
 
+    # --- lesson provenance filter (v1.5 Phase-8 hotfix Step 4 A, 2026-07-01) ---
+    # Why: the research prompt is fed recent trade_lessons; lessons from code-verification
+    # trades (seeded, sub-minute forced time-stops) describe the test harness, not a market
+    # decision, and pollute the single AI decision's input. These three knobs drive
+    # ``context_builder`` → ``db.get_recent_lessons_for_prompt`` (three signals, precision order):
+    #   * exclude_provenance — precise: drop lessons tagged with these provenance values (the
+    #     tag is written at close into market_context_json for trades opened since v1.5).
+    #   * lesson_min_hold_min — fallback: drop lessons whose trade was held < this (catches the
+    #     already-polluted, pre-tag lessons — all are sub-minute time-stops).
+    #   * lesson_quarantine_before — reversible one-time reset (ISO ts); None = off.
+    # Provisional (data-collection) — re-baseline before live. Lessons gate nothing (root rule 3).
+    lesson_exclude_provenance: tuple[str, ...] = ("verification",)
+    lesson_min_hold_min: float = 2.0
+    lesson_quarantine_before: str | None = None
+
     # --- token meter (USD + EUR) ---
     pricing_usd_per_mtok: dict[str, tuple[float, float]] = field(
         default_factory=lambda: dict(_DEFAULT_PRICING_USD_PER_MTOK)

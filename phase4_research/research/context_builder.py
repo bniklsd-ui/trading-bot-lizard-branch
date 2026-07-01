@@ -66,6 +66,17 @@ class _DBLike(Protocol):
 
     def get_recent_lessons(self, n: int = ...) -> list[dict[str, Any]]: ...
 
+    # v1.5 (Phase-8 hotfix Step 4 A): provenance-/quality-filtered lesson selection for the
+    # prompt (keeps verification-trade lessons out). Kept separate from ``get_recent_lessons``.
+    def get_recent_lessons_for_prompt(
+        self,
+        n: int = ...,
+        *,
+        min_hold_min: float | None = ...,
+        quarantine_before: str | None = ...,
+        exclude_provenance: tuple[str, ...] = ...,
+    ) -> list[dict[str, Any]]: ...
+
     def get_current_score(self) -> float: ...
 
     def get_risk_level(self) -> str: ...
@@ -181,7 +192,17 @@ def build_context(
             tradeable_epics.append(probed)
 
     recent_trades = db.get_recent_trades(8)
-    recent_lessons = db.get_recent_lessons(5)
+    # v1.5 (Phase-8 hotfix Step 4 A): filter verification-trade lessons out of the prompt.
+    # Precise provenance tag (written since v1.5) + hold-time fallback (catches pre-tag
+    # polluted lessons) + optional reversible date quarantine — all driven by config, applied
+    # in the query so we still get the newest 5 *surviving* lessons. Only the prompt is
+    # cleaned; the reward/score math never reads these (root rule 3).
+    recent_lessons = db.get_recent_lessons_for_prompt(
+        5,
+        min_hold_min=config.lesson_min_hold_min,
+        quarantine_before=config.lesson_quarantine_before,
+        exclude_provenance=config.lesson_exclude_provenance,
+    )
     bot_score = db.get_current_score()
     risk_level = db.get_risk_level()
 

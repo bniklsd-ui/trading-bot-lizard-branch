@@ -228,3 +228,69 @@ def test_insert_decision_context_serializes_json(db, base_trade):
         "SELECT * FROM decision_context WHERE id = ?", (cid,)
     ).fetchone()
     assert json.loads(row["veto_factors_json"]) == {"spread": "ok"}
+
+
+# -- trade_lessons: get_recent_lessons_for_prompt (v1.5 Phase-8 hotfix Step 4 A) ----
+
+def test_for_prompt_no_filter_equals_get_recent_lessons(db, base_trade):
+    tid = db.insert_trade(base_trade)
+    db.insert_lesson(tid, {"lesson_text": "a"})
+    db.insert_lesson(tid, {"lesson_text": "b"})
+    assert db.get_recent_lessons_for_prompt(5) == db.get_recent_lessons(5)
+
+
+def test_for_prompt_excludes_tagged_provenance(db, base_trade):
+    tid = db.insert_trade(base_trade)
+    db.insert_lesson(tid, {"lesson_text": "verif", "market_context_json": {"provenance": "verification"}})
+    db.insert_lesson(tid, {"lesson_text": "auto", "market_context_json": {"provenance": "autonomous"}})
+    db.insert_lesson(tid, {"lesson_text": "untagged"})  # no market_context_json → NULL tag → kept
+    texts = [
+        l["lesson_text"]
+        for l in db.get_recent_lessons_for_prompt(5, exclude_provenance=("verification",))
+    ]
+    assert "verif" not in texts
+    assert "auto" in texts and "untagged" in texts
+
+
+def test_for_prompt_hold_time_filter(db, base_trade):
+    short = db.insert_trade({**base_trade, "deal_id": "SHORT"})  # open_ts 09:00
+    db.update_trade_close("SHORT", {"close_ts": "2026-05-21T09:01:00.000Z"})  # 1 min hold
+    db.insert_lesson(short, {"lesson_text": "short-hold"})
+    long_ = db.insert_trade({**base_trade, "deal_id": "LONG"})
+    db.update_trade_close("LONG", {"close_ts": "2026-05-21T10:00:00.000Z"})  # 60 min hold
+    db.insert_lesson(long_, {"lesson_text": "long-hold"})
+    openq = db.insert_trade({**base_trade, "deal_id": "OPENQ"})  # never closed → NULL hold
+    db.insert_lesson(openq, {"lesson_text": "open-hold"})
+    texts = [l["lesson_text"] for l in db.get_recent_lessons_for_prompt(5, min_hold_min=2.0)]
+    assert "short-hold" not in texts
+    assert "long-hold" in texts
+    assert "open-hold" in texts  # NULL hold → fail-open keep
+
+
+def test_for_prompt_quarantine_before(db, base_trade):
+    tid = db.insert_trade(base_trade)
+    db.insert_lesson(tid, {"lesson_text": "old", "extracted_at": "2026-05-20T00:00:00.000Z"})
+    db.insert_lesson(tid, {"lesson_text": "new", "extracted_at": "2026-06-30T00:00:00.000Z"})
+    texts = [
+        l["lesson_text"]
+        for l in db.get_recent_lessons_for_prompt(5, quarantine_before="2026-06-01T00:00:00.000Z")
+    ]
+    assert "old" not in texts
+    assert "new" in texts
+
+
+def test_for_prompt_combined_returns_newest_n_survivors(db, base_trade):
+    tid = db.insert_trade(base_trade)  # never closed → NULL hold (not dropped by hold rule)
+    db.insert_lesson(tid, {"lesson_text": "drop-verif", "market_context_json": {"provenance": "verification"}})
+    db.insert_lesson(tid, {"lesson_text": "keep1", "market_context_json": {"provenance": "autonomous"}})
+    db.insert_lesson(tid, {"lesson_text": "drop-old", "extracted_at": "2026-01-01T00:00:00.000Z"})
+    db.insert_lesson(tid, {"lesson_text": "keep2"})
+    db.insert_lesson(tid, {"lesson_text": "keep3"})
+    got = db.get_recent_lessons_for_prompt(
+        2,
+        min_hold_min=2.0,
+        quarantine_before="2026-03-01T00:00:00.000Z",
+        exclude_provenance=("verification",),
+    )
+    # survivors are keep1/keep2/keep3; LIMIT 2 returns the newest two, id DESC.
+    assert [l["lesson_text"] for l in got] == ["keep3", "keep2"]

@@ -181,17 +181,24 @@ class FakeDB:
         *,
         trades: list[dict[str, Any]] | None = None,
         lessons: list[dict[str, Any]] | None = None,
+        for_prompt_lessons: list[dict[str, Any]] | None = None,
         score: float = 55.0,
         risk_level: str = "AGGRESSIV",
         mark_raises: bool = False,
     ) -> None:
         self._trades = trades if trades is not None else []
         self._lessons = lessons if lessons is not None else []
+        # v1.5 (Step 4 A): what the filtered prompt getter returns. Defaults to ``lessons`` so
+        # existing tests (which configured ``lessons=…``) get them back through the new method.
+        self._for_prompt_lessons = (
+            for_prompt_lessons if for_prompt_lessons is not None else self._lessons
+        )
         self._score = score
         self._risk_level = risk_level
         self._mark_raises = mark_raises
         self.trade_n: list[int] = []
         self.lesson_n: list[int] = []
+        self.for_prompt_calls: list[dict[str, Any]] = []
         self.marked_used: list[int] = []
 
     def get_recent_trades(self, n: int = 8) -> list[dict[str, Any]]:
@@ -201,6 +208,29 @@ class FakeDB:
     def get_recent_lessons(self, n: int = 5) -> list[dict[str, Any]]:
         self.lesson_n.append(n)
         return list(self._lessons)
+
+    def get_recent_lessons_for_prompt(
+        self,
+        n: int = 5,
+        *,
+        min_hold_min: float | None = None,
+        quarantine_before: str | None = None,
+        exclude_provenance: tuple[str, ...] = (),
+    ) -> list[dict[str, Any]]:
+        # v1.5 (Step 4 A): the provenance-filtered prompt getter context_builder now calls.
+        # Records the request (n → lesson_n so the limit assertion still holds; the filter
+        # kwargs → for_prompt_calls) and returns the configured prompt lessons. The actual
+        # SQL filtering semantics are proven against a real DB in the Phase-2 test_db suite.
+        self.lesson_n.append(n)
+        self.for_prompt_calls.append(
+            {
+                "n": n,
+                "min_hold_min": min_hold_min,
+                "quarantine_before": quarantine_before,
+                "exclude_provenance": exclude_provenance,
+            }
+        )
+        return list(self._for_prompt_lessons)
 
     def get_current_score(self) -> float:
         return self._score
