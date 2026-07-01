@@ -19,6 +19,14 @@ def test_epic_to_yf_known_epics():
     assert m.epic_to_yf("CS.D.EURUSD.MINI.IP") == "EURUSD=X"
 
 
+def test_epic_to_yf_euro_stoxx_50():
+    # v1.5 Step 2B: static entry only — asserts the mapping is registered, NOT that
+    # ^STOXX50E is a live yfinance ticker (that's the operator's smoke_test.py job).
+    m = TickerMapper()
+    assert m.epic_to_yf("IX.D.STXE.IFM.IP") == "^STOXX50E"
+    assert m.epic_to_volume_yf("IX.D.STXE.IFM.IP") is None  # no static proxy (DAX pattern)
+
+
 def test_unknown_epic_raises():
     m = TickerMapper()
     with pytest.raises(EpicNotMappedError) as exc_info:

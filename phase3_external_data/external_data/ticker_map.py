@@ -33,6 +33,12 @@ class TickerMapper:
         "IX.D.DAX.DAILY.IP": "^GDAXI",
         "CS.D.EURUSD.MINI.IP": "EURUSD=X",
         "IX.D.DOW.DAILY.IP": "^DJI",
+        # v1.5 Issue C, Step 2B (2026-07-01): epic confirmed live via resolve_epics.py
+        # against IG demo; the "^STOXX50E" yfinance ticker itself is the well-known
+        # public symbol (by analogy with DAX's ^GDAXI), NOT yet live-verified — operator
+        # should confirm via `python scripts/smoke_test.py --epic IX.D.STXE.IFM.IP
+        # --volume-proxy EXW1.DE` before trusting the brain-context signal for it.
+        "IX.D.STXE.IFM.IP": "^STOXX50E",  # Euro Stoxx 50 Kassa (2€)
     }
     _VOLUME_MAP: dict[str, str] = {}  # empty default → ^GDAXI degrades (no proxy)
 
