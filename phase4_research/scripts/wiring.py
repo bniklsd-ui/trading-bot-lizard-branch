@@ -35,7 +35,7 @@ for _p in (
         sys.path.insert(0, str(_p))
 
 # Phase-4 (own package) — safe to import without network.
-from research import Research, ResearchConfig  # noqa: E402
+from research import EXTENDED_UNIVERSE, Research, ResearchConfig  # noqa: E402
 from research.credentials import get_credential  # noqa: E402  (Decision-6 shim)
 from research.llm_client import LLMClient  # noqa: E402
 
@@ -60,13 +60,16 @@ def build_research(config: ResearchConfig | None = None) -> Research:
     key), so this must run with the keyring available and the demo creds seeded.
 
     Args:
-        config: the run config; defaults to :class:`ResearchConfig` (allow-list
-            ``("IX.D.DAX.IFMM.IP",)``, EXS1.DE volume proxy, the §1 floors/clamp).
+        config: the run config; defaults to :class:`ResearchConfig` widened to the
+            v1.5 confirmed multi-instrument universe (``EXTENDED_UNIVERSE`` — DAX +
+            Euro Stoxx 50), the §1 floors/clamp. Pass an explicit ``config`` (as
+            ``smoke_test.py``/``live_test.py`` do via ``--epic``) to constrain to one
+            instrument for a deterministic single-epic test run.
 
     Returns:
         A ready-to-``run`` :class:`Research`.
     """
-    config = config if config is not None else ResearchConfig()
+    config = config if config is not None else ResearchConfig(universe=EXTENDED_UNIVERSE)
 
     # Phase-1 broker — keyring-backed, no network at construction.
     from broker_wrapper import get_broker  # noqa: E402

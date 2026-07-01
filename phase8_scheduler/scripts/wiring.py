@@ -103,13 +103,19 @@ def _build_research(broker: Any, db: Any, state: Any) -> Any:
     the ``scripts.wiring`` name collision. Registers the ETF volume proxy on the anchor epic so
     ``^GDAXI`` does not degrade to ``volume_available=False`` (Decision 5). The Anthropic key is read
     from the keyring here; the SDK is lazy (fires inside ``Research.run``).
+
+    v1.5 Issue C, Step 2B: the daemon's ``ResearchConfig`` is built with
+    ``universe=EXTENDED_UNIVERSE`` (DAX + Euro Stoxx 50, confirmed via
+    ``scripts/resolve_epics.py`` 2026-07-01) — unconditionally, since this function takes
+    no config override (unlike Phase-4's own ``build_research``). This is the actual
+    daemon-critical widening: every autonomous cycle now sees both instruments.
     """
     from external_data import FileCache, MarketDataFetcher, TickerMapper
-    from research import Research, ResearchConfig
+    from research import EXTENDED_UNIVERSE, Research, ResearchConfig
     from research.credentials import get_credential
     from research.llm_client import LLMClient
 
-    config = ResearchConfig()
+    config = ResearchConfig(universe=EXTENDED_UNIVERSE)
     mapper = TickerMapper()
     # v1.5 (Issue C): register each curated instrument's yFinance ticker + volume proxy
     # from the typed universe (SoT). DAX default unchanged → daemon behaviour identical.
@@ -224,7 +230,9 @@ def build_scheduler(
         sleep_fn: optional **loop-cadence** sleep (default real ``time.sleep``). The executor keeps
             its own real sleep (the monitor must actually wait); only ``clock.sleep`` uses this.
         max_iterations: optional loop bound (``None`` ⇒ run forever; ``live_test`` passes a few).
-        exec_config: optional Phase-5 ``ExecutionConfig`` (default ``ExecutionConfig()``); ``live_test``
+        exec_config: optional Phase-5 ``ExecutionConfig`` (default: ``point_values`` derived from
+            ``research.EXTENDED_UNIVERSE`` — v1.5 Issue C, so Gate-4 sizing uses the confirmed
+            per-epic point value, not the 1.0 fallback, for every non-DAX instrument); ``live_test``
             passes a short-hold one so a placed demo trade closes quickly.
 
     Returns:
@@ -258,7 +266,20 @@ def build_scheduler(
     from persistence import Database, StateManager
 
     _now = now_fn or (lambda: datetime.now(ZoneInfo(config.tz)))
-    exec_cfg = exec_config if exec_config is not None else ExecutionConfig()
+    if exec_config is not None:
+        exec_cfg = exec_config
+    else:
+        # v1.5 Issue C, Step 2B: derive point_values from the SAME confirmed universe
+        # research uses (research.EXTENDED_UNIVERSE), rather than hand-duplicating point
+        # values in a second file — InstrumentSpec.point_value is the single source of
+        # truth; this wiring layer (a legitimate cross-phase composition point) projects
+        # it into P5's ExecutionConfig.point_values shape. DAX (1.0) is the field's own
+        # default for any unmapped epic, so it doesn't need an explicit entry.
+        from research import EXTENDED_UNIVERSE
+
+        exec_cfg = ExecutionConfig(
+            point_values={spec.epic: spec.point_value for spec in EXTENDED_UNIVERSE}
+        )
 
     # --- the shared, warm trading core ---
     broker = get_broker("ig_demo")  # the ONE broker (Decision 1, Contract G)
