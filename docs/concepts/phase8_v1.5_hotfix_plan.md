@@ -66,12 +66,12 @@ pflegen; well-factored Funktionen statt Monolith; fail-closed bei Ambiguität ü
 ## 2. Sequenz (Überblick)
 
 ```
-Step 0   Cleanup (turbo) + Verify-Baseline (Regression grün, BEVOR irgendwas)
-Step 0b  Doku-Reconciliation (eigener Commit)
-Step 1   MESSEN: bot_score-Verteilung (read-only Diagnostic; Operator läuft)
-Step 2   C — Universum als typisiertes Config-Objekt + 3–4 Epics integrieren   ← größter Hebel
-Step 3   B — Clamp/Floor entkoppeln + relaxen (data-collection mode; Werte aus Step 1)
-Step 4   A — Lesson-Provenance (Seed-Marker + Hold-Time; Prompt-Filter + Quarantäne)   ← nach C/B
+Step 0   Cleanup (turbo) + Verify-Baseline (Regression grün, BEVOR irgendwas)          ✅
+Step 0b  Doku-Reconciliation (eigener Commit)                                          ✅
+Step 1   MESSEN: bot_score-Verteilung (read-only Diagnostic; Operator läuft)           ✅
+Step 2   C — Universum als typisiertes Config-Objekt + 3–4 Epics integrieren   ✅ (4 Instrumente)
+Step 3   B — Clamp/Floor entkoppeln + relaxen (data-collection mode; Werte aus Step 1) ✅
+Step 4   A — Lesson-Provenance (Seed-Marker + Hold-Time; Prompt-Filter + Quarantäne)   ← NEXT
 Step 5   Operator-Live-Runs: 5a Varietät (open→close)  +  5b Breaker-Fire (separat, eng)
 Step 6   Doku/Note-Update: Phase 8 → ✅, CLAUDE.md Session stopped, ROADMAP
 ```
@@ -253,25 +253,26 @@ laufen per-Epic; malformed Eintrag failt closed; Regression grün.
 > - **Grün:** P4 99→**117**, P5 146→**153**, root `tests` 20→**26**; Regression P6 70 · P7 128 · P8 181 unberührt.
 >   Import-Isolation gewahrt. **2B (echte Epics) + Step 4 (A) offen.** Detail: `phase8_scheduler/CLAUDE.md`.
 
-> **🔶 Step 2B TEILWEISE ERLEDIGT (2026-07-01, Claude Code, nach dem ersten `resolve_epics.py`-Live-Lauf
-> des Nikinger).** **Euro Stoxx 50 aufgenommen** (`IX.D.STXE.IFM.IP`, `research.models.EXTENDED_UNIVERSE`,
-> live bestätigt currency/min_deal_size/TRADEABLE/ohlcv; `point_value`/`yf_ticker`/`volume_proxy` inferiert/
-> öffentlich bekannt, NICHT unabhängig live verifiziert). **CAC 40 / AEX / IBEX 35 zurückgestellt** — der
-> Live-Lauf zeigte am Ende (France 40 + beide Restterme) ein Rate-Limit-Kaskaden-Muster (`IGAdapter`
+> **✅ Step 2 (C — Variety) VOLLSTÄNDIG ABGESCHLOSSEN (2026-07-01, Claude Code).** Erste Teil-Runde
+> (Euro Stoxx 50) + der ursprüngliche CAC/AEX/IBEX-Fehlschlag waren **Rate-Limit-Artefakte** (`IGAdapter`
 > wirft `RateLimitError` auf HTTP 429 ohne eigenen Retry; der Resolver machte ~35 ungebremste Calls in
-> Folge), **nicht** eine echte „nicht verfügbar"-Datenlage — insbesondere `ohlcv_available=False` für den
-> einzigen CAC-Treffer, der überhaupt antwortete, ist damit **inkonklusiv**, nicht bestätigt fehlend.
-> Da VETO 3 ohne Bars fail-closed ist, wäre ein Aufnehmen ohne Klärung ein Phantom-Instrument-Risiko —
-> bewusst zurückgestellt. **Fix:** `scripts/resolve_epics.py` pausiert jetzt (`--pace-s`, Default 0.6 s)
-> zwischen jedem Broker-Call + surfaced den echten `env.error` (vorher hartcodiert `None`). **Zusätzlicher
-> Fund:** die 2A.4-Wiring-Schleife (dynamische Registrierung) deckt den Daemon-Pfad, aber NICHT die
-> Operator-Verifizierbarkeit über P3s eigene `smoke_test.py` (die einen bare `TickerMapper()` baut) — ein
-> **statischer P3-`ticker_map.py`-Eintrag bleibt nötig** für `IX.D.STXE.IFM.IP → ^STOXX50E`. Wiring (P4
-> `build_research`, P8 `_build_research` + `build_scheduler`) opt-in jetzt explizit in
-> `EXTENDED_UNIVERSE`; P5 `point_values` wird **von `EXTENDED_UNIVERSE` abgeleitet** (eine SoT, keine
-> Hand-Duplizierung). Grün: P3 70→**71** · P4 117→**120** · root `tests` 26→**28**; P5 153 · P6 70 ·
-> P7 128 · P8 181 unberührt. **Next (Operator):** P3-`smoke_test.py`-Verify für STXE + ein gepacter
-> `resolve_epics.py`-Re-Lauf für CAC/AEX/IBEX. Detail: `phase8_scheduler/CLAUDE.md`.
+> Folge) — **bestätigt** durch einen zweiten, **gepacten** Re-Lauf (`resolve_epics.py --pace-s 1.0`,
+> Fix aus derselben Session): **CAC 40 (`IX.D.CAC.IFE.IP`) und IBEX 35 (`IX.D.IBEX.IFM.IP`) beide
+> sauber mit `ohlcv_available=True` für alle Treffer.** Netherlands 25 (AEX) = echtes Leer-Ergebnis
+> (`search_ok=true, hits=[]`, keine Rate-Limit-Signatur) — bewusst nicht weiterverfolgt (Decision-Table
+> klammert AEX ohnehin „optional"; 4 Instrumente erfüllen „3-4"). **Euro Stoxx 50s `yf_ticker`/
+> `volume_proxy` zusätzlich voll live-verifiziert** via `phase3_external_data/scripts/smoke_test.py`
+> (echte Marktdaten + echtes `EXW1.DE`-Volumen). `research.models.EXTENDED_UNIVERSE` trägt jetzt **4
+> EUR-Instrumente** (DAX + Euro Stoxx 50 + CAC 40 + IBEX 35), alle mit bestätigtem `ohlcv_available=True`
+> (kein VETO-3-Phantom-Risiko). `point_value` für alle drei Nicht-DAX-Instrumente bleibt **inferiert**
+> aus IG's „(X€)"-Namenskonvention (Analogie zum verifizierten DAX-Muster), **nicht** unabhängig
+> bestätigt; `^FCHI`/`^IBEX` (Basis-Ticker) sind öffentlich bekannte Symbole, **nicht** live-verifiziert
+> (im Gegensatz zu DAX/STXE). Keine Wiring-Code-Änderung nötig (die Schleifen iterieren bereits generisch
+> über `config.universe`). Grün: P3 71→**72** · P4 unverändert **120** · root **28**; P1 52 · P2 62 ·
+> P5 153 · P6 70 · P7 128 · P8 181 unberührt. **Kombiniert mit dem bereits erledigten Step 3 (B) ist der
+> Hauptblocker der v1.5-Diagnose (1-Instrument-Universum + Doppel-Clamp) jetzt vollständig behoben.**
+> Next: Step 4 (A — Lesson-Provenance), dann Step 5 (Operator-Live-Läufe). Detail:
+> `phase8_scheduler/CLAUDE.md` → `## Session stopped` (Step 2 complete).
 
 ---
 

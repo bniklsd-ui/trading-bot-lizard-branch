@@ -213,6 +213,88 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-01 (v1.5-Hotfix: **Step 2 (C — Variety) VOLLSTÄNDIG ABGESCHLOSSEN** — CAC 40 + IBEX 35 bestätigt, STXE voll live-verifiziert)
+
+> **Auslöser:** der Nikinger hat die zwei angeforderten Operator-Schritte gelaufen (P3-`smoke_test.py`
+> für STXE + ein **gepacter** `resolve_epics.py`-Re-Lauf für France 40/Netherlands 25/Spain 35) und die
+> Ausgabe in dieselbe Datei angehängt (`scripts/2026_07_01-Testrun-Results.md`). **Kontext läuft hoch —
+> dies ist der Session-Abschluss-Handover.**
+
+### Befund — der Re-Lauf war ein ERFOLG, kein zweiter Fehlschlag
+Der Nikinger meldete „again a failed run", aber die Daten zeigen das Gegenteil:
+- **STXE-`smoke_test.py`:** voller `BrainContext` mit echten Werten (drift/momentum/history) UND
+  `volume_available=True, volume_source='EXW1.DE'` mit echtem `today_volume=188152.0` — **`^STOXX50E`
+  UND `EXW1.DE` sind jetzt beide live-verifiziert**, nicht mehr nur „öffentlich bekannt vermutet".
+- **`resolve_epics.py --pace-s 1.0`** (die Pacing-Fix aus der letzten Session griff): **France 40 (CAC
+  40) 4/4 Treffer sauber, `ohlcv_available=True` für alle**; **Spain 35 (IBEX 35) 4/4 Treffer sauber,
+  `ohlcv_available=True` für alle**. Die Rate-Limit-Hypothese von letzter Session ist damit **bestätigt**
+  (der erste Lauf war Artefakt, nicht echte Datenlage) — der zweite, gepacte Lauf beweist es.
+- **Netherlands 25 (AEX):** `search_ok=true, hits=[]` — ein **echtes** Leer-Ergebnis (keine Rate-Limit-
+  Signatur), IG hat unter diesem Suchbegriff schlicht keinen Markt. Bewusst nicht weiterverfolgt (im
+  Locked-Decision-Table ohnehin „optional" geklammert; 4 bestätigte Instrumente erfüllen „3-4" bereits).
+
+### Completed — Step 2B jetzt vollständig
+- **`research/models.py` `EXTENDED_UNIVERSE`** von 2 auf **4 Instrumente** erweitert:
+  DAX (unverändert) · **Euro Stoxx 50** `IX.D.STXE.IFM.IP` (yf_ticker+volume_proxy jetzt **voll
+  live-verifiziert**, `point_value=2.0` bleibt inferiert) · **CAC 40** `IX.D.CAC.IFE.IP` („Frankreich 40
+  Kassa (1€)" — die kleinste Kassa-Variante, passt am besten zum DAX-Muster; `point_value=1.0` inferiert
+  aus der „(1€)"-Namenskonvention, `yf_ticker="^FCHI"` öffentlich bekannt/**nicht** live-verifiziert,
+  `volume_proxy=None` bewusst — kein sicher bekannter ETF-Ticker geraten, C3-toleriert) · **IBEX 35**
+  `IX.D.IBEX.IFM.IP` („Spanien 35 Kassa (2€)" — keine 1€-Variante vorhanden; `point_value=2.0` inferiert,
+  `yf_ticker="^IBEX"` öffentlich bekannt/**nicht** live-verifiziert, `volume_proxy=None` bewusst).
+  **Alle vier `ohlcv_available=True` live bestätigt** → kein Phantom-Instrument-Risiko für VETO 3.
+- **P3 `ticker_map.py`:** zwei neue statische Einträge (`IX.D.CAC.IFE.IP → ^FCHI`,
+  `IX.D.IBEX.IFM.IP → ^IBEX`), STXE-Kommentar auf „voll live-verifiziert" aktualisiert.
+- **Keine Wiring-Änderung nötig** — die P4/P8-Wiring-Schleifen iterieren bereits generisch über
+  `config.universe`/`EXTENDED_UNIVERSE`; vier Instrumente statt zwei fließen automatisch durch (verifiziert:
+  `ResearchConfig(universe=EXTENDED_UNIVERSE).epic_allowlist` liefert alle 4 Epics, die abgeleitete
+  `point_values`-Dict-Comprehension in `build_scheduler` ebenso).
+- **Tests aktualisiert:** `test_universe.py` (4-Instrumente-Assertions, `volume_proxy is None` für
+  CAC/IBEX geprüft), `test_ticker_map.py` (+1 Test für die zwei neuen statischen Einträge).
+
+### Verifiziert (gemockt/offline — Live-Verifikation von `^FCHI`/`^IBEX` steht noch aus)
+- **P3 71→72 · P4 unverändert 120** (Tests erweitert/umbenannt, keine neuen Testfunktionen nötig) ·
+  root **28**. Regression unberührt: **P1 52 · P2 62 · P5 153 · P6 70 · P7 128 · P8 181**. `py_compile`
+  clean. Import-Isolation bestätigt (`import scripts.wiring` in P8 zieht weiterhin NONE cross-phase).
+  Direkt verifiziert: `ResearchConfig(universe=EXTENDED_UNIVERSE).epic_allowlist` = alle 4 Epics;
+  abgeleitete `point_values` = `{DAX:1.0, STXE:2.0, CAC:1.0, IBEX:2.0}`.
+
+### Step 2 (C — Variety) ist damit ABGESCHLOSSEN
+Von 1 auf 4 EUR-Instrumente, alle mit bestätigtem `ohlcv_available=True` (VETO 3 kann für jedes
+tatsächlich feuern statt phantom-blockieren). Kombiniert mit dem bereits erledigten Step 3 (B — Clamp/
+Floor entkoppelt+relaxt) ist der **Hauptblocker der v1.5-Diagnose (1-Instrument-Universum + Doppel-Clamp)
+jetzt vollständig behoben.** Übrig: Step 4 (A — Lesson-Provenance, kleiner, nach C/B sequenziert) + Step 5
+(Operator-Live-Läufe, die den ✅-Beweis liefern).
+
+### Next (für die nächste Session — frisch einsteigen)
+1. **Operator (optional, vor dem nächsten Live-Lauf empfohlen, nicht blockierend):**
+   `python phase3_external_data/scripts/smoke_test.py --epic IX.D.CAC.IFE.IP` und
+   `--epic IX.D.IBEX.IFM.IP` laufen lassen, um `^FCHI`/`^IBEX` gegen echtes yfinance zu bestätigen
+   (analog zum bereits erledigten STXE-Check). Kein Blocker für Step 4 oder einen Live-Testlauf — ein
+   unverifizierter Ticker degradiert nur zu `brain_context=None` für dieses Epic (kein Crash), aber vor
+   einem Live-Konto-Einsatz zwingend nachzuholen.
+2. **Step 4 (A — Lesson-Provenance):** Seed-Marker (`"MANUAL SEED (not a real research pick)"`,
+   `seed_candidate.py:62`) + Hold-Time-Heuristik zur Identifikation von Verifikations-Trades;
+   `get_recent_lessons`/`context_builder.py:184`-Prompt-Filter, der sie ausschließt; Quarantäne-by-date
+   für bestehende verschmutzte Lessons. **Kein Migration-003/DB-Schema-Touch** (Plan-Vorgabe). Reward/
+   Score rechnet weiter auf allen Lessons — nur der Prompt wird gereinigt. Plan:
+   `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
+3. **Danach Step 5 (Operator-Live-Läufe):** 5a Varietäts-Run (mehrere Tage, fängt den ersten
+   netto-neuen autonomen open→close mit dem jetzt 4-instrumentigen Universum + gelockertem Clamp/Floor
+   ein) + 5b Breaker-Fire-Run (separat, enger Cap). Diese zwei schließen das Phase-8-✅-Gate.
+- **Commit:** vorgeschlagen (atomar: (1) EXTENDED_UNIVERSE CAC+IBEX + P3-Mapping + Tests, (2) docs),
+  wartet auf Nikinger-Trigger.
+
+### Offene Punkte / blockers
+- `^FCHI`/`^IBEX` (Basis-Ticker) und alle drei `point_value`-Werte (STXE/CAC/IBEX) bleiben **inferiert /
+  öffentlich bekannt, nicht unabhängig live bestätigt** — vor einem echten Live-Konto-Einsatz zwingend
+  verifizieren (Kontraktdetails/manueller Demo-Trade für point_value; `smoke_test.py` für die Ticker).
+  Kein Blocker für die weitere v1.5-Arbeit (Demo-only, fail-closed bleibt intakt).
+- CAC/IBEX haben bewusst **keinen** Volume-Proxy (kein sicher bekannter ETF-Ticker) — beide degradieren
+  zu `volume_z_score=None` (reduced-signal, C3-toleriert, kein Bug).
+
+---
+
 ## Session stopped — 2026-07-01 (v1.5-Hotfix: Step 2B (C) — Euro Stoxx 50 aufgenommen, CAC/AEX/IBEX zurückgestellt, resolve_epics.py-Rate-Limit-Fix)
 
 > **Auslöser:** der Nikinger hat `scripts/resolve_epics.py` gegen IG-Demo laufen lassen und die
