@@ -69,6 +69,19 @@ single network point.
   `YFRateLimitError` → `RateLimitError`; empty/short DataFrame →
   `DataUnavailableError`.
 
+> 🔁 **Phase-8 v1.5-hotfix edit (2026-07-01, Issue C, Step 2B — code = source of truth):** added one
+> static `TickerMapper._MAP` entry, `"IX.D.STXE.IFM.IP": "^STOXX50E"` (Euro Stoxx 50 Kassa 2€). DAX/
+> EURUSD/DOW entries unchanged. **Why a static entry when Phase 8's wiring already registers per-epic
+> tickers dynamically (`phase8_scheduler/scripts/wiring.py`):** that dynamic registration covers the
+> daemon's runtime, but P3's own `scripts/smoke_test.py`/`live_test.py` build a **bare** `TickerMapper()`
+> — without a static entry, the operator has no existing-tool way to independently verify a newly
+> guessed yfinance ticker before trusting it. `^STOXX50E` is a well-known public symbol (by analogy with
+> DAX's `^GDAXI`), **not yet live-verified** — operator: confirm with `python scripts/smoke_test.py
+> --epic IX.D.STXE.IFM.IP --volume-proxy EXW1.DE` (no static volume-proxy entry added, matching the
+> existing DAX convention of passing the proxy via `--volume-proxy` each run). +1 test
+> (`test_ticker_map.py`, **70 → 71**). Detail: `phase8_scheduler/CLAUDE.md` → `## Session stopped`
+> (Step 2B) + `docs/concepts/phase8_v1.5_hotfix_plan.md`.
+
 ## ⚠ Phase-5 momentum-VETO flag (cross-phase notice)
 
 The concept (§13) explicitly states: a **hard momentum VETO in Phase 5 must

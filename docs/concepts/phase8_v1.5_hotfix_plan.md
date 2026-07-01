@@ -253,6 +253,26 @@ laufen per-Epic; malformed Eintrag failt closed; Regression grün.
 > - **Grün:** P4 99→**117**, P5 146→**153**, root `tests` 20→**26**; Regression P6 70 · P7 128 · P8 181 unberührt.
 >   Import-Isolation gewahrt. **2B (echte Epics) + Step 4 (A) offen.** Detail: `phase8_scheduler/CLAUDE.md`.
 
+> **🔶 Step 2B TEILWEISE ERLEDIGT (2026-07-01, Claude Code, nach dem ersten `resolve_epics.py`-Live-Lauf
+> des Nikinger).** **Euro Stoxx 50 aufgenommen** (`IX.D.STXE.IFM.IP`, `research.models.EXTENDED_UNIVERSE`,
+> live bestätigt currency/min_deal_size/TRADEABLE/ohlcv; `point_value`/`yf_ticker`/`volume_proxy` inferiert/
+> öffentlich bekannt, NICHT unabhängig live verifiziert). **CAC 40 / AEX / IBEX 35 zurückgestellt** — der
+> Live-Lauf zeigte am Ende (France 40 + beide Restterme) ein Rate-Limit-Kaskaden-Muster (`IGAdapter`
+> wirft `RateLimitError` auf HTTP 429 ohne eigenen Retry; der Resolver machte ~35 ungebremste Calls in
+> Folge), **nicht** eine echte „nicht verfügbar"-Datenlage — insbesondere `ohlcv_available=False` für den
+> einzigen CAC-Treffer, der überhaupt antwortete, ist damit **inkonklusiv**, nicht bestätigt fehlend.
+> Da VETO 3 ohne Bars fail-closed ist, wäre ein Aufnehmen ohne Klärung ein Phantom-Instrument-Risiko —
+> bewusst zurückgestellt. **Fix:** `scripts/resolve_epics.py` pausiert jetzt (`--pace-s`, Default 0.6 s)
+> zwischen jedem Broker-Call + surfaced den echten `env.error` (vorher hartcodiert `None`). **Zusätzlicher
+> Fund:** die 2A.4-Wiring-Schleife (dynamische Registrierung) deckt den Daemon-Pfad, aber NICHT die
+> Operator-Verifizierbarkeit über P3s eigene `smoke_test.py` (die einen bare `TickerMapper()` baut) — ein
+> **statischer P3-`ticker_map.py`-Eintrag bleibt nötig** für `IX.D.STXE.IFM.IP → ^STOXX50E`. Wiring (P4
+> `build_research`, P8 `_build_research` + `build_scheduler`) opt-in jetzt explizit in
+> `EXTENDED_UNIVERSE`; P5 `point_values` wird **von `EXTENDED_UNIVERSE` abgeleitet** (eine SoT, keine
+> Hand-Duplizierung). Grün: P3 70→**71** · P4 117→**120** · root `tests` 26→**28**; P5 153 · P6 70 ·
+> P7 128 · P8 181 unberührt. **Next (Operator):** P3-`smoke_test.py`-Verify für STXE + ein gepacter
+> `resolve_epics.py`-Re-Lauf für CAC/AEX/IBEX. Detail: `phase8_scheduler/CLAUDE.md`.
+
 ---
 
 ## Step 3 — B: Clamp/Floor entkoppeln + relaxen (data-collection mode)

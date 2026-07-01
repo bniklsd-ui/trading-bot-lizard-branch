@@ -213,6 +213,105 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-01 (v1.5-Hotfix: Step 2B (C) — Euro Stoxx 50 aufgenommen, CAC/AEX/IBEX zurückgestellt, resolve_epics.py-Rate-Limit-Fix)
+
+> **Auslöser:** der Nikinger hat `scripts/resolve_epics.py` gegen IG-Demo laufen lassen und die
+> Ausgabe als Datei geliefert (`scripts/2026_07_01-Testrun-Results.md`). Auftrag: „go in with the
+> second half of our plan; wenn Replanning nötig ist, dokumentiere die Findings und sag Bescheid."
+
+### Befund (Replanning-relevant, Code = Wahrheit)
+- **Germany 40 (DAX):** 7 Treffer, alle sauber (`market_info_ok=True`, `ohlcv_available=True`).
+  `IX.D.DAX.IFMM.IP` bestätigt unverändert korrekt.
+- **EU Stocks 50 (Euro Stoxx 50):** 5 Treffer, sauber. Gewählt: **`IX.D.STXE.IFM.IP`** („EU Stocks
+  50 Kassa (2€)", kleinste Kassa-Variante — analog zu DAX' `IFMM` (1€), gleiches Muster: Name „(X€)"
+  + `lot_size==X` korrelieren exakt bei DAX). `currency=EUR`, `min_deal_size=0.5`,
+  `market_status=TRADEABLE`, `ohlcv_available=True` — **live bestätigt**.
+- **France 40 (CAC 40) + Netherlands 25 (AEX) + Spain 35 (IBEX):** **Befund = wahrscheinlich
+  Rate-Limit-Kaskade, NICHT echte Datenlage.** `IGAdapter._request` wirft `RateLimitError` bei
+  HTTP 429 **ohne eigenen Retry/Backoff** (`ig_adapter.py:321-322`) — der Resolver machte ~35
+  ungebremste Broker-Calls direkt hintereinander (Germany 40: 15, EU Stocks 50: 11, dann France
+  40). Genau ab da: 3/4 CAC-Treffer `get_market_info` komplett fehlgeschlagen, der 4. Treffer
+  (`IX.D.CAC.IFD.IP`) mit `ohlcv_available=False`, **beide** folgenden Suchbegriffe komplett
+  fehlgeschlagen (`error=None`, weil mein Skript den echten `env.error` nicht auslas — auch
+  gefixt). **Bedeutung, warum das wichtig ist:** VETO 3 (Momentum) failt closed ohne Bars — ein
+  Epic ohne `ohlcv_available` würde **nie** eine Order clearen (ein „Phantom"-Instrument). CAC 40
+  / AEX / IBEX werden deshalb **bewusst NICHT** aufgenommen, bis ein sauberer Re-Lauf das klärt.
+
+### Completed
+- **`research/models.py`:** neues öffentliches `EXTENDED_UNIVERSE` (DAX + Euro Stoxx 50) neben dem
+  unveränderten privaten `_DEFAULT_UNIVERSE` (DAX-only, bleibt der `ResearchConfig()`-bare-Default
+  — **kein** bestehender Test/Caller ändert sich). `point_value=2.0` für STXE ist **inferiert** aus
+  IG's „(2€)"-Namenskonvention (Analogie zum verifizierten DAX-Muster), **nicht** unabhängig
+  bestätigt — Kommentar an Ort und Stelle. `yf_ticker="^STOXX50E"` / `volume_proxy="EXW1.DE"` sind
+  öffentlich bekannte Symbole (Analogie DAX `^GDAXI`/`EXS1.DE"), **nicht** live gegen yfinance
+  verifiziert. `research/__init__.py` exportiert `EXTENDED_UNIVERSE`. **+3 Tests** (`test_universe.py`).
+- **P3 `ticker_map.py`:** statischer `_MAP`-Eintrag `IX.D.STXE.IFM.IP → ^STOXX50E` ergänzt (DAX-
+  Muster: `_VOLUME_MAP` bleibt leer, Proxy weiter per `--volume-proxy`-Flag). **Grund, warum die
+  2A.4-Wiring-Schleife das nicht ersetzt:** die dynamische Registrierung deckt den **Daemon**-Pfad,
+  aber P3s eigene `smoke_test.py`/`live_test.py` bauen einen **bare** `TickerMapper()` — ohne den
+  statischen Eintrag könnte der Operator die STXE-Ticker-Vermutung gar nicht unabhängig verifizieren
+  (`EpicNotMappedError`). **+1 Test** (`test_ticker_map.py`).
+- **Wiring (die eigentliche Verdrahtung des neuen Instruments):**
+  - P4 `scripts/wiring.py` `build_research`: Default (kein `config`-Arg) → `ResearchConfig(universe=
+    EXTENDED_UNIVERSE)`. Betrifft **nicht** `smoke_test.py`/`live_test.py` (die übergeben immer
+    explizit `epic_allowlist=(args.epic,)` — bleiben Single-Epic-Tools, unverändert).
+  - P8 `scripts/wiring.py` `_build_research`: **unconditional** `ResearchConfig(universe=
+    EXTENDED_UNIVERSE)` (kein Override-Pfad hier) — das ist der **daemon-kritische** Punkt, jeder
+    autonome Zyklus sieht jetzt beide Instrumente.
+  - P8 `scripts/wiring.py` `build_scheduler`: `ExecutionConfig.point_values` wird jetzt **aus
+    `EXTENDED_UNIVERSE` abgeleitet** (`{spec.epic: spec.point_value for spec in EXTENDED_UNIVERSE}`)
+    statt hand-dupliziert — **eine** echte SoT (`InstrumentSpec.point_value`), die Wiring-Schicht
+    projiziert sie nur in P5s Config-Form (löst die früher dokumentierte „zwei SoTs"-Sorge auf).
+- **`scripts/resolve_epics.py` — Rate-Limit-Fix (Bug in meinem eigenen Tool, live gefunden):**
+  injizierbares `sleep_fn` + `--pace-s` (Default 0.6 s, spiegelt P3s `RateLimiter`-Mindestabstand)
+  pausiert jetzt **nach jedem** Broker-Call (`search_markets`/`get_market_info`/`get_ohlcv`).
+  **Zweiter Fix:** `resolve_term`s „search failed"-Zweig hardcodete vorher `error: None` statt den
+  echten `env.error` zu lesen — neuer `_error_message()`-Helfer surfaced jetzt die echte Meldung
+  (z. B. „429 rate limited"), + neues `market_info_error`-Feld je Hit. **+3 Tests**
+  (`tests/test_resolve_epics.py`: Pacing-Beweis, Error-Surfacing ×2).
+- **C.4 (VETO-Quelle je Epic) read-only verifiziert (kein Code-Änderung nötig):**
+  `execution/vetos.py:pre_trade_check` liest `epic = candidate["epic"]` und reicht es an
+  `veto_momentum(broker, epic, ...)` durch — die Momentum-VETO-Quelle war **schon** per-Kandidat-
+  Epic dynamisch (nicht hardcodiert), genau wie der Step-2-Plan es verlangte zu verifizieren.
+
+### Verifiziert (gemockt/offline — Live-Rerun für CAC/AEX/IBEX ist Operator-Sache)
+- **P3 70→71 · P4 117→120 · root tests 26→28.** Regression unberührt: **P5 153 · P6 70 · P7 128 ·
+  P8 181**. `py_compile` clean auf allen berührten Dateien. Import-Isolation bestätigt: `import
+  scripts.wiring` (P8) zieht weiterhin **NONE** cross-phase beim Modul-Laden (nur die lazy
+  Funktionskörper-Imports wuchsen um einen Namen).
+
+### Plan-Abweichung (dokumentiert, wie vom Nikinger verlangt)
+- **CAC 40 / AEX / IBEX 35 bleiben zurückgestellt** — Step 2B ist damit **teilweise** erledigt
+  (Euro Stoxx 50 drin, die anderen drei offen), nicht vollständig wie ursprünglich geplant.
+- **Neuer Zwischenschritt entdeckt:** die 2A.4-Wiring-Schleife allein reicht nicht für Operator-
+  Verifizierbarkeit neuer Ticker — ein **statischer P3-`TickerMapper`-Eintrag bleibt nötig**, damit
+  der Operator `phase3_external_data/scripts/smoke_test.py --epic <neu> --volume-proxy <neu>`
+  eigenständig gegen echtes yfinance laufen lassen kann, bevor der Daemon der Vermutung vertraut.
+
+### Next
+- **Operator:**
+  1. `python phase3_external_data/scripts/smoke_test.py --epic IX.D.STXE.IFM.IP --volume-proxy
+     EXW1.DE` laufen — verifiziert `^STOXX50E`/`EXW1.DE` gegen echtes yfinance, bevor der Daemon
+     dem Brain-Context für dieses Epic vertraut.
+  2. `python scripts/resolve_epics.py --term "France 40" --term "Netherlands 25" --term "Spain 35"`
+     erneut laufen (jetzt gepaced, Default 0.6 s zwischen Calls; `--pace-s 1.0` falls immer noch
+     Rate-Limit-Muster auftauchen) → saubere CAC/AEX/IBEX-Daten, insbesondere `ohlcv_available`.
+  3. point_value je bestätigtem Instrument aus den IG-Kontraktdetails / einem manuellen Demo-Trade
+     bestätigen (bleibt für STXE ebenfalls **inferiert**, nicht unabhängig bestätigt).
+- **Nach dem Re-Lauf:** CAC 40 (+ ggf. AEX/IBEX) zu `EXTENDED_UNIVERSE` hinzufügen, falls
+  `ohlcv_available=True` sauber bestätigt — sonst dokumentiert ausschließen (Phantom-Instrument-
+  Risiko). **Danach Step 4 (A — Lesson-Provenance).**
+- **Commit:** vorgeschlagen (atomar: (1) P3+P4 EXTENDED_UNIVERSE+TickerMapper+wiring+tests, (2)
+  resolve_epics.py Rate-Limit-Fix+tests, (3) docs), wartet auf Nikinger-Trigger.
+
+### Offene Punkte / blockers
+- CAC 40 / AEX / IBEX 35 Resolution ist **inkonklusiv** (wahrscheinlich Rate-Limit-Artefakt) — kein
+  Code-Blocker, aber ein Daten-Blocker für die restliche Step-2B-Populierung.
+- Euro Stoxx 50s `point_value`/`yf_ticker`/`volume_proxy` sind **inferiert/öffentlich bekannt, nicht
+  unabhängig live bestätigt** — vor einem Live-Lauf mit echtem Geld zwingend verifizieren.
+
+---
+
 ## Session stopped — 2026-07-01 (v1.5-Hotfix: Step 2A (C) — typisiertes Universum + per-Epic Brain-Context + P5-point_value-Naht + resolve_epics.py)
 
 > **Auslöser:** der Nikinger startet Step 2 (C — Variety, der größte Hebel) nach dem erledigten B.

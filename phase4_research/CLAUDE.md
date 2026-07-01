@@ -68,7 +68,21 @@ is kicked off in the browser concept session, not here.
 > (`ExecutionConfig.point_values`) and a new read-only operator resolver `scripts/resolve_epics.py`
 > (repo-root). +18 P4 tests (**99 → 117**). Real epic strings (Euro Stoxx 50 / CAC 40) land in **Step 2B**
 > after the operator runs `resolve_epics.py`. Detail: `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 2 +
-> `phase8_scheduler/CLAUDE.md` → `## Session stopped — 2026-07-01 (Step 2A)`.
+> `phase8_scheduler/CLAUDE.md` → `## Session stopped` (Step 2A).
+
+> 🔁 **Phase-8 v1.5-hotfix edit (2026-07-01, Issue C, Step 2B — Euro Stoxx 50, code = source of truth):**
+> after the operator's first `resolve_epics.py` live run, `research/models.py` gained a public
+> `EXTENDED_UNIVERSE` (DAX + Euro Stoxx 50 `IX.D.STXE.IFM.IP`) alongside the unchanged private
+> `_DEFAULT_UNIVERSE` — a bare `ResearchConfig()` still defaults to DAX-only (no existing test/caller
+> changes); only `scripts/wiring.py` (P4's `build_research` default, and P8's daemon-critical
+> `_build_research`) opts explicitly into `EXTENDED_UNIVERSE`. STXE's `point_value=2.0` is **inferred**
+> from IG's "(2€)" cash-instrument naming (by analogy with the verified DAX "(1€)" <-> 1.0 pattern), and
+> `yf_ticker="^STOXX50E"`/`volume_proxy="EXW1.DE"` are well-known public symbols — **none of the three are
+> independently live-verified**. CAC 40 / AEX / IBEX 35 were **not** added: the live run's tail showed a
+> rate-limit cascade (IG's `RateLimitError` has no built-in retry), so their `ohlcv_available` reading is
+> inconclusive, not confirmed — adding an epic without real-time OHLCV would create a VETO-3 "phantom"
+> instrument that can never clear the momentum gate. +3 P4 tests (**117 -> 120**). Detail:
+> `phase8_scheduler/CLAUDE.md` -> `## Session stopped` (Step 2B).
 
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which
