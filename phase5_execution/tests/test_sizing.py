@@ -131,6 +131,55 @@ def test_leverage_cap_clips_oversized_risk() -> None:
     assert size == 111.1  # capped, NOT the uncapped 3000
 
 
+# --- compute_size: v1.5 per-epic point value ------------------------------
+
+
+def test_point_value_scales_size_down() -> None:
+    # A €5/pt instrument risks 5× as much per lot, so the same risk budget buys 1/5
+    # the size: 2% of 1500 / (30 × 5) = 0.2 (vs 1.0 at point_value 1.0).
+    epic = "IX.D.STXE.IFMM.IP"
+    config = replace(ExecutionConfig(), point_values={epic: 5.0})
+    size, reason = compute_size(
+        _account(1500), _price(18_000), _market_info(0.1),
+        config.risk_pct_conservative, config, epic=epic,
+    )
+    assert reason is None
+    assert size == 0.2
+
+
+def test_point_value_default_one_when_epic_unmapped(config: ExecutionConfig) -> None:
+    # An epic absent from point_values falls back to 1.0 → identical to the DAX path.
+    size, reason = compute_size(
+        _account(1500), _price(18_000), _market_info(0.1),
+        config.risk_pct_conservative, config, epic="UNMAPPED.EPIC",
+    )
+    assert (size, reason) == (1.0, None)
+
+
+def test_point_value_from_market_info_echo_when_epic_arg_omitted() -> None:
+    # Back-compat: no epic arg → resolved from the market_info envelope's echoed epic.
+    epic = "IX.D.CAC.IFMM.IP"
+    config = replace(ExecutionConfig(), point_values={epic: 10.0})
+    info = _FakeEnv(ok=True, data={"min_deal_size": 0.1, "currency": "EUR", "epic": epic})
+    size, reason = compute_size(
+        _account(1500), _price(18_000), info, config.risk_pct_conservative, config
+    )
+    # 2% of 1500 / (30 × 10) = 0.1
+    assert (size, reason) == (0.1, None)
+
+
+def test_point_value_still_fails_closed_below_min() -> None:
+    # A high point value can push the size below min_deal_size → still a no-trade.
+    epic = "IX.D.STXE.IFMM.IP"
+    config = replace(ExecutionConfig(), point_values={epic: 10.0})
+    size, reason = compute_size(
+        _account(1000), _price(18_000), _market_info(0.5),
+        config.risk_pct_conservative, config, epic=epic,
+    )
+    # 2% of 1000 / (30 × 10) = 0.066 -> 0.0, below the 0.5 min.
+    assert (size, reason) == (0.0, "below_min_deal_size")
+
+
 # --- compute_size: available read path & zero balance ---------------------
 
 

@@ -70,3 +70,19 @@ def test_overrides_are_honoured() -> None:
     assert cfg.max_spread_pct == 0.8
     # untouched fields keep their defaults
     assert cfg.tz == "Europe/Berlin"
+
+
+# --- v1.5 per-epic point value ---------------------------------------------
+
+
+def test_point_values_default_empty_and_helper_returns_one() -> None:
+    cfg = ExecutionConfig()
+    assert cfg.point_values == {}
+    assert cfg.point_value_for("IX.D.DAX.IFMM.IP") == 1.0  # unmapped → default 1.0
+    assert cfg.point_value_for(None) == 1.0
+
+
+def test_point_value_for_returns_mapped_value() -> None:
+    cfg = ExecutionConfig(point_values={"IX.D.STXE.IFMM.IP": 5.0})
+    assert cfg.point_value_for("IX.D.STXE.IFMM.IP") == 5.0
+    assert cfg.point_value_for("IX.D.DAX.IFMM.IP") == 1.0  # still default for others

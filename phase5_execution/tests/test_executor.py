@@ -22,8 +22,8 @@ import pytest
 
 from execution.config import ExecutionConfig
 from execution.execution_state import CLOSED, ExecutionState
-from execution.executor import Executor
-from execution.models import OrderPlan
+from execution.executor import Executor, build_opened
+from execution.models import ExecutionResult, OrderPlan
 from tests.conftest import DEFAULT_EPIC, FakeBroker, FakeDB, FakeState, _FakeEnv
 
 DEAL_ID = "DIAAAA-FAKE"  # the FakeBroker default open_env deal_id
@@ -634,6 +634,30 @@ def test_build_closed_carries_close_confirm_pnl(
     assert closed.deal_id == "D1"
     assert closed.close_level == 24990.0
     assert closed.profit_loss == 42.0
+
+
+def test_build_opened_scales_initial_risk_by_point_value(
+    make_order_plan: Callable[..., OrderPlan]
+) -> None:
+    """v1.5 (Issue C): build_opened threads the per-epic point value into initial_risk."""
+    plan = make_order_plan(direction="BUY", size=1.0, stop_level=17970.0)
+    price_env = _FakeEnv(ok=True, data={"ask": 18000.0, "bid": 17999.0})
+    place = ExecutionResult(status="OPEN", deal_id=DEAL_ID, plan=plan, detail=None)
+    now = datetime(2026, 7, 1, 10, 0)
+
+    # Default point_value 1.0 → |18000-17970| * 1.0 * 1.0 = 30.0
+    opened_default = build_opened(
+        {"llm_confidence": 70.0}, plan, place, price_env, None,
+        score_at_open=50.0, now=now,
+    )
+    assert opened_default.initial_risk == 30.0
+
+    # point_value 5.0 → 30 * 1.0 * 5.0 = 150.0 (proves the value threads through)
+    opened_pv5 = build_opened(
+        {"llm_confidence": 70.0}, plan, place, price_env, None,
+        score_at_open=50.0, now=now, point_value=5.0,
+    )
+    assert opened_pv5.initial_risk == 150.0
 
 
 def test_build_closed_defaults_none_without_confirm(

@@ -126,6 +126,20 @@ Hand-off „Candidate → Gates → Order" so bauen, dass P6 die Richtungs-/Size
 > den `ClosedTrade`. **Additiv, P5 bit-identisch** (Defaults); +4 Tests (`test_monitor.py` +2,
 > `test_executor.py` +2 für `build_closed`) → **142 → 146**. Detail: `phase7_reward/` + Konzept §9.
 
+> 🔁 **Phase-8 v1.5-hotfix edit (2026-07-01, Issue C — per-epic point_value in Gate-4 sizing, code = source
+> of truth):** multi-instrument sizing must use each instrument's account-currency value of one point
+> (`risk / (stop_pts × point_value)`). Because the **`Candidate`/`turbo_candidates.json` contract is frozen**
+> and IG's `get_market_info` does **not** expose a point value, the seam is **P5-side**: `ExecutionConfig`
+> gained `point_values: dict[epic→float]` (default `{}`) + `point_value_for(epic)` (→ 1.0 default = DAX/any
+> unmapped epic). `sizing.compute_size(..., *, epic=None)` uses it (falls back to the market_info-echoed epic);
+> `executor` passes the candidate epic and `build_opened(..., point_value=config.point_value_for(plan.epic))`
+> so `initial_risk` matches. **Additive, default `{}` → every epic 1.0 → the DAX/default path is bit-identical**
+> (P5 146 → **153**, +7 tests: 4 sizing, 2 config, 1 executor). This is **Gate-4 sizing, not a VETO** — the 4
+> VETOs + 5 gates are untouched. ⚠ **Two SoTs by design**: this map ↔ P4 `InstrumentSpec.point_value` (the
+> frozen cross-phase contract carries no point value); non-DAX values are **provisional** until the operator
+> confirms them via `scripts/resolve_epics.py` (v1.5 Step 2B) — comment flags at both sites; re-baseline before
+> live. Detail: `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 2A.5 + `phase8_scheduler/CLAUDE.md`.
+
 ## Datei-/Modul-Übersicht (Soll, Konzept §"Modul-Plan")
 ```
 phase5_execution/

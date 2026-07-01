@@ -212,7 +212,7 @@ class Executor:
         market_info_env = self.broker.get_market_info(epic)
         risk_pct = select_risk_pct(self.db, self.config)
         size, size_reason = compute_size(
-            account_env, price_env, market_info_env, risk_pct, self.config
+            account_env, price_env, market_info_env, risk_pct, self.config, epic=epic
         )
         if size_reason is not None:
             return self._no_trade("sizing", size_reason)
@@ -284,6 +284,7 @@ class Executor:
             opened = build_opened(
                 candidate, plan, place_result, price_env, outcome,
                 score_at_open=self.db.get_current_score(), now=now,
+                point_value=self.config.point_value_for(plan.epic),
             )
             self.reward_sink.on_trade_opened(opened)
         except Exception as exc:  # noqa: BLE001 - the sink must never kill the cycle (J)
@@ -342,8 +343,11 @@ class Executor:
 # imports ``scripts.wiring``. The contracts are stdlib-only frozen dataclasses (no
 # anthropic/broker/db deps), used here purely as the single-source-of-truth payload shape.
 
-# DAX cash CFD = 1 € / point. ``ExecutionConfig`` has no ``point_value`` field — ``sizing.py``
-# likewise hardcodes 1.0 — so the reconstructed initial risk uses the same constant (v1).
+# DAX cash CFD = 1 € / point — the default when a caller passes no ``point_value``.
+# v1.5 (Issue C): ``ExecutionConfig`` now carries a per-epic ``point_values`` map and
+# the executor passes ``config.point_value_for(plan.epic)`` here, so the reconstructed
+# ``initial_risk`` matches the point value Gate-4 sizing used. Default 1.0 keeps every
+# existing caller (and the DAX path) bit-identical.
 _POINT_VALUE = 1.0
 
 
@@ -356,6 +360,7 @@ def build_opened(
     *,
     score_at_open: float,
     now: datetime,
+    point_value: float = 1.0,
 ) -> Any:
     """Build the ``OpenedTrade`` decision-context snapshot captured the moment a trade opens.
 
@@ -374,7 +379,7 @@ def build_opened(
     else:  # SELL
         entry = data.get("bid") if data.get("bid") is not None else data.get("ask")
     intended_open_level = float(entry)
-    initial_risk = abs(intended_open_level - plan.stop_level) * plan.size * _POINT_VALUE
+    initial_risk = abs(intended_open_level - plan.stop_level) * plan.size * point_value
 
     return OpenedTrade(
         deal_reference=plan.deal_reference,

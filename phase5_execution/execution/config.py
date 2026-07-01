@@ -24,7 +24,7 @@ verified against ``ig_adapter.py`` / ``filters.py``):
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -112,6 +112,16 @@ class ExecutionConfig:
     risk_pct_conservative: float = 2.0     # percent; sizing.py divides by 100
     risk_pct_aggressive: float = 3.0       # percent; sizing.py divides by 100
     max_leverage: float = 20.0             # notional cap = balance × this (ESMA ceiling)
+    # v1.5 (Issue C — multi-instrument sizing): per-epic account-currency value of ONE
+    # index point, used by Gate-4 sizing (``risk / (stop_pts × point_value)``) and the
+    # reconstructed ``initial_risk``. Default ``{}`` → every epic falls back to 1.0
+    # (DAX cash CFD = 1 €/pt) → the DAX/default path is bit-identical. ⚠ Non-DAX values
+    # are PROVISIONAL until the operator confirms them on IG demo via
+    # ``scripts/resolve_epics.py`` (v1.5 Step 2B); keep this map consistent with the
+    # research-side ``InstrumentSpec.point_value`` (the two are separate SoTs because the
+    # frozen Candidate/turbo_candidates.json contract carries no point value and IG's
+    # ``get_market_info`` does not expose one). Re-baseline before live.
+    point_values: dict[str, float] = field(default_factory=dict)
 
     # --- SL / TP ---
     stop_distance_points: float = 30.0     # v1, tune at profit
@@ -131,3 +141,16 @@ class ExecutionConfig:
     # --- order placement (Step 6 — PENDING fail-closed re-check) ---
     pending_recheck_attempts: int = 3      # v1, tune at profit
     pending_recheck_interval_s: float = 2.0  # v1, tune at profit
+
+    def point_value_for(self, epic: str | None) -> float:
+        """Account-currency value of one index point for ``epic`` (v1.5).
+
+        Returns ``point_values[epic]`` when present, else ``1.0`` (DAX cash CFD =
+        1 €/pt, and the safe default for any not-yet-confirmed instrument). ``None``
+        epic → ``1.0`` too. This is the P5 sizing authority for the point value; see
+        the ``point_values`` field note on why it is a separate SoT from the research
+        ``InstrumentSpec.point_value`` and that non-DAX values are provisional.
+        """
+        if epic is None:
+            return 1.0
+        return self.point_values.get(epic, 1.0)

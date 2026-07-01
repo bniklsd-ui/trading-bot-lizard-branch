@@ -89,6 +89,8 @@ def compute_size(
     market_info_env: Any,
     risk_pct: float,
     config: ExecutionConfig,
+    *,
+    epic: str | None = None,
 ) -> tuple[float, str | None]:
     """Gate 4: size the order, or reject (no trade) below ``min_deal_size``.
 
@@ -115,6 +117,12 @@ def compute_size(
     ask = float((price_env.data or {}).get("ask", 0) or 0)
     min_deal_size = float((market_info_env.data or {}).get("min_deal_size", 0) or 0)
 
+    # v1.5 (Issue C): per-epic point value (default 1.0 = DAX / any unmapped epic). The
+    # epic is resolved from the arg, falling back to the market_info envelope's echoed
+    # ``epic`` — so a caller that omits it (existing tests) still gets the 1.0 default.
+    epic_for_pv = epic if epic is not None else (market_info_env.data or {}).get("epic")
+    point_value = config.point_value_for(epic_for_pv)
+
     # Config risk_pct is a PERCENT (2.0 → 2.0%); the helper takes a fraction.
     size = _size_from_risk(
         available_balance=available,
@@ -122,7 +130,7 @@ def compute_size(
         stop_distance_points=config.stop_distance_points,
         price=ask,
         max_leverage=config.max_leverage,
-        point_value=1.0,
+        point_value=point_value,
     )
 
     if size < min_deal_size:
