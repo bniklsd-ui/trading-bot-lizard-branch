@@ -119,6 +119,13 @@ def test_opened_trade_allows_none_debate_confidence() -> None:
     assert _opened(debate_confidence=None).debate_confidence is None
 
 
+def test_opened_trade_provenance_defaults_autonomous() -> None:
+    # v1.5 (Step 4 A): the field is additive with a default so every existing construction
+    # (which omits it) stays valid; the executor seam sets "verification" only for seeds.
+    assert _opened().provenance == "autonomous"
+    assert _opened(provenance="verification").provenance == "verification"
+
+
 def test_opened_trade_initial_risk_matches_documented_formula() -> None:
     # The field only CARRIES the value; the formula is documented for the caller
     # (Step 10). Pin the relationship so the contract is unambiguous:

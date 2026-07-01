@@ -350,6 +350,14 @@ class Executor:
 # existing caller (and the DAX path) bit-identical.
 _POINT_VALUE = 1.0
 
+# v1.5 (Phase-8 hotfix Step 4 A, 2026-07-01): the prefix a **manual seed** candidate's
+# ``reasoning`` starts with (``scripts/seed_candidate.py`` writes "MANUAL SEED (not a real
+# research pick): …"). ``build_opened`` uses it to tag the trade's lesson provenance so the
+# P4 research prompt can exclude verification-trade lessons downstream. Intra-phase coupling
+# (the seed tool lives in this same phase); a real Phase-4 research pick never contains it
+# (see the P8 ``test_no_manual_seed_marker`` invariant), and a test here pins the derivation.
+_SEED_MARKER_PREFIX = "MANUAL SEED"
+
 
 def build_opened(
     candidate: dict[str, Any],
@@ -370,6 +378,12 @@ def build_opened(
     ``debate_confidence`` comes from the in-memory ``outcome`` (``None`` when no debate ran,
     verified-contract 1.3). ``account`` is the bootstrap-phase ``"demo"`` constant — the
     durable demo/live source is the wiring layer (Step 13), which knows the broker name.
+
+    ``provenance`` (v1.5 Phase-8 hotfix Step 4 A) is ``"verification"`` when the candidate is a
+    manual seed (its ``reasoning`` starts with ``_SEED_MARKER_PREFIX``) else ``"autonomous"`` —
+    a deterministic string check, no AI. It rides into ``trade_lessons.market_context_json`` at
+    close (via the recorder) so the research prompt can exclude verification-trade lessons. It
+    gates nothing (root rule 3).
     """
     from reward.models import OpenedTrade  # lazy: keep execution.* + stdlib at module scope
 
@@ -380,6 +394,12 @@ def build_opened(
         entry = data.get("bid") if data.get("bid") is not None else data.get("ask")
     intended_open_level = float(entry)
     initial_risk = abs(intended_open_level - plan.stop_level) * plan.size * point_value
+
+    # v1.5 (Phase-8 hotfix Step 4 A): tag lesson provenance so a later research prompt can
+    # drop verification-trade lessons. Deterministic string check — NO AI. A manual seed's
+    # ``reasoning`` starts with the seed marker; a real Phase-4 pick never does → "autonomous".
+    reasoning = candidate.get("reasoning") or ""
+    provenance = "verification" if reasoning.startswith(_SEED_MARKER_PREFIX) else "autonomous"
 
     return OpenedTrade(
         deal_reference=plan.deal_reference,
@@ -403,6 +423,7 @@ def build_opened(
         session_date=now.strftime("%Y-%m-%d"),
         open_ts=now.isoformat(),
         account="demo",  # bootstrap phase; wiring (Step 13) owns the durable demo/live tag
+        provenance=provenance,  # v1.5 (Step 4 A): "verification" for seeds, else "autonomous"
     )
 
 

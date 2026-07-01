@@ -349,6 +349,15 @@ class RewardSink:
         spread: float,
     ) -> None:
         """Run the best-effort Haiku ``reflect`` and persist the lesson if any (E/J)."""
+        # v1.5 (Phase-8 hotfix Step 4 A, 2026-07-01): stamp the trade's provenance into the
+        # lesson's market_context so the P4 research prompt can exclude verification-trade
+        # lessons (which describe the test harness, not a market decision). It rides inside
+        # the existing free-form ``market_context_json`` blob → **no schema change**. The tag
+        # comes from the stashed ``OpenedTrade.provenance`` (set at open by the executor seam
+        # from the candidate's seed marker). On a cold reconcile after a restart the stash is
+        # gone (``opened is None``) → ``"unknown"``: kept by the read-path tag clause, then
+        # caught by its hold-time/date fallbacks. Provenance is display/prompt-only — it never
+        # feeds the reward/score math below (root rule 3).
         market_context = {
             "epic": opened.epic if opened is not None else row.get("epic"),
             "direction": opened.direction if opened is not None else row.get("direction"),
@@ -357,6 +366,7 @@ class RewardSink:
             "r_multiple": reward.r_multiple,
             "win_loss": reward.win_loss,
             "session_date": opened.session_date if opened is not None else row.get("session_date"),
+            "provenance": opened.provenance if opened is not None else "unknown",
         }
         try:
             lesson = self.brain.reflect(closed, reward, market_context)

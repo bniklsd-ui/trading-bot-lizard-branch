@@ -123,6 +123,20 @@ class OpenedTrade:
         account: ``"demo"`` | ``"live"`` — the data-source tag (Decision H); needed
             so ``include_demo_in_edge`` can filter the edge metric. Persisted in the
             ``account`` column added by migration 002 (operator decision 2026-06-18).
+        provenance: ``"autonomous"`` | ``"verification"`` (v1.5 Phase-8 hotfix Step 4 A,
+            2026-07-01). **Why:** the P4 research prompt is fed recent ``trade_lessons``;
+            lessons distilled from **code-verification trades** (seeded, sub-minute forced
+            time-stops — see ``seed_candidate.py``) describe the test harness, not a market
+            decision, and pollute the single AI decision's input. The literal seed marker
+            ``"MANUAL SEED (not a real research pick)"`` is otherwise **never persisted**
+            (``build_opened`` stores only ``llm_confidence``; ``trade_outcomes`` has no
+            reasoning column) and a schema migration is out of scope for the hotfix — so the
+            executor seam derives this tag from the candidate ``reasoning`` and the recorder
+            writes it into the existing ``trade_lessons.market_context_json`` blob (no schema
+            change). The read-path filter (``db.get_recent_lessons_for_prompt``) then keeps
+            ``"verification"`` lessons out of the prompt. **Display/prompt-provenance only —
+            it gates nothing and never feeds the reward/score math** (root rule 3). Defaults
+            to ``"autonomous"`` so every existing construction stays valid (additive).
     """
 
     deal_reference: str
@@ -143,6 +157,9 @@ class OpenedTrade:
     session_date: str
     open_ts: str
     account: str  # "demo" | "live"
+    # v1.5 (Phase-8 hotfix Step 4 A): lesson-prompt provenance; default keeps existing
+    # constructions valid + must stay the trailing field (only trailing fields may default).
+    provenance: str = "autonomous"  # "autonomous" | "verification"
 
 
 # ---------------------------------------------------------------------------

@@ -515,12 +515,32 @@ def test_reward_sink_fires_both_callbacks_with_built_snapshots(
     assert opened.debate_confidence is None                 # no debate ran
     assert opened.score_at_open == 50.0                     # FakeDB default
     assert opened.account == "demo"
+    assert opened.provenance == "autonomous"                # candidate reasoning != seed marker
     assert opened.deal_reference.startswith("bot-")
 
     closed = sink.closed[0]
     assert closed.status == "CLOSED_BY_BROKER"
     assert closed.deal_id == DEAL_ID
     assert closed.deal_reference == opened.deal_reference   # links back to the open
+
+
+def test_reward_sink_open_payload_tags_seed_provenance(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """v1.5 (Step 4 A): a manual-seed candidate (``reasoning`` starts with the seed marker)
+    → ``opened.provenance == "verification"`` so its lesson is later kept out of the prompt.
+    A deterministic string check — no AI; the autonomous case is pinned by the test above."""
+    broker = _full_path_broker()
+    seed_reasoning = "MANUAL SEED (not a real research pick): injected to exercise the path"
+    state = FakeState(
+        fresh=True, candidates=[make_candidate(direction="BUY", reasoning=seed_reasoning)]
+    )
+    sink = _RecordingSink()
+    executor, _ = _build(broker, state, exec_state, reward_sink=sink)
+
+    executor.run()
+
+    assert sink.opened[0].provenance == "verification"
 
 
 def test_reward_sink_open_payload_reflects_debate_flip(

@@ -118,6 +118,36 @@ def test_market_context_handed_to_brain_carries_outcome(make_opened, make_closed
     assert market_context["direction"] == "BUY"
 
 
+def test_market_context_carries_provenance_from_opened(make_opened, make_closed):
+    """v1.5 (Step 4 A): the stashed OpenedTrade.provenance is written into the lesson's
+    market_context (→ market_context_json), so the research prompt can later exclude it."""
+    db = FakeDB()
+    brain = FakeBrain()
+    sink = _sink(db, brain=brain)
+    sink.on_trade_opened(make_opened(provenance="verification"))
+    sink.on_trade_closed(make_closed(status="TIME_STOP"))
+
+    _, _, market_context = brain.calls[-1]
+    assert market_context["provenance"] == "verification"
+    # and it lands in the persisted lesson row's context blob (FakeDB stores (trade_id, dict))
+    _, lesson_row = db.lessons[-1]
+    assert lesson_row["market_context_json"]["provenance"] == "verification"
+
+
+def test_market_context_provenance_unknown_on_cold_reconcile(make_opened):
+    """Cold reconcile after a restart (no stash, opened is None) → provenance 'unknown'
+    (kept by the read-path tag clause, then caught by its hold-time/date fallbacks)."""
+    db = FakeDB()
+    _sink(db).on_trade_opened(make_opened())  # opened by a now-gone sink instance
+
+    brain = FakeBrain()
+    closer = _sink(db, broker=FakeBroker([make_tx()]), brain=brain)
+    closer.reconcile_open_trades()
+
+    _, _, market_context = brain.calls[-1]
+    assert market_context["provenance"] == "unknown"
+
+
 def test_score_advances_current_score(make_opened, make_closed):
     db = FakeDB()
     sink = _sink(db)
