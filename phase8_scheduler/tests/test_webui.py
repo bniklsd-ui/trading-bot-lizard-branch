@@ -50,7 +50,7 @@ def _seed_db(db_path: str) -> None:
         );
         CREATE TABLE trade_lessons (
             id INTEGER PRIMARY KEY AUTOINCREMENT, trade_id INTEGER, lesson_text TEXT,
-            used_in_research INTEGER, extracted_at TEXT
+            used_in_research INTEGER, extracted_at TEXT, market_context_json TEXT
         );
         """
     )
@@ -71,8 +71,16 @@ def _seed_db(db_path: str) -> None:
         "(1,-2.0,-0.5,47.5,'LOSS',-41.16,-1.3,'2026-06-28T10:05:01Z')"
     )
     conn.execute(
+        "INSERT INTO trade_lessons "
+        "(trade_id, lesson_text, used_in_research, extracted_at, market_context_json) VALUES "
+        "(1,'Avoid shorting into a relief rally.',0,'2026-06-28T10:05:02Z',"
+        "'{\"provenance\": \"autonomous\"}')"
+    )
+    # v1.5 (Step 4 addendum): a pre-v1.5 lesson with no market_context_json at all — the
+    # provenance column must degrade to NULL / "untagged" in the API/UI, not error.
+    conn.execute(
         "INSERT INTO trade_lessons (trade_id, lesson_text, used_in_research, extracted_at) VALUES "
-        "(1,'Avoid shorting into a relief rally.',0,'2026-06-28T10:05:02Z')"
+        "(1,'Old lesson written before the provenance tag existed.',0,'2026-05-01T09:00:00Z')"
     )
     conn.commit()
     conn.close()
@@ -178,8 +186,19 @@ def test_confidence_shape(client) -> None:
 def test_lessons_returns_seeded_row(client) -> None:
     c, _cfg = client
     rows = c.get("/api/lessons").json()
-    assert len(rows) == 1
-    assert "relief rally" in rows[0]["lesson_text"]
+    assert len(rows) == 2
+    assert "relief rally" in rows[1]["lesson_text"]  # newest-first; older seeded row
+
+
+def test_lessons_expose_provenance(client) -> None:
+    """v1.5 (Step 4 addendum): /api/lessons surfaces provenance (from market_context_json)
+    so the dashboard can label verification-trade lessons instead of showing them unmarked;
+    a pre-v1.5 row with no market_context_json degrades to a NULL provenance, not an error."""
+    c, _cfg = client
+    rows = c.get("/api/lessons").json()
+    by_text = {r["lesson_text"]: r["provenance"] for r in rows}
+    assert by_text["Avoid shorting into a relief rally."] == "autonomous"
+    assert by_text["Old lesson written before the provenance tag existed."] is None
 
 
 def test_last_cycle_shape(client) -> None:

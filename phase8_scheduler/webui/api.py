@@ -202,10 +202,20 @@ def create_app(config: SchedulerConfig | None = None) -> FastAPI:
 
     @app.get("/api/lessons")
     def lessons() -> list[dict[str, Any]]:
-        """The most recent free-text lessons (``trade_lessons``), newest first."""
+        """The most recent free-text lessons (``trade_lessons``), newest first.
+
+        v1.5 (Phase-8 hotfix Step 4 addendum, 2026-07-01): also surfaces ``provenance``
+        (``json_extract`` of ``market_context_json.$.provenance`` — the tag Step 4 added so
+        the P4 prompt can exclude verification-trade lessons). The dashboard shows **every**
+        lesson (unfiltered — the DB stays the source of truth for the operator), but without
+        this the operator couldn't tell a code-verification-trade lesson from a real one.
+        ``NULL`` for lessons written before the tag existed (pre-v1.5) — the frontend labels
+        those "untagged" rather than silently presenting them as real.
+        """
         return _query(
             cfg.live_db_path,
-            "SELECT id, trade_id, lesson_text, used_in_research, extracted_at "
+            "SELECT id, trade_id, lesson_text, used_in_research, extracted_at, "
+            "json_extract(market_context_json, '$.provenance') AS provenance "
             "FROM trade_lessons ORDER BY id DESC LIMIT ?",
             (_DEFAULT_LIMIT,),
         )

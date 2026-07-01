@@ -377,6 +377,8 @@ body {
 }
 .lesson-ts { display: block; font-size: 10px; color: var(--dim); letter-spacing: 0.08em; margin-bottom: 5px; }
 .lesson-text { font-size: 13px; color: var(--text); line-height: 1.5; }
+/* v1.5 (Step 4 addendum): compact inline provenance badge next to each lesson's timestamp. */
+.lesson-provenance { padding: 2px 8px; font-size: 9px; vertical-align: middle; }
 
 .empty { color: var(--dim); font-style: normal; text-align: center; padding: 22px 8px; font-size: 12px; }
 

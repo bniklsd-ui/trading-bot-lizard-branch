@@ -386,6 +386,18 @@ fließen normal; Reward unverändert.
 >   `recent_lessons`), P5 153→**154** (build_opened Seed→verification/real→autonomous), P7 128→**131**
 >   (OpenedTrade-Default, recorder schreibt Tag, Cold→unknown). Regression unberührt: P1 52 · P3 72 ·
 >   P6 70 · P8 181. **Live-Wirkung (Prompt sieht keine Verifikations-Lessons) = Operator-Lauf Step 5.**
+>
+> **Addendum ✅ (2026-07-01, derselbe Tag — Nikinger-Frage vor Step 5): Provenance-Label im Webui.**
+> Der Nikinger bemerkte, dass die Lessons-Card im Dashboard weiterhin **alle** Lessons ohne
+> Kennzeichnung zeigt — **kein Bug** (Step 4 war bewusst auf den P4-Prompt begrenzt), aber eine echte
+> Lücke: der Operator konnte eine Verifikations-Lesson nicht von einer echten unterscheiden. Auf
+> Nikinger-Freigabe („nur ein UI-Label, direkt umsetzen, kein Opus-Plan nötig") sofort umgesetzt:
+> `webui/api.py` `/api/lessons` liest jetzt zusätzlich `json_extract(market_context_json,
+> '$.provenance')`; `app.js`/`style.css` zeigen ein kleines Badge je Lesson (`verification` amber-
+> akzentuiert, `autonomous`/`unknown`/fehlend = `"untagged"` gedämpft) — Liste bleibt **unfiltered**
+> (DB bleibt Source of Truth für den Operator), nur die Anzeige wird ehrlicher. **P8 181→182** (+1
+> Test, ein Bestandstest erweitert). Visuell gegen die echte `data/trading_bot.sqlite` verifiziert
+> (Scratch-Port 8011): alle 3 realen Lessons (pre-v1.5) zeigen korrekt `untagged`, kein Crash.
 
 ---
 

@@ -213,6 +213,47 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## UI-Erweiterung — 2026-07-01 (Lesson-Provenance-Label — Addendum zu Step 4 A)
+
+> **Auslöser:** der Nikinger, kurz vor dem Start von Step 5, bemerkte, dass die Lessons-Card im
+> Dashboard weiterhin **alle** Lessons ohne Kennzeichnung zeigt — Frage: Bug oder echte Lücke?
+> **Befund: kein Bug.** `webui/api.py`s `/api/lessons` liest per **eigenem** SQL direkt gegen die
+> `mode=ro`-DB (nicht über `persistence.Database`), Step 4 hat nur den P4-Prompt-Pfad
+> (`context_builder` → `get_recent_lessons_for_prompt`) berührt — das Webui war **nie** im Scope. Die
+> Lücke ist real: eine Verifikations-Lesson ist im Dashboard von einer echten nicht unterscheidbar.
+> **Nikinger-Freigabe:** „nur ein UI-Label, direkt umsetzen, kein Opus-Plan nötig."
+
+### Completed (additiv, UI-only, DB bleibt read-only + **unfiltered**)
+- **`webui/api.py` `/api/lessons`:** SELECT ergänzt um `json_extract(market_context_json,
+  '$.provenance') AS provenance`. Die Liste bleibt **komplett** (DB = Source of Truth für den
+  Operator) — nur eine zusätzliche Spalte, kein Filter.
+- **`webui/static/app.js` `renderLessons`:** neuer Helper `lessonProvenanceTag` — rendert ein
+  kompaktes Pill-Badge neben dem Timestamp jeder Lesson: `verification` amber-akzentuiert
+  (`.tag--accent`, wiederverwendet vom Confidence-Tag), `autonomous`/`unknown` gedämpft (Default
+  `.tag`), fehlender Tag (pre-v1.5-Lessons, `market_context_json` ohne den Key oder ganz `NULL`) →
+  **ehrlich als `"untagged"` gelabelt**, nicht stillschweigend als echt dargestellt.
+- **`webui/static/style.css`:** eine kompakte `.lesson-provenance`-Modifier-Regel (kleinere
+  Schriftgröße/Padding als der Standard-`.tag`, damit das Badge neben dem 10px-Timestamp nicht
+  dominiert). Kein neues Farbschema — reuse der bestehenden `--amber`/`--dim`-Tokens.
+
+### Verifiziert (gemockt + visuell — kein Netz/LLM/Broker nötig fürs UI)
+- `pytest phase8_scheduler/tests -q` → **182 passed** (181 + 1: `test_lessons_expose_provenance`,
+  plus die bestehende `test_lessons_returns_seeded_row` auf die neue 2-Zeilen-Fixture angepasst —
+  ein getaggtes `autonomous` + ein pre-v1.5-`NULL`-Row, beide korrekt zurückgegeben, kein Crash).
+  `node --check app.js` + `py_compile api.py` clean.
+- **Visuell** gegen die **echte** `data/trading_bot.sqlite` (Scratch-Port 8011, Operator-`:8000`
+  unberührt, per `agent-browser` gescreenshottet): alle 3 realen Lessons (alle pre-v1.5, kein Trade
+  ist bisher mit dem neuen Code gelaufen) zeigen korrekt das gedämpfte `untagged`-Badge, kein Crash,
+  `app.js`/`style.css` laden 200. Sobald der Step-5-Live-Lauf echte Trades erzeugt, werden neue
+  Lessons automatisch `autonomous`/`verification` zeigen.
+
+### Next
+Zurück zu **Step 5** (Operator-Live-Läufe) — unverändert, s. Block unten. Diese Änderung ist rein
+additiv und blockt nichts.
+- **Commit:** vorgeschlagen, wartet auf Nikinger-Trigger.
+
+---
+
 ## Session stopped — 2026-07-01 (v1.5-Hotfix: **Step 4 (A — Lesson-Provenance) ABGESCHLOSSEN** — präziser Provenance-Tag + Read-Path-Filter, kein Schema-Touch)
 
 > **Auslöser:** der Nikinger startete Step 4 (A — Lesson-Provenance), den letzten Code-Step vor den

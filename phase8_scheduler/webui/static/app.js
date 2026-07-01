@@ -384,11 +384,22 @@ function renderLessons(rows) {
   list.innerHTML = rows
     .map(
       (l) => `<li>
-        <span class="lesson-ts">${fmtTs(l.extracted_at)}</span>
+        <span class="lesson-ts">${fmtTs(l.extracted_at)}${lessonProvenanceTag(l.provenance)}</span>
         <span class="lesson-text">${escapeHtml(l.lesson_text || "")}</span>
       </li>`
     )
     .join("");
+}
+
+// v1.5 (Phase-8 hotfix Step 4 addendum): label each lesson's provenance so a
+// code-verification-trade lesson is never mistaken for a real autonomous-trade insight.
+// The list itself stays unfiltered (DB = source of truth for the operator); this is display
+// only. "verification" gets the accent (amber) tag; "autonomous"/"unknown"/pre-tag "untagged"
+// stay muted — informative, not alarming.
+function lessonProvenanceTag(provenance) {
+  const label = provenance || "untagged";
+  const cls = label === "verification" ? "tag tag--accent" : "tag";
+  return ` <span class="${cls} lesson-provenance">${escapeHtml(label)}</span>`;
 }
 
 function escapeHtml(s) {
