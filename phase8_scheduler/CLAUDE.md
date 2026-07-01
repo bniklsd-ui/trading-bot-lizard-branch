@@ -213,6 +213,80 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-01 (v1.5-Hotfix: Step 1 — `bot_score`-Verteilungs-Diagnostic, read-only)
+
+> **Auslöser:** der Nikinger bat um den nächsten Schritt nach dem Housekeeping. Gemäß Plan
+> (`docs/concepts/phase8_v1.5_hotfix_plan.md` §Step 1) = „erst messen": ein read-only Script,
+> das die `bot_score`-Verteilung (`reward_pts.score_after`) aus der Live-DB berichtet, damit die
+> Floor-Werte in Step 3 (B) datengetrieben statt geraten sind. **Kein Trading-Code berührt.**
+
+### Completed
+- **`scripts/diag_score_distribution.py`** (NEU, **repo-root, phasenlos** — der Hotfix-Plan
+  listet diese Datei explizit mit „—" in der Phase-Spalte des Cross-Phase-Edit-Registers).
+  Stdlib-only (`sqlite3`/`statistics`/`argparse`/`json`), **keine** Cross-Phase-Imports.
+  DB-Zugriff spiegelt `phase8_scheduler/webui/api.py:ro_connect` (`file:...?mode=ro`-URI,
+  ein Write scheitert **strukturell**, nicht nur diszipliniert) — dupliziert statt importiert
+  (Begründung im Docstring: `webui`/`scripts` sind nicht Teil des installierten Pakets;
+  `persistence.Database` öffnet RW + hat keinen Full-Series-Getter). Query: `reward_pts LEFT
+  JOIN trade_outcomes ON trade_id`, `ORDER BY id ASC` (chronologisch, keine LIMIT). Reine
+  `compute_distribution(scores)`-Funktion (kein I/O) liefert min/max/median/mean/p25/p75
+  (`statistics.quantiles(method="inclusive")`, bleibt garantiert in `[min,max]`) + Count/Anteil
+  `<50`/`<35` (strikt, deckt sich mit dem echten Clamp in `candidate_filter.py`) +
+  `current_score` (letztes Element in ID-Reihenfolge — **nicht** sortiert, entspricht exakt
+  `get_current_score()`s Semantik). Drei unterschiedene „insufficient"-Gründe (`database not
+  found` / `reward_pts table missing` / `no reward_pts rows`) münden alle im selben stabilen
+  JSON-Schema (nie ein Sonderformat für den Fehlerfall). `small_sample`-Flag (n<10, echot
+  `reward.confidence.n_min` informell, **kein** Import) zeigt trotzdem alle Stats — unterdrückt
+  nichts. Output-Disziplin: Mensch-lesbare Narrative → stderr, JSON → stdout (immer, kein Flag),
+  spiegelt `phase7_reward/scripts/inspect_history.py`. Exit 0 in jedem erwarteten Fall
+  (Report-Tool, kein Pass/Fail-Test); ein echter unerwarteter Fehler wird **nicht** geschluckt.
+- **`tests/test_diag_score_distribution.py`** (NEU, **repo-root `tests/`** — bewusst **kein**
+  neues `scripts/__init__.py`, um die bestehende `scripts.wiring`-Namenskollision über P4–P8
+  nicht zu riskieren; Modul-Load via `importlib.util.spec_from_file_location`). **20 Tests**:
+  12 reine `compute_distribution`-Fälle (leer/Einzelpunkt/**chronologische Reihenfolge** ≠
+  sortiert/Boundary exakt-50/exakt-35 ausgeschlossen/Median gerade+ungerade/Ties/p25-p75
+  innerhalb min-max/small-sample-Grenze/negative Robustheit) + 8 `tmp_path`-SQLite-
+  Integrationstests über `main()` (befüllte DB/leere Tabelle/fehlende DB-Datei/fehlende
+  Tabelle/**Read-only-Beweis** — ein Write auf der `_ro_connect`-Connection wirft/`NULL`-
+  Account→„unknown"/stdout ist valides JSON + stderr trägt die Narrative).
+
+### Design-Entscheidungen (aus einer Plan-Agent-Review verifiziert, nicht selbst geraten)
+- `statistics.median()` statt `quantiles()[1]` (unterschiedliche Interpolation); `quantiles(...,
+  method="inclusive")` statt Default `"exclusive"` (letzteres kann außerhalb `[min,max]`
+  extrapolieren — für einen Operator verwirrend).
+- **LEFT JOIN, nicht INNER** — die Score-Verteilung zählt jede `reward_pts`-Zeile, auch falls
+  ein Join-Partner je fehlen sollte; `account` degradiert dann zu `NULL`→„unknown" statt eine
+  Score-Zeile stillschweigend zu droppen.
+- **`trade_outcomes.account` ist NULL für Zeilen vor Migration 002** (kein Backfill) → der
+  „unknown"-Bucket ist kein Edge-Case, sondern erwartetes Verhalten auf der echten DB.
+
+### Verifiziert (gemockt/lokal — keine echte DB berührt, Live-Lauf = Operator)
+- `pytest tests -q` → **20 passed**. `python scripts/diag_score_distribution.py --help` exit 0.
+- Manueller Smoke-Test gegen eine Scratch-DB (nicht `data/trading_bot.sqlite`): befüllter Pfad
+  (4 Zeilen, gemischte Accounts) und der `database not found`-Pfad beide mit korrekter stderr-
+  Narrative + stabilem stdout-JSON bestätigt.
+- **Regression unberührt** (kein Trading-Code angefasst): `pytest phase8_scheduler/tests -q` →
+  weiterhin **181 passed**.
+
+### Next
+- **Operator:** `python scripts/diag_score_distribution.py` gegen die echte
+  `data/trading_bot.sqlite` laufen lassen und die Ausgabe (v. a. `n`, `current_score`,
+  `below_50`/`below_35`-Anteile, `median`/`p25`) zurückmelden — das gated die Floor-Werte in
+  **Step 3 (B: Clamp/Floor entkoppeln + relaxen)**. Bei sehr kleinem `n` (aktuell erwartet, nur
+  eine Handvoll früherer Demo-Trades) ist die Verteilung nur ein grober Hinweis, kein hartes
+  Signal — `small_sample: true` macht das im Output explizit.
+- **Danach Step 2 (C — Universum als `InstrumentSpec`-Liste, größter Hebel)**, dann Step 3 (B)
+  mit den jetzt gemessenen Werten, dann Step 4 (A — Lesson-Provenance). Plan:
+  `docs/concepts/phase8_v1.5_hotfix_plan.md`.
+- **Commit:** vorgeschlagen, wartet auf Trigger durch den Nikinger (Working Agreement
+  unverändert — Claude committet nicht automatisch).
+
+### Offene Punkte / blockers
+- Keine. Das Script ist bewusst minimal (nur `--db-path`) — kein `--json`-Flag nötig (JSON ist
+  immer auf stdout), kein Limit (volle Historie gewollt, anders als die Webui-Sparkline-Cap 200).
+
+---
+
 ## Session stopped — 2026-06-30 (v1.5-Hotfix: initiales Housekeeping — Step 0 + Step 0b, KEINE Trading-Code-Änderung)
 
 > **Auslöser:** der Nikinger startet die v1.5-Hotfix-Implementierung (`docs/concepts/
