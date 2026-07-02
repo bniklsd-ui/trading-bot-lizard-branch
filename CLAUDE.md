@@ -100,7 +100,16 @@ LLM-Abstain-Begründung speiste ("three consecutive losses"). Fix: `trade_outcom
 gestamped vom P7-Recorder; ein neues Operator-Skript `scripts/archive_verification_trades.py`
 archiviert die drei betroffenen Alt-Trades aus der Live-DB. Detail: `phase8_scheduler/CLAUDE.md` →
 `## Session stopped — 2026-07-02 (v1.6-Hotfix: Cause A part 2)` +
-`docs/concepts/phase8_v1.6_hotfix_plan.md` §6.
+`docs/concepts/phase8_v1.6_hotfix_plan.md` §6. **🎉 Update (2026-07-02, noch am selben Tag): der
+erste echte autonome Trade.** DAX BUY (`deal_id=DIAAAAXW7U4AWAP`), echter P4-Pick → echte
+P6-Debatte → TRADE-Entscheidung, ACCEPTED 16:58:32, vom Broker per SL/TP geschlossen 17:07:21 —
+der harte, bisher unbewiesene Kern der Phase-8-Mission. Direkt danach fiel eine kleine,
+webui-only Anzeige-Inkonsistenz auf (Trade-Zähler + Realized-P&L-Karte lagen hinter der DB
+zurück — kein Sicherheitsproblem, DB/Broker/Loss-Breaker bestätigt korrekt; die
+`provenance`-Änderung von oben wurde als Ursache konklusiv ausgeschlossen). Kleiner Folge-Plan
+**v1.7** geschrieben (das „Was", noch kein Code): `docs/concepts/phase8_v1.7_hotfix_plan.md`;
+Detail: `phase8_scheduler/CLAUDE.md` → `## Session stopped — 2026-07-02 (🎉 erster autonomer
+Trade + v1.7-Webui-Diagnose)`.
 (gestartet 2026-06-27). **Mission (zuerst lesen):** Phase 8 heißt „Scheduler", aber das Ziel ist
 **autonome, unbeaufsichtigte Erzeugung echter Demo-Trades** — alles danach (Confidence aus
 `INSUFFICIENT`, P9-Instinct-Promotion) ist auf reale Outcomes gegatet. Der harte Pfad ist die

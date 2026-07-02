@@ -214,6 +214,58 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-02 (🎉 erster autonomer Trade + v1.7-Webui-Diagnose)
+
+> **Der historische Moment:** heute (2026-07-02) hat der Scheduler zum ersten Mal überhaupt einen
+> **echten, autonom generierten, net-new Trade** platziert — der harte Kern der Phase-8-Mission.
+> **DAX BUY**, `deal_id=DIAAAAXW7U4AWAP`, size 19.5, `open_level=25617.0`. Entstanden aus einem
+> echten P4-Research-Pick (conf 62) → echter P6-Bull/Bear/Judge-Debatte → Entscheidung **TRADE**
+> (nicht ABSTAIN, wie fast jeden Zyklus zuvor). Order ACCEPTED 16:58:32; vom Broker per SL/TP
+> geschlossen 17:07:21. P&L-Auflösung folgt dem aus Phase 7 bekannten IG-Settlement-Lag-Muster
+> (Reconciler-Retry läuft periodisch weiter, kein neuer Bug).
+
+### Auslöser für die v1.7-Diagnose
+Kurz nach dem Trade meldete Nikinger die Webui als "kaputt": Trade-Zähler + Realized-P&L-Karte
+zeigten falsche/veraltete Werte, Score-/Confidence-/Lessons-Karten leer. Zwei parallele
+Untersuchungen (read-only, Code + Live-DB + Live-Log) fanden eine präzise, kleine, webui-only
+Ursache — **kein** Zusammenhang mit dem am selben Tag gemergten `provenance`-Fix (konklusiv
+ausgeschlossen: kein Code-Pfad im Repo liest `trade_outcomes` positional), **kein**
+Sicherheitsproblem (DB/Broker/Loss-Breaker bestätigt korrekt + unberührt).
+
+### Befund (Details: `docs/concepts/phase8_v1.7_hotfix_plan.md`)
+`scheduler/state.py` dokumentiert bereits selbst (Design Point 3), dass `realized_pnl_today` ein
+bewusster *best-effort*-Snapshot ist, **nicht** die Quelle der Wahrheit — der Loss-Breaker liest
+deshalb bereits direkt aus der DB (`scripts/wiring.py:301-308`). Die Webui hat diese
+Unterscheidung nie bekommen: `/api/status` reicht den lagging State-Snapshot durch, während
+`/api/trades` auf demselben Dashboard bereits korrekt aus der DB liest — daraus die sichtbare
+Inkonsistenz, zum ersten Mal überhaupt, weil es der erste echte Trade lang genug war (~9 min
+IG-Lag), um die Lücke sichtbar zu machen. **Nikinger bestätigte live:** der Trade-Zähler
+korrigierte sich selbst (0/5 → 1/5), sobald der Zyklus durchlief — "einige Elemente sind einfach
+extrem verzögert". `realized_pnl_today` bleibt dagegen strukturell falsch für jeden
+`CLOSED_BY_BROKER`-Trade (nicht selbstheilend) — das ist der eigentliche Fix-Punkt. Die leeren
+Score-/Confidence-/Lessons-Karten sind ein separater, korrekter Nicht-Bug (Folge des
+`archive_verification_trades.py --commit`-Laufs von heute, der `reward_pts`/`trade_lessons` auf
+null kaskadiert hat).
+
+### Next
+- **v1.7-Plan geschrieben** (das „Was"): `docs/concepts/phase8_v1.7_hotfix_plan.md` — kleiner,
+  webui-only Fix (`/api/status` DB-gespeist statt Snapshot-gespeist, mirror `/api/trades` +
+  `wiring.py`s bereits bewiesenes Query-Muster). Eine spätere „Wie"-Session baut daraus den
+  Ausführungsplan + implementiert. **Kein Code in dieser Session** — Nikinger-Anweisung.
+- Offene Nikinger-Entscheidung (Plan §3.3): zählt der heutige Trade als v1.6-Step-4s „5a
+  Varietäts-Run"-Beweis, oder braucht 5a noch einen saubereren/längeren Lauf?
+- Die laufende v1.6-Instrument-Verifikation/-Live-Test-Kette läuft unverändert weiter,
+  unabhängig vom v1.7-Fix.
+
+### Gotchas (für den Re-Entry)
+- Branch **`v1.6`** (v1.7 noch nicht auf eigenem Branch — Nikinger-Entscheidung beim Start der
+  „Wie"-Session).
+- **AI-Grenze:** v1.7 ist reine Webui-/Display-Logik, kein LLM-Touch geplant.
+- Provenance-Hypothese für die Webui-Inkonsistenz ist **konklusiv ausgeschlossen** — eine
+  spätere Session sollte sie nicht erneut verfolgen (s. Plan §1).
+
+---
+
 ## Session stopped — 2026-07-02 (v1.6-Hotfix: Cause A part 2 — the `recent_trades` prompt-channel leak)
 
 > **Auslöser:** während des laufenden v1.6-Live-Tests (Step-2-Harness gelaufen, Daemon-Variety-
