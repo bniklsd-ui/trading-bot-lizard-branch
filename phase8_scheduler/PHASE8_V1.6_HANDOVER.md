@@ -12,6 +12,12 @@
 > yet**, so the exact root cause can't be pinned from the current raw yfinance stderr. v1.6
 > should treat "add real logging first" as step zero.
 
+> **⟳ Update 2026-07-02 (Claude Code):** der **Initial-Plan (das „Was") existiert jetzt**:
+> `docs/concepts/phase8_v1.6_hotfix_plan.md` — bewusst in Claude Code statt im Web-Chat
+> erstellt (Begründung dort, §0a). Dieses Handover bleibt das Diagnose-Dokument; der Plan
+> verfeinert §2a bereits (Daily-Fetches funktionieren, nur Intraday-5m failt → H1). Nächster
+> Schritt: eine „Wie"-Session baut daraus den Ausführungsplan.
+
 ---
 
 ## 0. TL;DR

@@ -213,6 +213,93 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-02 (v1.6-Kickoff: Initial-Plan „das Was" geschrieben + Step 1 (Diagnose) live gelaufen — docs-only, KEIN Code)
+
+> **Auslöser:** der Nikinger startete v1.6 mit einem Sonderauftrag: den **initialen v1.6-Plan
+> (das „Was")** erstellen — zukunftssicher Richtung **v3 (semi-automatisches Research)** — und in
+> eine physische Plan-Datei schreiben, inkl. Dokumentation, **warum der Plan in Claude Code statt
+> im Web-Chat** entstand (Konventions-Abweichung, bewusst). Zwei-Stufen-Modell: diese Session =
+> „Was"; eine spätere Claude-Code-Session = „Wie" (Ausführungsplan); erst danach Code. Direkt im
+> Anschluss lief der Nikinger **Step 1 (Diagnose)** selbst gegen echtes yfinance/IG —
+> Output-Datei geliefert, hier ausgewertet + in den Plan eingearbeitet.
+> **Kein Trading-/Scheduler-Code berührt** (docs + Memory only).
+
+### Ursprünglicher Kern-Befund (Code = Wahrheit — verfeinert das v1.6-Handover §2a)
+- Die Fehler-Signatur (`period=1d`, `got 0, want >= 4`) matcht die **Intraday-5m-Fetches**
+  (`fetcher.py:352/401/450`, alle `period="1d", interval="5m"`); das Operator-Log
+  `intraday price unavailable for ^IBEX; using last daily close` (`fetcher.py:453`) beweist
+  zugleich: die **Daily-Fetches funktionierten**. → Arbeitshypothese **H1**: Yahoo liefert für
+  `^FCHI`/`^IBEX` Daily-, aber **keine 5m-Intraday-Daten**; der Brain-Context ist vermutlich
+  **teil-degradiert** (drift/momentum `None`, Daily-Signale intakt), nicht komplett `None` —
+  genau das kann heute niemand sehen (Observability-Gap → bestätigt „Step 0 = Logging zuerst").
+
+### ⟳ Step-1-Ergebnis (Operator-Lauf, `scripts/2026_07_02-v1.6-step1-diagnosis.md`) — dreht die Diagnose
+- **H1 widerlegt:** `^FCHI` UND `^IBEX` lieferten sowohl `period=5d,interval=1d` (5 rows) als
+  auch `period=1d,interval=5m` (**19 rows**) — identisch zur `^GDAXI`-Kontrolle. Kein
+  Daily-vs-Intraday-Unterschied. **H2 hinfällig** (weitere Intervall-Varianten liefen sauber
+  durch). Der volle P3-`smoke_test.py`-Lauf war für **beide** Epics grün (drift/momentum/bars/
+  history/brain_context populiert; nur `volume` degradiert — der **erwartete** C3-Pfad ohne
+  registrierten Proxy, kein Bug).
+- **H4 gestützt:** dieselben Fetches, die im Live-Lauf `possibly delisted` warfen, liefen jetzt
+  fehlerfrei — Zwei-Zeitpunkte-Kontrast **ist** der Intermittenz-Beweis, kein zweiter
+  Wiederholungslauf nötig (optionaler Spot-Check als Carry vermerkt).
+- **★ Neuer, bisher undokumentierter Befund: yfinance-Versions-Pin-Drift.** Installiert
+  `yfinance==1.4.1`, aber `phase3_external_data/requirements.txt:6` pinnt `>=0.2.65,<0.3` —
+  eine Major-Version-Drift außerhalb des dokumentierten Pins; plausibelster Root-Cause-
+  Kandidat für die Intermittenz (yfinance 0.2.x→1.x hatte größere interne Rewrites/API-
+  Änderungen). Muss in der „Wie"-Session verifiziert werden.
+- **Auswirkung auf Step 3:** die binäre Fix-vs-Drop-Regel im Plan passt nicht mehr sauber —
+  eine **dritte Option „Tolerieren"** (Versions-Pin klären + bestehende Retry/Backoff-Logik
+  gegen dieses Fehlerbild härten, Instrumente bleiben im Universum) ist jetzt die plausiblere
+  erste Wahl vor Fix/Drop. Im Plan §1-Addendum + §3 + §4-Frage-6 nachgeführt.
+
+### Completed (docs-only)
+- **`docs/concepts/phase8_v1.6_hotfix_plan.md`** (NEU — die physische Plan-Datei, v1.5-Format):
+  §0a Warum-Claude-Code-statt-Web (3 Gründe: Root-Cause nur per Code-Lektüre eingrenzbar;
+  v1.5-Anker-Drift; v3-Naht `InstrumentSpec.source="research_promoted"` muss verifiziert statt
+  erinnert werden) · §0b Leitplanken (carried) · §1 Befund-Update + Hypothesen H1–H4 · §2 die
+  **v3-Linse** (Fix = „validate"-Hälfte des validate→promote-Pfads + permanente per-Epic-Daten-
+  Health-Observability, kein Ticker-Patch, keine AI) · §3 Steps: 0 Observability → 1 Diagnose
+  (Operator) → 2 **Instrument-Verification-Harness** (konsolidiert `resolve_epics.py` +
+  P3-`smoke_test.py` zu EINEM wiederholbaren Verdikt; der künftige v3-Promotion-Gate) → 3 Fix
+  oder Drop (Entscheidungsregel: verifizierter Fix > ehrlicher Drop; „Universum-Ehrlichkeit
+  schlägt Instrumenten-Zahl") → 4 Live-Beweis (carried 5a/5b) → 5 Doku-Flip + point_value-Carry ·
+  §4 offene Fragen für die „Wie"-Session · §5 antizipiertes Cross-Phase-Register.
+- **Pointer:** dated Note im `PHASE8_V1.6_HANDOVER.md`-Kopf (Plan existiert; Handover bleibt
+  Diagnose-Dokument); root-`CLAUDE.md` „Active phase" um den Plan-Link ergänzt; Memory
+  aktualisiert.
+- **Step-1-Ergebnis eingearbeitet:** `docs/concepts/phase8_v1.6_hotfix_plan.md` §1 (dated
+  Addendum: H1 widerlegt, H2 hinfällig, H4 gestützt, Versions-Drift-Befund), §3 (Fix-vs-Drop
+  → Fix-Tolerieren-Drop nachgeführt, „Tolerieren" als neue Präferenz-1), §4 (neue Frage 6:
+  Versions-Pin-Klärung). Roh-Output des Operator-Laufs liegt in
+  `scripts/2026_07_02-v1.6-step1-diagnosis.md`.
+
+### Verifiziert
+- **Kein Code berührt** — `git status` zeigt ausschließlich `.md`-Dateien (+ die neue
+  Operator-Output-Datei) → Regression per Definition unberührt (Baseline bleibt P1 52 ·
+  P2 67 · P3 72 · P4 122 · P5 154 · P6 70 · P7 131 · P8 182; kein Test-Lauf nötig/gelaufen).
+  Alle im Plan zitierten file:line-Anker gegen den echten Baum verifiziert
+  (`fetcher.py:352/401/450/453`, `models.py:294/304/369`, `research_tick.py:84-89`,
+  `context_builder.py:141`); yfinance-Versions-Drift bestätigt (`pip show yfinance` → `1.4.1`
+  vs. `phase3_external_data/requirements.txt:6` → `>=0.2.65,<0.3`).
+
+### Next (frische Session)
+1. **Die „Wie"-Session:** aus `docs/concepts/phase8_v1.6_hotfix_plan.md` den file-für-file-
+   Ausführungsplan bauen — jetzt mit dem Step-1-Ergebnis als Startpunkt (Versions-Pin-Frage
+   §4.6 zuerst klären, dann „Tolerieren"-vs-Fix/Drop entscheiden), plus die übrigen offenen
+   Fragen §4 mit dem Nikinger locken (Log-Format/-Ort, Abstain-Taxonomie, Harness-Verortung).
+2. **Optional (Operator, billig, nicht blockierend):** ein zweiter, zeitversetzter H1-Spot-
+   Check (Carry-Vermerk in §3), falls die „Wie"-Session zusätzliche Intermittenz-Evidenz will.
+3. Danach Implementierung in Plan-Reihenfolge (Step 0 Observability zuerst).
+- **Branch:** `v1.6` (neu, von `main`). **Commit:** dieser Step ist committet (Nikinger-
+  getriggert); „Commit ⇒ Note-Update" gilt im selben Commit.
+
+### Offene Punkte / blockers
+- Keine technischen. Die §4-Fragen des Plans sind bewusst offen (gehören in die „Wie"-Session,
+  nicht hierher entschieden).
+
+---
+
 ## Session stopped — 2026-07-02 (v1.5 nach `main` gemergt + ehrlich geflaggt; erster Live-Lauf → yFinance-Blocker; v1.6-Handover geschrieben)
 
 > **Auslöser:** der Nikinger hat den v1.5-Daemon **live** laufen lassen — er produziert

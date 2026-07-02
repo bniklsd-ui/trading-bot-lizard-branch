@@ -89,7 +89,9 @@ Daily-Close, **kein VETO betroffen** — Momentum-VETO nutzt IG-Echtzeit-Bars, *
 v1.5-Provenance-Code). Der **net-new autonome open→close** bleibt unbewiesen; es fehlt zudem **echtes
 Logging**. **Nächster Track = v1.6** (erst Observability, dann `^FCHI`/`^IBEX` verifizieren/fixen oder
 droppen, dann der Live-Beweis), Handover: `phase8_scheduler/PHASE8_V1.6_HANDOVER.md` (v1.5-Kontext:
-`PHASE8_V1.5_HOTFIX_HANDOVER.md`).
+`PHASE8_V1.5_HOTFIX_HANDOVER.md`). **Initial-Plan (das „Was", 2026-07-02, bewusst in Claude Code
+statt Web-Chat erstellt — Begründung dort §0a):** `docs/concepts/phase8_v1.6_hotfix_plan.md`; die
+„Wie"-Session baut daraus den Ausführungsplan.
 (gestartet 2026-06-27). **Mission (zuerst lesen):** Phase 8 heißt „Scheduler", aber das Ziel ist
 **autonome, unbeaufsichtigte Erzeugung echter Demo-Trades** — alles danach (Confidence aus
 `INSUFFICIENT`, P9-Instinct-Promotion) ist auf reale Outcomes gegatet. Der harte Pfad ist die
