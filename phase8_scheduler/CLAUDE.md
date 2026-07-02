@@ -85,7 +85,8 @@ v1.5-Hotfix** (`PHASE8_V1.5_HOTFIX_HANDOVER.md`: der Bot abstained fast immer �
 | `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ✅ (Modul 6, 18 Tests) |
 | `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ✅ (9 Tests) |
 | `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ✅ (Modul 7, 13 Tests) |
-| `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ✅ (Modul 8, 10 Tests) |
+| `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ✅ (Modul 8, 14 Tests) |
+| `scheduler/observability.py` | v1.6 Step 0 — per-Zyklus JSONL-Diagnose-Log (`record_cycle`/`iter_records`), Sicherheitsnetz für Rückfälle | ✅ (v1.6, 9 Tests) |
 | `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ✅ (7 Tests) |
 | `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown + `request_stop()` | ✅ (Modul 10, 18 Tests) |
 | `scheduler/run.py` | `python -m scheduler.run` Entry (in-package, lazy `scripts.wiring`, SIGTERM/SIGINT → `request_stop`) | ✅ (Modul 11, 6 Tests) |
@@ -210,6 +211,109 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-07-02 (v1.6-Hotfix: „Wie"-Session — Step 3a (Tolerieren) + Step 0 (Observability) + Step 2 (Verification-Harness) implementiert)
+
+> **Auslöser:** die „Wie"-Session, die aus dem „Was"-Plan (`docs/concepts/phase8_v1.6_hotfix_plan.md`)
+> den file-für-file-Ausführungsplan baute (Plan-Mode, `AskUserQuestion` für die vier offenen §4-
+> Scope-Fragen, Nikinger-Freigabe), dann direkt implementiert. **Kein Live-/Netz-Lauf diese Session**
+> (Operator-Job) — alles gemockt/offline.
+
+### Vier Nikinger-Entscheidungen (via AskUserQuestion, vor der Implementierung gelockt)
+1. **Step 3 = Tolerieren** (nicht Drop/Fix) — `^FCHI`/`^IBEX` bleiben unverändert im Universum, nur
+   der `requirements.txt`-Pin wird korrigiert. **Bedingung:** von „sophisticated logging" begleitet,
+   um bei einer Wiederholung die echte Ursache zu finden — Step 0 wurde dadurch vom Nice-to-have zum
+   Sicherheitsnetz.
+2. **Step 0 = Lean + Error-Detail** — nicht nur „welches Feld degradiert", sondern auch „warum"
+   (das tatsächliche Fetch-Exception-Text), via einer additiven P3-Feld-Ergänzung.
+3. **Step 2 (Harness) = jetzt bauen**, nicht auf v3 verschieben.
+4. **Reihenfolge:** die Nummerierung 0→1→2→3→4→5 im Plan-Dokument bleibt für Kontinuität zum „Was",
+   aber die **tatsächliche Baureihenfolge** wich bewusst ab (dokumentiert im Plan-Dokument selbst,
+   §„Ausführungsreihenfolge-Notiz") — Step 3a zuerst (billig, entkoppelt von Step 0), dann Step 0,
+   dann Step 2, dann der Live-Beweis (Operator) und der Doku-Flip.
+
+### Completed (alle additiv, gemockt/offline verifiziert)
+- **Step 3a — Tolerieren:** `phase3_external_data/requirements.txt` von `yfinance>=0.2.65,<0.3`
+  (stale) auf `yfinance>=1.4.0,<1.5` (die tatsächlich installierte/getestete Version) re-gepinnt —
+  eine **separate Hygiene-Korrektur**, **nicht** der Fix für den Live-Ausfall (der war intermittente
+  Yahoo-Flakiness, H4). **Korrektur einer vorherigen Theorie:** die „Versions-Pin-Drift"-Hypothese
+  (installiert `1.4.1` vs. damals gepinnt `<0.3`) ist **widerlegt** — sowohl der fehlgeschlagene
+  Live-Lauf als auch der erfolgreiche Diagnose-Lauf liefen gegen dieselbe `1.4.1`. Kein
+  `ticker_map.py`/`EXTENDED_UNIVERSE`-Code-Touch. Dated Notes in `phase3_external_data/CLAUDE.md` +
+  `docs/concepts/phase8_v1.6_hotfix_plan.md` (Step 3 auf ✅ Tolerieren geflippt).
+- **Step 0 — Observability (P3 + P4 + P8, additiv durchgängig):**
+  - **P3** (`external_data/models.py`/`fetcher.py`): `BrainContext.field_errors: dict[str,str]`
+    (default `{}`) — die bisher verworfene Exception jedes fehlgeschlagenen Sub-Fetches
+    (drift/momentum/volume/high_low/history) wird jetzt in `get_brain_context`s `_safe()`-Helfer
+    gesammelt. **Nicht** in `to_prompt_dict()` (LLM-Shape unverändert), **wohl** in `to_dict()`
+    (für den P8-Log). +1 Test (72→73).
+  - **P4** (`research/models.py`/`context_builder.py`/`research.py`): `ResearchContext.
+    brain_context_health` (per-Epic `{"status": "full"|"degraded"|"unavailable", "missing":[...],
+    "errors":{...}}`, aus den bereits vorhandenen `brain_contexts`-Prompt-Dicts abgeleitet — **kein**
+    zweiter P3-Call). `Research` bekommt zwei neue Instanz-Attribute (Muster wie
+    `last_no_pick_reasoning`): `last_context_health` (Kopie von `context.brain_context_health` nach
+    jedem `build_context()`) + `last_abort_detail` (der exakte Freitext-Grund aus **jedem**
+    `_abstain()`-Aufruf — breiter als `last_no_pick_reasoning`, das nur den LLM-Prosa-Fall deckt).
+    Beide reset am Zyklus-Anfang. +11 Tests (122→133: 5 context_builder, 6 research).
+  - **P8** (neu `scheduler/observability.py` + Wiring): `record_cycle()` hängt einen JSON-Lines-
+    Record pro WINDOW-Zyklus an `data/state/research_health.jsonl` an (plain append, **nicht**
+    tmp+`os.replace` — ein JSONL-Log wächst nur, eine unterbrochene Zeile wird beim Lesen toleriert);
+    `iter_records()` als fail-soft Reader (Operator-Tooling/späteres Webui). `ResearchResult` (in
+    `research_tick.py`) trägt jetzt `context_health`/`abort_detail` (defensiv per `getattr` gelesen).
+    `SchedulerConfig.observability_path` (Default `data/state/research_health.jsonl`). `runner.py`s
+    WINDOW-Branch fängt den bisher **verworfenen** `ResearchResult`-Return jetzt ab und schreibt den
+    Log-Eintrag — nur auf dem `can_open`-PASS-Pfad (ein Cap-Block triggert nie Research). Root
+    `.gitignore` um den neuen Pfad ergänzt (verifiziert via `git check-ignore`). +15 Tests
+    (182→197: 9 observability, 4 research_tick, 2 runner).
+- **Step 2 — Instrument-Verification-Harness:** **neu** `scripts/verify_instrument.py`
+  (repo-root, phasenlos — spiegelt `resolve_epics.py`/`diag_score_distribution.py`). Konsolidiert
+  IG-Seite (`get_market_info`+`get_ohlcv`-Probe, spiegelt `resolve_epics.resolve_epic`) und
+  yFinance-Seite (`get_history`/`get_bars`/`get_volume_anomaly`, spiegelt P3-`smoke_test.py`) zu
+  **einem** PASS/FAIL-Verdikt pro Instrument (`currency_eur`/`min_deal_size_ok`/
+  `ig_ohlcv_available`/`yf_daily_ok`/`yf_intraday_ok`/`volume_proxy_ok`). Reused P3s eigene
+  Off-Hours-Ehrlichkeit (`get_bars` → `None` außerhalb der Handelszeit) statt einen zweiten
+  Markt-Check zu bauen — ein `None`-Intraday-Ergebnis wird als `"skipped(market closed)"`
+  reportet, **nie** als Fail gewertet. Default iteriert `research.models.EXTENDED_UNIVERSE`
+  (lazy-imported); `--epic`/`--yf-ticker`/`--volume-proxy` verifiziert einen Ad-hoc-Kandidaten
+  (die künftige v3-Promotion-Nutzung). **v3-Naht dokumentiert, nicht gebaut:** die reinen
+  Check-Funktionen (`check_ig_side`/`check_yf_side`/`verdict_for`) sind duck-typed + I/O-frei,
+  importierbar via `importlib.util.spec_from_file_location` wie die Testsuite es schon tut.
+  **Neu** `tests/test_verify_instrument.py` (root, importlib-Pattern) — 22 Tests (root-`tests`
+  28→50).
+
+### Verifiziert (gemockt/offline — Live/Netz = Operator)
+- Jede Phase **separat** gelaufen (bekannte `tests.conftest`-Namenskollision):
+  **P1 52 · P2 67 · P3 73 (+1) · P4 133 (+11) · P5 154 · P6 70 · P7 131 · P8 197 (+15) ·
+  root-`tests` 50 (+22)** — alle grün, exakt den erwarteten Deltas entsprechend (keine
+  unerwarteten neuen/fehlenden Tests). `py_compile` clean auf allen berührten/neuen Dateien.
+- **Import-Isolation erneut bestätigt:** `import scheduler.runner`/`scheduler.observability`
+  ziehen weiterhin **NONE** cross-phase; `import research.research`/`research.context_builder`
+  ziehen weiterhin **NONE** cross-phase (broker_wrapper/persistence/external_data/anthropic
+  nicht geladen).
+- `python scripts/verify_instrument.py --help` → exit 0, `git check-ignore
+  data/state/research_health.jsonl` → bestätigt ignoriert.
+
+### Next (Operator)
+1. **Step 4 — Live-Beweis** (unverändert aus v1.5-Step-5, jetzt mit Step-0-Sichtbarkeit): 5a
+   Varietäts-Run (mehrere Demo-Tage, normale Caps → den ersten netto-neuen autonomen open→close
+   fangen) + 5b Breaker-Fire-Run (enge Caps → einen Safety-Breaker tatsächlich auslösen sehen).
+   Ein Abstain-lastiger Tag ist jetzt aus `data/state/research_health.jsonl` erklärbar statt
+   geraten.
+2. **Optional, nicht blockierend:** `python scripts/verify_instrument.py` gegen echtes IG-Demo +
+   yfinance laufen lassen → das erste konsolidierte Verdikt für alle vier Instrumente (ersetzt die
+   verstreuten Einzel-Checks aus v1.5).
+3. **Nach 5a/5b:** Step 5 — Doku-Flip auf ✅ (ROADMAP/README/root-CLAUDE.md), weiterhin **kein**
+   Profit-/Edge-Claim.
+- **Commit:** vorgeschlagen (atomar denkbar: (1) Step 3a re-pin+docs, (2) P3 field_errors, (3) P4
+  context-health+abort-detail, (4) P8 observability+wiring, (5) verify_instrument.py+tests, (6) docs),
+  wartet auf Nikinger-Trigger.
+
+### Offene Punkte / blockers
+- Keine technischen. Der optionale H4-Spot-Check (zweiter zeitversetzter Diagnose-Lauf, im „Was"-
+  Plan als Carry vermerkt) bleibt weiterhin optional/nicht blockierend — die Zwei-Zeitpunkte-
+  Evidenz aus Step 1 gilt als ausreichend.
 
 ---
 

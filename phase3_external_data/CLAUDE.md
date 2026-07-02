@@ -84,6 +84,25 @@ single network point.
 > `phase8_scheduler/CLAUDE.md` → `## Session stopped` (Step 2 complete) +
 > `docs/concepts/phase8_v1.5_hotfix_plan.md`.
 
+> 🔁 **Phase-8 v1.6-hotfix edit (2026-07-02, Step 1 diagnosis + Step 3a — code = source of truth):**
+> the first live daemon run threw `possibly delisted; no price data found` for `^FCHI`/`^IBEX`. An
+> operator diagnosis run (`scripts/2026_07_02-v1.6-step1-diagnosis.md`) **disproved** the original
+> "daily-only data" hypothesis — both tickers returned full daily **and** 5m-intraday rows, and a full
+> `smoke_test.py` run was green for both (populated `brain_context`, only the always-expected
+> `volume=None` since no proxy is registered — not a bug). The failure is **intermittent Yahoo-side
+> flakiness** (the same fetches that failed live succeeded cleanly minutes later on identical code/
+> params) — **not** a structural symbol/interval gap. **Decision: Tolerate** — `^FCHI`/`^IBEX` stay in
+> `ticker_map.py`/`EXTENDED_UNIVERSE` unchanged; the existing 3× exponential-backoff retry
+> (`fetcher._fetch_with_retry`) already handles this failure mode correctly per the log evidence, it
+> just didn't ride out that one transient. **Correction to a prior theory:** the previously-flagged
+> "yfinance version-pin drift" (installed `1.4.1` vs. the then-pinned `>=0.2.65,<0.3`) is **not** the
+> cause — the live run that *failed* and the diagnosis run that *succeeded* both ran against the
+> identical installed `1.4.1`, so version drift cannot explain a difference between two runs on the
+> same version. The pin was still stale (a fresh venv install would have silently landed on an
+> untested ancient `0.2.x`) and is re-pinned to `yfinance>=1.4.0,<1.5` (`requirements.txt`) as a
+> separate, unrelated hygiene fix — not a fix for the live failure. Detail:
+> `docs/concepts/phase8_v1.6_hotfix_plan.md` Step 3 + `phase8_scheduler/CLAUDE.md`.
+
 ## ⚠ Phase-5 momentum-VETO flag (cross-phase notice)
 
 The concept (§13) explicitly states: a **hard momentum VETO in Phase 5 must

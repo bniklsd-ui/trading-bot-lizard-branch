@@ -186,6 +186,17 @@ Step 4   Live-Beweis (carried v1.5-Step-5: 5a Varietäts-Run + 5b Breaker-Fire)
 Step 5   Doku-Flip + Carries
 ```
 
+> **⟳ Ausführungsreihenfolge-Notiz (2026-07-02, „Wie"-Session, Nikinger-Freigabe):** die
+> Nummerierung oben bleibt für die Kontinuität zum „Was"-Dokument unverändert, aber die
+> **tatsächliche Baureihenfolge** dieser Session weicht bewusst ab — dokumentiert statt still
+> abgewichen (v1.5-Präzedenz: „B vor C"-Reorder). Step 0 war ursprünglich vor Step 3 geplant,
+> weil dessen Daten für die Fix/Drop-Entscheidung nötig schienen; Step 1s Diagnose hat diese
+> Entscheidung aber bereits billig + schlüssig getroffen, **ohne** Step 0. Reale Reihenfolge:
+> **Step 3a** (billig: Re-Pin + Doku, ✅ erledigt) → **Step 0** (jetzt umgerahmt als
+> Sicherheitsnetz für einen Rückfall, Nikinger-Bedingung — nicht mehr Step-3-Voraussetzung) →
+> **Step 2** (Harness, zukunftssicher) → **Step 4** (Live-Beweis, Operator) → **Step 5**
+> (Doku-Flip). Voller Kontext: `phase8_scheduler/CLAUDE.md` → `## Session stopped` (v1.6 „Wie").
+
 **Step 0 — Observability (Enabler + permanenter v3-Feedback-Kanal).**
 Strukturiertes, **persistiertes** Logging dessen, was heute nur als stderr-Rauschen existiert:
 - **Per-Zyklus/per-Epic Daten-Health:** welches Brain-Context-Signal war full / degraded /
@@ -232,11 +243,32 @@ Instrument-Kandidaten die komplette Checkliste maschinenlesbar prüft:
 
 **Step 3 — Fix, Tolerieren oder Drop (Entscheidungsregel, datengetrieben aus Step 1/2).**
 
-> **⚠ Nachgeführt (2026-07-02) nach dem Step-1-Ergebnis:** die ursprünglich binäre
-> Fix-vs-Drop-Regel unten passt nicht sauber auf den echten Befund (H1 widerlegt, H4
-> gestützt, Versions-Drift entdeckt — s. §1-Addendum). Eine **dritte Option (Tolerieren)**
-> ist jetzt die plausiblere erste Wahl; Fix/Drop bleiben als Fallback, falls die
-> „Wie"-Session die Versions-Hypothese nicht bestätigt.
+> **✅ ENTSCHIEDEN (2026-07-02, „Wie"-Session, Nikinger-Freigabe): Tolerieren.**
+> `^FCHI`/`^IBEX` bleiben unverändert in `ticker_map.py`/`EXTENDED_UNIVERSE` — Step 1 hat
+> bewiesen, dass beide voll funktionieren (Daily **und** 5m-Intraday, kompletter
+> `brain_context`). Einzige Code-Änderung: `phase3_external_data/requirements.txt` von
+> `yfinance>=0.2.65,<0.3` (stale) auf `yfinance>=1.4.0,<1.5` (die tatsächlich installierte,
+> tatsächlich getestete Version) re-gepinnt — eine **separate Hygiene-Korrektur**, **nicht**
+> der Fix für den Live-Ausfall. Kein Retry/Backoff-Code-Änderung nötig (die bestehende
+> 3×-Exponential-Backoff-Logik hat den Fehler laut Log korrekt behandelt, sie hat nur diesen
+> einen Transienten nicht überstanden). **Nikinger-Bedingung:** dies wird von Step 0
+> (Observability) als „sophisticated logging, um bei einer Wiederholung die echte Ursache zu
+> finden" begleitet — Step 0 ist damit das Sicherheitsnetz für einen Rückfall, nicht nur ein
+> Nice-to-have.
+>
+> **⚠ Korrektur einer vorherigen Theorie:** die zuvor geflaggte „yfinance-Versions-Pin-Drift"
+> (installiert `1.4.1` vs. damals gepinnt `>=0.2.65,<0.3`) ist **NICHT** die Ursache der
+> Intermittenz. Sowohl der **fehlgeschlagene** Live-Lauf als auch der **erfolgreiche**
+> Diagnose-Lauf liefen gegen dieselbe installierte `1.4.1` — Versions-Drift kann den
+> Unterschied zwischen zwei Läufen auf identischer Version nicht erklären. Der Pin war
+> trotzdem stale (ein frischer venv-Install hätte still eine ungetestete uralte `0.2.x`
+> bekommen) und wurde als unabhängige Korrektur re-gepinnt, s. o.
+>
+> *(Ursprüngliche Nachführung 2026-07-02 vor der Entscheidung, zur Nachvollziehbarkeit
+> belassen:)* die ursprünglich binäre Fix-vs-Drop-Regel unten passt nicht sauber auf den
+> echten Befund (H1 widerlegt, H4 gestützt, Versions-Drift-Theorie entdeckt-aber-später-
+> widerlegt — s. §1-Addendum). Eine **dritte Option (Tolerieren)** erwies sich als die
+> richtige Wahl; Fix/Drop bleiben unten als historischer Kontext / Fallback-Dokumentation.
 
 - **Tolerieren (neue Präferenz-1-Option, aus dem Step-1-Befund):** wenn die „Wie"-Session
   bestätigt, dass es sich um **intermittente Yahoo-/Versions-Flakiness** handelt (nicht um
@@ -318,23 +350,33 @@ Harness (Step 2) ist die Zukunftssicherung und fällt als Letztes — aber **vor
 
 ---
 
-## 5. Erwartetes Cross-Phase-Register (antizipiert — die „Wie"-Session verifiziert)
+## 5. Cross-Phase-Register — ✅ so umgesetzt (die „Wie"-Session, 2026-07-02)
 
-| Phase | Datei (verifizieren) | Erwarteter Edit | Default unverändert? |
+> Ursprünglich antizipiert (s. Historie unten); hier durch den tatsächlichen Umsetzungsstand
+> ersetzt (Code = Source of Truth). Kein Drop-Pfad genommen (Step 3 = Tolerieren) → **kein**
+> `ticker_map.py`/`EXTENDED_UNIVERSE`/`execution/config.py`-Touch.
+
+| Phase | Datei | Tatsächlicher Edit | Default unverändert? |
 |---|---|---|---|
-| P3 | `external_data/fetcher.py` | Fehler-Detail/Health strukturiert nach oben (Step 0); ggf. Fetch-Params (Step 3a) | ja — additiv |
-| P3 | `external_data/ticker_map.py` | Symbol-Korrektur **oder** CAC/IBEX-Entfernung (Step 3) | DAX/STXE unverändert |
-| P4 | `research/models.py` (`EXTENDED_UNIVERSE:369`) | ggf. CAC/IBEX-Drop oder daily-only-Kennzeichnung (Step 3) | DAX/STXE unverändert |
-| P4 | `research/research.py`/`context_builder.py` | ggf. Abstain-Grund nach oben reichen (§4 Frage 2) | ja — additiv |
-| P8 | `scheduler/` (+ ggf. `webui/`) | Daten-Health-/Decision-Log persistieren (Step 0) | ja — additiv |
-| — | `scripts/verify_instrument.py` (neu) | der Verification-Harness (Step 2) | n/a (read-only Tool) |
-| P5 | `execution/config.py` (`point_values`) | nur falls Step 3 = Drop (abgeleitetes Dict schrumpft automatisch mit — verifizieren) | ja |
-| docs | Konzepte/ROADMAP/README/CLAUDE.md | dated Notes je Edit; ✅-Flip erst nach Step 4 | n/a |
+| P3 | `external_data/requirements.txt` | Re-Pin `yfinance>=0.2.65,<0.3` → `>=1.4.0,<1.5` (Step 3a) | n/a (Dep-Pin) |
+| P3 | `external_data/models.py` + `fetcher.py` | `BrainContext.field_errors` (Step 0, additiv, nicht im Prompt-Dict) | ja — additiv |
+| P4 | `research/models.py` + `context_builder.py` + `research.py` | `ResearchContext.brain_context_health` + `Research.last_context_health`/`last_abort_detail` (Step 0, additiv) | ja — additiv |
+| P8 | `scheduler/observability.py` (neu) + `research_tick.py` + `config.py` + `runner.py` + `__init__.py` | Per-Zyklus-JSONL-Log (Step 0, additiv, nur auf dem `can_open`-PASS-Pfad) | ja — additiv |
+| — | `scripts/verify_instrument.py` (neu) | der Verification-Harness (Step 2, read-only) | n/a (read-only Tool) |
+| — | `tests/test_verify_instrument.py` (neu) | 22 Tests, `importlib`-Pattern | n/a |
+| root | `.gitignore` | `data/state/research_health.jsonl` ergänzt | n/a |
+| docs | `phase3_external_data/CLAUDE.md`, `phase4_research/CLAUDE.md`, `phase8_scheduler/CLAUDE.md`, dieser Plan | dated Notes je Edit; ✅-Flip weiterhin erst nach Step 4 (Live-Beweis, Operator) | n/a |
 
-> Jeder Edit als dokumentierter Cross-Phase-Edit; Regression P1–P8 nach jedem Step grün
-> (Baseline bei v1.6-Start: P1 52 · P2 67 · P3 72 · P4 122 · P5 154 · P6 70 · P7 131 · P8 182).
+**Nicht angefasst (Step 3 = Tolerieren, kein Drop/Fix nötig):** `external_data/ticker_map.py`,
+`research/models.py`s `EXTENDED_UNIVERSE`-Liste selbst, `execution/config.py` `point_values`.
+
+> Regression nach jedem Step separat grün (bekannte `tests.conftest`-Namenskollision):
+> **P1 52 · P2 67 · P3 73 (+1) · P4 133 (+11) · P5 154 · P6 70 · P7 131 · P8 197 (+15) ·
+> root-`tests` 50 (+22)** — Baseline bei v1.6-Start war P1 52 · P2 67 · P3 72 · P4 122 ·
+> P5 154 · P6 70 · P7 131 · P8 182 · root-`tests` 28.
 
 ---
 
-*Ende des Initial-Plans. Nächster Schritt: die „Wie"-Session (Claude Code) baut hieraus den
-file-für-file-Ausführungsplan; erst danach wird Code angefasst.*
+*Ende des Plans (Was + Wie). Step 4 (Live-Beweis) und Step 5 (Doku-Flip) sind Operator-Schritte —
+s. `phase8_scheduler/CLAUDE.md` → `## Session stopped` (v1.6 „Wie") für die volle Implementierungs-
+Zusammenfassung.*

@@ -104,6 +104,24 @@ is kicked off in the browser concept session, not here.
 > recorder — see those phases. +2 P4 tests (**120 → 122**; `FakeDB` gained the new method). Detail:
 > `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
 
+> 🔁 **Phase-8 v1.6-hotfix edit (2026-07-02, Step 0 — observability, code = source of truth):** the
+> v1.6 diagnosis of the `^FCHI`/`^IBEX` yfinance blocker exposed a meta-gap — no structured record of
+> "which brain-context signal was full/degraded/unavailable per epic, and why". Fix (additive, gates
+> nothing — root rule 3): `research/models.py`'s `ResearchContext` gained `brain_context_health`
+> (per-epic `{"status": "full"|"degraded"|"unavailable", "missing":[...], "errors":{...}}`), derived
+> in `context_builder.build_context` **from the already-fetched** `brain_contexts` prompt-dicts (the
+> "which field" half is free — every `None` gap was already explicit) plus the new Phase-3
+> `BrainContext.field_errors` (the "why" half — see `phase3_external_data/CLAUDE.md`'s matching note).
+> `research.py`'s `Research` gained two new instance attributes mirroring the existing
+> `last_no_pick_reasoning` pattern: `last_context_health` (copied from `context.brain_context_health`
+> after every `build_context()`) and `last_abort_detail` (the exact free-text reason from **every**
+> `_abstain()` call — broader than `last_no_pick_reasoning`, which only covers the model's own prose
+> on a valid abstain). Both reset each cycle, both read defensively (`getattr`) by Phase 8's
+> `research_tick.py`, which persists them into a new per-cycle JSONL log
+> (`scheduler/observability.py`). +11 P4 tests (**122 → 133**: 5 `test_context_builder.py`, 6
+> `test_research.py`). Detail: `docs/concepts/phase8_v1.6_hotfix_plan.md` Step 0 +
+> `phase8_scheduler/CLAUDE.md` → `## Session stopped` (v1.6 „Wie").
+
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which
 candidate?"). Everything else is plain code:
