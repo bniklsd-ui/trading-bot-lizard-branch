@@ -25,6 +25,7 @@ from scheduler.backoff import BackoffTracker
 from scheduler.clock import Clock, Phase
 from scheduler.config import SchedulerConfig
 from scheduler.exceptions import PreflightError
+from scheduler.research_tick import ResearchResult
 from scheduler.runner import SchedulerRunner
 from scheduler.safety import AutoConfirm
 from scheduler.state import SchedulerState, StateStore
@@ -131,12 +132,19 @@ class _FakeExecutor:
 
 
 class _FakeResearchTick:
-    def __init__(self) -> None:
+    """Duck-typed ``ResearchTick``: real ``ensure_candidates`` always returns a
+    ``ResearchResult`` (never ``None``, per the real contract in ``research_tick.py``) — the
+    fake mirrors that shape so a runner bug reading ``.context_health`` off ``None`` would
+    surface here, not only live (the same "fake diverges from real shape" lesson as
+    reconciliation 8 in ``runner.py``)."""
+
+    def __init__(self, *, result: ResearchResult | None = None) -> None:
+        self._result = result if result is not None else ResearchResult(picked=False, n=0, reason=None)
         self.calls = 0
 
-    def ensure_candidates(self, state: SchedulerState):
+    def ensure_candidates(self, state: SchedulerState) -> ResearchResult:
         self.calls += 1
-        return None
+        return self._result
 
 
 class _FakeReconciler:
@@ -201,6 +209,7 @@ def _config(tmp_path, **over) -> SchedulerConfig:
         kill_path=str(tmp_path / "KILL"),
         command_path=str(tmp_path / "cmd.json"),
         live_db_path=str(tmp_path / "db.sqlite"),
+        observability_path=str(tmp_path / "research_health.jsonl"),
     )
     base.update(over)
     return SchedulerConfig(**base)
@@ -269,6 +278,48 @@ def test_window_happy_path_runs_research_then_bare_execute(tmp_path) -> None:
     assert ex.run_calls == 1
     assert store.load().trades_today == 1                 # OPEN is a real trade (Contract E)
     assert cfg.cycle_interval_min * 60 in sleep.sleeps    # WINDOW sleeps one cycle interval
+
+
+def test_window_cycle_writes_one_observability_record(tmp_path) -> None:
+    """v1.6 Step 0: a WINDOW cycle that passes the cap gate appends exactly one diagnostic
+    record, carrying the ResearchResult's health/reason/detail through unchanged."""
+    from scheduler import observability
+
+    health = {"IX.D.DAX.IFMM.IP": {"status": "degraded", "missing": ["drift"], "errors": {}}}
+    rt = _FakeResearchTick(
+        result=ResearchResult(
+            picked=False, n=0, reason="LLM_ABSTAIN",
+            context_health=health, abort_detail="weak setup",
+        )
+    )
+    runner, _sleep, _store, cfg = _make_runner(
+        tmp_path, times=[_WINDOW_T], research_tick=rt, max_iterations=1
+    )
+
+    runner.run()
+
+    records = list(observability.iter_records(cfg.observability_path))
+    assert len(records) == 1
+    assert records[0]["context_health"] == health
+    assert records[0]["picked"] is False
+    assert records[0]["reason"] == "LLM_ABSTAIN"
+    assert records[0]["abort_detail"] == "weak setup"
+
+
+def test_cap_blocked_cycle_writes_no_observability_record(tmp_path) -> None:
+    """A cap-blocked cycle never triggers research → nothing to log; no file is even created."""
+    from scheduler import observability
+
+    cfg = _config(tmp_path, max_trades_per_day=0)
+    runner, _sleep, _store, _cfg2 = _make_runner(
+        tmp_path, times=[_WINDOW_T], config=cfg,
+        auto_confirm=_FakeAutoConfirm(ok=False, reason="CAP_BLOCK"),
+        max_iterations=1,
+    )
+
+    runner.run()
+
+    assert list(observability.iter_records(cfg.observability_path)) == []
 
 
 def test_no_trade_status_does_not_count_against_the_cap(tmp_path) -> None:

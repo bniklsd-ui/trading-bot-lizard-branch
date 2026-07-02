@@ -84,6 +84,16 @@ Concept↔code reconciliations (dated 2026-06-28, code = source of truth):
    ``_warm_session`` read ``env.ok`` / ``env.error`` (see :class:`_EnvelopeLike`), and the fakes
    return objects matching that shape so the contract divergence cannot recur. Lesson: a fake that
    diverges from the real return shape turns a live-only bug invisible in CI.
+
+9. **v1.6 (Phase-8 hotfix Step 0, observability) — one diagnostic log write per WINDOW cycle.**
+   Right after ``research_tick.ensure_candidates`` (whose return value used to be discarded), the
+   ``ResearchResult`` is now captured and handed to ``observability.record_cycle`` — a per-epic
+   brain-context health snapshot plus the free-text no-trade reason, appended to
+   ``config.observability_path``. Fail-soft (the module never raises out), diagnostic-only (gates
+   nothing), and only on the ``can_open`` PASS branch — a cap-blocked cycle never triggered research
+   in the first place, so there is nothing to log for it beyond ``state.last_no_trade_reason``
+   (already recorded). Purely additive: no observability call ⇒ the WINDOW branch's trading logic
+   is byte-for-byte the same as before Step 0.
 """
 
 from __future__ import annotations
@@ -92,7 +102,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, Protocol
 
-from scheduler import command, killswitch
+from scheduler import command, killswitch, observability
 from scheduler.backoff import BackoffTracker
 from scheduler.clock import Clock, Phase
 from scheduler.config import SchedulerConfig
@@ -322,7 +332,20 @@ class SchedulerRunner:
             self._maybe_reconcile(state, now)
             ok, reason = self._auto_confirm.can_open(state)
             if ok:
-                self._research_tick.ensure_candidates(state)
+                research_result = self._research_tick.ensure_candidates(state)
+                # v1.6 (Phase-8 hotfix Step 0, observability): one per-cycle diagnostic record,
+                # whether or not this tick produced a pick — the safety net for diagnosing a
+                # future recurrence of the ^FCHI/^IBEX-style intermittent data gap without
+                # needing another ad-hoc live investigation.
+                observability.record_cycle(
+                    self._config.observability_path,
+                    ts=now,
+                    context_health=research_result.context_health,
+                    picked=research_result.picked,
+                    n=research_result.n,
+                    reason=research_result.reason,
+                    abort_detail=research_result.abort_detail,
+                )
                 result = self._executor.run()  # Contract A: bare run(); confirm_fn at the ctor
                 state = self._state_store.record_cycle(state, result)
             else:

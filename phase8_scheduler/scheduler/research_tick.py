@@ -98,11 +98,21 @@ class ResearchResult:
         n: number of candidates written (0 or 1 — Phase-4 persists at most one pick).
         reason: the ``no_trade_reason`` when ``picked`` is ``False`` (one of the ``REASON_*``
             constants), else ``None``.
+        context_health: v1.6 (Phase-8 hotfix Step 0, observability) — the per-epic brain-
+            context health snapshot from this tick (``Research.last_context_health``, read
+            defensively), or ``None`` if the collaborator does not expose it (a pre-v1.6 fake).
+            Diagnostic-only, gates nothing (root rule 3).
+        abort_detail: v1.6 (Step 0) — the free-text reason behind ``reason`` (Phase-4's
+            ``Research.last_abort_detail``, read defensively), or ``None`` on a pick / when
+            unavailable. Broader than the LLM-prose-only ``last_no_trade_detail`` on
+            :class:`~scheduler.state.SchedulerState` (that one is valid-abstain-only).
     """
 
     picked: bool
     n: int
     reason: str | None
+    context_health: dict[str, dict] | None = None
+    abort_detail: str | None = None
 
 
 class _ResearchLike(Protocol):
@@ -117,6 +127,11 @@ class _ResearchLike(Protocol):
     # Optional: the LLM's prose abstain reason from the last ``run()`` (``None`` after a pick /
     # pre-LLM abort). Read defensively via ``getattr`` so a fake without it still satisfies this.
     last_no_pick_reasoning: str | None
+    # Optional (v1.6 Step 0, observability): the per-epic brain-context health snapshot and the
+    # free-text abort reason from the last ``run()``. Both read defensively via ``getattr`` —
+    # a pre-v1.6 fake without them still satisfies this Protocol.
+    last_context_health: dict[str, dict] | None
+    last_abort_detail: str | None
 
     def run(self) -> list: ...
 
@@ -180,20 +195,36 @@ class ResearchTick:
             self._clear_candidates_fail_closed()
             state.last_no_trade_reason = REASON_PREFLIGHT
             state.last_no_trade_detail = None  # pre-LLM/exception path has no model prose
-            return ResearchResult(picked=False, n=0, reason=REASON_PREFLIGHT)
+            return ResearchResult(
+                picked=False,
+                n=0,
+                reason=REASON_PREFLIGHT,
+                context_health=getattr(self._research, "last_context_health", None),
+                abort_detail=getattr(self._research, "last_abort_detail", None),
+            )
+
+        # v1.6 Step 0 (observability): read once, used on both outcome branches below.
+        context_health = getattr(self._research, "last_context_health", None)
+        abort_detail = getattr(self._research, "last_abort_detail", None)
 
         if candidates:
             state.last_no_trade_reason = None
             state.last_no_trade_detail = None  # a pick: no abstain reason to show
             logger.info("research tick: %d candidate(s) written (PASS).", len(candidates))
-            return ResearchResult(picked=True, n=len(candidates), reason=None)
+            return ResearchResult(
+                picked=True, n=len(candidates), reason=None,
+                context_health=context_health, abort_detail=abort_detail,
+            )
 
         state.last_no_trade_reason = REASON_LLM_ABSTAIN
         # The LLM's prose abstain reason (display-only); ``None`` unless Phase-4 captured one
         # (only the genuine ``abstain=true`` path carries prose — see research.py).
         state.last_no_trade_detail = getattr(self._research, "last_no_pick_reasoning", None)
         logger.info("research tick: abstain (no candidate, reason=%s).", REASON_LLM_ABSTAIN)
-        return ResearchResult(picked=False, n=0, reason=REASON_LLM_ABSTAIN)
+        return ResearchResult(
+            picked=False, n=0, reason=REASON_LLM_ABSTAIN,
+            context_health=context_health, abort_detail=abort_detail,
+        )
 
     # --- internals ---------------------------------------------------------
 

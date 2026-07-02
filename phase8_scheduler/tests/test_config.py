@@ -46,6 +46,8 @@ def test_defaults_match_locked_concept_values() -> None:
     assert cfg.state_path == "data/state/scheduler_state.json"
     assert cfg.kill_path == "data/state/KILL"
     assert cfg.command_path == "data/state/scheduler_command.json"
+    # v1.6 (Phase-8 hotfix Step 0, observability)
+    assert cfg.observability_path == "data/state/research_health.jsonl"
 
 
 def test_window_is_full_market_not_the_concept_morning_window() -> None:
@@ -139,6 +141,7 @@ def test_full_override_roundtrips() -> None:
         state_path="/tmp/state.json",
         kill_path="/tmp/KILL",
         command_path="/tmp/cmd.json",
+        observability_path="/tmp/health.jsonl",
     )
     assert cfg.window_open == "10:00"
     assert cfg.window_close == "12:30"
@@ -150,6 +153,7 @@ def test_full_override_roundtrips() -> None:
     assert cfg.daily_token_budget == 1_000_000
     assert cfg.reconcile_interval_min == 30
     assert cfg.live_db_path == "/tmp/x.sqlite"
+    assert cfg.observability_path == "/tmp/health.jsonl"
 
 
 def test_exported_from_package_root() -> None:

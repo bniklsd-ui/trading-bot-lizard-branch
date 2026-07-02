@@ -24,7 +24,7 @@ Full design + the 20 locked decisions: ``../docs/concepts/phase8_scheduler_conce
 
 from __future__ import annotations
 
-from . import command, killswitch
+from . import command, killswitch, observability
 from .backoff import BackoffTracker
 from .budget import TokenBudget
 from .clock import Clock, Phase
@@ -48,6 +48,7 @@ __all__ = [
     "StateStore",
     "killswitch",
     "command",
+    "observability",
     "AutoConfirm",
     "Budget",
     "TokenBudget",

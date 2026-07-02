@@ -100,6 +100,10 @@ class SchedulerConfig:
             by ``safety.py`` / every loop, written by the auto-trip and the UI.
         command_path: ``scheduler_command.json`` — the UI's start/stop control channel
             (Decision 14); the daemon polls it. Generic enough for later P10 actions.
+        observability_path: ``research_health.jsonl`` — v1.6 (Phase-8 hotfix Step 0) append-only
+            per-cycle diagnostic log (``scheduler/observability.py``): which brain-context
+            signals were full/degraded/unavailable per epic, and the free-text reason behind
+            each cycle's no-trade outcome. Diagnostic-only, gates nothing.
     """
 
     # --- time / window ---
@@ -131,6 +135,7 @@ class SchedulerConfig:
     state_path: str = "data/state/scheduler_state.json"
     kill_path: str = "data/state/KILL"
     command_path: str = "data/state/scheduler_command.json"
+    observability_path: str = "data/state/research_health.jsonl"
 
     def __post_init__(self) -> None:
         """Emit one loud WARNING when the daily-loss breaker is inactive.

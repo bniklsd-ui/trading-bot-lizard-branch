@@ -55,11 +55,20 @@ class _FakeResearch:
         result: list | None = None,
         raises: Exception | None = None,
         save_raises: bool = False,
+        context_health: dict | None = None,
+        abort_detail: str | None = None,
     ) -> None:
         self._result = result if result is not None else []
         self._raises = raises
         self.state = _FakeStateManager()
         self.run_calls = 0
+        # v1.6 Step 0 (observability): deliberately only set when explicitly given, so a
+        # default-constructed fake (most existing tests) proves the defensive-``getattr``
+        # fallback still works when the collaborator lacks these attrs entirely.
+        if context_health is not None:
+            self.last_context_health = context_health
+        if abort_detail is not None:
+            self.last_abort_detail = abort_detail
         if save_raises:
             def _boom(_c: list) -> None:
                 raise RuntimeError("disk full")
@@ -252,6 +261,65 @@ def test_default_now_fn_is_tz_aware() -> None:
     # parseable ISO with an offset (tz-aware), not a naive stamp
     parsed = datetime.fromisoformat(state.last_research_ts)
     assert parsed.tzinfo is not None
+
+
+# --- v1.6 Step 0: context_health / abort_detail on ResearchResult ---------
+
+
+def test_pass_carries_context_health_and_clears_abort_detail() -> None:
+    """A PASS surfaces the collaborator's health snapshot; abort_detail is None (no abort)."""
+    health = {"IX.D.DAX.IFMM.IP": {"status": "full", "missing": [], "errors": {}}}
+    research = _FakeResearch(result=[_real_pick()], context_health=health)
+    tick = ResearchTick(research, now_fn=_fixed_now())
+    state = _state()
+
+    result = tick.ensure_candidates(state)
+
+    assert result.context_health == health
+    assert result.abort_detail is None
+
+
+def test_abstain_carries_context_health_and_abort_detail() -> None:
+    """An abstain surfaces BOTH the health snapshot and the free-text abort detail."""
+    health = {"IX.D.DAX.IFMM.IP": {"status": "degraded", "missing": ["drift"], "errors": {}}}
+    research = _FakeResearch(result=[], context_health=health, abort_detail="validator abstain (no pick)")
+    tick = ResearchTick(research, now_fn=_fixed_now())
+    state = _state()
+
+    result = tick.ensure_candidates(state)
+
+    assert result.context_health == health
+    assert result.abort_detail == "validator abstain (no pick)"
+
+
+def test_exception_path_still_reads_context_health_and_abort_detail() -> None:
+    """Best-effort: even on a research exception, whatever health/detail the collaborator
+    managed to set before crashing is still surfaced (never crashes the tick itself)."""
+    health = {"IX.D.DAX.IFMM.IP": {"status": "unavailable"}}
+    research = _FakeResearch(
+        raises=RuntimeError("broker down"), context_health=health, abort_detail="mid-crash detail"
+    )
+    tick = ResearchTick(research, now_fn=_fixed_now())
+    state = _state()
+
+    result = tick.ensure_candidates(state)
+
+    assert result.reason == REASON_PREFLIGHT
+    assert result.context_health == health
+    assert result.abort_detail == "mid-crash detail"
+
+
+def test_context_health_and_abort_detail_default_to_none_without_attrs() -> None:
+    """A collaborator lacking the v1.6 attrs entirely (pre-v1.6 fake) degrades to None, never
+    raises — the defensive ``getattr`` fallback."""
+    research = _FakeResearch(result=[_real_pick()])  # no context_health/abort_detail passed
+    tick = ResearchTick(research, now_fn=_fixed_now())
+    state = _state()
+
+    result = tick.ensure_candidates(state)
+
+    assert result.context_health is None
+    assert result.abort_detail is None
 
 
 # --- plumbing --------------------------------------------------------------
