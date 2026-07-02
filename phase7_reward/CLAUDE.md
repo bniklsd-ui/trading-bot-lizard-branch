@@ -35,6 +35,24 @@ P7 baut nur das **Substrat** (`trade_lessons` + `reward_pts`).
 > lessons gate nothing (root rule 3, Decision C/J intact). +3 P7 tests (**128 → 131**). Detail:
 > `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
 
+> 🔁 **Phase-8 v1.6-hotfix edit (2026-07-02, Cause A part 2 — trade-row provenance, code = source of
+> truth):** the v1.5 fix above stamped `provenance` into the lesson's `market_context_json` blob, but
+> never onto the `trade_outcomes` row itself — because a **second, separate** P4 prompt channel
+> (`context_builder`'s raw `db.get_recent_trades`) read straight off that row and stayed unfiltered.
+> A live v1.6 run showed the LLM's abstain reasoning citing fake "three consecutive losses" from the
+> three seeded verification trades. **Fix:** `recorder.py::_open_record` now also writes
+> `"provenance": opened.provenance` (the field already existed on `OpenedTrade` since v1.5 — this is a
+> one-line addition, not a new field) into the `insert_trade` record; it lands against the real DB
+> only after P2 migration 003 (`trade_outcomes.provenance TEXT`, same "written but silently dropped
+> until the migration lands" pattern as `initial_risk`/`account` for migration 002). Read by a new P2
+> `get_recent_trades_for_prompt` (P4's second filtered getter, mirroring
+> `get_recent_lessons_for_prompt`). **Reward/score math remains provably untouched** — `provenance`
+> only ever reaches an `insert_trade` record, never a `Scorer`/`compute_confidence` input; lessons and
+> trade history both gate nothing (root rule 3, Decision C/J intact). +2 P7 tests (**131 → 133**:
+> provenance round-trips through `on_trade_opened`; defaults to `"autonomous"` when not overridden).
+> Detail: `docs/concepts/phase8_v1.6_hotfix_plan.md` §6 + `phase8_scheduler/CLAUDE.md` →
+> `## Session stopped — 2026-07-02 (v1.6-Hotfix: Cause A part 2)`.
+
 ## Harte Regeln (nicht verhandelbar)
 - **`confidence` ist observe-only und gatet NICHTS** (Decision C). N < `n_min=10` → `INSUFFICIENT`
   (fließt in NICHTS). Moduliert in v1 **nicht** `risk_pct`. Wer eine Confidence-Schwelle einbaut →

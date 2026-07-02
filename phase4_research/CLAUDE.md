@@ -104,6 +104,24 @@ is kicked off in the browser concept session, not here.
 > recorder — see those phases. +2 P4 tests (**120 → 122**; `FakeDB` gained the new method). Detail:
 > `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
 
+> 🔁 **Phase-8 v1.6-hotfix edit (2026-07-02, Cause A part 2 — trade-history provenance, code = source
+> of truth):** the v1.5 fix above only cleaned the `recent_lessons` channel. `build_context` also
+> reads `db.get_recent_trades(8)` — a **second, separate** channel into the same single-AI-call
+> prompt — which stayed unfiltered. A live v1.6 run showed the LLM's abstain reasoning citing fake
+> "three consecutive losses totaling ~345€" from the three seeded verification trades (sub-minute
+> forced time-stops), read straight off the raw trade-history table. **Fix (mirrors the lesson fix
+> exactly, one level down):** `context_builder.build_context` now calls a **new** P2 method
+> `db.get_recent_trades_for_prompt(8, …)` instead of `get_recent_trades(8)`, driven by three new
+> **provisional** `ResearchConfig` fields — `recent_trades_exclude_provenance=("verification",)`,
+> `recent_trades_min_hold_min=2.0`, `recent_trades_quarantine_before=None` — same three-signal
+> precision order, but against the real `trade_outcomes.provenance` column (migration 003, P2) rather
+> than a JSON blob. **Trade history still gates nothing** (root rule 3) — this only shapes the
+> prompt. The write-side (who stamps `provenance` on the trade row) is the P7 recorder's
+> `_open_record` (the tag already existed on `OpenedTrade`, it just never reached the trade row
+> before this fix). +2 P4 tests (**133 → 135**; `FakeDB` gained `get_recent_trades_for_prompt`).
+> Detail: `docs/concepts/phase8_v1.6_hotfix_plan.md` §6 + `phase8_scheduler/CLAUDE.md` →
+> `## Session stopped — 2026-07-02 (v1.6-Hotfix: Cause A part 2)`.
+
 > 🔁 **Phase-8 v1.6-hotfix edit (2026-07-02, Step 0 — observability, code = source of truth):** the
 > v1.6 diagnosis of the `^FCHI`/`^IBEX` yfinance blocker exposed a meta-gap — no structured record of
 > "which brain-context signal was full/degraded/unavailable per epic, and why". Fix (additive, gates

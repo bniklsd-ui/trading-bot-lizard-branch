@@ -91,7 +91,16 @@ Logging**. **Nächster Track = v1.6** (erst Observability, dann `^FCHI`/`^IBEX` 
 droppen, dann der Live-Beweis), Handover: `phase8_scheduler/PHASE8_V1.6_HANDOVER.md` (v1.5-Kontext:
 `PHASE8_V1.5_HOTFIX_HANDOVER.md`). **Initial-Plan (das „Was", 2026-07-02, bewusst in Claude Code
 statt Web-Chat erstellt — Begründung dort §0a):** `docs/concepts/phase8_v1.6_hotfix_plan.md`; die
-„Wie"-Session baut daraus den Ausführungsplan.
+„Wie"-Session baut daraus den Ausführungsplan. **Update (2026-07-02, während des laufenden v1.6-
+Live-Tests): „Cause A part 2" gefunden + gefixt** — die v1.5-Lesson-Provenance-Filterung war korrekt,
+aber `context_builder` hat einen zweiten, bis dahin ungefilterten Prompt-Kanal
+(`db.get_recent_trades`), der dieselben drei Verifikations-Trades unverändert in die
+LLM-Abstain-Begründung speiste ("three consecutive losses"). Fix: `trade_outcomes` bekam eine echte
+`provenance`-Spalte (P2 Migration 003) + einen gefilterten `get_recent_trades_for_prompt`-Read (P4),
+gestamped vom P7-Recorder; ein neues Operator-Skript `scripts/archive_verification_trades.py`
+archiviert die drei betroffenen Alt-Trades aus der Live-DB. Detail: `phase8_scheduler/CLAUDE.md` →
+`## Session stopped — 2026-07-02 (v1.6-Hotfix: Cause A part 2)` +
+`docs/concepts/phase8_v1.6_hotfix_plan.md` §6.
 (gestartet 2026-06-27). **Mission (zuerst lesen):** Phase 8 heißt „Scheduler", aber das Ziel ist
 **autonome, unbeaufsichtigte Erzeugung echter Demo-Trades** — alles danach (Confidence aus
 `INSUFFICIENT`, P9-Instinct-Promotion) ist auf reale Outcomes gegatet. Der harte Pfad ist die

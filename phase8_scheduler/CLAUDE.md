@@ -214,6 +214,103 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-02 (v1.6-Hotfix: Cause A part 2 — the `recent_trades` prompt-channel leak)
+
+> **Auslöser:** während des laufenden v1.6-Live-Tests (Step-2-Harness gelaufen, Daemon-Variety-
+> Lauf online) bemerkte Nikinger, dass die UI-Abstain-Reasoning weiterhin auf alte Test-Trade-Daten
+> referenziert ("the recent trade history shows three consecutive losses totaling ~345€") — er las
+> das zunächst als "alte Lessons nicht ausgeschlossen". Diagnose (Code + Live-DB, kein Live-Netz
+> nötig) zeigte: die v1.5-Step-4-A-Lesson-Filterung war **korrekt** (alle 3 Test-Lessons haben
+> `hold_duration_min < 2.0` → schon vom `min_hold_min`-Fallback ausgeschlossen). Der echte Leak war
+> ein **zweiter, bisher unbemerkter Kanal**: `context_builder.build_context` liest zusätzlich
+> `db.get_recent_trades(8)` — die rohe Trade-History-Tabelle, gerendert in denselben Prompt — und
+> dieser Read blieb **ungefiltert**. Genau die drei geseedeten Verifikations-Trades (Zeitstempel
+> 0.01/0.02/1.03 min Hold) erschienen dort als "drei Verlust-Trades" und färbten die
+> LLM-Abstain-Begründung ein.
+
+### Nikinger-Entscheidungen (via AskUserQuestion, vor der Implementierung gelockt)
+- **Filter-Ansatz:** eine echte `provenance`-Spalte via **Migration 003** (statt der
+  migrationsfreien Hold-Time-only-Variante) — sauber dokumentiert, mirror der v1.5-Lesson-Lösung.
+- **Bestehende 3 Test-Trades:** aus der Live-DB **archivieren** (nicht nur code-seitig filtern) —
+  ein neues, gitignored `data/archive/`-Verzeichnis, dokumentiert warum/was.
+
+### Completed (P2 + P4 + P7 — additiv, jede Datei dated-note-annotiert)
+- **P2 `migrations/003_phase8_trade_provenance.sql`** (neu) — `ALTER TABLE trade_outcomes ADD
+  COLUMN provenance TEXT`, ausführlicher Header-Kommentar (mirror 002-Stil): erklärt den
+  Zwei-Kanal-Leak, dass `provenance` vorher nur im Lesson-Blob lag, nie auf der Trade-Zeile selbst.
+  Frische DB erreicht jetzt **Version 3**. `persistence/db.py`: `_TRADE_COLUMNS += ("provenance",)`
+  + neue **`get_recent_trades_for_prompt(n, *, min_hold_min, quarantine_before,
+  exclude_provenance)`** — exaktes Gegenstück zu `get_recent_lessons_for_prompt` (v1.5), aber gegen
+  `trade_outcomes.provenance` statt den JSON-Blob (kein `json_extract` nötig — echte Spalte).
+  `get_recent_trades` bleibt unangetastet für andere Caller.
+- **P7 `reward/recorder.py::_open_record`** — `"provenance": opened.provenance` ergänzt (das Feld
+  existierte schon auf `OpenedTrade`, erreichte aber nie die `trade_outcomes`-Zeile — nur den
+  Lesson-Kontext via `_extract_lesson`). Migration-003-gated wie `initial_risk`/`account` es für 002 waren.
+- **P4** — drei neue **provisorische** `ResearchConfig`-Felder, exaktes Mirror der Lesson-Knobs:
+  `recent_trades_exclude_provenance=("verification",)`, `recent_trades_min_hold_min=2.0`,
+  `recent_trades_quarantine_before=None`. `context_builder.build_context` ruft jetzt
+  `db.get_recent_trades_for_prompt(8, …)` statt `db.get_recent_trades(8)`; `_DBLike`-Protocol
+  entsprechend erweitert. **Trade-History gatet weiterhin nichts** (root rule 3) — nur der Prompt
+  ändert sich.
+- **Neues Skript `scripts/archive_verification_trades.py`** (repo-root, phaseless, mirror
+  `verify_instrument.py`-Stil) — **dry-run per Default**; nur `--commit` schreibt
+  `data/archive/verification_<UTC-Stamp>.json` (Snapshot **vor** dem Delete: `trade_outcomes` +
+  kaskadierende `trade_lessons`/`reward_pts`/`market_regime_snapshots`/`decision_context`) und
+  löscht dann die `trade_outcomes`-Zeilen — FK-`ON DELETE CASCADE` (die `Database` öffnet mit
+  `PRAGMA foreign_keys = ON`) räumt die Kinder automatisch mit ab, kein separates Kinder-Delete
+  nötig. Auswahl: `provenance='verification'` **oder** `hold_duration_min < --hold-threshold-min`
+  (Fallback für die migrationsälteren, ungetaggten Trades) — ODER-verknüpft; `--ids` überschreibt
+  beide Heuristiken explizit. `.gitignore` um `data/archive/` ergänzt (dated Note, gleiche
+  Konvention wie die anderen `data/`-Einträge). Kein `data/archive/README.md` — das Repo trackt
+  grundsätzlich **nichts** unter `data/` (`git ls-files data/` ist leer); die Doku lebt hier + im
+  Skript-Docstring + im v1.6-Plan statt in einer ohnehin gitignorten Datei.
+- **Tests:** P2 **75** (67 → +8: Migrations-Version 2→3 + Spalten-Test + 5 neue
+  `get_recent_trades_for_prompt`-Fälle + 1 Provenance-Round-Trip + 1 NULL-Default-Test), P4 **135**
+  (133 → +2: Wiring-Test wie beim Lesson-Filter), P7 **133** (131 → +2: `_open_record`-Provenance-
+  Round-Trip + Autonomous-Default), root-`tests` **64** (50 → +14: der neue Archive-Script-Suite).
+  P5 unberührt (**154**).
+
+### Reconciliation (Code = Source of Truth)
+- **Warum der Leak trotz v1.5 Step 4 A passierte:** v1.5 fixte den `recent_lessons`-Kanal
+  vollständig korrekt — der Fehler war eine **unvollständige Diagnose**, nicht ein kaputter Fix.
+  `build_context` hat zwei P2-Reads, die beide in denselben Prompt fließen
+  (`context_builder.py:234`/`240` vor diesem Fix); nur einer wurde 2026-07-01 gefiltert.
+- **`trade_outcomes` hatte strukturell keine Provenance-Info vor Migration 003** — `provenance`
+  lief bisher nur bis in `trade_lessons.market_context_json` (Recorder-`_extract_lesson`). Die
+  Trade-Zeile selbst blieb "blind" — das war der eigentliche strukturelle Gap, den Migration 003 schließt.
+
+### ✅ Live-verifiziert (2026-07-02, noch am selben Tag — Operator-Lauf)
+- Migration 003 lief über `init_db.py` gegen die Live-DB → Schema-Version **3** bestätigt.
+- `scripts/archive_verification_trades.py --commit` lief erfolgreich →
+  `data/archive/verification_20260702T145156Z.json` geschrieben; `trade_outcomes`/`trade_lessons`
+  in der Live-DB jetzt **leer** (die 3 Verifikations-Trades + ihre Lessons sind archiviert).
+- **UI + LLM-Prompt bestätigt sauber:** Nikinger sieht keine Lessons mehr in der Webui, und die
+  LLM-Abstain-Begründung referenziert die alten Test-Trades nicht mehr. Ein nachfolgender
+  Research-Zyklus (16:52) bekam sogar erstmals wieder einen echten P4-Pick (BUY DAX, conf=58),
+  der dann korrekt vom P6-Debate-Layer **aus Marktgründen** (Echtzeit-IG-Bars widersprachen dem
+  verzögerten yFinance-Seed) auf ABSTAIN gesetzt wurde — System arbeitet wie designed, kein Bug.
+  ⚠ `scheduler_state.json → last_no_trade_detail` zeigt noch den alten Text — das Feld
+  aktualisiert sich nur bei einem **Research-Level**-Abstain (der letzte war 14:18, vor dem
+  Archiv-Lauf 14:51); ein künftiger Abstain zeigt sauberen Text. Kein Bug, nur ein noch nicht
+  neu geschriebenes Display-Feld.
+- Kein weiterer offener Punkt zu Cause A — beide Prompt-Kanäle (Lessons + Trade-History) sind jetzt
+  provenance-gefiltert **und live bestätigt**.
+
+### Next
+- Die laufende v1.6-Instrument-Verifikation/-Live-Test-Kette ist von diesem Fix unabhängig und
+  läuft unverändert weiter → **Step 4** (5a Varietäts-Run für den net-new autonomen open→close,
+  5b Breaker-Fire-Run) bleibt das offene Live-Beweis-Gate; danach Step 5 (Doku-Flip). Kein
+  weiterer Code ist für v1.6 geplant, außer ein Live-Lauf deckt einen neuen Bug auf.
+
+### Gotchas (für den Re-Entry)
+- Branch **`v1.6`**. Dieser Fix ist additiv über P2+P4+P7 — Regression läuft **pro Phase separat**
+  (`tests.conftest`-Namenskollision, s. Memory `reference_running_phase_tests`).
+- **AI-Grenze gewahrt:** reine Schema-/Filter-/Skript-Änderung, kein LLM-Touch.
+- Migration 003 ist additiv + idempotent (Runner-Versions-Guard) — eine bestehende Dev-DB auf
+  Version 2 bekommt Spalte 3 automatisch beim nächsten `run_migrations()`/`init_db.py`.
+
+---
+
 ## Session stopped — 2026-07-02 (v1.6-Hotfix: „Wie"-Session — Step 3a (Tolerieren) + Step 0 (Observability) + Step 2 (Verification-Harness) implementiert)
 
 > **Auslöser:** die „Wie"-Session, die aus dem „Was"-Plan (`docs/concepts/phase8_v1.6_hotfix_plan.md`)

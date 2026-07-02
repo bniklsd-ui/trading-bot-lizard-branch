@@ -55,6 +55,33 @@ def test_on_trade_opened_inserts_trade_and_stashes(make_opened):
     assert sink._opened[opened.deal_id] is opened
 
 
+def test_on_trade_opened_persists_provenance(make_opened):
+    """v1.6 (Phase-8 hotfix, Cause A part 2): the same provenance tag that already reaches
+    the lesson's market_context_json (see test_on_trade_closed's lesson assertions) must also
+    land on the trade_outcomes row itself, so the SEPARATE recent_trades prompt channel
+    (P4 context_builder.get_recent_trades_for_prompt) can filter on it too — migration 003.
+    """
+    db = FakeDB()
+    sink = _sink(db)
+    opened = make_opened(provenance="verification")
+
+    sink.on_trade_opened(opened)
+
+    row = db.get_trade_by_deal_id(opened.deal_id)
+    assert row["provenance"] == "verification"
+
+
+def test_on_trade_opened_provenance_defaults_to_autonomous(make_opened):
+    db = FakeDB()
+    sink = _sink(db)
+    opened = make_opened()  # no explicit provenance override
+
+    sink.on_trade_opened(opened)
+
+    row = db.get_trade_by_deal_id(opened.deal_id)
+    assert row["provenance"] == "autonomous"
+
+
 def test_on_trade_opened_insert_failure_is_fail_closed(make_opened, caplog):
     db = FakeDB(fail_on={"insert_trade"})
     sink = _sink(db)

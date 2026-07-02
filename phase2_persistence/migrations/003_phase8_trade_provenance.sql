@@ -1,0 +1,41 @@
+-- Phase 8 v1.6 hotfix — trade-row provenance (version 3)
+-- Additive only. Adds `provenance` to `trade_outcomes`.
+--
+-- WHY (Cause A, part 2 — 2026-07-02, code = source of truth):
+-- v1.5 Step 4 A tagged verification (seeded, forced sub-minute time-stop) trades so
+-- their AI-extracted *lessons* could be quarantined out of the P4 research prompt
+-- (`OpenedTrade.provenance`, stamped "verification" | "autonomous" at
+-- `phase5_execution/execution/executor.py:402`, carried into `trade_lessons.
+-- market_context_json.$.provenance` by `phase7_reward/reward/recorder.py`). That
+-- fixed the `recent_lessons` channel.
+--
+-- It missed a SECOND channel into the same prompt: `context_builder.build_context`
+-- also reads `db.get_recent_trades(8)` — the raw trade-history table — and that read
+-- was never filtered. A live v1.6 run showed the LLM's abstain reasoning citing
+-- "three consecutive losses totaling ~345€": the three demo verification trades
+-- (forced SELL seeds, ~1-minute holds, `trade_outcomes.id` 1-3), read straight off
+-- `trade_outcomes` with no provenance signal on the row itself — `provenance` had only
+-- ever reached the lesson's JSON blob, never the trade row.
+--
+-- FIX: give `trade_outcomes` its own `provenance` column (mirrors the tag already on
+-- `OpenedTrade`/the lesson blob) so a new `get_recent_trades_for_prompt` read (P2) can
+-- filter the trade-history prompt channel the same way `get_recent_lessons_for_prompt`
+-- (v1.5) already filters the lesson channel. Pre-existing rows (opened before this
+-- migration) get `provenance = NULL` — NOT auto-tagged "verification" or "autonomous"
+-- retroactively (we don't know which ones were real without re-deriving it, and this
+-- migration must stay a pure additive DDL step, no data guessing). The read-path
+-- filter is NULL-safe (`provenance IS NOT 'verification'` keeps NULL rows) and falls
+-- back to `hold_duration_min` for exactly this pre-tag case. The three existing
+-- verification trades are additionally archived out of the live DB by
+-- `scripts/archive_verification_trades.py` (operator-run) for a clean slate — this
+-- migration does not delete anything.
+--
+-- Display/prompt-only, same as the lesson provenance tag (root rule 3): `provenance`
+-- is read by the P4 prompt-context filter only. It is never read by the P7
+-- reward/score math (Scorer, Confidence, `select_edge_set`) and gates no VETO/gate.
+--
+-- NOTE: SQLite `ALTER TABLE ... ADD COLUMN` is NOT self-`IF NOT EXISTS`. Idempotency
+-- is provided by the runner's `_schema_version` guard (persistence/migrations.py):
+-- version 3 is applied exactly once. Re-running run_migrations after this is a no-op.
+
+ALTER TABLE trade_outcomes ADD COLUMN provenance TEXT;  -- 'verification' | 'autonomous' | NULL (pre-migration rows)

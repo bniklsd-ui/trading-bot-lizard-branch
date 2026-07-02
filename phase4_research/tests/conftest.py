@@ -181,6 +181,7 @@ class FakeDB:
         *,
         trades: list[dict[str, Any]] | None = None,
         lessons: list[dict[str, Any]] | None = None,
+        for_prompt_trades: list[dict[str, Any]] | None = None,
         for_prompt_lessons: list[dict[str, Any]] | None = None,
         score: float = 55.0,
         risk_level: str = "AGGRESSIV",
@@ -188,6 +189,12 @@ class FakeDB:
     ) -> None:
         self._trades = trades if trades is not None else []
         self._lessons = lessons if lessons is not None else []
+        # v1.6 (Cause A part 2): what the filtered trade-history prompt getter returns.
+        # Defaults to ``trades`` so existing tests (which configured ``trades=…``) get them
+        # back through the new method.
+        self._for_prompt_trades = (
+            for_prompt_trades if for_prompt_trades is not None else self._trades
+        )
         # v1.5 (Step 4 A): what the filtered prompt getter returns. Defaults to ``lessons`` so
         # existing tests (which configured ``lessons=…``) get them back through the new method.
         self._for_prompt_lessons = (
@@ -198,12 +205,37 @@ class FakeDB:
         self._mark_raises = mark_raises
         self.trade_n: list[int] = []
         self.lesson_n: list[int] = []
+        self.trade_for_prompt_calls: list[dict[str, Any]] = []
         self.for_prompt_calls: list[dict[str, Any]] = []
         self.marked_used: list[int] = []
 
     def get_recent_trades(self, n: int = 8) -> list[dict[str, Any]]:
         self.trade_n.append(n)
         return list(self._trades)
+
+    def get_recent_trades_for_prompt(
+        self,
+        n: int = 8,
+        *,
+        min_hold_min: float | None = None,
+        quarantine_before: str | None = None,
+        exclude_provenance: tuple[str, ...] = (),
+    ) -> list[dict[str, Any]]:
+        # v1.6 (Cause A part 2): the provenance-filtered trade-history prompt getter
+        # context_builder now calls. Records the request (n → trade_n so the limit assertion
+        # still holds; the filter kwargs → trade_for_prompt_calls) and returns the configured
+        # prompt trades. The actual SQL filtering semantics are proven against a real DB in
+        # the Phase-2 test_db suite.
+        self.trade_n.append(n)
+        self.trade_for_prompt_calls.append(
+            {
+                "n": n,
+                "min_hold_min": min_hold_min,
+                "quarantine_before": quarantine_before,
+                "exclude_provenance": exclude_provenance,
+            }
+        )
+        return list(self._for_prompt_trades)
 
     def get_recent_lessons(self, n: int = 5) -> list[dict[str, Any]]:
         self.lesson_n.append(n)

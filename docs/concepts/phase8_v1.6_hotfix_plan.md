@@ -377,6 +377,41 @@ Harness (Step 2) ist die Zukunftssicherung und fällt als Letztes — aber **vor
 
 ---
 
+## 6. Addendum — Cause A part 2 (der `recent_trades`-Prompt-Kanal, 2026-07-02)
+
+> Kein neuer Step in der obigen §3-Sequenz — ein während des laufenden Step-4-Live-Tests
+> gefundener + gefixter Bug, an derselben Baustelle wie v1.5 Step 4 A. Volle Session-Doku:
+> `phase8_scheduler/CLAUDE.md` → `## Session stopped — 2026-07-02 (v1.6-Hotfix: Cause A part 2)`.
+
+**Befund:** die v1.5-Step-4-A-Lesson-Filterung (`get_recent_lessons_for_prompt`) war korrekt,
+aber `context_builder.build_context` hat **zwei** P2-Reads, die beide in denselben P4-Prompt
+fließen — nur `recent_lessons` wurde 2026-07-01 gefiltert. Der zweite, unbemerkte Kanal
+`recent_trades = db.get_recent_trades(8)` blieb ungefiltert und speiste die drei geseedeten
+Verifikations-Trades (sub-Minuten-Hold, Time-Stop-Losses) als "drei Verlust-Trades" in die
+LLM-Abstain-Begründung — genau das, was Nikinger in der laufenden UI bemerkte.
+
+**Fix (additiv, P2+P4+P7):** `trade_outcomes` bekam eine echte `provenance`-Spalte (Migration
+003 — Nikinger-Entscheidung: Schema-Spalte statt migrationsfrei, sauber dokumentiert), gestamped
+vom P7-Recorder (`_open_record`, das Feld existierte bereits auf `OpenedTrade`, erreichte aber nie
+die Trade-Zeile). Eine neue `get_recent_trades_for_prompt` (P2) filtert exakt wie ihr
+Lesson-Gegenstück (Tag-Ausschluss + Hold-Time-Fallback + Quarantäne-Datum); `context_builder`
+nutzt sie jetzt statt der rohen `get_recent_trades`. Ein neues Operator-Skript
+`scripts/archive_verification_trades.py` (dry-run per Default) archiviert die drei bestehenden
+Verifikations-Trades (+ kaskadierende Lessons/Rewards via FK `ON DELETE CASCADE`) aus der Live-DB
+in `data/archive/` (gitignored, Nikinger-Entscheidung: Archivieren statt nur code-seitig filtern).
+
+**Regression:** P2 **75** (67→+8) · P4 **135** (133→+2) · P7 **133** (131→+2) · root-`tests`
+**64** (50→+14) · P5 unberührt (154). Trade-History gatet weiterhin nichts (root rule 3).
+
+**✅ Live bestätigt (2026-07-02, noch am selben Tag):** Operator-Lauf von `init_db.py` (Migration
+003 → Schema-Version 3) + `archive_verification_trades.py --commit` (Archiv geschrieben, die 3
+Verifikations-Trades + Lessons aus der Live-DB entfernt). UI zeigt keine Lessons mehr; die
+LLM-Abstain-Begründung referenziert die alten Test-Trades nicht mehr. Ein nachfolgender
+Research-Zyklus lieferte sogar einen echten P4-Pick, der vom P6-Debate-Layer korrekt (Marktgründe,
+kein Bug) auf ABSTAIN gesetzt wurde.
+
+---
+
 *Ende des Plans (Was + Wie). Step 4 (Live-Beweis) und Step 5 (Doku-Flip) sind Operator-Schritte —
 s. `phase8_scheduler/CLAUDE.md` → `## Session stopped` (v1.6 „Wie") für die volle Implementierungs-
 Zusammenfassung.*

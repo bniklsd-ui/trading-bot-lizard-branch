@@ -88,6 +88,19 @@ def test_insert_trade_persists_initial_risk_and_account(db, base_trade):
     assert trade["account"] == "demo"
 
 
+def test_insert_trade_persists_provenance(db, base_trade):
+    # Migration 003 (Phase 8 v1.6, Cause A part 2): the provenance tag must round-trip.
+    db.insert_trade({**base_trade, "provenance": "verification"})
+    trade = db.get_trade_by_deal_id("DEAL1")
+    assert trade["provenance"] == "verification"
+
+
+def test_insert_trade_provenance_defaults_to_null(db, base_trade):
+    db.insert_trade(base_trade)
+    trade = db.get_trade_by_deal_id("DEAL1")
+    assert trade["provenance"] is None
+
+
 # -- reward_pts -------------------------------------------------------------
 
 def test_insert_reward_returns_id(db, base_trade):
@@ -294,3 +307,62 @@ def test_for_prompt_combined_returns_newest_n_survivors(db, base_trade):
     )
     # survivors are keep1/keep2/keep3; LIMIT 2 returns the newest two, id DESC.
     assert [l["lesson_text"] for l in got] == ["keep3", "keep2"]
+
+
+# -- trade_outcomes: get_recent_trades_for_prompt (v1.6 Phase-8 hotfix, Cause A part 2) ----
+
+def test_trades_for_prompt_no_filter_equals_get_recent_trades(db, base_trade):
+    db.insert_trade(base_trade)
+    db.insert_trade({**base_trade, "deal_id": "DEAL2"})
+    assert db.get_recent_trades_for_prompt(8) == db.get_recent_trades(8)
+
+
+def test_trades_for_prompt_excludes_tagged_provenance(db, base_trade):
+    db.insert_trade({**base_trade, "deal_id": "VERIF", "provenance": "verification"})
+    db.insert_trade({**base_trade, "deal_id": "AUTO", "provenance": "autonomous"})
+    db.insert_trade({**base_trade, "deal_id": "UNTAGGED"})  # no provenance → NULL → kept
+    ids = [
+        t["deal_id"]
+        for t in db.get_recent_trades_for_prompt(8, exclude_provenance=("verification",))
+    ]
+    assert "VERIF" not in ids
+    assert "AUTO" in ids and "UNTAGGED" in ids
+
+
+def test_trades_for_prompt_hold_time_filter(db, base_trade):
+    db.insert_trade({**base_trade, "deal_id": "SHORT"})  # open_ts 09:00
+    db.update_trade_close("SHORT", {"close_ts": "2026-05-21T09:01:00.000Z"})  # 1 min hold
+    db.insert_trade({**base_trade, "deal_id": "LONG"})
+    db.update_trade_close("LONG", {"close_ts": "2026-05-21T10:00:00.000Z"})  # 60 min hold
+    db.insert_trade({**base_trade, "deal_id": "OPENQ"})  # never closed → NULL hold
+    ids = [t["deal_id"] for t in db.get_recent_trades_for_prompt(8, min_hold_min=2.0)]
+    assert "SHORT" not in ids
+    assert "LONG" in ids
+    assert "OPENQ" in ids  # NULL hold → fail-open keep (still-open trade)
+
+
+def test_trades_for_prompt_quarantine_before(db, base_trade):
+    db.insert_trade({**base_trade, "deal_id": "OLD", "open_ts": "2026-05-20T00:00:00.000Z"})
+    db.insert_trade({**base_trade, "deal_id": "NEW", "open_ts": "2026-06-30T00:00:00.000Z"})
+    ids = [
+        t["deal_id"]
+        for t in db.get_recent_trades_for_prompt(8, quarantine_before="2026-06-01T00:00:00.000Z")
+    ]
+    assert "OLD" not in ids
+    assert "NEW" in ids
+
+
+def test_trades_for_prompt_combined_returns_newest_n_survivors(db, base_trade):
+    db.insert_trade({**base_trade, "deal_id": "DROP_VERIF", "provenance": "verification"})
+    db.insert_trade({**base_trade, "deal_id": "KEEP1", "provenance": "autonomous"})
+    db.insert_trade({**base_trade, "deal_id": "DROP_OLD", "open_ts": "2026-01-01T00:00:00.000Z"})
+    db.insert_trade({**base_trade, "deal_id": "KEEP2"})  # never closed → NULL hold, not dropped
+    db.insert_trade({**base_trade, "deal_id": "KEEP3"})
+    got = db.get_recent_trades_for_prompt(
+        2,
+        min_hold_min=2.0,
+        quarantine_before="2026-03-01T00:00:00.000Z",
+        exclude_provenance=("verification",),
+    )
+    # survivors are KEEP1/KEEP2/KEEP3; LIMIT 2 returns the newest two, id DESC.
+    assert [t["deal_id"] for t in got] == ["KEEP3", "KEEP2"]

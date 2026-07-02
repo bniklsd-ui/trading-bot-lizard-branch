@@ -56,6 +56,25 @@ Two stores. **100% deterministic code — no LLM calls anywhere in Phase 2.**
 > migration.** P2 stays a dumb parameterised store — the excluded values + thresholds are the caller's
 > (P4) policy. +5 tests (**62 → 67**). Detail: `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
 
+> 🔁 **Phase-8 v1.6-hotfix edit (2026-07-02, Cause A part 2 — trade-history provenance, code = source
+> of truth):** the v1.5 fix above cleaned the *lessons* channel; `build_context` (P4) also reads
+> `get_recent_trades` — a **second, separate** channel into the same research prompt — which stayed
+> unfiltered. A live v1.6 run showed the LLM's abstain reasoning citing fake "three consecutive
+> losses" from three seeded verification trades read straight off `trade_outcomes`. **Fix (new,
+> real schema column this time — Nikinger decision, unlike the JSON-blob-only lesson fix):**
+> `migrations/003_phase8_trade_provenance.sql` adds `trade_outcomes.provenance TEXT` (fresh DB now
+> reaches **version 3**); `_TRADE_COLUMNS += ("provenance",)`; new **read-only** sibling method
+> `get_recent_trades_for_prompt(n=8, *, min_hold_min=None, quarantine_before=None,
+> exclude_provenance=())` mirrors `get_recent_lessons_for_prompt` exactly, but against the real
+> `provenance` column (no `json_extract` needed — it's a column, not a JSON blob field) —
+> `get_recent_trades` itself stays untouched for other callers. Three signals, same precision order:
+> `provenance IS NOT <tag>` (NULL-safe), `hold_duration_min` fallback (catches trades opened before
+> migration 003 — NULL hold i.e. still-open trades are kept, fail-open), `open_ts` quarantine cutoff.
+> +8 tests (**67 → 75**: 1 migration-version-3 assertion + 1 column-presence test + 5
+> `get_recent_trades_for_prompt` filter cases + 1 provenance round-trip + 1 NULL-default case).
+> Detail: `docs/concepts/phase8_v1.6_hotfix_plan.md` §6 + `phase8_scheduler/CLAUDE.md` →
+> `## Session stopped — 2026-07-02 (v1.6-Hotfix: Cause A part 2)`.
+
 ## Conventions
 - All timestamps ISO 8601 UTC, ms precision, `Z` suffix.
 - All money REAL + explicit `currency` column.

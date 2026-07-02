@@ -610,6 +610,24 @@ class ResearchConfig:
     lesson_min_hold_min: float = 2.0
     lesson_quarantine_before: str | None = None
 
+    # --- trade-history provenance filter (v1.6 Phase-8 hotfix, Cause A part 2, 2026-07-02) ---
+    # Why: v1.5 above cleaned the *lessons* channel only. ``build_context`` also reads
+    # ``db.get_recent_trades`` — the raw trade-history table rendered into the same prompt as a
+    # recent-trades table — and that read stayed unfiltered. A live v1.6 run showed the LLM's
+    # abstain reasoning citing fake "three consecutive losses" from three seeded verification
+    # trades. Same three signals, same precision order, now against ``trade_outcomes.provenance``
+    # (migration 003) instead of the lesson's JSON blob:
+    #   * recent_trades_exclude_provenance — precise: drop trades tagged with these provenance
+    #     values (written at open into trade_outcomes.provenance for trades opened since v1.6).
+    #   * recent_trades_min_hold_min — fallback: drop trades held < this many minutes (catches
+    #     the already-polluted, pre-migration trades — all are sub-minute forced time-stops).
+    #   * recent_trades_quarantine_before — reversible one-time reset (ISO ts on open_ts); None = off.
+    # Provisional (data-collection) — re-baseline before live. Trade history gates nothing (root
+    # rule 3); this only shapes what the LLM sees in its prompt.
+    recent_trades_exclude_provenance: tuple[str, ...] = ("verification",)
+    recent_trades_min_hold_min: float = 2.0
+    recent_trades_quarantine_before: str | None = None
+
     # --- token meter (USD + EUR) ---
     pricing_usd_per_mtok: dict[str, tuple[float, float]] = field(
         default_factory=lambda: dict(_DEFAULT_PRICING_USD_PER_MTOK)

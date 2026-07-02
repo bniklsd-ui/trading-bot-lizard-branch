@@ -29,6 +29,7 @@ _TRADE_COLUMNS = (
     "hold_duration_min", "profit_loss", "status", "research_confidence",
     "gate_path", "session_date", "created_at", "updated_at",
     "initial_risk", "account",  # migration 002 (Phase 7)
+    "provenance",  # migration 003 (Phase 8 v1.6, Cause A part 2)
 )
 _REWARD_COLUMNS = (
     "trade_id", "outcome_score_delta", "score_after", "win_loss", "pnl_raw",
@@ -203,6 +204,60 @@ class Database:
         """The ``n`` most recent trades, newest first (for Brain/Research context)."""
         cur = self.conn.execute(
             "SELECT * FROM trade_outcomes ORDER BY id DESC LIMIT ?", (n,)
+        )
+        return self._rows(cur)
+
+    def get_recent_trades_for_prompt(
+        self,
+        n: int = 8,
+        *,
+        min_hold_min: float | None = None,
+        quarantine_before: str | None = None,
+        exclude_provenance: tuple[str, ...] = (),
+    ) -> list[dict[str, Any]]:
+        """The ``n`` newest trades **after** dropping verification-trade noise (v1.6, Cause A part 2).
+
+        A parameterised sibling of :meth:`get_recent_trades` for the Phase-4 research prompt,
+        mirroring :meth:`get_recent_lessons_for_prompt` (v1.5 Step 4 A) exactly. With all filters
+        unset it is identical to ``get_recent_trades``; ``get_recent_trades`` itself is left
+        untouched for other callers. Filtering happens **in the query** (fetch the newest ``n``
+        *survivors*, not fetch-``n``-then-drop). Phase 2 stays a dumb parameterised store — the
+        excluded provenance values + thresholds are the caller's policy (Phase-4 config).
+
+        **Why this exists:** v1.5 Step 4 A tagged verification-trade *lessons* out of the prompt,
+        but ``build_context`` also reads the raw trade-history table (:meth:`get_recent_trades`),
+        which stayed unfiltered — a live v1.6 run showed the LLM citing fake "three consecutive
+        losses" from three seeded verification trades. This closes that second channel. Three
+        signals, in precision order (matching the lesson filter):
+
+        - ``exclude_provenance`` (**precise**, trades opened since migration 003 / the P7 write-path
+          fix): drops a trade whose ``provenance`` column is one of the given tags (e.g.
+          ``("verification",)``). NULL-safe ``IS NOT`` — a trade with no tag (opened before
+          migration 003) is **kept** here and handled by the fallback below.
+        - ``min_hold_min`` (**fallback**, catches the pre-migration polluted trades): drops a trade
+          held < this many minutes (a forced sub-minute time-stop). ``hold_duration_min IS NULL``
+          (still open) is **kept** — fail-open toward keeping real/in-flight trades.
+        - ``quarantine_before`` (**reversible reset**): drops trades with ``open_ts`` before this
+          ISO timestamp — a one-time hard reset the operator can enable; ``None`` = off.
+
+        Provenance/quality here only shapes the **prompt**; it never touches the reward/score math.
+        """
+        clauses: list[str] = []
+        params: list[Any] = []
+        for tag in exclude_provenance:
+            # NULL-safe: keep rows with no provenance tag; drop only the exact tag.
+            clauses.append("provenance IS NOT ?")
+            params.append(tag)
+        if min_hold_min is not None:
+            clauses.append("(hold_duration_min IS NULL OR hold_duration_min >= ?)")
+            params.append(min_hold_min)
+        if quarantine_before is not None:
+            clauses.append("open_ts >= ?")
+            params.append(quarantine_before)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(n)
+        cur = self.conn.execute(
+            f"SELECT * FROM trade_outcomes{where} ORDER BY id DESC LIMIT ?", params
         )
         return self._rows(cur)
 

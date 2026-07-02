@@ -141,7 +141,8 @@ class RewardSink:
         """Map an ``OpenedTrade`` onto a ``trade_outcomes`` insert record.
 
         ``intended_open_level`` → ``open_level`` (NOT NULL in P2). ``initial_risk`` /
-        ``account`` persist only after migration 002 (whitelist drops them until then).
+        ``account`` persist only after migration 002 (whitelist drops them until then);
+        ``provenance`` only after migration 003 (Phase 8 v1.6, Cause A part 2, same rule).
         """
         return {
             "deal_id": opened.deal_id,
@@ -157,6 +158,11 @@ class RewardSink:
             "session_date": opened.session_date,
             "initial_risk": opened.initial_risk,  # migration 002 (Step 12)
             "account": opened.account,  # migration 002 (Step 12)
+            # v1.6 (Phase-8 hotfix, Cause A part 2, 2026-07-02): stamp the same tag that
+            # already reaches the lesson's market_context_json (see _extract_lesson below)
+            # onto the trade row itself, so the SEPARATE recent_trades prompt channel
+            # (context_builder.get_recent_trades_for_prompt) can filter on it too.
+            "provenance": opened.provenance,  # migration 003 (Phase 8 v1.6)
         }
 
     # -- close --------------------------------------------------------------

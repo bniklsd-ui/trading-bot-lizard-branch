@@ -64,6 +64,18 @@ class _DBLike(Protocol):
 
     def get_recent_trades(self, n: int = ...) -> list[dict[str, Any]]: ...
 
+    # v1.6 (Phase-8 hotfix, Cause A part 2): provenance-/quality-filtered trade-history selection
+    # for the prompt (keeps verification-trade rows out) — mirrors get_recent_lessons_for_prompt
+    # below, but against trade_outcomes.provenance (migration 003) instead of the lesson blob.
+    def get_recent_trades_for_prompt(
+        self,
+        n: int = ...,
+        *,
+        min_hold_min: float | None = ...,
+        quarantine_before: str | None = ...,
+        exclude_provenance: tuple[str, ...] = ...,
+    ) -> list[dict[str, Any]]: ...
+
     def get_recent_lessons(self, n: int = ...) -> list[dict[str, Any]]: ...
 
     # v1.5 (Phase-8 hotfix Step 4 A): provenance-/quality-filtered lesson selection for the
@@ -231,7 +243,17 @@ def build_context(
         if probed is not None:
             tradeable_epics.append(probed)
 
-    recent_trades = db.get_recent_trades(8)
+    # v1.6 (Phase-8 hotfix, Cause A part 2, 2026-07-02): filter verification-trade *history* rows
+    # out of the prompt — the second, previously-unfiltered channel feeding the same test trades
+    # to the LLM (v1.5 Step 4 A below only cleaned the lessons channel). Same three-signal shape,
+    # against trade_outcomes.provenance (migration 003) + hold_duration_min fallback (catches
+    # trades opened before that migration — all forced sub-minute time-stops).
+    recent_trades = db.get_recent_trades_for_prompt(
+        8,
+        min_hold_min=config.recent_trades_min_hold_min,
+        quarantine_before=config.recent_trades_quarantine_before,
+        exclude_provenance=config.recent_trades_exclude_provenance,
+    )
     # v1.5 (Phase-8 hotfix Step 4 A): filter verification-trade lessons out of the prompt.
     # Precise provenance tag (written since v1.5) + hold-time fallback (catches pre-tag
     # polluted lessons) + optional reversible date quarantine — all driven by config, applied
