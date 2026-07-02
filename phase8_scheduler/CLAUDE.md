@@ -213,6 +213,62 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-02 (v1.5 nach `main` gemergt + ehrlich geflaggt; erster Live-Lauf → yFinance-Blocker; v1.6-Handover geschrieben)
+
+> **Auslöser:** der Nikinger hat den v1.5-Daemon **live** laufen lassen — er produziert
+> yFinance-Fehler. Auftrag (gleiche Taktik wie beim P8-Merge): **v1.5 mit ehrlicher Doku nach `main`
+> pushen + mergen**, stale Docs updaten, ein **v1.6-Handover** schreiben (was v1.5 lieferte + was es
+> live NICHT produzierte), dann Session-stopped + Konventionen. **Kein Code-Fix diese Session** — das
+> echte Troubleshooting ist deep cross-phase + es gibt **noch kein echtes Logging**, also gehört es in
+> eine frische Session (ausdrücklicher Nikinger-Wunsch).
+
+### Befund (Code = Wahrheit — NICHT der v1.5-Provenance-Code)
+- **yFinance-Blocker:** `^IBEX` (und mit hoher Sicherheit `^FCHI`) liefern `possibly delisted; no price
+  data found (period=1d)` → der P3-`fetcher` retryt 3× und degradiert den **Brain-Context** dieses Epics
+  zu `None` (P4 `context_builder._safe_brain_context`; concept C3 „reduced-signal, toleriert"). **Kein
+  Hard-Crash** (Fallback „using last daily close"), das Epic bleibt handelbar (Tradeability kommt vom
+  Broker-Probe, nicht von yFinance), aber es erreicht den LLM mit `n/a`-Signalen + flutet die Logs.
+- **Das ist exakt das im Step-2-Variety-Track geflaggte, aber NIE operator-verifizierte Risiko:**
+  `^FCHI`/`^IBEX` waren „well-known public symbols, **not** live-verified" (nur DAX `^GDAXI` + Euro
+  Stoxx 50 `^STOXX50E` sind verifiziert). Der Ticker-Map-Eintrag steht in
+  `phase3_external_data/external_data/ticker_map.py`.
+- **Effekt:** die v1.5-„Variety" ist **halb wirksam** — DAX + Euro Stoxx 50 voller Context, CAC 40 +
+  IBEX 35 kein Context. Der **net-new autonome open→close** (v1.5-Ziel) bleibt **unbewiesen**.
+- **Meta-Lücke:** es gibt **kein strukturiertes Logging** (nur rohe yFinance/fetcher-stderr-WARNINGs) →
+  die Ursache ist aus dem aktuellen Output nicht sauber zu pinnen. v1.6-Step-0 = Observability.
+
+### Completed (diese Session — nur Doku + Merge, KEIN Trading-/Scheduler-Code)
+- **`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`** (NEU) — was v1.5 lieferte (A/B/C + Provenance-UI,
+  mockgrün) · was live noch fehlt (open→close, Breaker, Multi-Day, Edge) · der yFinance-Blocker
+  (Symptome + Code-Pfad + Hypothesen) · die No-Logging-Meta-Lücke · v1.6-Richtungen (Observability →
+  `^FCHI`/`^IBEX` verifizieren/fixen **oder** droppen → Live-Beweis) · Datei-Anker.
+- **Stale-Docs ehrlich geflippt:** `README.md` (Statuszeile 8 + Fußnote ⁵), `ROADMAP.md`
+  (Phase-8-Header + neuer ⚠-v1.5-Stand-Block), root `CLAUDE.md` („Active phase"-Opener) — alle mit dem
+  v1.5-merged-Stand + yFinance-Blocker + v1.6-Pointer.
+- **Merge:** `phase8-v1.5-hotfix` → `main` (fast-forward) + Push nach `origin` (s. u.).
+
+### Verifiziert (mockgrün — Live = Operator)
+- Regression unberührt (kein Code berührt diese Session): **P1 52 · P2 67 · P3 72 · P4 122 · P5 154 ·
+  P6 70 · P7 131 · P8 182**. Die yFinance-Fehler sind ein **Laufzeit-/Daten-Problem**, kein Test-Fail.
+
+### Next (frische Session — v1.6)
+1. **Observability zuerst** (der Enabler): strukturiertes Per-Zyklus/Per-Epic-Brain-Context-Log
+   (full/degraded/warum) + persistiertes Daemon-Run-Log; heute ist die Diagnose Blindflug.
+2. **Den übersprungenen P3-Check nachholen:** `python phase3_external_data/scripts/smoke_test.py --epic
+   IX.D.CAC.IFE.IP` und `--epic IX.D.IBEX.IFM.IP` gegen echtes yFinance — was liefert Yahoo für
+   `^FCHI`/`^IBEX` wirklich (Symbol/period/interval)? (Operator-Lauf.)
+3. **Fix oder Drop:** Symbol/period korrigieren (cross-phase P3) **oder** CAC 40 + IBEX 35 aus
+   `EXTENDED_UNIVERSE` entfernen (zurück auf die zwei verifizierten DAX + Euro Stoxx 50) — beide additiv,
+   cross-phase (models + ticker_map + Tests + abgeleitete P5-`point_values`).
+4. **Dann Live-Beweis** (v1.5-Step-5): Varietäts-Run (open→close) + Breaker-Fire-Run.
+- **Commit:** die Doku dieser Session ist committet + gemergt (Operator-getriggert).
+
+### Offene Punkte / blockers
+- yFinance `^FCHI`/`^IBEX` Ursache **ungepinnt** (bewusst — braucht Logging + den P3-smoke_test in einer
+  frischen Session). `point_value` STXE/CAC/IBEX weiterhin **inferiert** (vor Live-Konto bestätigen).
+
+---
+
 ## UI-Erweiterung — 2026-07-01 (Lesson-Provenance-Label — Addendum zu Step 4 A)
 
 > **Auslöser:** der Nikinger, kurz vor dem Start von Step 5, bemerkte, dass die Lessons-Card im

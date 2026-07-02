@@ -203,7 +203,7 @@ live-verifiziert ≠ profit-validiert (erst **ein** Trade; Edge-Metrik läuft be
 
 ---
 
-## Phase 8 — Scheduler 🟡 code-complete + merged 2026-06-30 — autonomer Trade NOCH NICHT live-bewiesen
+## Phase 8 — Scheduler 🟡 code-complete + merged; v1.5-Hotfix merged 2026-07-02 — autonomer Trade NOCH NICHT live-bewiesen (→ v1.6)
 
 > **Mission (zuerst lesen):** „Scheduler" ist nur der Name — das Ziel ist **autonome,
 > unbeaufsichtigte Erzeugung realer Demo-Trades**, weil alles nach P8 (Confidence aus
@@ -237,10 +237,22 @@ Trade** open *und* close in einem sauberen Lauf; **real auslösende** Safety-Bre
 Edge/Profitabilität (nie im Scope).
 
 **Why the gap + nächster Track:** der Bot **abstaint** fast jeden Zyklus (Single-Instrument-Universum
-+ Sub-50-Doppel-Clamp). Nächster Track = **v1.5-Hotfix** (Varietät C + Clamp/Floor B + echte
-Lessons A) — siehe [`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md)
++ Sub-50-Doppel-Clamp). Track = **v1.5-Hotfix** (Varietät C + Clamp/Floor B + echte Lessons A) —
+siehe [`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md)
 (+ Planner-Companion `PHASE8_V1.5_KICKOFF_HANDOVER.md`). Das ursprüngliche „Done when" (live net-new
 autonomer open→close + demonstrierbarer Breaker-Trip) ist **in v1.5 übernommen**, hier nicht behauptet.
+
+> **⚠ v1.5-Stand (gemergt 2026-07-02, ehrlich):** die drei Code-Fixes A/B/C sind fertig + mockgrün
+> (P1 52 · P2 67 · P3 72 · P4 122 · P5 154 · P6 70 · P7 131 · P8 182). Aber der erste **Live-Lauf**
+> (2026-07-02) deckte einen **yFinance-Blocker** auf: CAC 40 (`^FCHI`) und IBEX 35 (`^IBEX`) — die im
+> Step-2-Variety-Track **nie live-verifizierten** Ticker — liefern keine Kursdaten (*„possibly
+> delisted; no price data"*) → deren P3-Brain-Context degradiert zu `None` (2 von 4 Instrumenten
+> reduced-signal). **Kein Hard-Crash** (Fallback auf letzten Daily-Close), **kein VETO betroffen**
+> (Momentum-VETO nutzt IG-Echtzeit-Bars, nicht yFinance), **nicht** der v1.5-Provenance-Code. Der
+> **net-new autonome open→close** bleibt damit **unbewiesen**. Es fehlt außerdem **echtes Logging**.
+> → Nächster Track = **v1.6** (erst Observability, dann `^FCHI`/`^IBEX` verifizieren/fixen **oder**
+> droppen, dann der Live-Beweis): siehe
+> [`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.6_HANDOVER.md).
 
 **Directory:** [`phase8_scheduler/`](./phase8_scheduler/) *(pkg `scheduler` + `webui`)*
 **Concept:** [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md)

@@ -78,10 +78,18 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 ## Current state
 
 **Active phase:** Phase 8 — Scheduler (`phase8_scheduler/`, Paket `scheduler`): 🟡 **code-complete +
-gemerged nach `main` (2026-06-30)** — mechanisch bewiesen (181 Tests), **autonomer Trade noch NICHT
-live-bewiesen** (ehrlich geflaggt gemerged, um den Build weiterzutragen). **Nächster Track = v1.5-Hotfix**
-(Variety + Clamp/Floor + echte Lessons), Plan-Handover: `phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`
-→ in Claude Web zum Detailplan, dann zurück zu Claude Code.
+gemerged nach `main` (2026-06-30); v1.5-Hotfix gemerged (2026-07-02)** — mechanisch bewiesen,
+**autonomer Trade noch NICHT live-bewiesen** (ehrlich geflaggt gemerged, um den Build weiterzutragen).
+**⚠ v1.5-Stand (ehrlich, 2026-07-02):** die drei Code-Fixes A/B/C sind fertig + mockgrün (P1 52 · P2 67 ·
+P3 72 · P4 122 · P5 154 · P6 70 · P7 131 · P8 182), aber der erste **Live-Lauf** deckte einen
+**yFinance-Blocker** auf — CAC 40 (`^FCHI`) und IBEX 35 (`^IBEX`), die im Step-2-Variety-Track **nie
+live-verifizierten** Ticker, liefern keine Kursdaten (*„possibly delisted"*) → deren P3-Brain-Context
+degradiert zu `None` (2 von 4 Instrumenten reduced-signal; **kein** Hard-Crash — Fallback auf letzten
+Daily-Close, **kein VETO betroffen** — Momentum-VETO nutzt IG-Echtzeit-Bars, **nicht** der
+v1.5-Provenance-Code). Der **net-new autonome open→close** bleibt unbewiesen; es fehlt zudem **echtes
+Logging**. **Nächster Track = v1.6** (erst Observability, dann `^FCHI`/`^IBEX` verifizieren/fixen oder
+droppen, dann der Live-Beweis), Handover: `phase8_scheduler/PHASE8_V1.6_HANDOVER.md` (v1.5-Kontext:
+`PHASE8_V1.5_HOTFIX_HANDOVER.md`).
 (gestartet 2026-06-27). **Mission (zuerst lesen):** Phase 8 heißt „Scheduler", aber das Ziel ist
 **autonome, unbeaufsichtigte Erzeugung echter Demo-Trades** — alles danach (Confidence aus
 `INSUFFICIENT`, P9-Instinct-Promotion) ist auf reale Outcomes gegatet. Der harte Pfad ist die

@@ -20,7 +20,7 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 5     | ig_bot.py Gates 1–5 + 4 VETOs + place/monitor/close | ✅ Abgeschlossen — live-**verifiziert** (Order-/Monitor-Pfad, Demo), noch nicht profit-validiert ² |
 | 6     | Bull/Bear/Judge Debate              | ✅ Abgeschlossen — live-**verifiziert** (Debatte-Pfad, Demo), noch nicht profit-validiert ³ |
 | 7     | Reward/Punishment + Brain           | ✅ live-verifiziert (Demo, 2026-06-26) — `live_test.py` 5/5; 128 Unit-Tests ⁴ |
-| 8     | Scheduler                           | 🟡 Code-complete + gemerged (2026-06-30) — mechanisch bewiesen (181 Tests), **autonomer Trade noch nicht live-bewiesen** ⁵ |
+| 8     | Scheduler                           | 🟡 Code-complete + gemerged; **v1.5-Hotfix gemerged (2026-07-02)** — A/B/C-Code fertig (mockgrün), aber autonomer Trade weiterhin nicht live-bewiesen + yFinance-Blocker (`^FCHI`/`^IBEX`) → **v1.6** ⁵ |
 | 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert)       |
 
 ¹ **Live-getestet ≠ profit-validiert.** Die Research-Pipeline läuft nachweislich
@@ -69,9 +69,16 @@ Reconcile+Reward-Loop auf **realen** früheren Demo-Trades. ⚠ **NOCH NICHT bew
 diesem ehrlichen Flag, um den Build weiterzutragen): ein **netto-neuer autonomer Trade** in einem
 sauberen Lauf geöffnet **und** geschlossen, die Safety-Breaker, die **tatsächlich auslösen**,
 Mehr-Tage-Verhalten, Edge/Profitabilität (nie im Scope). **Ursache des Gaps + Fix-Vorschlag:** der Bot
-**abstained** fast immer (1-Instrument-Universe + Doppel-Clamp unter Score 50) → der nächste Track ist
-ein **v1.5-Hotfix** (Variety + Clamp/Floor + echte Lessons), siehe
-`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`. Konzept: `docs/concepts/phase8_scheduler_concept.md`.
+**abstained** fast immer (1-Instrument-Universe + Doppel-Clamp unter Score 50) → **v1.5-Hotfix
+(Variety + Clamp/Floor + echte Lessons) gemerged 2026-07-02**. **v1.5-Stand (ehrlich):** die drei
+Code-Fixes (A/B/C) sind fertig + mockgrün, aber der **netto-neue autonome open→close** ist weiterhin
+**nicht live-bewiesen** — der erste Live-Lauf deckte einen **yFinance-Blocker** auf: CAC 40 (`^FCHI`)
+und IBEX 35 (`^IBEX`) liefern keine Kursdaten (*„possibly delisted"*) → deren Phase-3-Brain-Context
+degradiert zu `None` (2 von 4 Instrumenten reduced-signal; **kein** Hard-Crash, kein VETO betroffen —
+der Momentum-VETO nutzt IG-Echtzeit-Bars, nicht yFinance). Es fehlt zudem **echtes Logging**. Nächster
+Track = **v1.6** (erst Observability, dann `^FCHI`/`^IBEX` verifizieren/fixen oder droppen, dann der
+Live-Beweis), siehe `phase8_scheduler/PHASE8_V1.6_HANDOVER.md` (v1.5-Kontext:
+`PHASE8_V1.5_HOTFIX_HANDOVER.md`). Konzept: `docs/concepts/phase8_scheduler_concept.md`.
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)
