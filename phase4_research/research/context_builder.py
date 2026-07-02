@@ -138,8 +138,10 @@ def _probe_epic(broker: _BrokerLike, epic: str, max_spread_pct: float) -> dict[s
     }
 
 
-def _safe_brain_context(market_data: _FetcherLike, anchor_epic: str) -> dict[str, Any] | None:
-    """Fetch the anchor epic's Phase-3 prompt dict, degrading to ``None`` safely.
+def _safe_brain_context(
+    market_data: _FetcherLike, anchor_epic: str
+) -> tuple[dict[str, Any] | None, dict[str, str]]:
+    """Fetch one epic's Phase-3 prompt dict, degrading to ``None`` safely.
 
     Guards the documented Phase-3 failure mode: ``get_brain_context`` propagates
     an ``EpicNotMappedError`` for an unmapped epic. That is caught **by class
@@ -147,6 +149,16 @@ def _safe_brain_context(market_data: _FetcherLike, anchor_epic: str) -> dict[str
     ``None`` with a warning; any other exception re-raises (never swallow
     silently). For a mapped epic the call practically never returns ``None``, but
     the defensive ``is None`` check is kept anyway.
+
+    Returns:
+        A ``(prompt_dict, field_errors)`` pair. v1.6 (Phase-8 hotfix Step 0,
+        observability): ``field_errors`` mirrors the Phase-3
+        ``BrainContext.field_errors`` (label → exception text for a degraded
+        sub-indicator), read via ``getattr`` since ``get_brain_context``'s return
+        is duck-typed ``Any`` here (phase isolation) — a fake without the
+        attribute (pre-v1.6 test doubles) degrades to ``{}``, never crashes.
+        ``({}, {})``-shaped on either guard branch (unmapped epic / ``None``
+        context) since there is nothing to report per-field in those cases.
     """
     try:
         bc = market_data.get_brain_context(anchor_epic)
@@ -154,11 +166,39 @@ def _safe_brain_context(market_data: _FetcherLike, anchor_epic: str) -> dict[str
         if type(exc).__name__ != "EpicNotMappedError":
             raise
         log.warning("context: brain context unavailable for %s (unmapped epic: %s)", anchor_epic, exc)
-        return None
+        return None, {}
     if bc is None:
         log.warning("context: brain context is None for %s — degrading", anchor_epic)
-        return None
-    return bc.to_prompt_dict()
+        return None, {}
+    field_errors = dict(getattr(bc, "field_errors", None) or {})
+    return bc.to_prompt_dict(), field_errors
+
+
+def _brain_health(prompt_dict: dict[str, Any] | None, field_errors: dict[str, str]) -> dict[str, Any]:
+    """Derive a v1.6 (Step 0) diagnostic health summary from one epic's snapshot.
+
+    Purely a function of the already-honest ``None``-gaps in ``to_prompt_dict()``
+    (no new Phase-3 data needed for the "which field" half) plus the exception text
+    Phase-3 now captures (the "why" half). Never gates anything — diagnostic-only.
+    """
+    if prompt_dict is None:
+        return {"status": "unavailable"}
+    missing: list[str] = []
+    if prompt_dict.get("drift_pct") is None:
+        missing.append("drift")
+    if prompt_dict.get("momentum_15m_pct") is None:
+        missing.append("momentum")
+    if prompt_dict.get("volume_z_score") is None:
+        missing.append("volume")
+    if prompt_dict.get("distance_to_high_pct") is None or prompt_dict.get("distance_to_low_pct") is None:
+        missing.append("high_low")
+    if prompt_dict.get("range_30d") is None:
+        missing.append("history")
+    return {
+        "status": "degraded" if missing else "full",
+        "missing": missing,
+        "errors": dict(field_errors),
+    }
 
 
 def build_context(
@@ -214,9 +254,15 @@ def build_context(
     epics_needing_brain = list(
         dict.fromkeys([e["epic"] for e in tradeable_epics] + [anchor_epic])
     )
-    brain_contexts: dict[str, dict[str, Any] | None] = {
-        epic: _safe_brain_context(market_data, epic) for epic in epics_needing_brain
-    }
+    brain_contexts: dict[str, dict[str, Any] | None] = {}
+    # v1.6 (Phase-8 hotfix Step 0, observability): a per-epic diagnostic summary
+    # assembled alongside brain_contexts, from the same fetch — no extra Phase-3
+    # calls. Display/diagnostic-only (root rule 3: gates nothing).
+    brain_context_health: dict[str, dict[str, Any]] = {}
+    for epic in epics_needing_brain:
+        prompt_dict, field_errors = _safe_brain_context(market_data, epic)
+        brain_contexts[epic] = prompt_dict
+        brain_context_health[epic] = _brain_health(prompt_dict, field_errors)
     brain_context = brain_contexts.get(anchor_epic)
 
     n_present = sum(1 for v in brain_contexts.values() if v is not None)
@@ -238,4 +284,5 @@ def build_context(
         brain_context=brain_context,
         anchor_epic=anchor_epic,
         brain_contexts=brain_contexts,
+        brain_context_health=brain_context_health,
     )

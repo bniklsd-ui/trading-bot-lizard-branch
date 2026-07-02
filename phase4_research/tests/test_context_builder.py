@@ -251,3 +251,61 @@ def test_lesson_prompt_filter_defaults(broker: FakeBroker, fetcher: FakeFetcher)
     assert db.for_prompt_calls[0]["exclude_provenance"] == ("verification",)
     assert db.for_prompt_calls[0]["min_hold_min"] == 2.0
     assert db.for_prompt_calls[0]["quarantine_before"] is None
+
+
+# -- v1.6 Step 0: brain_context_health (observability) -------------------------
+
+def test_brain_context_health_full_when_all_signals_present(
+    broker: FakeBroker, db: FakeDB, fetcher: FakeFetcher
+) -> None:
+    """A fully-populated prompt dict (the default fixture) → status 'full', nothing missing."""
+    ctx = build_context(broker, db, fetcher, _config())
+
+    health = ctx.brain_context_health[DEFAULT_EPIC]
+    assert health == {"status": "full", "missing": [], "errors": {}}
+
+
+def test_brain_context_health_degraded_lists_missing_fields(
+    broker: FakeBroker, db: FakeDB
+) -> None:
+    """Specific None fields surface by name in 'missing', not just a blanket flag."""
+    pd = _make_prompt_dict(drift_pct=None, momentum_15m_pct=None, volume_z_score=None)
+    fetcher = FakeFetcher(prompt_dict=pd, field_errors={"drift": "no usable data for '^GDAXI'"})
+    ctx = build_context(broker, db, fetcher, _config())
+
+    health = ctx.brain_context_health[DEFAULT_EPIC]
+    assert health["status"] == "degraded"
+    assert set(health["missing"]) == {"drift", "momentum", "volume"}
+    # high_low/history stayed populated (not in missing)
+    assert "high_low" not in health["missing"]
+    assert "history" not in health["missing"]
+    assert health["errors"] == {"drift": "no usable data for '^GDAXI'"}
+
+
+def test_brain_context_health_unavailable_when_context_is_none(
+    broker: FakeBroker, db: FakeDB
+) -> None:
+    """A whole-epic failure (None context) → status 'unavailable', no crash."""
+    fetcher = FakeFetcher(returns_none=True)
+    ctx = build_context(broker, db, fetcher, _config())
+
+    assert ctx.brain_context_health[DEFAULT_EPIC] == {"status": "unavailable"}
+
+
+def test_brain_context_health_unavailable_on_unmapped_epic(broker: FakeBroker, db: FakeDB) -> None:
+    """EpicNotMappedError guard path → health also degrades to 'unavailable', not a crash."""
+    fetcher = FakeFetcher(raises=EpicNotMappedError("no mapping for epic"))
+    ctx = build_context(broker, db, fetcher, _config())
+
+    assert ctx.brain_context_health[DEFAULT_EPIC] == {"status": "unavailable"}
+
+
+def test_brain_context_health_keyed_per_epic_like_brain_contexts(
+    db: FakeDB, fetcher: FakeFetcher
+) -> None:
+    """brain_context_health has exactly the same key set as brain_contexts (one health entry
+    per epic that got a brain-context fetch attempt, tradeable epics ∪ anchor)."""
+    broker = FakeBroker()
+    ctx = build_context(broker, db, fetcher, _config())
+
+    assert set(ctx.brain_context_health) == set(ctx.brain_contexts)

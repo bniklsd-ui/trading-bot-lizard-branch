@@ -245,10 +245,17 @@ class FakeDB:
 
 
 class _FakeBrainContext:
-    """Wraps a prompt dict so the builder can call ``to_prompt_dict()`` on it."""
+    """Wraps a prompt dict so the builder can call ``to_prompt_dict()`` on it.
 
-    def __init__(self, prompt_dict: dict[str, Any]) -> None:
+    v1.6 (Phase-8 hotfix Step 0): optionally carries ``field_errors`` (mirrors the
+    real Phase-3 ``BrainContext.field_errors``), read defensively via ``getattr``
+    by ``context_builder._safe_brain_context`` — a plain instance without it
+    (the pre-v1.6 default here) degrades that read to ``{}``, never crashes.
+    """
+
+    def __init__(self, prompt_dict: dict[str, Any], field_errors: dict[str, str] | None = None) -> None:
         self._prompt_dict = prompt_dict
+        self.field_errors = field_errors or {}
 
     def to_prompt_dict(self) -> dict[str, Any]:
         return dict(self._prompt_dict)
@@ -268,10 +275,12 @@ class FakeFetcher:
         prompt_dict: dict[str, Any] | None = None,
         returns_none: bool = False,
         raises: Exception | None = None,
+        field_errors: dict[str, str] | None = None,
     ) -> None:
         self._prompt_dict = prompt_dict
         self._returns_none = returns_none
         self._raises = raises
+        self._field_errors = field_errors
         self.calls: list[str] = []
 
     def get_brain_context(self, epic: str) -> Any:
@@ -280,7 +289,7 @@ class FakeFetcher:
             raise self._raises
         if self._returns_none or self._prompt_dict is None:
             return None
-        return _FakeBrainContext(self._prompt_dict)
+        return _FakeBrainContext(self._prompt_dict, self._field_errors)
 
 
 def _make_prompt_dict(**overrides: Any) -> dict[str, Any]:

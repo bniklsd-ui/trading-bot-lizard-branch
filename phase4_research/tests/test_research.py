@@ -418,3 +418,86 @@ def test_run_mark_lesson_used_failure_does_not_break_cycle() -> None:
     assert len(result) == 1                       # the pick was still saved + returned
     assert state.saved == [[result[0].to_dict()]]  # one-save invariant intact
     assert db.marked_used == []                    # the mark raised before recording
+
+
+# --------------------------------------------------------------------------- #
+# 8. v1.6 Step 0 (observability): last_context_health / last_abort_detail     #
+# --------------------------------------------------------------------------- #
+
+
+def test_run_pass_populates_context_health_and_clears_abort_detail() -> None:
+    """A clean PASS captures the per-epic health snapshot and leaves no abort detail."""
+    research, _, _, _ = _research(llm=FakeLLM(raw=_buy_raw()))
+
+    research.run()
+
+    assert research.last_context_health[DEFAULT_EPIC] == {"status": "full", "missing": [], "errors": {}}
+    assert research.last_abort_detail is None
+
+
+def test_run_session_health_abort_sets_abort_detail_no_context_health() -> None:
+    """A pre-flight abort sets ``last_abort_detail`` with the exact reason; context is never
+    built on this branch, so ``last_context_health`` stays at its reset default ``{}``."""
+    broker = FakeBroker(account_ok=False)
+    research, _, _, _ = _research(broker=broker)
+
+    research.run()
+
+    assert research.last_abort_detail == "session-health abort: get_account not ok"
+    assert research.last_context_health == {}
+
+
+def test_run_empty_universe_sets_abort_detail_and_context_health() -> None:
+    """Empty-universe abort: context WAS built (health present) before the abort fires."""
+    broker = FakeBroker(currency="USD")
+    research, _, _, _ = _research(broker=broker)
+
+    research.run()
+
+    assert research.last_abort_detail == "empty universe (nothing tradeable)"
+    # brain context is still fetched for the anchor even though the universe is empty.
+    assert DEFAULT_EPIC in research.last_context_health
+
+
+def test_run_llm_error_sets_abort_detail() -> None:
+    """An LLM error's exact reason lands in ``last_abort_detail`` (broader than the LLM's own
+    prose — that field is valid-abstain-only, see ``last_no_pick_reasoning``)."""
+    llm = FakeLLM(raises=LLMResponseError("boom after retry"))
+    research, _, _, _ = _research(llm=llm)
+
+    research.run()
+
+    assert research.last_abort_detail == "LLM error: boom after retry"
+
+
+def test_run_validator_reject_sets_abort_detail() -> None:
+    """A validator REJECT's reason lands in ``last_abort_detail`` (not just the LLM_ABSTAIN
+    umbrella Phase 8 sees — this is the free-text detail behind it)."""
+    llm = FakeLLM(
+        raw={
+            "abstain": False,
+            "epic": "IX.D.FTSE.IFMM.IP",
+            "direction": "BUY",
+            "confidence": 90.0,
+            "reasoning": "Hallucinated instrument.",
+        }
+    )
+    research, _, _, _ = _research(llm=llm)
+
+    research.run()
+
+    assert research.last_abort_detail is not None
+    assert research.last_abort_detail.startswith("validator REJECT:")
+
+
+def test_run_pass_clears_stale_abort_detail_and_context_health() -> None:
+    """Both v1.6 observability attrs reset at the top of every run() — a PASS after a prior
+    abort-carrying cycle leaves no stale detail behind."""
+    research, _, _, _ = _research(llm=FakeLLM(raw=_buy_raw()))
+    research.last_abort_detail = "stale from a previous cycle"
+    research.last_context_health = {"stale": {"status": "unavailable"}}
+
+    research.run()
+
+    assert research.last_abort_detail is None
+    assert "stale" not in research.last_context_health

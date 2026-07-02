@@ -140,6 +140,18 @@ class Research:
         # captured so a UI can show *why* it skipped. ``None`` after a pick or a pre-LLM abort.
         # Never gates anything and never becomes a candidate (root rule 3). Read by Phase-8.
         self.last_no_pick_reasoning: str | None = None
+        # v1.6 (Phase-8 hotfix Step 0, observability). Diagnostic-only, gates nothing (root
+        # rule 3); both reset at the top of every run() and read defensively by Phase-8
+        # (getattr, so a pre-v1.6 fake without these attrs still satisfies the Protocol):
+        # - last_context_health: the per-epic brain-context health from the *last* cycle's
+        #   build_context() call (copied from ResearchContext.brain_context_health). Set even
+        #   on a pre-LLM abort (context is always built before any abort branch that has one).
+        # - last_abort_detail: the exact free-text reason passed to _abstain() on the *last*
+        #   cycle, for EVERY non-pick branch (session-health abort / empty universe / LLM error
+        #   / validator reject / valid abstain / filter reject) — broader than
+        #   last_no_pick_reasoning, which only covers the model's own prose on a valid abstain.
+        self.last_context_health: dict[str, dict] = {}
+        self.last_abort_detail: str | None = None
 
     # ------------------------------------------------------------------ #
     # Public API                                                         #
@@ -158,6 +170,9 @@ class Research:
         """
         # Reset the display-only abstain prose each cycle (a pick / pre-LLM abort leaves it clear).
         self.last_no_pick_reasoning = None
+        # v1.6 Step 0: reset the observability attrs each cycle too (see __init__ docstring).
+        self.last_context_health = {}
+        self.last_abort_detail = None
 
         # 1. Session-health pre-flight. Any fault → abort, no AI call.
         try:
@@ -167,6 +182,8 @@ class Research:
 
         # 2. Deterministic context (Phase-1 probe / Phase-2 reads / Phase-3 brain).
         context = build_context(self.broker, self.db, self.market_data, self.config)
+        # v1.6 Step 0: capture the per-epic health snapshot regardless of what happens next.
+        self.last_context_health = context.brain_context_health
         if not context.tradeable_epics:
             return self._abstain("empty universe (nothing tradeable)")
 
@@ -287,5 +304,8 @@ class Research:
     def _abstain(self, reason: str) -> list[Candidate]:
         """Persist the empty candidate list and return it (the no-trade path)."""
         log.info("research abstain → save_candidates([]): %s", reason)
+        # v1.6 Step 0 (observability): the exact free-text reason, for every non-pick
+        # branch — broader than last_no_pick_reasoning (LLM prose, valid-abstain only).
+        self.last_abort_detail = reason
         self.state.save_candidates([])
         return []

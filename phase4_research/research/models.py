@@ -173,6 +173,16 @@ class ResearchContext:
             back-compat; multi-epic consumers (prompt render, drift-coherence) read
             the candidate's own epic from here. Defaults to ``{}`` so callers built
             before v1.5 keep working (they fall back to ``brain_context``).
+        brain_context_health: v1.6 (Phase-8 hotfix Step 0, observability) — a
+            per-epic diagnostic summary derived alongside ``brain_contexts``, keyed
+            by epic. Each value is ``{"status": "unavailable"}`` when the whole
+            fetch failed/returned ``None``, else ``{"status": "full"|"degraded",
+            "missing": [...field names that were None...], "errors": {...}}`` (the
+            ``errors`` map mirrors Phase-3's ``BrainContext.field_errors`` — label
+            → exception text). **Display/diagnostic-only** — never read by the
+            prompt, validator, or filter (root rule 3: gates nothing). Phase 8
+            copies it onto ``Research.last_context_health`` for its per-cycle
+            health log. Defaults to ``{}``.
     """
 
     tradeable_epics: list[dict[str, Any]]
@@ -183,6 +193,7 @@ class ResearchContext:
     brain_context: dict[str, Any] | None
     anchor_epic: str
     brain_contexts: dict[str, dict[str, Any] | None] = field(default_factory=dict)
+    brain_context_health: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
