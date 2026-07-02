@@ -134,4 +134,28 @@ Netz-Verifikation bleibt Nikingers Job (Projekt-Konvention).
 
 ---
 
+---
+
+## Addendum — 2026-07-02, „Wie"-Session: Entscheidungen + Umsetzung
+
+Die vier §3-Fragen sind gelockt (Nikinger, via `AskUserQuestion`, vor der Implementierung):
+
+1. **Trade-Zähler-Semantik:** alle heutigen Trades zählen (`COUNT(*) … WHERE session_date=?`) — jede
+   `trade_outcomes`-Zeile ist ein echter eröffneter Trade, live-akkurat mitten im Zyklus, konsistent
+   mit `/api/trades`.
+2. **Read-Helper vs. Inline-SQL:** Inline-SQL in `webui/api.py` — architektur-determiniert, weil die
+   Webui bewusst nie `persistence.Database` (RW) importiert, sondern jeden Read über den eigenen
+   `mode=ro`-Seam macht. Ein P2-Helper wäre hier nicht nutzbar.
+3. **Zählt der 2026-07-02-Trade als v1.6-Step-4s „5a"-Beweis?** Technisch ja (netto-neuer autonomer
+   open→close, sauber), aber **bewusst noch nicht als ✅ geflippt** — Nikinger sammelt weiter
+   Trade-Qualitäts-Daten (jetzt sichtbar über das v1.6-Observability-Log) über den laufenden,
+   bis morgigem Marktschluss weiterlaufenden Live-Test, bevor der Doku-Flip kommt.
+4. **Step 2 (Leerzustand-Copy):** gestrichen. Ehrlichkeit vor Kosmetik — keine Lessons heißt keine
+   Lessons, die leeren Karten sind der korrekte Zustand nach `archive_verification_trades.py
+   --commit`, keine beschönigende Copy nötig.
+
+**Step 1 (der Fix) ist implementiert + mockgrün** (`webui/api.py::status()`, +2 Tests, 199 P8-Tests
+gesamt). Detail: `phase8_scheduler/CLAUDE.md` → `## Session stopped — 2026-07-02 (v1.7: /api/status
+DB-gespeist — der eigentliche Fix)`.
+
 *Ende des Plans (Was). Die „Wie"-Session baut daraus den file-für-file-Ausführungsplan.*

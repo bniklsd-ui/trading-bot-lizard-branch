@@ -106,10 +106,17 @@ P6-Debatte → TRADE-Entscheidung, ACCEPTED 16:58:32, vom Broker per SL/TP gesch
 der harte, bisher unbewiesene Kern der Phase-8-Mission. Direkt danach fiel eine kleine,
 webui-only Anzeige-Inkonsistenz auf (Trade-Zähler + Realized-P&L-Karte lagen hinter der DB
 zurück — kein Sicherheitsproblem, DB/Broker/Loss-Breaker bestätigt korrekt; die
-`provenance`-Änderung von oben wurde als Ursache konklusiv ausgeschlossen). Kleiner Folge-Plan
-**v1.7** geschrieben (das „Was", noch kein Code): `docs/concepts/phase8_v1.7_hotfix_plan.md`;
-Detail: `phase8_scheduler/CLAUDE.md` → `## Session stopped — 2026-07-02 (🎉 erster autonomer
-Trade + v1.7-Webui-Diagnose)`.
+`provenance`-Änderung von oben wurde als Ursache konklusiv ausgeschlossen). **Update (2026-07-02,
+noch am selben Tag): v1.7-Fix implementiert + mockgrün.** `webui/api.py`s `/api/status` liest
+`trades_today`/`realized_pnl_today` jetzt aus der DB statt dem lagging `scheduler_state.json`-
+Snapshot (199 P8-Tests, 197+2). **Der laufende Live-Test läuft bewusst bis morgigem Marktschluss
+weiter** — der DAX-Trade ist ein technisch sauberer netto-neuer autonomer open→close, aber Nikinger
+sammelt bewusst mehr Trade-*Qualitäts*-Daten (via v1.6-Observability-Log) vor einem 5a-✅-Flip statt
+beim ersten „er tradet" zu stoppen — **ehrlich: nur die Mechanik ist bewiesen, nicht Qualität/Edge/
+Mehr-Zyklen-Verhalten/auslösende Safety-Breaker.** Plan: `docs/concepts/phase8_v1.7_hotfix_plan.md`;
+Detail: `phase8_scheduler/CLAUDE.md` → `## Session stopped — 2026-07-02 (v1.7: /api/status
+DB-gespeist — der eigentliche Fix)` (+ die vorherige `## Session stopped — 2026-07-02 (🎉 erster
+autonomer Trade + v1.7-Webui-Diagnose)`).
 (gestartet 2026-06-27). **Mission (zuerst lesen):** Phase 8 heißt „Scheduler", aber das Ziel ist
 **autonome, unbeaufsichtigte Erzeugung echter Demo-Trades** — alles danach (Confidence aus
 `INSUFFICIENT`, P9-Instinct-Promotion) ist auf reale Outcomes gegatet. Der harte Pfad ist die

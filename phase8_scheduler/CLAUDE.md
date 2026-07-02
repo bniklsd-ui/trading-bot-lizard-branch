@@ -92,8 +92,8 @@ v1.5-Hotfix** (`PHASE8_V1.5_HOTFIX_HANDOVER.md`: der Bot abstained fast immer �
 | `scheduler/run.py` | `python -m scheduler.run` Entry (in-package, lazy `scripts.wiring`, SIGTERM/SIGINT → `request_stop`) | ✅ (Modul 11, 6 Tests) |
 | `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures | ✅ (Modul 11, operator-run) |
 | `scripts/run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Operator-Tools (Start-Script · offline Sim-Tag mit Fakes · echter unbeaufsichtigter IG-Demo-Zyklus) | ✅ (Modul 11, operator-run) |
-| `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes. **+ Token-Meter-Card** (`/api/token_usage`) **+ Last-Cycle-Reasoning** (`/api/last_cycle` zeigt jetzt Research-Pick + Bull/Bear/Judge-Transkript) — s. `## UI-Erweiterung — 2026-06-29` | ✅ (Modul 12, 18 Tests) |
-| `tests/*` | gemockt, kein Netz/LLM/echter sleep (181, Schwerpunkt `test_runner` + `test_safety` + `test_webui`) | ✅ |
+| `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes. **+ Token-Meter-Card** (`/api/token_usage`) **+ Last-Cycle-Reasoning** (`/api/last_cycle` zeigt jetzt Research-Pick + Bull/Bear/Judge-Transkript) — s. `## UI-Erweiterung — 2026-06-29`. **v1.7 (2026-07-02): `/api/status`s `trades_today`/`realized_pnl_today` DB-gespeist** (nicht mehr der lagging `scheduler_state.json`-Snapshot) — s. `## Session stopped — 2026-07-02 (v1.7: /api/status DB-gespeist)` | ✅ (Modul 12, 20 Tests) |
+| `tests/*` | gemockt, kein Netz/LLM/echter sleep (199, Schwerpunkt `test_runner` + `test_safety` + `test_webui`) | ✅ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine
 Datei = eine Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging →
@@ -211,6 +211,83 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-07-02 (v1.7: `/api/status` DB-gespeist — der eigentliche Fix)
+
+> **Auslöser:** die „Wie"-Session, die aus dem „Was"-Plan (`docs/concepts/phase8_v1.7_hotfix_plan.md`)
+> den Ausführungsplan baute (Plan-Mode, drei `AskUserQuestion`-Entscheidungen, Nikinger-Freigabe), dann
+> direkt implementiert. **Kein Live-/Netz-Lauf diese Session** (Operator-Job) — gemockt/offline.
+
+### Drei Nikinger-Entscheidungen (via AskUserQuestion, vor der Implementierung gelockt)
+1. **Trade-Zähler = alle heutigen Trades** aus der DB (`COUNT(*) … WHERE session_date=?`) — jede
+   `trade_outcomes`-Zeile ist ein echter eröffneter Trade (ein NO_TRADE-Zyklus inserted nie eine),
+   spiegelt also `state.trades_today`-Semantik, ist aber live-akkurat mitten im Zyklus, konsistent
+   mit `/api/trades`.
+2. **v1.6 Step-4/5a bleibt bewusst offen:** der heutige DAX-Trade ist ein technisch sauberer
+   netto-neuer autonomer open→close — aber Nikinger will **Trade-Qualitäts-Daten** sammeln (jetzt
+   sichtbar über das v1.6-Observability-Log), nicht nur „er tradet" akzeptieren. Der Plan darf
+   gemerged werden, sobald bereit, **aber unter der Bedingung ehrlicher Doku**: was ist bewiesen, was
+   nicht, und dass der Lauf weiterläuft (bis morgigem Marktschluss). **Kein v1.6-Code diese Session.**
+3. **Step 2 (Leerzustand-Copy) gestrichen — Ehrlichkeit statt Kosmetik.** Keine Lessons heißt keine
+   Lessons; die leeren Score-/Confidence-/Lessons-Karten sind der korrekte, ehrliche Zustand nach
+   `archive_verification_trades.py --commit`. Dokumentiert warum, keine beschönigende Copy.
+
+### Completed (P8-only — `webui/api.py` + `tests/test_webui.py`, additiv)
+- **`webui/api.py` `status()`:** `trades_today`/`realized_pnl_today` sind jetzt **DB-gespeist**
+  statt aus dem `scheduler_state.json`-Snapshot durchgereicht — zwei neue Inline-Queries über den
+  bestehenden fail-soft `_query`-Seam, spiegeln exakt die bereits bewiesene Loss-Breaker-Query
+  (`scripts/wiring.py:301-308`) + `/api/trades` (dasselbe Dashboard liest die DB dort schon direkt).
+  `SELECT COUNT(*) … WHERE session_date=?` (Trade-Zähler, Entscheidung 1 oben) +
+  `SELECT COALESCE(SUM(profit_loss),0.0) … WHERE session_date=? AND profit_loss IS NOT NULL`
+  (realized P&L, identisch zur Breaker-Query). `session_date`-Parameter = `state.date` (hält die
+  Statuskarte intern konsistent, auch pausiert/gestoppt). Fail-soft erhalten: fehlende DB/Tabelle →
+  `_query` liefert `[]` → beide fallen auf `0`/`0.0` zurück, kein neuer 500-Pfad. **Kein Client-
+  Change** (`app.js:145,152` rendern die Felder unverändert verbatim). `scheduler/state.py`/
+  `safety.py`/`reconcile.py`/`runner.py`/`wiring.py` **unberührt** — ihr Snapshot-Gebrauch ist
+  korrekt und bereits dokumentiert (der Loss-Breaker liest ohnehin schon aus der DB).
+- **Helper-vs-Inline-SQL (offene Plan-Frage 2) entschieden — architektur-determiniert:** die Webui
+  importiert bewusst **nie** `persistence.Database` (öffnet RW) und macht Inline-SQL für **jeden**
+  Read über den `mode=ro`-Seam; ein P2-Helper wäre hier nicht nutzbar. Inline SQL in `api.py`
+  spiegelt `/api/trades` + `wiring.py` — konsistent mit dem bestehenden Muster.
+- **Step 2 bewusst nicht gebaut** (Nikinger-Entscheidung 3 oben) — die leeren Score-/Confidence-/
+  Lessons-Karten bleiben unverändert; das ist der korrekte, ehrliche Zustand (kein Bug, keine Copy-
+  Änderung nötig).
+- **Tests (`tests/test_webui.py`):** `test_status_shape_and_running_state` aktualisiert
+  (`trades_today` 1→**2**, DB-gespeist statt Snapshot; `realized_pnl_today`-Assertion ergänzt).
+  **+2 neue Tests:** `test_status_reads_db_not_stale_snapshot` (der eigentliche Regressions-Guard —
+  ein absichtlich falscher Snapshot `trades_today=99`/`realized_pnl_today=0.0` gegen die geseedete
+  DB → Endpoint liefert die DB-Wahrheit `2`/`-41.16`, nicht den Snapshot — reproduziert exakt die
+  2026-07-02-Bug-Form); `test_status_missing_db_falls_back_to_zero` (fehlende DB → `0`/`0.0`, nie
+  ein 500).
+
+### Verifiziert (gemockt/offline — Live = Operator)
+- `pytest phase8_scheduler/tests -q` → **199 passed** (197 + 2, exakt das erwartete Delta).
+  `py_compile` clean auf `webui/api.py` + `tests/test_webui.py`.
+
+### Der ehrliche 5a-Stand (per Nikinger-Entscheidung 2, hier explizit festgehalten)
+Der heutige DAX-Trade (`deal_id=DIAAAAXW7U4AWAP`) ist ein **technisch sauberer, netto-neuer
+autonomer open→close** — die Mechanik der Phase-8-Mission ist bewiesen. **Was NICHT bewiesen ist:**
+Trade-*Qualität* über einen einzelnen Trade hinaus, Mehr-Zyklen-/Mehr-Tage-Verhalten, auslösende
+Safety-Breaker, Edge/Profit (nie im Scope). Der laufende Live-Test läuft **bewusst weiter bis zum
+morgigen Marktschluss**, um mit dem jetzt vorhandenen v1.6-Observability-Log echte Trade-Qualitäts-
+Daten zu sammeln, statt beim ersten „er tradet" zu stoppen. **Kein ✅-Doku-Flip für Step 5a** in
+dieser Session — das bleibt Nikingers Entscheidung, wann genug Daten gesammelt sind.
+
+### Next
+- **Operator:** den laufenden Live-Test bis morgigem Marktschluss weiterlaufen lassen; danach
+  entscheiden, ob 5a genug Daten hat. Optional: `run_webui.sh` neu starten (neuer `api.py`-Code) +
+  Browser hart neu laden, um den Fix live gegen die echte `data/trading_bot.sqlite` zu sehen.
+- **Danach:** Step 5b (Breaker-Fire-Run) + der finale v1.6-Doku-Flip auf ✅, unverändert aus dem
+  v1.6-Plan.
+- **Commit:** vorgeschlagen (atomar: (1) `webui/api.py` + Tests, (2) docs), wartet auf
+  Nikinger-Trigger. Branch weiterhin `v1.6` (v1.7 noch nicht auf eigenem Branch — Nikinger-
+  Entscheidung, ob/wann ein `v1.7`-Branch abgezweigt wird, steht noch aus).
+
+### Offene Punkte / blockers
+- Keine technischen. Die 5a-„genug Daten"-Schwelle ist bewusst Nikingers Entscheidung, nicht
+  code-seitig festgelegt.
 
 ---
 

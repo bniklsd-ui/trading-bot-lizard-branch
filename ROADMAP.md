@@ -203,7 +203,7 @@ live-verifiziert ≠ profit-validiert (erst **ein** Trade; Edge-Metrik läuft be
 
 ---
 
-## Phase 8 — Scheduler 🟡 code-complete + merged; v1.5-Hotfix merged 2026-07-02 — autonomer Trade NOCH NICHT live-bewiesen (→ v1.6)
+## Phase 8 — Scheduler 🟡 code-complete; v1.5+v1.6+v1.7 merged 2026-07-02 — autonomer Trade JETZT live bewiesen, Datensammlung + Breaker-Beweis laufen weiter
 
 > **Mission (zuerst lesen):** „Scheduler" ist nur der Name — das Ziel ist **autonome,
 > unbeaufsichtigte Erzeugung realer Demo-Trades**, weil alles nach P8 (Confidence aus
@@ -228,31 +228,42 @@ schläft — und so die ersten realen Outcome-Daten sammelt.
 - [x] `scripts/` — wiring (voller P1–P7-Stack), `run.py` entry, `run_scheduler.sh`, smoke_test, live_test
 - [x] Web-UI (`webui/`, FastAPI read-mostly + statisches Dashboard) — **zuletzt gebaut**
 
-**Status (ehrlich):** Alle 12 Module gebaut, **181 Unit-Tests grün**, gemergt nach `main`
-(2026-06-30). ✅ **Bewiesen** (Operator-Run 2026-06-29 + Mocks): Daemon-Lifecycle (preflight →
+**Status (ehrlich):** Alle 12 Module gebaut, **199 Unit-Tests grün**, v1.5+v1.6+v1.7 gemergt nach
+`main` (2026-07-02). ✅ **Bewiesen** (Operator-Runs + Mocks): Daemon-Lifecycle (preflight →
 bounded loop → clean shutdown), State-Persistenz, autonomes **echtes** P4-Research mit korrektem
-Fail-Safe-Abstain, reconcile+reward auf **2 realen Demo-Trades**, scharfes Token-Budget,
-read-only Web-UI. ⚠ **NICHT bewiesen** (mit ehrlichem Flag gemergt): ein **net-new autonomer
-Trade** open *und* close in einem sauberen Lauf; **real auslösende** Safety-Breaker; Multi-Day;
+Fail-Safe-Abstain, reconcile+reward auf realen Demo-Trades, scharfes Token-Budget, read-only
+Web-UI — **und jetzt auch: ein netto-neuer autonomer Trade open *und* close in einem sauberen
+Lauf** (2026-07-02, DAX BUY `DIAAAAXW7U4AWAP` — der harte, bisher unbewiesene Kern der
+Phase-8-Mission). ⚠ **Weiterhin NICHT bewiesen:** Trade-*Qualität* über mehrere Zyklen (der eine
+Trade beweist Mechanik, nicht Konsistenz); **real auslösende** Safety-Breaker; Multi-Day-Verhalten;
 Edge/Profitabilität (nie im Scope).
 
-**Why the gap + nächster Track:** der Bot **abstaint** fast jeden Zyklus (Single-Instrument-Universum
-+ Sub-50-Doppel-Clamp). Track = **v1.5-Hotfix** (Varietät C + Clamp/Floor B + echte Lessons A) —
-siehe [`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md)
-(+ Planner-Companion `PHASE8_V1.5_KICKOFF_HANDOVER.md`). Das ursprüngliche „Done when" (live net-new
-autonomer open→close + demonstrierbarer Breaker-Trip) ist **in v1.5 übernommen**, hier nicht behauptet.
+**Why der ursprüngliche Gap + die drei Hotfix-Tracks:** der Bot **abstaint** anfangs fast jeden
+Zyklus (Single-Instrument-Universum + Sub-50-Doppel-Clamp). **v1.5** (Varietät C + Clamp/Floor B +
+echte Lessons A) behob den Hauptblocker — siehe
+[`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md).
+**v1.6** fand + fixte einen zweiten, bis dahin unbemerkten Prompt-Leak-Kanal („Cause A part 2") und
+ergänzte Observability + eine Instrument-Verification-Harness — direktes Ergebnis noch am selben
+Tag: **der erste echte autonome Trade**. **v1.7** fixte eine kleine webui-only Anzeige-
+Inkonsistenz, die der lange Trade-Lebenszyklus (~9 min IG-Settlement-Lag) erstmals sichtbar
+machte (kein Sicherheitsproblem). Das ursprüngliche „Done when" (live net-new autonomer
+open→close + demonstrierbarer Breaker-Trip) ist damit **zur Hälfte erreicht** — der Breaker-Trip
++ die Trade-Qualitäts-Datensammlung stehen noch aus.
 
-> **⚠ v1.5-Stand (gemergt 2026-07-02, ehrlich):** die drei Code-Fixes A/B/C sind fertig + mockgrün
-> (P1 52 · P2 67 · P3 72 · P4 122 · P5 154 · P6 70 · P7 131 · P8 182). Aber der erste **Live-Lauf**
-> (2026-07-02) deckte einen **yFinance-Blocker** auf: CAC 40 (`^FCHI`) und IBEX 35 (`^IBEX`) — die im
-> Step-2-Variety-Track **nie live-verifizierten** Ticker — liefern keine Kursdaten (*„possibly
-> delisted; no price data"*) → deren P3-Brain-Context degradiert zu `None` (2 von 4 Instrumenten
-> reduced-signal). **Kein Hard-Crash** (Fallback auf letzten Daily-Close), **kein VETO betroffen**
-> (Momentum-VETO nutzt IG-Echtzeit-Bars, nicht yFinance), **nicht** der v1.5-Provenance-Code. Der
-> **net-new autonome open→close** bleibt damit **unbewiesen**. Es fehlt außerdem **echtes Logging**.
-> → Nächster Track = **v1.6** (erst Observability, dann `^FCHI`/`^IBEX` verifizieren/fixen **oder**
-> droppen, dann der Live-Beweis): siehe
-> [`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.6_HANDOVER.md).
+> **⚠ v1.6/v1.7-Stand (gemergt 2026-07-02, ehrlich):** `^FCHI`/`^IBEX` liefern intermittierend
+> keine Kursdaten (*„possibly delisted"*, vermutlich Yahoo-Rate-Limiting) — **toleriert**
+> (Version-Pin korrigiert, per-Zyklus-Observability macht künftige Degradation sichtbar), nicht
+> gefixt oder gedroppt (kein Hard-Crash, kein VETO betroffen — Momentum-VETO nutzt IG-Echtzeit-
+> Bars, nicht yFinance). `webui/api.py`s `/api/status` liest `trades_today`/`realized_pnl_today`
+> jetzt aus der DB statt einem lagging State-Snapshot (v1.7). **Der Live-Varietäts-Lauf läuft
+> bewusst bis ~17:30 morgen weiter** — der 2026-07-02-Trade ist ein technisch sauberer netto-neuer
+> autonomer open→close, aber Nikinger sammelt bewusst mehr Trade-Qualitäts-Daten (jetzt über das
+> v1.6-Observability-Log sichtbar) vor dem finalen Doku-Flip, statt beim ersten „er tradet" zu
+> stoppen. Danach folgt Step 5b (Breaker-Fire-Run). Details:
+> [`phase8_scheduler/CLAUDE.md`](./phase8_scheduler/CLAUDE.md) (Session-Journal, aktuellster
+> Stand), [`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.6_HANDOVER.md),
+> [`docs/concepts/phase8_v1.6_hotfix_plan.md`](./docs/concepts/phase8_v1.6_hotfix_plan.md),
+> [`docs/concepts/phase8_v1.7_hotfix_plan.md`](./docs/concepts/phase8_v1.7_hotfix_plan.md).
 
 **Directory:** [`phase8_scheduler/`](./phase8_scheduler/) *(pkg `scheduler` + `webui`)*
 **Concept:** [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md)

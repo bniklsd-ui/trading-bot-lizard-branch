@@ -5,9 +5,15 @@
 >
 > **As-built reconciliation (2026-06-30, v1.5 hotfix housekeeping Step 0b):** this document had
 > drifted to a pre-Phase-5 vocabulary (options terminology, a single `pre_trade_option_check()`,
-> no Phase 7/8). Brought to as-built against the live code (P1–P8, code = source of truth). See
-> `phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md` for the current open work (Phase 8 abstains
-> almost every cycle — the v1.5 hotfix is in progress).
+> no Phase 7/8). Brought to as-built against the live code (P1–P8, code = source of truth).
+>
+> **Update (2026-07-02):** v1.5+v1.6+v1.7 are merged to `main`. The bot no longer abstains almost
+> every cycle — the v1.5 universe/clamp fixes plus a v1.6 prompt-leak fix ("Cause A part 2")
+> produced the **first-ever real autonomous trade** (DAX BUY) the same day, proving the hard
+> mechanical core of Phase 8's mission. Honest flag remains: that one clean open→close proves
+> mechanics, not trade *quality* across cycles or an actually-tripping safety breaker — the live
+> variety run continues intentionally through tomorrow's close to gather that data (see
+> `phase8_scheduler/CLAUDE.md` journal for the current state).
 
 ---
 
@@ -59,8 +65,9 @@
 │  SCHEDULER (P8) — unsupervised daemon driving the cycle above on a  │
 │  market-hours loop: auto-confirm, file kill-switch, daily-loss      │
 │  breaker, token budget, idempotent reconcile, read-mostly web UI.   │
-│  🟡 code-complete + merged, autonomous net-new trade NOT yet proven │
-│  live (the bot abstains almost every cycle — v1.5 hotfix in flight) │
+│  🟡 code-complete, v1.5+v1.6+v1.7 merged — first net-new autonomous │
+│  trade proven live (2026-07-02); quality-data run + breaker-trip    │
+│  proof still in progress, no final ✅ flip yet                      │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -115,19 +122,26 @@
   deferred to **Phase 9f**, gated on real outcomes
 - **No VETO touch.** Reward/lessons sit entirely downstream of order execution
 
-### Scheduler (Phase 8 — 🟡 code-complete + merged, unproven live)
+### Scheduler (Phase 8 — 🟡 code-complete, v1.5+v1.6+v1.7 merged, first live trade proven)
 - Long-running daemon (injectable `now_fn`/`sleep_fn`) drives the cycle above unsupervised on a
   market-hours loop, with no new AI — pure mechanics around the existing P4 research / P6 debate
   / P7 reward calls
 - Safety: `AutoConfirm` (demo-only, fail-closed `confirm_fn` replacement), a file kill-switch,
   consecutive-failure backoff, a daily-loss breaker, a daily token budget, idempotent reconcile
 - Read-mostly web UI (FastAPI, DB opened `mode=ro`) for status/control — control is file-writes
-  only, so a UI crash can never touch trading
-- **Status:** the bot currently **abstains almost every cycle** (single-instrument universe +
-  an over-conservative confidence clamp below score 50) — no net-new autonomous trade has been
-  observed open→close in one clean run yet. The **v1.5 hotfix** (universe variety, clamp/floor
-  decoupling, lesson provenance) is the active track; see
-  `phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`
+  only, so a UI crash can never touch trading; `/api/status`'s trade-count/P&L card is now DB-fed
+  (v1.7, 2026-07-02), no longer a lagging state-file snapshot
+- **Status:** the bot used to **abstain almost every cycle** (single-instrument universe + an
+  over-conservative confidence clamp below score 50) — the **v1.5 hotfix** (universe variety,
+  clamp/floor decoupling, lesson provenance) resolved that. **v1.6** then found + fixed a second
+  prompt-leak channel ("Cause A part 2") — the same day, the scheduler placed **the first-ever
+  real net-new autonomous trade** (DAX BUY, `deal_id=DIAAAAXW7U4AWAP`), proving the hard,
+  previously-unproven mechanical core of the Phase-8 mission. ⚠ Honestly still open: that one
+  clean open→close proves mechanics, not trade *quality* across cycles, nor an actually-tripping
+  safety breaker — the live variety run continues intentionally through the next market close to
+  gather that data before any final ✅ doc flip. See `phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`,
+  `phase8_scheduler/PHASE8_V1.6_HANDOVER.md`, and `phase8_scheduler/CLAUDE.md`'s journal for the
+  current state.
 
 ### Dual State
 - **SQLite (persistent):** `trade_lessons`, `trade_outcomes`, `reward_pts`,
@@ -179,4 +193,4 @@ Per-phase concept + implementation:
 - Phase 5 — [`docs/concepts/phase5_concept.md`](./docs/concepts/phase5_concept.md) · [`phase5_execution/`](./phase5_execution/)
 - Phase 6 — [`docs/concepts/phase6_debate_concept.md`](./docs/concepts/phase6_debate_concept.md) · [`phase6_debate/`](./phase6_debate/)
 - Phase 7 — [`docs/concepts/phase7_reward_concept.md`](./docs/concepts/phase7_reward_concept.md) · [`phase7_reward/`](./phase7_reward/)
-- Phase 8 — [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md) · [`phase8_scheduler/`](./phase8_scheduler/) · hotfix in flight: [`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md)
+- Phase 8 — [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md) · [`phase8_scheduler/`](./phase8_scheduler/) · hotfix history: [`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md) · [`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.6_HANDOVER.md) · live variety run in progress: [`phase8_scheduler/CLAUDE.md`](./phase8_scheduler/CLAUDE.md)

@@ -20,7 +20,7 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 5     | ig_bot.py Gates 1–5 + 4 VETOs + place/monitor/close | ✅ Abgeschlossen — live-**verifiziert** (Order-/Monitor-Pfad, Demo), noch nicht profit-validiert ² |
 | 6     | Bull/Bear/Judge Debate              | ✅ Abgeschlossen — live-**verifiziert** (Debatte-Pfad, Demo), noch nicht profit-validiert ³ |
 | 7     | Reward/Punishment + Brain           | ✅ live-verifiziert (Demo, 2026-06-26) — `live_test.py` 5/5; 128 Unit-Tests ⁴ |
-| 8     | Scheduler                           | 🟡 Code-complete + gemerged; **v1.5-Hotfix gemerged (2026-07-02)** — A/B/C-Code fertig (mockgrün), aber autonomer Trade weiterhin nicht live-bewiesen + yFinance-Blocker (`^FCHI`/`^IBEX`) → **v1.6** ⁵ |
+| 8     | Scheduler                           | 🟡 Code-complete + gemerged; **v1.5+v1.6+v1.7 gemerged (2026-07-02)** — 🎉 erster echter autonomer Trade platziert, Webui-Fix mockgrün; Live-Varietäts-Lauf läuft bewusst bis ~17:30 morgen weiter (Trade-Qualitäts-Daten), Doku-Flip auf ✅ noch offen ⁵ |
 | 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert)       |
 
 ¹ **Live-getestet ≠ profit-validiert.** Die Research-Pipeline läuft nachweislich
@@ -57,28 +57,44 @@ Lesson-Extraktion (`reflect()`, ein Haiku-Call, best-effort); Confidence ist **o
 gatet nichts** (keine VETO-Berührung — Instinct→VETO ist Phase 9f). ⚠ Nur **ein** Trade beweist den
 Pfad, **nicht** die Profitabilität (Edge = Live-Betrieb). Demo only, manueller Trigger.
 
-⁵ **Phase 8 (Scheduler) — code-complete + gemerged (2026-06-30), aber NICHT live-bewiesen für einen
-autonomen Trade.** „Scheduler" ist nur der Name; das Ziel ist die **autonome, unbeaufsichtigte Erzeugung
-echter Demo-Trades** (der Datennachschub, auf den P9 gegatet ist). Der harte Pfad ist die **autonome
+⁵ **Phase 8 (Scheduler) — code-complete, v1.5+v1.6+v1.7 nach `main` gemerged (2026-07-02),
+autonomer Trade jetzt live bewiesen, aber Datensammlung + Breaker-Beweis laufen noch.**
+„Scheduler" ist nur der Name; das Ziel ist die **autonome, unbeaufsichtigte Erzeugung echter
+Demo-Trades** (der Datennachschub, auf den P9 gegatet ist). Der harte Pfad ist die **autonome
 Kandidaten-Generierung** über echtes P4-Research (nie der manuelle Seed). **Keine neue AI** — reine
 Mechanik: Daemon mit Marktzeiten-Phasen, Auto-Confirm (demo-only, fail-closed), Datei-Kill-Switch,
-Tages-Loss-Breaker, Token-Budget, idempotenter Reconcile, read-mostly Web-UI. **Alle 12 Module gebaut,
-181 Unit-Tests grün; nach `main` gemerged.** ✅ **Bewiesen** (Operator-Lauf 2026-06-29 + Mocks):
-Daemon-Lifecycle, State-Persistenz, autonomes echtes P4-Research mit korrektem Fail-Safe-Abstain,
-Reconcile+Reward-Loop auf **realen** früheren Demo-Trades. ⚠ **NOCH NICHT bewiesen** (gemerged mit
-diesem ehrlichen Flag, um den Build weiterzutragen): ein **netto-neuer autonomer Trade** in einem
-sauberen Lauf geöffnet **und** geschlossen, die Safety-Breaker, die **tatsächlich auslösen**,
-Mehr-Tage-Verhalten, Edge/Profitabilität (nie im Scope). **Ursache des Gaps + Fix-Vorschlag:** der Bot
-**abstained** fast immer (1-Instrument-Universe + Doppel-Clamp unter Score 50) → **v1.5-Hotfix
-(Variety + Clamp/Floor + echte Lessons) gemerged 2026-07-02**. **v1.5-Stand (ehrlich):** die drei
-Code-Fixes (A/B/C) sind fertig + mockgrün, aber der **netto-neue autonome open→close** ist weiterhin
-**nicht live-bewiesen** — der erste Live-Lauf deckte einen **yFinance-Blocker** auf: CAC 40 (`^FCHI`)
-und IBEX 35 (`^IBEX`) liefern keine Kursdaten (*„possibly delisted"*) → deren Phase-3-Brain-Context
-degradiert zu `None` (2 von 4 Instrumenten reduced-signal; **kein** Hard-Crash, kein VETO betroffen —
-der Momentum-VETO nutzt IG-Echtzeit-Bars, nicht yFinance). Es fehlt zudem **echtes Logging**. Nächster
-Track = **v1.6** (erst Observability, dann `^FCHI`/`^IBEX` verifizieren/fixen oder droppen, dann der
-Live-Beweis), siehe `phase8_scheduler/PHASE8_V1.6_HANDOVER.md` (v1.5-Kontext:
-`PHASE8_V1.5_HOTFIX_HANDOVER.md`). Konzept: `docs/concepts/phase8_scheduler_concept.md`.
+Tages-Loss-Breaker, Token-Budget, idempotenter Reconcile, read-mostly Web-UI. **Alle 12 Module
+gebaut, 199 Unit-Tests grün.**
+
+**v1.5 (gemergt 2026-07-02):** Universum von 1 auf 4 EUR-Instrumente erweitert (DAX/StoxxE50/
+CAC40/IBEX35), Clamp/Floor unter Score 50 entkoppelt+relaxt, Lesson-Provenance-Filterung —
+behob den Hauptblocker („der Bot abstained fast immer").
+
+**v1.6 (gemergt 2026-07-02):** yFinance-Version-Pin-Drift toleriert (`^FCHI`/`^IBEX` bleiben im
+Universum), per-Zyklus Observability-Log (`data/state/research_health.jsonl`) + Instrument-
+Verification-Harness (`scripts/verify_instrument.py`) ergänzt, ein zweiter bis dahin unbemerkter
+Prompt-Leak-Kanal gefixt (**„Cause A part 2"** — `context_builder` fütterte ungefilterte
+Verifikations-Trade-Historie in die LLM-Abstain-Begründung; echte `provenance`-Spalte + Filter +
+Archivierungs-Skript beheben es, live bestätigt). **🎉 Direktes Ergebnis, noch am selben Tag: der
+erste echte autonome Trade** — DAX BUY (`deal_id=DIAAAAXW7U4AWAP`), echter P4-Pick → echte
+P6-Debatte → TRADE-Entscheidung, ACCEPTED → vom Broker per SL/TP geschlossen. Der harte,
+bisher unbewiesene Kern der Phase-8-Mission ist damit **mechanisch bewiesen**.
+
+**v1.7 (gemergt 2026-07-02, noch am selben Tag):** der Trade deckte eine kleine, webui-only
+Anzeige-Inkonsistenz auf (Trade-Zähler + Realized-P&L-Karte lagen hinter der DB zurück — **kein**
+Sicherheitsproblem, DB/Broker/Loss-Breaker bestätigt korrekt und unberührt). Fix: `/api/status`
+liest beide Werte jetzt aus der DB statt dem lagging State-Snapshot, mockgrün.
+
+**⚠ Ehrlich weiterhin offen (bewusst, kein ✅-Flip):** der 2026-07-02-Trade beweist die Mechanik
+eines einzelnen sauberen open→close, aber **nicht** Trade-*Qualität* über mehrere Zyklen, nicht
+**tatsächlich auslösende** Safety-Breaker, nicht Mehr-Tage-Verhalten, nicht Edge/Profitabilität
+(nie im Scope). Der Live-Varietäts-Lauf läuft deshalb **bewusst bis ~17:30 morgen** weiter — jetzt
+mit dem v1.6-Observability-Log sichtbar —, um mehr Trade-Qualitäts-Daten zu sammeln, statt beim
+ersten „er tradet" zu stoppen. Danach folgt Step 5b (Breaker-Fire-Run) und erst dann der finale
+Doku-Flip. Details: `phase8_scheduler/CLAUDE.md` (Session-Journal, aktuellster Stand),
+`phase8_scheduler/PHASE8_V1.6_HANDOVER.md` (v1.5-Kontext: `PHASE8_V1.5_HOTFIX_HANDOVER.md`),
+`docs/concepts/phase8_v1.6_hotfix_plan.md`, `docs/concepts/phase8_v1.7_hotfix_plan.md`. Konzept:
+`docs/concepts/phase8_scheduler_concept.md`.
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)
