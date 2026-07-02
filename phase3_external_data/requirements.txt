@@ -3,7 +3,17 @@
 # a build toolchain (see README install note).
 
 # runtime
-yfinance>=0.2.65,<0.3
+# v1.6 (2026-07-02, Phase-8 hotfix Step 3a): re-pinned from the stale ">=0.2.65,<0.3"
+# range to the actually-installed, actually-live-tested 1.4.1 (a fresh venv install
+# against the old pin would have silently landed on an ancient, untested 0.2.x —
+# a real (if separate) risk surfaced during the v1.6 diagnosis). Deliberately narrow
+# (not "<2.0"): re-widen consciously only once tested against a newer major version,
+# so a future drift like this one can't repeat silently. See
+# docs/concepts/phase8_v1.6_hotfix_plan.md Step 3 for the full reasoning — this pin
+# fix is NOT what resolved the live ^FCHI/^IBEX failure (that was intermittent
+# Yahoo-side flakiness, H4; both the failing live run and the succeeding diagnosis
+# run used this same 1.4.1, so version drift was never the cause).
+yfinance>=1.4.0,<1.5
 pandas>=2.0.0
 
 # dev / test
