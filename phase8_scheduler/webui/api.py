@@ -131,20 +131,47 @@ def create_app(config: SchedulerConfig | None = None) -> FastAPI:
 
     @app.get("/api/status")
     def status() -> dict[str, Any]:
-        """Phase + running-state + the day's counters (the at-a-glance card)."""
+        """Phase + running-state + the day's counters (the at-a-glance card).
+
+        v1.7 (webui hotfix, 2026-07-02): ``trades_today``/``realized_pnl_today`` are DB-fed —
+        mirrors the loss-breaker's proven query (``scripts/wiring.py:301-308``) and ``/api/trades``
+        (below), which already read the DB directly. The first real autonomous trade's ~9-minute
+        broker-settlement lifecycle exposed that this endpoint used to pass ``scheduler_state.
+        json``'s snapshot straight through instead — ``SchedulerState.realized_pnl_today`` is a
+        documented *best-effort* snapshot (``scheduler/state.py`` Design Point 3), not the source of
+        truth: a ``CLOSED_BY_BROKER`` close resolves its P&L only later, via the reconcile pass, so
+        the snapshot was structurally stale for exactly that trade. The snapshot itself is untouched
+        — its other consumers (day-rollover, backoff, restart safety) correctly still depend on it.
+        """
         state = StateStore(cfg.state_path).load()
         clock = Clock(cfg)
         halted = killswitch.is_set(cfg.kill_path)
         paused = command.read_command(cfg.command_path) == "stop"
         running_state = "HALTED" if halted else ("PAUSED" if paused else "RUNNING")
+
+        pnl_rows = _query(
+            cfg.live_db_path,
+            "SELECT COALESCE(SUM(profit_loss), 0.0) AS pnl FROM trade_outcomes "
+            "WHERE session_date = ? AND profit_loss IS NOT NULL",
+            (state.date,),
+        )
+        realized_pnl_today = pnl_rows[0]["pnl"] if pnl_rows else 0.0
+
+        count_rows = _query(
+            cfg.live_db_path,
+            "SELECT COUNT(*) AS n FROM trade_outcomes WHERE session_date = ?",
+            (state.date,),
+        )
+        trades_today = count_rows[0]["n"] if count_rows else 0
+
         return {
             "phase": clock.classify(clock.now()).value,
             "running_state": running_state,
             "kill_reason": killswitch.read_reason(cfg.kill_path) if halted else None,
             "session_date": state.date,
-            "trades_today": state.trades_today,
+            "trades_today": trades_today,
             "max_trades_per_day": cfg.max_trades_per_day,
-            "realized_pnl_today": state.realized_pnl_today,
+            "realized_pnl_today": realized_pnl_today,
             "daily_loss_cap": cfg.daily_loss_cap,
             "consecutive_failures": state.consecutive_failures,
             "max_consecutive_failures": cfg.max_consecutive_failures,

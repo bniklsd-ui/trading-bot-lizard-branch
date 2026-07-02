@@ -116,9 +116,45 @@ def test_status_shape_and_running_state(client) -> None:
         assert key in body
     assert body["phase"] in _PHASES
     assert body["running_state"] == "RUNNING"     # no kill, no command file
-    assert body["trades_today"] == 1
+    # v1.7: DB-fed, not the state snapshot — the seeded DB has 2 trade_outcomes rows for
+    # 2026-06-28 (DEAL1 CLOSED -41.16, DEAL2 OPEN/NULL), while the snapshot itself says 1 /
+    # -41.16 (see test_status_reads_db_not_stale_snapshot below for the divergence proof).
+    assert body["trades_today"] == 2
+    assert body["realized_pnl_today"] == -41.16   # SUM excludes DEAL2's NULL profit_loss
     assert body["max_trades_per_day"] == 5
     assert body["session_date"] == "2026-06-28"
+
+
+def test_status_reads_db_not_stale_snapshot(client) -> None:
+    """v1.7 regression guard: /api/status must ignore a wrong/stale state-file snapshot.
+
+    Reproduces the 2026-07-02 bug shape — a scheduler_state.json whose counters lag the DB
+    (as happens for a CLOSED_BY_BROKER trade before the reconcile pass resolves its P&L) —
+    and asserts the endpoint reports the DB's truth, not the snapshot.
+    """
+    c, cfg = client
+    StateStore(cfg.state_path).save(
+        SchedulerState(date="2026-06-28", trades_today=99, realized_pnl_today=0.0)
+    )
+    body = c.get("/api/status").json()
+    assert body["trades_today"] == 2          # DB truth, not the stale snapshot's 99
+    assert body["realized_pnl_today"] == -41.16  # DB truth, not the stale snapshot's 0.0
+
+
+def test_status_missing_db_falls_back_to_zero(tmp_path) -> None:
+    """v1.7: no DB file yet -> DB-fed status/trades/pnl degrade to 0 / 0.0, never a 500."""
+    cfg = dataclasses.replace(
+        SchedulerConfig(max_trades_per_day=5),
+        live_db_path=str(tmp_path / "nope.sqlite"),
+        state_path=str(tmp_path / "scheduler_state.json"),
+        kill_path=str(tmp_path / "KILL"),
+        command_path=str(tmp_path / "cmd.json"),
+    )
+    StateStore(cfg.state_path).save(SchedulerState(date="2026-06-28"))
+    c = TestClient(create_app(cfg))
+    body = c.get("/api/status").json()
+    assert body["trades_today"] == 0
+    assert body["realized_pnl_today"] == 0.0
 
 
 def test_kill_flips_status_to_halted(client) -> None:
