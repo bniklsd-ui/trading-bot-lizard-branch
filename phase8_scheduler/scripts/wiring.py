@@ -27,8 +27,9 @@ Five points worth pinning (code = source of truth — see the dated concept §11
 3. **All data paths resolved to the absolute ``<repo_root>/data/`` tree.** The ``SchedulerConfig``
    path defaults are repo-relative; a daemon may start from any cwd, so they are rewritten (via
    ``dataclasses.replace``) to the canonical gitignored tree that Phase-2 ``init_db.py`` and the
-   Phase-4…7 wirings already use — DB, ``scheduler_state.json``, ``KILL``, the command file, plus the
-   shared ``llm_usage.json`` (token budget) and ``execution_state.json`` (reconcile).
+   Phase-4…7 wirings already use — DB, ``scheduler_state.json``, ``KILL``, the command file, the
+   v1.6 ``research_health.jsonl`` observability log, plus the shared ``llm_usage.json`` (token
+   budget) and ``execution_state.json`` (reconcile).
 
 4. **The three runner closures live here**, where cross-phase access is allowed:
    ``realized_pnl_today`` (the daily-loss breaker's DB read), ``pending_reconcile_fn`` (the Phase-5
@@ -81,6 +82,7 @@ _EXEC_STATE_PATH = _STATE_DIR / "execution_state.json"
 _SCHED_STATE_PATH = _STATE_DIR / "scheduler_state.json"
 _KILL_PATH = _STATE_DIR / "KILL"
 _COMMAND_PATH = _STATE_DIR / "scheduler_command.json"
+_OBSERVABILITY_PATH = _STATE_DIR / "research_health.jsonl"  # v1.6 Step 0 per-cycle health log
 
 
 def _no_research() -> list[dict[str, Any]]:
@@ -255,6 +257,7 @@ def build_scheduler(
         state_path=str(_SCHED_STATE_PATH),
         kill_path=str(_KILL_PATH),
         command_path=str(_COMMAND_PATH),
+        observability_path=str(_OBSERVABILITY_PATH),
     )
 
     from broker_wrapper import get_broker
