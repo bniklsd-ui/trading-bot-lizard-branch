@@ -147,6 +147,14 @@ class BrainContext:
         yf_symbol: The yFinance symbol resolved from ``ticker``.
         price_history_30d: Daily bars for the last ~30 trading days.
         generated_at: ISO 8601 UTC timestamp of when this snapshot was built.
+        field_errors: v1.6 observability (Phase-8 hotfix Step 0) — maps a
+            sub-indicator label (``"drift"`` / ``"momentum"`` / ``"volume"`` /
+            ``"high_low"`` / ``"history"``) to ``str(exc)`` when
+            ``MarketDataFetcher.get_brain_context`` had to degrade that field
+            to ``None``. Empty when every sub-fetch succeeded. **Not**
+            surfaced in :meth:`to_prompt_dict` (the LLM-facing shape is
+            unchanged — this is diagnostic-only, never AI input); it is
+            included in :meth:`to_dict` for Phase-8's per-cycle health log.
     """
 
     ticker: str
@@ -157,6 +165,7 @@ class BrainContext:
     high_low: HighLowDistance | None
     price_history_30d: list[PriceBar] = field(default_factory=list)
     generated_at: str = ""
+    field_errors: dict[str, str] = field(default_factory=dict)
 
     def to_prompt_dict(self) -> dict[str, Any]:
         """Compact view for the LLM Research prompt.
@@ -209,7 +218,8 @@ class BrainContext:
 
         Suitable for ``trade_lessons.market_context_json`` in Phase 2/7.
         Sub-dataclasses are converted via :func:`dataclasses.asdict`;
-        ``None`` sub-fields are preserved.
+        ``None`` sub-fields are preserved. ``field_errors`` (v1.6 Step 0) is
+        included here but deliberately **not** in :meth:`to_prompt_dict`.
         """
         return {
             "ticker": self.ticker,
@@ -220,4 +230,5 @@ class BrainContext:
             "high_low": asdict(self.high_low) if self.high_low is not None else None,
             "price_history_30d": [asdict(bar) for bar in self.price_history_30d],
             "generated_at": self.generated_at,
+            "field_errors": dict(self.field_errors),
         }

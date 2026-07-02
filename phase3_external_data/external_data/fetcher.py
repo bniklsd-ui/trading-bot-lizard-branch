@@ -466,14 +466,23 @@ class MarketDataFetcher:
         ``try/except`` over :class:`ExternalDataError`: a missing one becomes a
         ``None`` field plus a WARNING, never a crash. Off-hours intraday fields are
         simply ``None`` (the methods return ``None``, not an error).
+
+        v1.6 (Phase-8 hotfix Step 0, observability): the exception text that used to
+        be logged and discarded is now also collected into
+        ``BrainContext.field_errors`` (label → ``str(exc)``) — the "why", not just
+        the "which field is None", for a later per-cycle health log (Phase 8). Purely
+        additive: the WARNING logging and the ``None``-on-failure behaviour are
+        unchanged.
         """
         symbol = self._mapper.epic_to_yf(epic)
+        field_errors: dict[str, str] = {}
 
         def _safe(label: str, fn):
             try:
                 return fn()
             except ExternalDataError as exc:
                 log.warning("brain_context: %s unavailable for %s (%s)", label, epic, exc)
+                field_errors[label] = str(exc)
                 return None
 
         drift = _safe("drift", lambda: self.get_drift(epic))
@@ -491,6 +500,7 @@ class MarketDataFetcher:
             high_low=high_low,
             price_history_30d=history,
             generated_at=timeutil.utc_iso_now(),
+            field_errors=field_errors,
         )
 
 

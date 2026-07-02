@@ -263,6 +263,29 @@ def test_brain_context_tolerates_missing_intraday(
         assert key in prompt
     assert prompt["drift_pct"] is None
     assert prompt["momentum_15m_pct"] is None
+    # v1.6 Step 0 (observability): the two failed sub-fetches are captured with their
+    # exception text, keyed by label — the "why", not just the "which field is None".
+    # high_low/volume/history all succeeded (daily-based), so they never appear here.
+    assert set(ctx.field_errors) == {"drift", "momentum"}
+    assert "no usable data" in ctx.field_errors["drift"]
+    assert "no usable data" in ctx.field_errors["momentum"]
+    # field_errors is diagnostic-only — never surfaced to the LLM-facing prompt dict.
+    assert "field_errors" not in prompt
+    # ...but is included in the full serialisation for Phase-8's per-cycle health log.
+    assert ctx.to_dict()["field_errors"] == ctx.field_errors
+
+
+def test_brain_context_field_errors_empty_on_full_success(
+    monkeypatch, tmp_cache, frozen_clock, no_sleep, sample_dax_daily, sample_dax_5m
+):
+    monkeypatch.setattr(
+        fetcher, "_raw_download", make_fake_download(daily=sample_dax_daily, m5=sample_dax_5m)
+    )
+    md = fetcher.MarketDataFetcher(TickerMapper(), tmp_cache)
+
+    ctx = md.get_brain_context(EPIC)
+    assert ctx is not None
+    assert ctx.field_errors == {}
 
 
 def test_unmapped_epic_propagates(monkeypatch, tmp_cache, frozen_clock):
