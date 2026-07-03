@@ -64,7 +64,10 @@ Demo-Trades** (der Datennachschub, auf den P9 gegatet ist). Der harte Pfad ist d
 Kandidaten-Generierung** über echtes P4-Research (nie der manuelle Seed). **Keine neue AI** — reine
 Mechanik: Daemon mit Marktzeiten-Phasen, Auto-Confirm (demo-only, fail-closed), Datei-Kill-Switch,
 Tages-Loss-Breaker, Token-Budget, idempotenter Reconcile, read-mostly Web-UI. **Alle 12 Module
-gebaut, 199 Unit-Tests grün.**
+gebaut, 199 Unit-Tests grün.** 📌 2026-07-03: Closeout + ein vorgeschlagenes V2/V3/V4-Reframing
+(autonome Epic-Recherche + verlässlicher Datennachschub zuerst) in
+[`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md) —
+Vorschlag für die nächste Browser-Planungssession, `ROADMAP.md` bewusst unverändert.
 
 **v1.5 (gemergt 2026-07-02):** Universum von 1 auf 4 EUR-Instrumente erweitert (DAX/StoxxE50/
 CAC40/IBEX35), Clamp/Floor unter Score 50 entkoppelt+relaxt, Lesson-Provenance-Filterung —

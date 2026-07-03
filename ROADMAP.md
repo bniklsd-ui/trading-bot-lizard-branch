@@ -268,6 +268,12 @@ open→close + demonstrierbarer Breaker-Trip) ist damit **zur Hälfte erreicht**
 **Directory:** [`phase8_scheduler/`](./phase8_scheduler/) *(pkg `scheduler` + `webui`)*
 **Concept:** [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md)
 
+> 📌 **2026-07-03:** [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md)
+> proposes reframing Phase 9 below into V2 (autonomous epic research + reliable
+> lightstreamer/yfinance data-input) → V3 (DB reform + no-trade lessons + UI) → V4 (the
+> current 9a–9f, deferred) — input for the next browser planning session. **Not yet applied
+> here**; reshaping this Phase 9 section is itself deferred to that track's housekeeping step.
+
 ---
 
 ## Phase 9 — V2 Erweiterungen

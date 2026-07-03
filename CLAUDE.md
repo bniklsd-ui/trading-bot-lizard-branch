@@ -77,6 +77,12 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
+> **📌 2026-07-03:** Phase 8 closeout + a proposed V2/V3/V4 roadmap reframe (autonomous epic
+> research + reliable data-input first, ahead of the sophisticated-AI Phase-9 items) are written
+> up as the input to the next browser planning session:
+> [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md).
+> Proposal only — ROADMAP.md is intentionally unchanged pending that session.
+
 **Active phase:** Phase 8 — Scheduler (`phase8_scheduler/`, Paket `scheduler`): 🟡 **code-complete +
 gemerged nach `main` (2026-06-30); v1.5-Hotfix gemerged (2026-07-02)** — mechanisch bewiesen,
 **autonomer Trade noch NICHT live-bewiesen** (ehrlich geflaggt gemerged, um den Build weiterzutragen).

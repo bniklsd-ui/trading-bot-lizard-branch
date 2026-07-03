@@ -214,6 +214,74 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
+## Session stopped — 2026-07-03 (Phase-8-Closeout-Handover + V2/V3/V4-Reframe-Vorschlag — docs-only)
+
+> **Auslöser:** die Elongation des laufenden Live-Tests deckte **erneut** die yFinance-
+> Intermittenz (`^FCHI`/`^IBEX`) auf — dasselbe Symptom wie in v1.5/v1.6, trotz „Tolerieren" in
+> v1.6. Statt eines dritten Hotfix-Rounds: **der Nikinger entschied, zu stoppen und neu zu
+> skalieren.** Auftrag: ein physisches Handover-File, das (a) ehrlich zusammenfasst, was Phase 8
+> erreicht hat + was v1.5–v1.7 (versucht haben zu) fixen, und (b) eine **Reframing-Empfehlung**
+> für V2/V3/V4 vorschlägt — V2 = autonome Epic-Recherche + verlässlicher Lightstreamer/yFinance-
+> Datennachschub, V3 = DB-Reform + No-Trade(Abstain)-Lessons + optionales UI, V4 = alles
+> Sophisticated/Optionale (das heutige Phase-9-9a–9f), deferred. **Kein Code, keine Tests** —
+> reine Dokumentation, Input für die nächste Browser-Planungssession (gleiches Zwei-Stufen-Muster
+> wie beim v1.6-Kickoff).
+
+### Completed (docs-only)
+- **`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`** (NEU) — §0 Zweck/Audience · §1 Phase-8-
+  Ist-Stand (proven/unproven, mission recap inkl. des 2026-07-02-Trades) · §2 der Hotfix-Arc
+  v1.5→v1.6→v1.7 (was jeder Round fixte + der rote Faden: zwei strukturelle Schwächen —
+  Datennachschub-Verlässlichkeit + kein autonomes Epic-Discovery — tauchten unter verschiedenen
+  Namen dreimal wieder auf) · §3 die Reframe-Begründung · §4 V2-Vorschlag (4a autonome
+  Epic-Recherche als Validate→Promote-Pipeline auf `verify_instrument.py` aufbauend, 4b
+  Lightstreamer/yFinance-Härtung auf den v1.6-Observability-Seams aufbauend) · §5 V3-Vorschlag
+  (DB-Reform + No-Trade-Lessons via `reflect()`-Erweiterung auf Abstain-Zyklen, auf den
+  bestehenden aber unterbenutzten `REASON_*`/`last_no_pick_reasoning`/`last_no_trade_detail`-
+  Ständen aufbauend + optionales UI) · §6 V4 (das heutige 9a–9f, deferred) · §7 Carry-overs
+  (5b-Breaker-Fire-Run, inferierte point_values, ungepinnte yFinance-Root-Cause, der offene
+  ✅-Doku-Flip) · §8 Next Step + **explizite Housekeeping-Notiz** (ROADMAP-Reshape ist der
+  Initial-Housekeeping-Schritt des V2-Tracks, nicht dieser Session) · §9 File-Anker.
+- **Pointer in drei höherrangigen Docs ergänzt** (additiv, kein Content-Reshape):
+  Root-`CLAUDE.md` „Current state"-Opener (neue 📌-Box direkt vor dem Phase-8-Absatz),
+  `ROADMAP.md` Phase-8-Block (📌-Zeile nach dem Concept-Link, **kein** Phase-9-Reshape),
+  `README.md` Fußnote ⁵ (ein angehängter Satz). Alle drei zeigen auf das neue Handover.
+- **`ROADMAP.md`s Phase-9-Sektion bewusst NICHT verändert** — die Nikinger-Entscheidung war
+  explizit: das Reshape ist der **Initial-Housekeeping-Schritt des V2-Tracks** (mirror Step 0/0b
+  aus jeder vorherigen Phase/Hotfix-Runde), nicht Teil dieser Session. Im Handover §8 + in den
+  Pointer-Zeilen selbst dokumentiert.
+
+### Verifiziert (docs-only)
+- **Kein Trading-/Scheduler-/Test-Code berührt** — `git status --short` zeigt ausschließlich
+  `.md`-Dateien (das neue Handover + drei Pointer-Edits + dieser Block) + Memory-Dateien außerhalb
+  des Repos. Regression per Definition unberührt (Baseline unverändert: P1 52 · P2 75 · P4 135 ·
+  P5 154 · P6 70 · P7 133 · P8 199 · root 64). Kein `pytest`-Lauf nötig/erwartet.
+- Alle im Handover zitierten file:line-/Symbol-Anker read-only gegen den echten Baum verifiziert
+  (`verify_instrument.py` existiert, `observability.py`s `record_cycle`/`iter_records`/
+  `research_health.jsonl`, `research_tick.py`s `REASON_*`-Konstanten, `research/models.py`s
+  `InstrumentSpec`/`load_universe`/`EXTENDED_UNIVERSE`, `external_data/models.py`s
+  `BrainContext.field_errors`, `ticker_map.py`, die zwei Lightstreamer-Notes-Dateien,
+  `research.py`s `last_no_pick_reasoning`, `state.py`s `last_no_trade_detail`) — keine erfundenen
+  Referenzen.
+
+### Next
+- **Browser-Planungssession (Nikinger):** aus `PHASE8_CLOSEOUT_HANDOVER.md` den detaillierten
+  V2-Recherche-Plan bauen (autonome Epic-Recherche + Lightstreamer/yFinance-Härtung) — inkl. der
+  Entscheidung, ob/wie `ROADMAP.md`s Phase 9 tatsächlich in V2/V3/V4 umsortiert wird (die im
+  Handover §8 explizit als „gehört in diese Session, nicht vorweggenommen" markierte
+  Housekeeping-Frage).
+- **Danach** eine „Wie"-Session baut daraus die Claude-Code-Ausführungsschritte (gleiches
+  Zwei-Stufen-Muster wie v1.6).
+- Der laufende v1.6/v1.7-Live-Test (Trade-Qualitäts-Datensammlung, Phase-8-✅-Doku-Flip) läuft
+  **unabhängig davon weiter** — dieses Handover ändert daran nichts, es ist reine Zukunfts-Planung.
+- **Commit:** vorgeschlagen (atomar denkbar: (1) das neue Handover, (2) die drei Pointer-Edits +
+  dieser Block, (3) Memory), wartet auf Nikinger-Trigger.
+
+### Offene Punkte / blockers
+- Keine technischen. Die Bucket-Grenzen/Nummerierung von V2/V3/V4 sind ein **Vorschlag**, keine
+  gelockte Entscheidung — das ist explizit der Job der nächsten Browser-Session.
+
+---
+
 ## Session stopped — 2026-07-02 (v1.7: `/api/status` DB-gespeist — der eigentliche Fix)
 
 > **Auslöser:** die „Wie"-Session, die aus dem „Was"-Plan (`docs/concepts/phase8_v1.7_hotfix_plan.md`)
