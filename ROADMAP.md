@@ -203,7 +203,7 @@ live-verifiziert ≠ profit-validiert (erst **ein** Trade; Edge-Metrik läuft be
 
 ---
 
-## Phase 8 — Scheduler 🟡 code-complete; v1.5+v1.6+v1.7 merged 2026-07-02 — autonomer Trade JETZT live bewiesen, Datensammlung + Breaker-Beweis laufen weiter
+## Phase 8 — Scheduler ✅ live-verifiziert (2026-07-03) — zwei autonome Trades + ein auslösender Safety-Breaker (Token-Budget) live bewiesen
 
 > **Mission (zuerst lesen):** „Scheduler" ist nur der Name — das Ziel ist **autonome,
 > unbeaufsichtigte Erzeugung realer Demo-Trades**, weil alles nach P8 (Confidence aus
@@ -232,11 +232,14 @@ schläft — und so die ersten realen Outcome-Daten sammelt.
 `main` (2026-07-02). ✅ **Bewiesen** (Operator-Runs + Mocks): Daemon-Lifecycle (preflight →
 bounded loop → clean shutdown), State-Persistenz, autonomes **echtes** P4-Research mit korrektem
 Fail-Safe-Abstain, reconcile+reward auf realen Demo-Trades, scharfes Token-Budget, read-only
-Web-UI — **und jetzt auch: ein netto-neuer autonomer Trade open *und* close in einem sauberen
-Lauf** (2026-07-02, DAX BUY `DIAAAAXW7U4AWAP` — der harte, bisher unbewiesene Kern der
-Phase-8-Mission). ⚠ **Weiterhin NICHT bewiesen:** Trade-*Qualität* über mehrere Zyklen (der eine
-Trade beweist Mechanik, nicht Konsistenz); **real auslösende** Safety-Breaker; Multi-Day-Verhalten;
-Edge/Profitabilität (nie im Scope).
+Web-UI, **ein netto-neuer autonomer Trade open *und* close in einem sauberen Lauf** (2026-07-02,
+DAX BUY `DIAAAAXW7U4AWAP`) — **und jetzt (2026-07-03, Nikinger-bestätigt) beide zuletzt offenen
+Beweis-Punkte der Mission:** ein **zweiter** net-new autonomer open→close, **und** ein Safety-
+Breaker, der **tatsächlich auslöst** (das Tages-Token-Budget erschöpfte sich mitten im Live-Lauf
+und blockierte weitere Trades — fail-closed, kein Crash, exakt wie designed). ⚠ **Weiterhin außerhalb
+des Scopes/nicht Ziel dieses Flips:** Trade-*Qualität*/Konsistenz über viele Zyklen hinweg (Mechanik
+ist bewiesen, Edge nicht); Multi-Day-Verhalten im Detail; Edge/Profitabilität (nie im Scope, wird
+es auch künftig nicht sein).
 
 **Why der ursprüngliche Gap + die drei Hotfix-Tracks:** der Bot **abstaint** anfangs fast jeden
 Zyklus (Single-Instrument-Universum + Sub-50-Doppel-Clamp). **v1.5** (Varietät C + Clamp/Floor B +
@@ -247,19 +250,21 @@ ergänzte Observability + eine Instrument-Verification-Harness — direktes Erge
 Tag: **der erste echte autonome Trade**. **v1.7** fixte eine kleine webui-only Anzeige-
 Inkonsistenz, die der lange Trade-Lebenszyklus (~9 min IG-Settlement-Lag) erstmals sichtbar
 machte (kein Sicherheitsproblem). Das ursprüngliche „Done when" (live net-new autonomer
-open→close + demonstrierbarer Breaker-Trip) ist damit **zur Hälfte erreicht** — der Breaker-Trip
-+ die Trade-Qualitäts-Datensammlung stehen noch aus.
+open→close + demonstrierbarer Breaker-Trip) ist damit **vollständig erreicht** (2026-07-03) — ein
+zweiter net-new open→close **und** ein tatsächlich auslösender Breaker (Token-Budget) liegen jetzt
+beide vor. Fortlaufende Trade-Qualitäts-Datensammlung bleibt ein informatives Nebenprodukt des
+weiterlaufenden Betriebs, ist aber **nicht** Bedingung dieses ✅-Flips (der deckt Mechanik, nicht Edge).
 
-> **⚠ v1.6/v1.7-Stand (gemergt 2026-07-02, ehrlich):** `^FCHI`/`^IBEX` liefern intermittierend
-> keine Kursdaten (*„possibly delisted"*, vermutlich Yahoo-Rate-Limiting) — **toleriert**
-> (Version-Pin korrigiert, per-Zyklus-Observability macht künftige Degradation sichtbar), nicht
-> gefixt oder gedroppt (kein Hard-Crash, kein VETO betroffen — Momentum-VETO nutzt IG-Echtzeit-
-> Bars, nicht yFinance). `webui/api.py`s `/api/status` liest `trades_today`/`realized_pnl_today`
-> jetzt aus der DB statt einem lagging State-Snapshot (v1.7). **Der Live-Varietäts-Lauf läuft
-> bewusst bis ~17:30 morgen weiter** — der 2026-07-02-Trade ist ein technisch sauberer netto-neuer
-> autonomer open→close, aber Nikinger sammelt bewusst mehr Trade-Qualitäts-Daten (jetzt über das
-> v1.6-Observability-Log sichtbar) vor dem finalen Doku-Flip, statt beim ersten „er tradet" zu
-> stoppen. Danach folgt Step 5b (Breaker-Fire-Run). Details:
+> **✅ v1.6/v1.7/Live-Beweis-Stand (2026-07-03, ehrlich):** `^FCHI`/`^IBEX` liefern weiterhin
+> intermittierend keine Kursdaten (*„possibly delisted"*, vermutlich Yahoo-Rate-Limiting) —
+> **toleriert** (Version-Pin korrigiert, per-Zyklus-Observability macht Degradation sichtbar),
+> nicht gefixt oder gedroppt (kein Hard-Crash, kein VETO betroffen — Momentum-VETO nutzt
+> IG-Echtzeit-Bars, nicht yFinance); Aufnahme in den V2-Reframe-Vorschlag (siehe Pointer unten).
+> `webui/api.py`s `/api/status` liest `trades_today`/`realized_pnl_today` seit v1.7 aus der DB statt
+> einem lagging State-Snapshot. **Der weiterlaufende Live-Test lieferte den zweiten net-new
+> autonomen open→close UND Step 5b (Breaker-Fire): das Tages-Token-Budget erschöpfte sich
+> mitten im Lauf und blockierte weitere Trades — fail-closed, kein Crash.** Beide zuletzt offenen
+> Beweis-Punkte der Phase-8-Mission sind damit geschlossen (Nikinger-bestätigt, 2026-07-03). Details:
 > [`phase8_scheduler/CLAUDE.md`](./phase8_scheduler/CLAUDE.md) (Session-Journal, aktuellster
 > Stand), [`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.6_HANDOVER.md),
 > [`docs/concepts/phase8_v1.6_hotfix_plan.md`](./docs/concepts/phase8_v1.6_hotfix_plan.md),
@@ -269,10 +274,12 @@ open→close + demonstrierbarer Breaker-Trip) ist damit **zur Hälfte erreicht**
 **Concept:** [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md)
 
 > 📌 **2026-07-03:** [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md)
-> proposes reframing Phase 9 below into V2 (autonomous epic research + reliable
-> lightstreamer/yfinance data-input) → V3 (DB reform + no-trade lessons + UI) → V4 (the
-> current 9a–9f, deferred) — input for the next browser planning session. **Not yet applied
-> here**; reshaping this Phase 9 section is itself deferred to that track's housekeeping step.
+> closes out Phase 8 (written before the ✅ flip above landed; still the fuller writeup of the
+> v1.5–v1.7 arc) and proposes reframing Phase 9 below into V2 (autonomous epic research + reliable
+> lightstreamer/yfinance data-input — the yFinance intermittency noted above is its trigger) → V3
+> (DB reform + no-trade lessons + UI) → V4 (the current 9a–9f, deferred) — input for the next
+> browser planning session. **Not yet applied here**; reshaping this Phase 9 section is itself
+> deferred to that track's housekeeping step.
 
 ---
 

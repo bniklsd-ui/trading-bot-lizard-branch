@@ -20,7 +20,7 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 5     | ig_bot.py Gates 1–5 + 4 VETOs + place/monitor/close | ✅ Abgeschlossen — live-**verifiziert** (Order-/Monitor-Pfad, Demo), noch nicht profit-validiert ² |
 | 6     | Bull/Bear/Judge Debate              | ✅ Abgeschlossen — live-**verifiziert** (Debatte-Pfad, Demo), noch nicht profit-validiert ³ |
 | 7     | Reward/Punishment + Brain           | ✅ live-verifiziert (Demo, 2026-06-26) — `live_test.py` 5/5; 128 Unit-Tests ⁴ |
-| 8     | Scheduler                           | 🟡 Code-complete + gemerged; **v1.5+v1.6+v1.7 gemerged (2026-07-02)** — 🎉 erster echter autonomer Trade platziert, Webui-Fix mockgrün; Live-Varietäts-Lauf läuft bewusst bis ~17:30 morgen weiter (Trade-Qualitäts-Daten), Doku-Flip auf ✅ noch offen ⁵ |
+| 8     | Scheduler                           | ✅ **live-verifiziert (2026-07-03)** — zwei autonome Trades + ein tatsächlich auslösender Safety-Breaker (Token-Budget) live bewiesen, noch nicht profit-validiert ⁵ |
 | 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert)       |
 
 ¹ **Live-getestet ≠ profit-validiert.** Die Research-Pipeline läuft nachweislich
@@ -57,8 +57,10 @@ Lesson-Extraktion (`reflect()`, ein Haiku-Call, best-effort); Confidence ist **o
 gatet nichts** (keine VETO-Berührung — Instinct→VETO ist Phase 9f). ⚠ Nur **ein** Trade beweist den
 Pfad, **nicht** die Profitabilität (Edge = Live-Betrieb). Demo only, manueller Trigger.
 
-⁵ **Phase 8 (Scheduler) — code-complete, v1.5+v1.6+v1.7 nach `main` gemerged (2026-07-02),
-autonomer Trade jetzt live bewiesen, aber Datensammlung + Breaker-Beweis laufen noch.**
+⁵ **Phase 8 (Scheduler) — ✅ live-verifiziert (2026-07-03).** v1.5+v1.6+v1.7 nach `main` gemerged
+(2026-07-02); der weiterlaufende Live-Test lieferte danach einen **zweiten** net-new autonomen
+open→close **und** den ersten **tatsächlich auslösenden** Safety-Breaker (Tages-Token-Budget,
+fail-closed, kein Crash) — beide zuletzt offenen Beweis-Punkte der Mission sind geschlossen.
 „Scheduler" ist nur der Name; das Ziel ist die **autonome, unbeaufsichtigte Erzeugung echter
 Demo-Trades** (der Datennachschub, auf den P9 gegatet ist). Der harte Pfad ist die **autonome
 Kandidaten-Generierung** über echtes P4-Research (nie der manuelle Seed). **Keine neue AI** — reine
@@ -88,13 +90,14 @@ Anzeige-Inkonsistenz auf (Trade-Zähler + Realized-P&L-Karte lagen hinter der DB
 Sicherheitsproblem, DB/Broker/Loss-Breaker bestätigt korrekt und unberührt). Fix: `/api/status`
 liest beide Werte jetzt aus der DB statt dem lagging State-Snapshot, mockgrün.
 
-**⚠ Ehrlich weiterhin offen (bewusst, kein ✅-Flip):** der 2026-07-02-Trade beweist die Mechanik
-eines einzelnen sauberen open→close, aber **nicht** Trade-*Qualität* über mehrere Zyklen, nicht
-**tatsächlich auslösende** Safety-Breaker, nicht Mehr-Tage-Verhalten, nicht Edge/Profitabilität
-(nie im Scope). Der Live-Varietäts-Lauf läuft deshalb **bewusst bis ~17:30 morgen** weiter — jetzt
-mit dem v1.6-Observability-Log sichtbar —, um mehr Trade-Qualitäts-Daten zu sammeln, statt beim
-ersten „er tradet" zu stoppen. Danach folgt Step 5b (Breaker-Fire-Run) und erst dann der finale
-Doku-Flip. Details: `phase8_scheduler/CLAUDE.md` (Session-Journal, aktuellster Stand),
+**✅ Beweis-Update (2026-07-03, Nikinger-bestätigt):** der weiterlaufende Live-Test produzierte
+einen **zweiten** net-new autonomen open→close **und** Step 5b (Breaker-Fire) — das Tages-Token-
+Budget erschöpfte sich mitten im Lauf und blockierte weitere Trades, fail-closed, kein Crash,
+exakt wie designed. Damit ist das ursprüngliche „Done when" der Phase-8-Mission (net-new
+autonomer open→close + tatsächlich auslösender Safety-Breaker) **vollständig erreicht** — der
+Doku-Flip auf ✅ ist mechanisch, **kein** Edge-/Profit-Claim (nie im Scope; fortlaufende
+Trade-Qualitäts-Datensammlung ist ein Nebenprodukt des weiterlaufenden Betriebs, keine Bedingung
+dieses Flips). Details: `phase8_scheduler/CLAUDE.md` (Session-Journal, aktuellster Stand),
 `phase8_scheduler/PHASE8_V1.6_HANDOVER.md` (v1.5-Kontext: `PHASE8_V1.5_HOTFIX_HANDOVER.md`),
 `docs/concepts/phase8_v1.6_hotfix_plan.md`, `docs/concepts/phase8_v1.7_hotfix_plan.md`. Konzept:
 `docs/concepts/phase8_scheduler_concept.md`.

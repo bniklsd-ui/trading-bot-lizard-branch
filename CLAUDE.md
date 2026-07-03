@@ -77,15 +77,20 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 
 ## Current state
 
-> **📌 2026-07-03:** Phase 8 closeout + a proposed V2/V3/V4 roadmap reframe (autonomous epic
-> research + reliable data-input first, ahead of the sophisticated-AI Phase-9 items) are written
-> up as the input to the next browser planning session:
+> **✅ 2026-07-03 — Phase 8 ABGESCHLOSSEN + live-verifiziert.** Der weiterlaufende Live-Test lieferte
+> einen **zweiten** net-new autonomen open→close **und** einen tatsächlich **auslösenden Safety-
+> Breaker** (das Tages-Token-Budget erschöpfte sich mitten im Lauf und blockierte weitere Trades —
+> fail-closed, kein Crash, exakt wie designed). Die beiden zuletzt offenen Beweis-Punkte der
+> Phase-8-Mission sind damit geschlossen (Nikinger-bestätigt, 2026-07-03). Dieser Flip gilt
+> **ausschließlich der Mechanik** — **kein** Edge-/Profit-Claim (nie im Scope). **Nächster Track =
+> V2** (autonome Epic-Recherche + verlässlicher Lightstreamer/yFinance-Datennachschub) — als
+> Vorschlag in Browser-Planung, noch nicht in Claude Code gestartet:
 > [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md).
-> Proposal only — ROADMAP.md is intentionally unchanged pending that session.
 
-**Active phase:** Phase 8 — Scheduler (`phase8_scheduler/`, Paket `scheduler`): 🟡 **code-complete +
-gemerged nach `main` (2026-06-30); v1.5-Hotfix gemerged (2026-07-02)** — mechanisch bewiesen,
-**autonomer Trade noch NICHT live-bewiesen** (ehrlich geflaggt gemerged, um den Build weiterzutragen).
+**Zuletzt abgeschlossene Phase:** Phase 8 — Scheduler (`phase8_scheduler/`, Paket `scheduler`): ✅
+**live-verifiziert (2026-07-03)** — vormals 🟡 **code-complete + gemerged nach `main` (2026-06-30);
+v1.5-Hotfix gemerged (2026-07-02)** — mechanisch bewiesen, **autonomer Trade jetzt zweifach
+live-bewiesen + ein Safety-Breaker (Tages-Token-Budget) live ausgelöst.**
 **⚠ v1.5-Stand (ehrlich, 2026-07-02):** die drei Code-Fixes A/B/C sind fertig + mockgrün (P1 52 · P2 67 ·
 P3 72 · P4 122 · P5 154 · P6 70 · P7 131 · P8 182), aber der erste **Live-Lauf** deckte einen
 **yFinance-Blocker** auf — CAC 40 (`^FCHI`) und IBEX 35 (`^IBEX`), die im Step-2-Variety-Track **nie
@@ -122,7 +127,13 @@ beim ersten „er tradet" zu stoppen — **ehrlich: nur die Mechanik ist bewiese
 Mehr-Zyklen-Verhalten/auslösende Safety-Breaker.** Plan: `docs/concepts/phase8_v1.7_hotfix_plan.md`;
 Detail: `phase8_scheduler/CLAUDE.md` → `## Session stopped — 2026-07-02 (v1.7: /api/status
 DB-gespeist — der eigentliche Fix)` (+ die vorherige `## Session stopped — 2026-07-02 (🎉 erster
-autonomer Trade + v1.7-Webui-Diagnose)`).
+autonomer Trade + v1.7-Webui-Diagnose)`). **✅ Update (2026-07-03): Phase 8 offiziell abgeschlossen
++ live-verifiziert.** Der weiterlaufende Live-Test lieferte einen zweiten net-new autonomen
+open→close und Step 5b (Breaker-Fire) — das Tages-Token-Budget erschöpfte sich mitten im Lauf und
+blockierte weitere Trades, fail-closed, kein Crash. Beide zuletzt offenen Beweis-Punkte der Mission
+sind damit geschlossen (Nikinger-bestätigt). Handover + V2/V3/V4-Reframe-Vorschlag:
+`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`; Detail: `phase8_scheduler/CLAUDE.md` →
+`## Session stopped — 2026-07-03 (✅ Phase-8-Live-Beweis abgeschlossen)`.
 (gestartet 2026-06-27). **Mission (zuerst lesen):** Phase 8 heißt „Scheduler", aber das Ziel ist
 **autonome, unbeaufsichtigte Erzeugung echter Demo-Trades** — alles danach (Confidence aus
 `INSUFFICIENT`, P9-Instinct-Promotion) ist auf reale Outcomes gegatet. Der harte Pfad ist die

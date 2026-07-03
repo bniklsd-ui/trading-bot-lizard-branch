@@ -10,10 +10,16 @@
 > **Update (2026-07-02):** v1.5+v1.6+v1.7 are merged to `main`. The bot no longer abstains almost
 > every cycle — the v1.5 universe/clamp fixes plus a v1.6 prompt-leak fix ("Cause A part 2")
 > produced the **first-ever real autonomous trade** (DAX BUY) the same day, proving the hard
-> mechanical core of Phase 8's mission. Honest flag remains: that one clean open→close proves
-> mechanics, not trade *quality* across cycles or an actually-tripping safety breaker — the live
-> variety run continues intentionally through tomorrow's close to gather that data (see
-> `phase8_scheduler/CLAUDE.md` journal for the current state).
+> mechanical core of Phase 8's mission.
+>
+> **✅ Update (2026-07-03): Phase 8 live-verified.** The live test continued and produced a
+> **second** net-new autonomous open→close **and** the first safety breaker **actually tripping**
+> live (the daily token budget exhausted mid-run and blocked further trades — fail-closed, no
+> crash, exactly as designed). Both previously-open proof points of the Phase-8 mission are now
+> closed (Nikinger-confirmed). This flip is mechanical only — no edge/profitability claim (never
+> in scope). Next track: a proposed V2/V3/V4 reframe (autonomous epic research + reliable
+> lightstreamer/yfinance data input first) — see
+> [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md).
 
 ---
 
@@ -122,7 +128,7 @@
   deferred to **Phase 9f**, gated on real outcomes
 - **No VETO touch.** Reward/lessons sit entirely downstream of order execution
 
-### Scheduler (Phase 8 — 🟡 code-complete, v1.5+v1.6+v1.7 merged, first live trade proven)
+### Scheduler (Phase 8 — ✅ live-verified 2026-07-03, v1.5+v1.6+v1.7 merged)
 - Long-running daemon (injectable `now_fn`/`sleep_fn`) drives the cycle above unsupervised on a
   market-hours loop, with no new AI — pure mechanics around the existing P4 research / P6 debate
   / P7 reward calls
@@ -136,11 +142,16 @@
   clamp/floor decoupling, lesson provenance) resolved that. **v1.6** then found + fixed a second
   prompt-leak channel ("Cause A part 2") — the same day, the scheduler placed **the first-ever
   real net-new autonomous trade** (DAX BUY, `deal_id=DIAAAAXW7U4AWAP`), proving the hard,
-  previously-unproven mechanical core of the Phase-8 mission. ⚠ Honestly still open: that one
-  clean open→close proves mechanics, not trade *quality* across cycles, nor an actually-tripping
-  safety breaker — the live variety run continues intentionally through the next market close to
-  gather that data before any final ✅ doc flip. See `phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`,
-  `phase8_scheduler/PHASE8_V1.6_HANDOVER.md`, and `phase8_scheduler/CLAUDE.md`'s journal for the
+  previously-unproven mechanical core of the Phase-8 mission. The live test then continued and,
+  by **2026-07-03**, produced a **second** net-new autonomous open→close **and** the first safety
+  breaker **actually tripping live** (the daily token budget exhausted mid-run and blocked
+  further trades — fail-closed, no crash, exactly as designed). **✅ Both previously-open proof
+  points of the mission are now closed (Nikinger-confirmed) — Phase 8 is live-verified.** This
+  covers mechanics only: autonomous generation, execution, and a triggering safety breaker — no
+  claim about trade *quality* across many cycles, multi-day behaviour, or edge/profitability
+  (never in scope). See `phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`,
+  `phase8_scheduler/PHASE8_V1.6_HANDOVER.md`, `phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`
+  (also proposes the next V2/V3/V4 track), and `phase8_scheduler/CLAUDE.md`'s journal for the
   current state.
 
 ### Dual State
@@ -193,4 +204,4 @@ Per-phase concept + implementation:
 - Phase 5 — [`docs/concepts/phase5_concept.md`](./docs/concepts/phase5_concept.md) · [`phase5_execution/`](./phase5_execution/)
 - Phase 6 — [`docs/concepts/phase6_debate_concept.md`](./docs/concepts/phase6_debate_concept.md) · [`phase6_debate/`](./phase6_debate/)
 - Phase 7 — [`docs/concepts/phase7_reward_concept.md`](./docs/concepts/phase7_reward_concept.md) · [`phase7_reward/`](./phase7_reward/)
-- Phase 8 — [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md) · [`phase8_scheduler/`](./phase8_scheduler/) · hotfix history: [`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md) · [`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.6_HANDOVER.md) · live variety run in progress: [`phase8_scheduler/CLAUDE.md`](./phase8_scheduler/CLAUDE.md)
+- Phase 8 — [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md) · [`phase8_scheduler/`](./phase8_scheduler/) · hotfix history: [`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md) · [`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.6_HANDOVER.md) · closeout + V2/V3/V4 proposal: [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md) · session journal: [`phase8_scheduler/CLAUDE.md`](./phase8_scheduler/CLAUDE.md)

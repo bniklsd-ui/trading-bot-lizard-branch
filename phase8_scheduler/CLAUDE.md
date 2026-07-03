@@ -33,13 +33,21 @@ Wer hier ein LLM „entscheiden/sizen/timen/vetoen" lassen will → **stop**, da
 Cleanup → Verify → **autonome Candidates** → Auto-Confirm/Safety → Reconcile →
 Loop/Daemon → **zuletzt** Web-UI. Unter Zeit-/Token-Druck fällt die UI weg, **nie** die
 Safety. **Stand 2026-06-30: Module 1–12 gebaut + grün (181 Tests) — Phase 8 code-complete +
-🟡 nach `main` gemerged** (ehrlich geflaggt, s. `## Session stopped — 2026-06-30`). **Bewusst
-KEIN ✅-„live-verifiziert"-Flip** wie P5/P6/P7 — gemerged mit dem ehrlichen Flag „mechanisch
-bewiesen, autonomer Trade noch NICHT live-bewiesen", um den Build weiterzutragen. Es fehlt ein
-echter Mehr-Zyklen-/Mehr-Tage-Lauf, der (a) einen netto-neuen autonomen Trade in **einem** sauberen
-Lauf öffnet+schließt und (b) die Safety-Breaker tatsächlich auslösen sieht — **beides carried in den
-v1.5-Hotfix** (`PHASE8_V1.5_HOTFIX_HANDOVER.md`: der Bot abstained fast immer → Variety + Clamp/Floor
-+ echte Lessons). **Token-Budget by-default scharf** (Default `200_000` ≈ €0.8/Tag; vorher `None`/aus).
+🟡 nach `main` gemerged** (ehrlich geflaggt, s. `## Session stopped — 2026-06-30`). Es fehlte
+damals ein echter Mehr-Zyklen-/Mehr-Tage-Lauf, der (a) einen netto-neuen autonomen Trade in
+**einem** sauberen Lauf öffnet+schließt und (b) die Safety-Breaker tatsächlich auslösen sieht —
+**beides carried in den v1.5-Hotfix** (`PHASE8_V1.5_HOTFIX_HANDOVER.md`: der Bot abstained fast
+immer → Variety + Clamp/Floor + echte Lessons). **Token-Budget by-default scharf** (Default
+`200_000` ≈ €0.8/Tag; vorher `None`/aus).
+
+> **✅ Update (2026-07-03): Phase 8 ABGESCHLOSSEN + live-verifiziert.** Beide oben genannten
+> fehlenden Punkte sind jetzt bewiesen — der weiterlaufende Live-Test lieferte einen **zweiten**
+> net-new autonomen open→close **und** einen tatsächlich **auslösenden Safety-Breaker** (das
+> Tages-Token-Budget erschöpfte sich mitten im Lauf und blockierte weitere Trades, fail-closed,
+> kein Crash). Nikinger-bestätigt. Der 🟡-Merge-Flag oben ist damit **historisch** (Stand
+> 2026-06-30) — der aktuelle Stand ist ✅. Details: `## Session stopped — 2026-07-03 (✅
+> Phase-8-Live-Beweis abgeschlossen)` unten. **Nächster Track = V2** (siehe
+> `PHASE8_CLOSEOUT_HANDOVER.md`), noch nicht in Claude Code gestartet.
 
 ## Harte Regeln (nicht verhandelbar)
 - **Demo-only strukturell, fail-closed.** Auto-Confirm gibt `True` **nur** bei: `account
@@ -211,6 +219,84 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-07-03 (✅ Phase-8-Live-Beweis abgeschlossen — zweiter Trade + Breaker-Trip — docs-only)
+
+> **Auslöser:** der Nikinger meldete, dass der weiterlaufende v1.6/v1.7-Live-Test seither zwei
+> Dinge produziert hat: einen **zweiten** autonomen Demo-Trade **und** einen Fall, in dem der Bot
+> das Tages-Token-Budget erreichte und daraufhin aufhörte zu handeln. Beides zusammen schließt die
+> beiden zuletzt offenen Beweis-Punkte der Phase-8-Mission (net-new autonomer open→close + ein
+> tatsächlich auslösender Safety-Breaker — Step 5a/5b aus dem v1.5-Plan). Auftrag: README + alle
+> anderen Docs auf **✅ Phase 8 offiziell abgeschlossen + live-verifiziert** flippen. **Docs-only,
+> kein Code.**
+
+### Was jetzt bewiesen ist (Nikinger-bestätigt, kein Code-seitiger Beweis in dieser Session)
+- **Ein zweiter net-new autonomer open→close** — zusätzlich zum ersten (2026-07-02, DAX BUY
+  `deal_id=DIAAAAXW7U4AWAP`). Beweist: der erste Trade war kein Einzelfall: die autonome
+  Kandidaten-Generierung → Debatte → Auto-Confirm → Order-Kette reproduziert sich.
+- **Ein Safety-Breaker, der tatsächlich auslöst** — das Tages-Token-Budget (`scheduler/safety.py`
+  `AutoConfirm`, Gate 5: `budget.is_exhausted()`) erschöpfte sich mitten im Lauf. Verifiziert per
+  Code-Lektüre (nicht neu getestet diese Session, nur die bestehende, bereits mockgrün getestete
+  Logik gegengelesen): `can_open()` gibt in diesem Fall `(False, REASON_BUDGET)` zurück →
+  `research_tick` wird für den Rest des Tages **nicht mehr aufgerufen** (spart weiteren
+  Token-Spend), der Daemon-Prozess selbst läuft **fail-closed weiter** (kein Crash, kein
+  Kill-Switch-Trip — Budget-Erschöpfung ist ein Trade-Block, keine Notabschaltung) — exakt wie im
+  Modul-7-Design dokumentiert. Das ist die **erste live bestätigte** Instanz eines der mehreren
+  P8-Safety-Breaker (Kill-Switch/Backoff-Trip/Loss-Breaker/Token-Budget) tatsächlich greifend.
+- Damit ist das ursprüngliche „Done when" der Phase-8-Mission — ein netto-neuer autonomer
+  open→close **und** ein demonstrierbarer Breaker-Trip — **vollständig erreicht**. Trade-*Qualität*
+  über viele Zyklen, Multi-Day-Verhalten und Edge/Profitabilität bleiben **außerhalb des Scopes**
+  dieses Flips (waren nie Teil des „Done when").
+
+### Completed (docs-only, dieser Session)
+- **Root `CLAUDE.md`:** Pointer-Box + „Active phase"-Flag auf ✅ geflippt (vormals 🟡), neue
+  Update-Notiz im historischen Fließtext ergänzt (additiv, keine Historie gelöscht).
+- **`ROADMAP.md`:** Phase-8-Header auf ✅ geflippt, „Status (ehrlich)"-Absatz + „Why"-Absatz +
+  die `⚠`→`✅`-Callout-Box aktualisiert (beide Beweis-Punkte als geschlossen markiert), 📌-Pointer
+  auf das Closeout-Handover ergänzt um einen Hinweis, dass der Flip bereits erfolgt ist.
+- **`README.md`:** Statustabelle Zeile 8 auf ✅ geflippt, Fußnote ⁵ Kopfsatz + der „Ehrlich
+  weiterhin offen"-Absatz (jetzt „✅ Beweis-Update") aktualisiert.
+- **`ARCHITECTURE.md`:** Top-Update-Box + `### Scheduler`-Header + Status-Absatz + die
+  Phase-8-Link-Zeile aktualisiert (Pointer jetzt auch auf `PHASE8_CLOSEOUT_HANDOVER.md`).
+- **`phase8_scheduler/CLAUDE.md`** (diese Datei): Build-Reihenfolge-Status-Absatz um eine
+  ✅-Update-Box ergänzt (der 🟡-Merge-Flag bleibt als historische Aussage stehen, korrekt für
+  ihren Zeitpunkt 2026-06-30); dieser Session-stopped-Block.
+- **`docs/concepts/phase8_scheduler_concept.md`: bewusst NICHT geändert** — der Doc trägt keinen
+  live-Status-Flag (nur einen Design-Status „Architektur geklärt" von der Konzept-Phase), reine
+  Architektur-Referenz, kein Status-Tracking-Dokument. Hygiene-Prinzip angewandt: keine Aktion, wo
+  keine nötig ist.
+- **`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`: bewusst NICHT nachträglich umgeschrieben** —
+  das Handover ist ein zeitgestempeltes Dokument (geschrieben *vor* dieser Nachricht, am selben
+  Tag). Sein §1/§7 (die dort als "unproven" gelisteten Punkte) sind jetzt durch diesen
+  Session-Block + die anderen Doku-Flips überholt — als **dated snapshot** stehen gelassen
+  (gleiche Konvention wie die übrige Session-Historie: neue Erkenntnisse ergänzen, alte Einträge
+  werden nicht rückwirkend umgeschrieben). Der V2/V3/V4-Reframe-**Vorschlag** selbst (der
+  eigentliche Zweck des Handovers) bleibt unverändert gültig — er betraf immer die Zukunft nach
+  Phase 8, nicht deren Live-Beweis-Status.
+
+### Verifiziert (docs-only)
+- **Kein Trading-/Scheduler-/Test-Code berührt** — `git status --short` zeigt ausschließlich
+  `.md`-Dateien. Regression per Definition unberührt (Baseline unverändert: P1 52 · P2 75 ·
+  P4 135 · P5 154 · P6 70 · P7 133 · P8 199 · root 64). Kein `pytest`-Lauf nötig/erwartet.
+- Die Breaker-Trip-Erklärung (`can_open()` → `REASON_BUDGET`, kein Kill-Switch-Trip) wurde gegen
+  `scheduler/safety.py` gegengelesen, um sie in den Docs korrekt zu beschreiben (fail-closed
+  Trade-Block, nicht Prozess-Crash) — reines Read-only-Nachschlagen, keine Code-Änderung.
+
+### Next
+- **Phase 8 ist geschlossen.** Der nächste Track ist **V2** — startet in der Browser-
+  Planungssession auf Basis von `PHASE8_CLOSEOUT_HANDOVER.md`; die dort explizit genannte
+  Housekeeping-Notiz (ROADMAP-Phase-9-Reshape) bleibt der Initial-Schritt dieses Tracks.
+- Kein weiterer Phase-8-Code ist geplant, außer ein künftiger Live-Betrieb deckt einen neuen Bug auf.
+- **Commit:** vorgeschlagen (dieser Block + die fünf Doku-Flips zusammen mit dem Closeout-
+  Handover-Commit oder als eigener Folge-Commit — Nikinger-Präferenz), wartet auf Trigger.
+
+### Offene Punkte / blockers
+- Keine technischen. Die konkreten Details des zweiten Trades (deal_id/Richtung/Zeitstempel) und
+  des Breaker-Trip-Zeitpunkts wurden vom Nikinger mündlich berichtet, nicht aus Logs/DB in dieser
+  Session extrahiert — falls für eine spätere Auswertung (z. B. Trade-Qualitäts-Analyse) benötigt,
+  aus `data/trading_bot.sqlite`/`data/state/research_health.jsonl`/`llm_usage.json` nachziehen.
 
 ---
 
