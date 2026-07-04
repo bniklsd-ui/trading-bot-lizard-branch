@@ -196,6 +196,15 @@ def run_promotion_cycle(
 
     # -- Step 3: health-recheck actives (+ curated-pricing confirmation) ---------
     for rec in store.active_universe():
+        # Skip instruments activated in Step 2 of THIS cycle (2026-07-04 review
+        # polish): they carry a full verify PASS from Step 1 moments ago — a second
+        # verify_instrument here is pure duplicate paced IG/yF traffic with no new
+        # information. They rejoin the normal health-recheck from the next cycle on.
+        # (Their pricing was just set in Step 1, so the curated-confirmation branch
+        # below — which only fires on point_value_source IS NULL — never applied.)
+        if rec.epic in report.activated:
+            report.unchanged += 1
+            continue
         verdict = verify_instrument.verify_instrument(
             broker, fetcher, rec.epic, volume_proxy=rec.volume_proxy,
             sleep_fn=sleep_fn, pace_s=pace_s,

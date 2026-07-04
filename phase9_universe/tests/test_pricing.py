@@ -88,6 +88,14 @@ def test_nothing_resolvable_returns_none():
     assert resolve_point_value({}) is None
 
 
+def test_name_lotsize_zero_is_not_accepted():
+    # 2026-07-04 review polish: path 2 carries the same `> 0` guard as path 1 —
+    # a hypothetical "(0€)" + lot_size 0 must not resolve to point_value 0
+    # (which would zero out P5 sizing math downstream).
+    market_info = {"name": "Broken Index Kassa (0€)", "lot_size": 0.0}
+    assert resolve_point_value(market_info) is None
+
+
 # -- confirm_curated ------------------------------------------------------------
 
 

@@ -150,6 +150,36 @@ def test_happy_path_discovered_to_active(store: UniverseStore):
     assert rec.point_value_source == "name_lotsize_agree"
 
 
+def test_freshly_activated_epic_is_not_reverified_same_cycle(store: UniverseStore):
+    # 2026-07-04 review polish: an epic verified in Step 1 and activated in Step 2
+    # carries a full verify PASS from moments ago — Step 3's health-recheck must
+    # skip it this cycle (no duplicate paced IG/yF traffic), and re-include it
+    # from the next cycle on. get_ohlcv fires exactly once per verify_instrument
+    # call, so its per-epic count is the verify count.
+    epic = "IX.D.DAX.IFMM.IP"
+    store.upsert_discovered(_discovered(epic))
+    broker = _FakeBroker({epic: _passing_market_info()})
+    fetcher = _FakeFetcher()
+    ohlcv_calls: list[str] = []
+    orig_get_ohlcv = broker.get_ohlcv
+
+    def counting_get_ohlcv(e: str, resolution: str, count: int):
+        ohlcv_calls.append(e)
+        return orig_get_ohlcv(e, resolution, count)
+
+    broker.get_ohlcv = counting_get_ohlcv
+
+    report = run_promotion_cycle(broker, fetcher, store, is_demo=True, sleep_fn=_no_sleep)
+
+    assert report.activated == [epic]
+    assert ohlcv_calls.count(epic) == 1  # Step-1 verify only — no Step-3 re-verify
+
+    # Next cycle: the now-established active IS health-rechecked normally.
+    ohlcv_calls.clear()
+    run_promotion_cycle(broker, fetcher, store, is_demo=True, sleep_fn=_no_sleep)
+    assert ohlcv_calls.count(epic) == 1  # the regular Step-3 health-recheck
+
+
 def test_pass_without_pricing_stays_discovered(store: UniverseStore):
     epic = "IX.D.NOPRICE.IP"
     store.upsert_discovered(_discovered(epic, name="Unresolvable Index"))

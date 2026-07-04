@@ -108,7 +108,10 @@ def record_event(path: str, event: dict[str, Any]) -> None:
     write failure is logged ``critical`` and swallowed, never raised.
     """
     record = dict(event)
-    record.setdefault("ts", datetime.now().isoformat())
+    # tz-aware (2026-07-04 review polish): record_cycle's ts is the runner's tz-aware
+    # clock.now(); a naive datetime.now() here would mix two timestamp formats in the
+    # same JSONL log. astimezone() stamps the local (daemon-zone) offset.
+    record.setdefault("ts", datetime.now().astimezone().isoformat())
     _append(path, record)
 
 

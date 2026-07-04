@@ -167,6 +167,15 @@ def test_record_event_appends_valid_jsonl(tmp_path) -> None:
     assert "ts" in record  # stamped, since the caller didn't supply one
 
 
+def test_record_event_stamps_tz_aware_ts(tmp_path) -> None:
+    # 2026-07-04 review polish: record_cycle's ts is the runner's tz-aware clock.now();
+    # a naive stamp here would mix two timestamp formats in the same JSONL log.
+    path = str(tmp_path / "research_health.jsonl")
+    observability.record_event(path, {"event": "bar_fetch"})
+    record = json.loads(open(path, encoding="utf-8").read().splitlines()[0])
+    assert datetime.fromisoformat(record["ts"]).tzinfo is not None
+
+
 def test_record_event_preserves_caller_supplied_ts(tmp_path) -> None:
     path = str(tmp_path / "research_health.jsonl")
     observability.record_event(path, {"event": "circuit_open", "ticker": "^FCHI", "ts": "2026-01-01T00:00:00Z"})

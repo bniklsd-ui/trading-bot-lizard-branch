@@ -155,6 +155,66 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 
 ---
 
+## Session stopped — 2026-07-04 (Wochenend-Session: Review-Polish-Fixes + Phase-1-Hardening-Plan geschrieben)
+
+> **Auslöser:** Nikinger-Auftrag (Wochenende, keine Live-Tests möglich): (a) die drei
+> kosmetischen Punkte aus der Review-Session umsetzen, (b) die am schwächsten
+> geschriebene Phase scannen und einen Verbesserungsplan **nur schreiben** — Umsetzung
+> später durch Sonnet, NACH den Live-Tests, als Teil von V2. Auto-Modus (Tests frei),
+> für (b) ausdrücklich keine Code-Änderungen.
+
+### Completed (a) — die drei Review-Polish-Fixes (klein, additiv, alle getestet)
+- **`universe/pricing.py`:** Pfad 2 (name/lot_size) trägt jetzt denselben `> 0`-Guard
+  wie Pfad 1 — ein hypothetisches „(0€)"/lot_size 0 kann nicht mehr zu
+  `point_value=0` auflösen (würde P5-Sizing nullen). **+1 Test** (`test_pricing.py`).
+- **`scheduler/observability.py`:** `record_event` stempelt jetzt ein **tz-aware**
+  `datetime.now().astimezone()` statt naiv — keine gemischten Zeitformate mehr im
+  selben JSONL wie `record_cycle`s tz-aware `clock.now()`. **+1 Test** → **P8 217**.
+- **`universe/promotion.py`:** Step 3 (Health-Recheck) überspringt Epics, die in
+  **diesem** Zyklus aktiviert wurden (Step-1-Verify liegt Sekunden zurück — der
+  zweite `verify_instrument`-Call war reiner Doppel-Traffic). Ab dem Folgezyklus
+  normale Recheck-Teilnahme. **+1 Test** (beweist: 1 `get_ohlcv`-Call im
+  Aktivierungszyklus, 1 im Folgezyklus) → **P9 69**.
+
+### Completed (b) — Scan + Plan (NUR Plan, kein Code — Nikinger-Vorgabe)
+- **Scan aller 9 Phasen** (Zeilen, Testdichte, Debt-Marker, qualitative Reads):
+  **Phase 1 (`broker_wrapper`) ist der klare Schwächste** — Testdichte 2.3
+  Tests/100 Zeilen (nächster: 4.7), größte Einzeldatei (`ig_adapter.py` 930 Zeilen),
+  und zwei live-gebissene strukturelle Löcher: 429 → sofortiger Raise ohne Retry
+  (verursachte den v1.5-CAC/AEX/IBEX-Ausfall; **fünf** Call-Sites reimplementieren
+  deshalb Pacing) und der fehlende `valueOfOnePip`/`contractSize`-Passthrough in
+  `get_market_info` (hält P9s Pricing-Pfad 1 dauerhaft dormant). Dazu ungetestete
+  Envelope-Shapes genau in der bewiesenen Live-Bug-Klasse („Fake ≠ echte Shape",
+  s. der 2026-06-29-`env.get`-Bug).
+- **Plan geschrieben:** [`docs/concepts/phase1_hardening_plan.md`](../docs/concepts/phase1_hardening_plan.md)
+  — §0 Scan-Evidenz · §2 Step 0 Baseline + P1-CLAUDE.md-Skeleton · §3 Step 1
+  429-Retry/Backoff zentral in `_request` (injizierbares `sleep_fn`, Opt-out,
+  Call-Site-Pacing bleibt als belt-and-braces) · §4 Step 2 MarketInfo-Feld-
+  Passthrough (aktiviert P9-Pricing Pfad 1 ohne P9-Änderung) · §5 Step 3
+  Test-Backfill nach Live-Risiko (Parser + Envelope-Shapes zuerst, ~52 → ~80+ Tests)
+  · §6 Cross-Phase-Register · **bewusst verworfen:** `ig_adapter.py`-Split (Risiko >
+  Ästhetik) und alles Lightstreamer (gehört zu Step 7b, keine Doppelung).
+- **Ausführung gelockt:** durch Sonnet (medium, Auto-Modus), erst NACH den
+  Phase-9-Live-Tests, als Teil des V2-Bogens.
+
+### Verifiziert (gemockt/offline)
+- Volle per-Phase-Regression grün: P1 52 · P2 76 · P3 100 · P4 141 · P5 154 ·
+  P6 70 · P7 133 · **P8 217 (+1)** · **P9 69 (+2)** · root 77.
+
+### Next
+- **Nikinger (Montag/Handelszeiten):** die zwei Live-Läufe aus dem Wiring-Handover
+  unten — (1) `--enable-ig-bars`-Lauf + `bar_fetch`-Events beobachten, (2) Step 7a
+  `python scripts/diag_lightstreamer_multi.py`. Danach: 7b, Step 8, und (separat,
+  Sonnet) der Phase-1-Hardening-Plan.
+- **Commit:** dieser Stand (3 Fixes + 3 Tests + Plan-Datei + dieser Block) ist
+  commit-fertig, wartet auf Nikinger-Trigger.
+
+### Offene Punkte / blockers
+- Keine technischen. Der Divergenz-Check (gebaut, kein Consumer) bleibt der einzige
+  unverdrahtete Step-6-Baustein — bewusst offen bis nach den Live-Läufen.
+
+---
+
 ## Session stopped — 2026-07-04 (Review von Steps 1–7a + BarProvider-Kette verdrahtet — hinter Default-aus-Flag)
 
 > **Auslöser:** Nikinger-Auftrag — (a) mit der Review-Skill die von Sonnet (medium,

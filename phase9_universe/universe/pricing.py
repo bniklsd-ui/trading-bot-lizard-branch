@@ -99,7 +99,10 @@ def resolve_point_value(market_info: dict[str, Any]) -> tuple[float, str] | None
                 lot_size_value = float(lot_size)
             except (TypeError, ValueError):
                 return None
-            if abs(name_value - lot_size_value) < _MATCH_TOLERANCE:
+            # Same `> 0` guard as the ig_fields path above (2026-07-04 review polish):
+            # a hypothetical "(0€)" name + lot_size 0 must not resolve to a
+            # point_value of 0 — a zero point value would zero out P5 sizing math.
+            if name_value > 0 and abs(name_value - lot_size_value) < _MATCH_TOLERANCE:
                 return (name_value, "name_lotsize_agree")
 
     return None
