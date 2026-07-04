@@ -104,7 +104,7 @@ Konzept C3, gleiche Disziplin wie P3s Brain-Context-Degradierung).
 | `universe/exceptions.py` | `UniverseError` → `UniverseSafetyError`/`UniverseStoreError` | ✅ (Step 1) |
 | `universe/store.py` | `UniverseStore` — eigene sqlite3-Connection (kein `persistence.Database`-Import, Phasen-Isolation) | ✅ (Step 1, 19 Tests) |
 | `universe/pricing.py` | Deterministischer `point_value`-Resolver (`resolve_point_value`/`confirm_curated`) | ✅ (Step 2, 15 Tests) |
-| `universe/discovery.py` | Seed-Sweep + Code-Filter | ⬜ (Step 3) |
+| `universe/discovery.py` | Seed-Sweep + Code-Filter (`discover`/`DiscoveryReport`) | ✅ (Step 3, 14 Tests) |
 | `universe/promotion.py` | Statusmaschine + Safety | ⬜ (Step 4) |
 | P4/P8-Integration | DB-Universum statt `EXTENDED_UNIVERSE`, Refresh-Naht | ⬜ (Step 5) |
 | `scripts/dev_install.sh` | `phase9_universe` in die editable-install-Kette aufgenommen | ✅ |
@@ -150,6 +150,48 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 `universe_refresher`-Naht default `None`, `observability.py` neue Event-Typen), Wiring
 (`scripts/wiring.py` — zentraler Cross-Phase-Konfig-Ort). **Nicht angefasst:** P5
 (Gates/VETOs/Sizing), P6 (Debatte), P7 (Reward). Null LLM-Änderungen.
+
+---
+
+## Session stopped — 2026-07-04 (Step 3: `discovery.py` — abgeschlossen)
+
+> **Auslöser:** direkte Fortsetzung nach Step 2, gleiche Session, Auto-Modus.
+
+### Completed
+- `universe/discovery.py` (neu): `SEARCH_TERMS` (deutsch+englisch, 18 Begriffe),
+  `KNOWN_YF_TICKERS`/`KNOWN_VOLUME_PROXIES` (statische Substring-Tabellen, kein LLM),
+  `discover(broker, store, *, search_terms, pace_s=1.0, sleep_fn) -> DiscoveryReport`.
+  Ruft je Treffer `get_market_info` (mirrors `scripts/resolve_epics.py`s Kette), filtert
+  EUR + `instrument_type` enthält INDICES + `market_status==TRADEABLE` + `min_deal_size>0`
+  + Kassa-Präferenz (kleinster `lot_size`, kein „forward" im Namen) bei Mehrfachtreffern
+  pro Term. Bereits bekannte Epics (jeder Status) → Skip. Fail-soft je Term (Exception
+  oder `search_ok=False` killt nie den restlichen Sweep).
+- **14 neue Tests** (`test_discovery.py`): jedes Filterkriterium einzeln, Kassa-Auswahl
+  bei 3 Treffern (Forward + zwei Kassa-Größen), Single-Hit-Bypass, Skip bekannter Epics,
+  Fail-soft (Exception + `search_ok=False`), Pacing-Beweis (injizierter `sleep_fn`,
+  keine echten Sleeps, 2 Calls je Epic: nach `search_markets` + nach `get_market_info`),
+  Report-Defaults, **Grep-Assertion** (`import anthropic` verboten im Paket — automatisiert,
+  nicht nur manuell geprüft).
+- `universe/__init__.py`: `discover`/`DiscoveryReport`/`SEARCH_TERMS`/`KNOWN_YF_TICKERS`/
+  `KNOWN_VOLUME_PROXIES` exportiert.
+
+### Verifiziert
+- `pytest phase9_universe/tests -v` → **48 passed** (19 store + 15 pricing + 14 discovery).
+- Import-Isolation erneut bestätigt (0 cross-phase Leaks); `py_compile` clean.
+- Volle Regression unverändert grün: P1 52 · P2 76 · P3 73 · P4 135 · P5 154 · P6 70 ·
+  P7 133 · P8 199 · root 64 · **P9 48**.
+
+### Next
+- **Step 4 — `promotion.py`:** Statusmaschine (discovered→verified→active,
+  Auto-Demotion active→quarantined), Demo-only Safety-Raise, Backoff-Treppe,
+  `max_active`-Kappung, kuratierte Bestätigung via `confirm_curated`. **Wichtig:** die
+  Verify-Funktionen (`check_ig_side`/`check_yf_side`/`verdict_for`) müssen aus
+  `phase8_scheduler/scripts/verify_instrument.py` via
+  `importlib.util.spec_from_file_location` importiert werden — **kein Copy-Paste**
+  (Plan §7). Vor dem Bau deren exakte Signaturen gegenlesen.
+
+### Offene Punkte / blockers
+- Keine technischen.
 
 ---
 
