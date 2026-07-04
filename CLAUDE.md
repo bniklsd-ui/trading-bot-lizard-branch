@@ -106,7 +106,7 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 | 6 — Bull/Bear/Judge Debatte | ✅ Abgeschlossen, live-verifiziert ≠ profit-validiert |
 | 7 — Reward/Brain | ✅ live-verifiziert + gemerged (2026-06-26) |
 | 8 — Scheduler | ✅ **live-verifiziert (2026-07-03)** — zwei autonome Trades + ein tatsächlich auslösender Safety-Breaker (Token-Budget), Nikinger-bestätigt. Details: `phase8_scheduler/CLAUDE.md` |
-| 9 — V2: Foundation (autonome Epic-Research + Daten-Zuverlässigkeit) | 🔄 in Arbeit — Plan fertig, Build noch nicht gestartet: [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md), [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md) |
+| 9 — V2: Foundation (autonome Epic-Research + Daten-Zuverlässigkeit) | 🔄 in Arbeit — Step 1 (Migration 004 + `UniverseStore`) ✅, Steps 2–8 offen: [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md), [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md) |
 | 10 — V3: Persistenz-Reform + No-Trade-Lessons + UI | Geplant, gegatet auf Phase 9 |
 | 11 — V4: Sophisticated/Optional (Council, Handover, Reward-Reform, Force-Trigger, Instinct-ECC) | Deferred, gegatet auf Phase 9+10 + reale Outcomes |
 

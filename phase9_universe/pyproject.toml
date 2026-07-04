@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "universe"
+version = "0.1.0"
+description = "Phase 9 (V2 — Foundation) — autonomous instrument discovery/verify/promote pipeline for the DAX CFD trading bot."
+requires-python = ">=3.11"
+# Phase 9 (V2) adds NO new AI (Bauprinzip): discovery/promotion criteria are 100%
+# code-evaluated (search-term sweep + IG-field filters + a deterministic point_value
+# resolver). This packaging metadata exists only to enable an editable install
+# (`pip install -e`) so `import universe` resolves at runtime without sys.path hacks.
+# The sibling `tests` directory is deliberately excluded from the installed package.
+#
+# Layout note: the importable package is `universe/` nested under this
+# `phase9_universe/` project dir, mirroring the established repo convention
+# (phase4_research/ -> research/, phase8_scheduler/ -> scheduler/, etc.).
+
+[tool.setuptools.packages.find]
+include = ["universe*"]

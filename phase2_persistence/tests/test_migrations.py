@@ -15,6 +15,7 @@ _EXPECTED_TABLES = {
     "ig_config_state",
     "market_regime_snapshots",
     "decision_context",
+    "instrument_universe",
 }
 
 
@@ -29,12 +30,13 @@ def test_get_version_zero_on_empty_db(tmp_path):
     assert migrations._get_schema_version(conn) == 0
 
 
-def test_fresh_db_reaches_version_3(tmp_path):
+def test_fresh_db_reaches_version_4(tmp_path):
     conn = sqlite3.connect(str(tmp_path / "x.sqlite"))
     conn.row_factory = sqlite3.Row
     version = migrations.run_migrations(conn, MIGRATIONS_DIR)
-    assert version == 3  # 001_initial + 002_phase7_reward + 003_phase8_trade_provenance
-    assert migrations._get_schema_version(conn) == 3
+    # 001_initial + 002_phase7_reward + 003_phase8_trade_provenance + 004_phase9_instrument_universe
+    assert version == 4
+    assert migrations._get_schema_version(conn) == 4
 
 
 def test_all_tables_created(tmp_path):
@@ -69,18 +71,19 @@ def test_rerun_is_noop(tmp_path):
     migrations.run_migrations(conn, MIGRATIONS_DIR)
     # Second run must not raise and must not advance the version.
     version = migrations.run_migrations(conn, MIGRATIONS_DIR)
-    assert version == 3
-    # One version row per applied migration (001 + 002 + 003), and no more on rerun.
+    assert version == 4
+    # One version row per applied migration (001 + 002 + 003 + 004), and no more on rerun.
     count = conn.execute("SELECT COUNT(*) FROM _schema_version").fetchone()[0]
-    assert count == 3
+    assert count == 4
 
 
 def test_find_pending_respects_current(tmp_path):
     pending = migrations._find_pending(MIGRATIONS_DIR, current=0)
-    assert [v for v, _ in pending] == [1, 2, 3]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=1)] == [2, 3]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=2)] == [3]
-    assert migrations._find_pending(MIGRATIONS_DIR, current=3) == []
+    assert [v for v, _ in pending] == [1, 2, 3, 4]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=1)] == [2, 3, 4]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=2)] == [3, 4]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=3)] == [4]
+    assert migrations._find_pending(MIGRATIONS_DIR, current=4) == []
 
 
 def test_database_run_migrations_seeds_defaults(db):
@@ -93,8 +96,8 @@ def test_database_run_migrations_seeds_defaults(db):
 def test_database_run_migrations_idempotent(tmp_path):
     path = str(tmp_path / "x.sqlite")
     d = Database(path)
-    assert d.run_migrations() == 3
-    assert d.run_migrations() == 3  # no error, no change
+    assert d.run_migrations() == 4
+    assert d.run_migrations() == 4  # no error, no change
     d.close()
 
 
@@ -123,3 +126,36 @@ def test_phase8_provenance_column_present(tmp_path):
         return {r["name"] for r in rows}
 
     assert "provenance" in _columns("trade_outcomes")
+
+
+def test_phase9_instrument_universe_table_present(tmp_path):
+    """Migration 004 (Phase 9 V2 foundation) adds the instrument_universe table."""
+    conn = sqlite3.connect(str(tmp_path / "x.sqlite"))
+    conn.row_factory = sqlite3.Row
+    migrations.run_migrations(conn, MIGRATIONS_DIR)
+
+    def _columns(table: str) -> set[str]:
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return {r["name"] for r in rows}
+
+    assert "instrument_universe" in _tables(conn)
+    assert _columns("instrument_universe") == {
+        "epic",
+        "name",
+        "yf_ticker",
+        "volume_proxy",
+        "point_value",
+        "point_value_source",
+        "min_deal_size",
+        "currency",
+        "status",
+        "source",
+        "checks_json",
+        "fail_count",
+        "data_degraded",
+        "last_verified_at",
+        "created_at",
+        "updated_at",
+    }
+    rows = conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()
+    assert "idx_instrument_universe_status" in {r["name"] for r in rows}

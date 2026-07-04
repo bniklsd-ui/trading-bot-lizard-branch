@@ -95,6 +95,54 @@ Konzept C3, gleiche Disziplin wie P3s Brain-Context-Degradierung).
   grünes `pytest` (gemockt/offline — Live-Läufe sind Operator-Sache, s. `feedback_live_testing`
   memory).
 
+## Modul-Struktur (`universe` Paket) — Status pro Step
+| Datei | Zweck | Status |
+|---|---|---|
+| `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 0b/1) | ✅ |
+| `phase2_persistence/migrations/004_phase9_instrument_universe.sql` | `instrument_universe`-Tabelle + Status-Index | ✅ (Step 1, P2-Berührung sanktioniert) |
+| `universe/models.py` | `UniverseRecord` (frozen, `to_row`/`from_row`/`to_instrument_spec`) + Status-/Source-/Pricing-Source-Konstanten | ✅ (Step 1) |
+| `universe/exceptions.py` | `UniverseError` → `UniverseSafetyError`/`UniverseStoreError` | ✅ (Step 1) |
+| `universe/store.py` | `UniverseStore` — eigene sqlite3-Connection (kein `persistence.Database`-Import, Phasen-Isolation) | ✅ (Step 1, 19 Tests) |
+| `universe/pricing.py` | Deterministischer `point_value`-Resolver | ⬜ (Step 2) |
+| `universe/discovery.py` | Seed-Sweep + Code-Filter | ⬜ (Step 3) |
+| `universe/promotion.py` | Statusmaschine + Safety | ⬜ (Step 4) |
+| P4/P8-Integration | DB-Universum statt `EXTENDED_UNIVERSE`, Refresh-Naht | ⬜ (Step 5) |
+| `scripts/dev_install.sh` | `phase9_universe` in die editable-install-Kette aufgenommen | ✅ |
+
+## Step 1 — Ergebnisse (2026-07-04)
+- **Migration 004** additiv, folgt exakt dem 002/003-Muster (dated Header-Kommentar,
+  `ALTER`/`CREATE TABLE IF NOT EXISTS`, kein bestehendes Objekt berührt). Frische DB
+  erreicht jetzt Version 4. **P2-Tests aktualisiert** (die einzige sanktionierte
+  P2-Berührung dieses Steps, mirror wie 002/003 es taten): `_EXPECTED_TABLES` +
+  `instrument_universe`, `test_fresh_db_reaches_version_3` → `_version_4`,
+  `test_rerun_is_noop`/`test_find_pending_respects_current`/
+  `test_database_run_migrations_idempotent` auf 4 gehoben, **+1 neuer Test**
+  (`test_phase9_instrument_universe_table_present`, prüft Spalten + Index) → **P2 75 → 76**.
+- **`UniverseStore` öffnet seine eigene `sqlite3`-Connection** (kein
+  `persistence.Database`-Import) — bewusste Abweichung vom P7-Muster
+  ("bestehende P2-CRUD wiederverwendet"), aber konsistent mit P8s `budget.py`
+  (liest `llm_usage.json` direkt statt einen P4-Reader zu importieren): die
+  physische DB-Datei ist geteilt, der Zugriffscode nicht. `import universe.*`
+  zieht **NONE** cross-phase (verifiziert: 33 neue Module beim Import, keiner
+  davon `broker_wrapper`/`persistence`/`external_data`/`research`/`execution`/
+  `reward`/`debate`/`scheduler`/`anthropic`/`requests`/`pandas`/`numpy`/`yfinance`).
+- **`seed_curated()`:** nur die DAX-Epic (`IX.D.DAX.IFMM.IP`, live-bestätigt) bekommt
+  `point_value_source="curated_confirmed"` beim Seed; alle anderen (STXE/CAC/IBEX,
+  bislang nur inferiert) seeden mit `point_value_source=NULL` → müssen den
+  Step-2-Resolver durchlaufen, um bestätigt zu werden (D6/carried-over point_value
+  stirbt hier strukturell, nicht per Behauptung). `INSERT OR IGNORE` auf dem PK
+  (`epic`) macht das Seeden idempotent — ein Re-Seed überschreibt nie bereits
+  vorhandene Zeilen (weder Operator- noch Pipeline-getriebene).
+- **19 Tests** (`test_store.py`): Migrations-Tabellen-Beweis, Record-Roundtrip
+  (inkl. leerer `checks`-Dict → `NULL`, nicht `"{}"`), invalid-Status/-Source →
+  `ValueError`, Seed-Idempotenz + 4-Instrumente-Fall, Upsert+Get+Conflict-Overwrite,
+  Status-Roundtrip + fail_count-Inkrement (unabhängig vom `set_pricing`-Pfad),
+  fehlende Epic → `UniverseStoreError` (beide Setter), Status-Filter (single/multi/
+  leer), `active_universe()`-Determinismus (created_at, dann epic als Tie-Break).
+- **Regression:** volle Suite neu gelaufen, alles grün + unverändert außer P2 (75→76
+  wie oben erklärt): P1 52 · P3 73 · P4 135 · P5 154 · P6 70 · P7 133 · P8 199 ·
+  root 64 · **P9 19 (neu)**. `py_compile` clean auf allen neuen Dateien.
+
 ## Cross-Phase-Edit-Register (aus dem Plan §11 — hier nur der Pointer, Details im Plan)
 P1 (`get_market_info`-Feld-Passthrough, Lightstreamer-Fix, `quote_cache.py`), P2 (Migration
 004), P3 (`providers.py`, `fetcher.py`-Härtung), P4 (`models.py`/`context_builder.py`
@@ -105,7 +153,55 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 
 ---
 
-## Session stopped — (leer, noch kein Modul-Step gestartet)
+## Session stopped — 2026-07-04 (Step 1: Migration 004 + `UniverseStore` — abgeschlossen)
 
-Dieser Block wird beim Abschluss des ersten echten Moduls (Step 1 — Migration 004 +
-`UniverseStore`) erstmals befüllt.
+> **Auslöser:** Fortsetzung der Phase-9-(V2)-Kickoff-Session (Housekeeping Step 0/0b lief
+> bereits vorher, docs-only, auf Branch `phase9-v2-foundation`, committet). Dieser Step
+> baut das erste echte Modul: die DB-Persistenz für das autonome Instrumenten-Universum.
+> Auto-Modus (Nikinger-Freigabe) — kein Plan-Mode-Zwischenstopp, da der Fable-Plan
+> bereits ausführungsreif ist; nur bei einem schweren Problem zurückfragen.
+
+### Completed
+- `phase2_persistence/migrations/004_phase9_instrument_universe.sql` (neu): `instrument_universe`-
+  Tabelle + `idx_instrument_universe_status`-Index, additiv, dated Header mirrort 002/003.
+- `phase2_persistence/tests/test_migrations.py`: Version-3→4-Anpassung an 5 Stellen +
+  1 neuer Test (`test_phase9_instrument_universe_table_present`). **P2 75 → 76.**
+- `phase9_universe/universe/models.py` (neu): `UniverseRecord` + Status-/Source-/
+  Pricing-Source-Konstanten.
+- `phase9_universe/universe/exceptions.py` (neu): `UniverseError`-Hierarchie.
+- `phase9_universe/universe/store.py` (neu): `UniverseStore` (eigene sqlite3-Connection,
+  `seed_curated`/`upsert_discovered`/`get`/`list_by_status`/`set_status`/`set_pricing`/
+  `active_universe`).
+- `phase9_universe/universe/__init__.py`: Public Exports.
+- `phase9_universe/tests/test_store.py` (neu, 19 Tests).
+- `phase9_universe/pyproject.toml` + `requirements.txt` + `README.md` (Scaffold).
+- `scripts/dev_install.sh`: `phase9_universe` in die editable-install-Kette aufgenommen
+  (Position nach P8, rein numerisch — keine echte Abhängigkeit, s. Kommentar im Script).
+
+### Verifiziert (gemockt/offline — kein Netz, kein LLM, kein Broker)
+- `pip install -e phase9_universe` grün; `pytest phase9_universe/tests -v` → **19 passed**.
+  `pytest phase2_persistence/tests -q` → **76 passed** (75+1).
+- **Import-Isolation bewiesen:** `import universe` zieht 33 neue Module beim Laden,
+  **keines davon** cross-phase (`broker_wrapper`/`persistence`/`external_data`/`research`/
+  `execution`/`reward`/`debate`/`scheduler`/`anthropic`/`requests`/`pandas`/`numpy`/
+  `yfinance` — alle abwesend).
+- `py_compile` clean auf allen neuen `.py`-Dateien; `bash -n scripts/dev_install.sh` clean.
+- **Volle Regression** (alle Phasen separat, bekannte `tests.conftest`-Kollision):
+  P1 52 · P2 76 · P3 73 · P4 135 · P5 154 · P6 70 · P7 133 · P8 199 · root 64 · **P9 19** —
+  alle grün, nur P2 verändert (erwartungsgemäß, s. o.).
+
+### Next
+- **Step 2 — `universe/pricing.py`:** deterministischer `point_value`-Resolver
+  (IG-Feld-Auflösung + Namens-/lot_size-Kreuzcheck + `confirm_curated()`). Plan §5
+  ([VERIFY]: welche `get_market_info`-Felder P1 heute durchreicht — sehr wahrscheinlich
+  nur `currency`/`min_deal_size`/`lot_size`; ggf. additive P1-Feld-Passthrough-Erweiterung
+  nötig, Cross-Phase-Edit-Register §11 im Plan).
+- Danach Step 3 (`discovery.py`), Step 4 (`promotion.py`), Step 5 (P4/P8-Integration).
+- **Commit:** dieser Step ist commit-fertig (Status-Tabelle + dieser Block aktuell,
+  „Commit ⇒ Note-Update" erfüllt).
+
+### Offene Punkte / blockers
+- Keine technischen. `pricing.py` (Step 2) muss zuerst gegen den echten
+  `get_market_info`-Envelope verifizieren, welche IG-Instrumentfelder heute
+  durchgereicht werden (Plan §14 Sammelliste Punkt 2) — bevor der Resolver gegen
+  Fixtures gebaut wird, die ggf. Felder erfinden, die P1 noch gar nicht liefert.

@@ -1,0 +1,12 @@
+# Phase 9 (V2 — Foundation) — autonomous instrument discovery/verify/promote pipeline.
+#
+# No new runtime dependency of its own for the discovery/pricing/promotion core
+# (Steps 1-5): pure stdlib (sqlite3, re, importlib) composed over the existing P1-P8
+# editable installs (broker_wrapper for search_markets/get_market_info, persistence's
+# migration runner). See scripts/dev_install.sh at the repo root.
+#
+# V2b (Steps 6-7, BarProvider chain + Lightstreamer wiring) touches phase3/phase1 code
+# directly rather than adding a dependency here.
+
+# dev / test
+pytest>=7.4.0
