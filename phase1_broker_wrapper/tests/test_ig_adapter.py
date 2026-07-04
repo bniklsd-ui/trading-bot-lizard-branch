@@ -400,3 +400,381 @@ def test_get_market_info_to_dict_roundtrip_keys():
         "min_deal_size", "lot_size", "market_status",
         "value_of_one_pip", "one_pip_means", "contract_size",
     }
+
+
+# --- Step 3 test backfill (Phase 1 hardening plan §5) ------------------------
+# Priority order per the plan: bars/ohlcv (P9 IGBarProvider's regression guard)
+# first, then transactions, search/account/positions, open_position lifecycle,
+# reconcile, _poll_confirms timeout. Real Envelope data shapes, not just status.
+
+from broker_wrapper.adapters.ig_adapter import _parse_bar, _parse_transaction  # noqa: E402
+
+
+# -- _parse_bar / get_ohlcv (highest live risk — P9's IGBarProvider depends on this shape) --
+
+
+def test_parse_bar_mid_of_bid_and_ask():
+    bar = _parse_bar({
+        "snapshotTime": "2026/07/04 12:00:00",
+        "openPrice": {"bid": 18000.0, "ask": 18002.0},
+        "highPrice": {"bid": 18010.0, "ask": 18012.0},
+        "lowPrice": {"bid": 17990.0, "ask": 17992.0},
+        "closePrice": {"bid": 18005.0, "ask": 18007.0},
+        "lastTradedVolume": 123,
+    })
+    assert bar.open == pytest.approx(18001.0)
+    assert bar.high == pytest.approx(18011.0)
+    assert bar.low == pytest.approx(17991.0)
+    assert bar.close == pytest.approx(18006.0)
+    assert bar.volume == 123.0
+
+
+def test_parse_bar_missing_one_side_falls_back_to_other():
+    bar = _parse_bar({
+        "snapshotTime": "2026/07/04 12:00:00",
+        "openPrice": {"bid": 18000.0, "ask": 0},
+        "highPrice": {"ask": 18012.0},
+        "lowPrice": {},
+        "closePrice": None,
+        "lastTradedVolume": 0,
+    })
+    assert bar.open == 18000.0       # bid-only (ask falsy) -> bid
+    assert bar.high == 18012.0       # no bid key -> ask
+    assert bar.low == 0.0            # empty dict -> 0.0
+    assert bar.close == 0.0          # None obj -> 0.0
+    assert bar.volume == 0.0
+
+
+def test_get_ohlcv_happy_path_envelope_shape():
+    """The exact shape P9's IGBarProvider (external_data/providers.py) relies on."""
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body={
+            "prices": [{
+                "snapshotTime": "2026/07/04 12:00:00",
+                "openPrice": {"bid": 18000.0, "ask": 18002.0},
+                "highPrice": {"bid": 18010.0, "ask": 18012.0},
+                "lowPrice": {"bid": 17990.0, "ask": 17992.0},
+                "closePrice": {"bid": 18005.0, "ask": 18007.0},
+                "lastTradedVolume": 42,
+            }],
+            "allowance": {"remainingAllowance": 9999},
+        })
+        env = a.get_ohlcv("IX.D.DAX.IFMM.IP", "MINUTE_5", 1)
+
+    assert env.ok is True
+    assert env.data["allowance"] == {"remainingAllowance": 9999}
+    bars = env.data["bars"]
+    assert len(bars) == 1
+    b = bars[0]
+    assert set(b.keys()) == {"timestamp", "open", "high", "low", "close", "volume"}
+    assert b["close"] == pytest.approx(18006.0)
+    assert b["volume"] == 42.0
+
+
+def test_get_historical_ohlcv_happy_path():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body={
+            "prices": [{
+                "snapshotTime": "2026/07/01 09:00:00",
+                "openPrice": {"bid": 100.0, "ask": 100.0},
+                "highPrice": {"bid": 101.0, "ask": 101.0},
+                "lowPrice": {"bid": 99.0, "ask": 99.0},
+                "closePrice": {"bid": 100.5, "ask": 100.5},
+                "lastTradedVolume": 5,
+            }],
+            "allowance": {},
+        })
+        env = a.get_historical_ohlcv(
+            "IX.D.DAX.IFMM.IP", "2026-07-01T00:00:00", "2026-07-02T00:00:00", "DAY",
+        )
+
+    assert env.ok is True
+    assert len(env.data["bars"]) == 1
+    assert env.data["bars"][0]["close"] == 100.5
+
+
+def test_get_historical_ohlcv_rejects_invalid_resolution():
+    a = _adapter()
+    with pytest.raises(ValueError):
+        a.get_historical_ohlcv("X", "2026-01-01", "2026-01-02", "BOGUS")
+
+
+# -- get_trade_history / _parse_transaction (signed size, currency stripping) --
+
+
+def test_parse_transaction_signed_size_and_currency_stripping():
+    tx = _parse_transaction({
+        "reference": "T1", "instrumentName": "Germany 40",
+        "size": "-1.0", "openLevel": "18000.0", "closeLevel": "18010.0",
+        "profitAndLoss": "E12.34", "currency": "EUR",
+        "openDateUtc": "2026-07-01T09:00:00", "dateUtc": "2026-07-01T10:00:00",
+        "transactionType": "WITH",
+    })
+    assert tx.size == -1.0
+    assert tx.profit_loss == pytest.approx(12.34)
+    assert tx.currency == "EUR"
+    assert tx.transaction_type == "WITH"
+
+
+def test_parse_transaction_missing_fields_are_none_not_crash():
+    tx = _parse_transaction({"reference": "T2"})
+    assert tx.size is None
+    assert tx.open_level is None
+    assert tx.profit_loss is None
+
+
+def test_get_trade_history_happy_path():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body={
+            "transactions": [{
+                "reference": "T1", "instrumentName": "Germany 40",
+                "size": "-1.0", "openLevel": "18000.0", "closeLevel": "18010.0",
+                "profitAndLoss": "E12.34", "currency": "EUR",
+                "openDateUtc": "2026-07-01T09:00:00", "dateUtc": "2026-07-01T10:00:00",
+                "transactionType": "WITH",
+            }],
+        })
+        env = a.get_trade_history(days=1)
+
+    assert env.ok is True
+    assert len(env.data["transactions"]) == 1
+    assert env.data["transactions"][0]["profit_loss"] == pytest.approx(12.34)
+
+
+def test_get_trade_history_rejects_invalid_days():
+    a = _adapter()
+    with pytest.raises(ValueError):
+        a.get_trade_history(days=0)
+    with pytest.raises(ValueError):
+        a.get_trade_history(days=366)
+
+
+# -- search_markets happy path -------------------------------------------------
+
+
+def test_search_markets_happy_path_maps_fields():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body={
+            "markets": [{
+                "epic": "IX.D.DAX.IFMM.IP", "instrumentName": "Germany 40",
+                "instrumentType": "INDICES", "expiry": "-",
+                "marketStatus": "TRADEABLE", "bid": 18000.0, "offer": 18002.0,
+            }],
+        })
+        env = a.search_markets("Germany 40")
+
+    assert env.ok is True
+    assert env.data["query"] == "Germany 40"
+    r = env.data["results"][0]
+    assert r["epic"] == "IX.D.DAX.IFMM.IP"
+    assert r["type"] == "INDICES"
+    assert r["market_status"] == "TRADEABLE"
+    assert r["bid"] == 18000.0
+    assert r["ask"] == 18002.0
+
+
+# -- get_account happy path + fallback ----------------------------------------
+
+
+def test_get_account_matches_configured_account_id():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body={
+            "accounts": [
+                {"accountId": "OTHER", "balance": {"balance": 1.0, "available": 1.0,
+                                                    "profitLoss": 0.0}, "currency": "EUR"},
+                {"accountId": "A1", "balance": {"balance": 1000.0, "available": 900.0,
+                                                 "profitLoss": 50.0}, "currency": "EUR"},
+            ],
+        })
+        env = a.get_account()
+
+    assert env.ok is True
+    assert env.data["account_id"] == "A1"
+    assert env.data["balance"] == 1000.0
+    assert env.data["available"] == 900.0
+    assert env.data["profit_loss"] == 50.0
+
+
+def test_get_account_falls_back_to_first_when_no_id_match():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body={
+            "accounts": [
+                {"accountId": "OTHER", "balance": {"balance": 1.0, "available": 1.0,
+                                                    "profitLoss": 0.0}, "currency": "EUR"},
+            ],
+        })
+        env = a.get_account()
+
+    assert env.ok is True
+    assert env.data["account_id"] == "OTHER"
+
+
+def test_get_account_no_accounts_returns_protocol_error():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body={"accounts": []})
+        env = a.get_account()
+
+    assert env.ok is False
+    assert env.error["code"] == "PROTOCOL_ERROR"
+
+
+# -- get_open_positions / _parse_position -------------------------------------
+
+
+def test_get_open_positions_happy_path():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body=_positions_body(
+            deal_id="D9", direction="SELL", size=2.0, level=18000.0,
+        ))
+        env = a.get_open_positions()
+
+    assert env.ok is True
+    p = env.data["positions"][0]
+    assert p["deal_id"] == "D9"
+    assert p["direction"] == "SELL"
+    assert p["size"] == 2.0
+    assert p["open_level"] == 18000.0
+
+
+def test_parse_position_missing_optional_fields():
+    from broker_wrapper.adapters.ig_adapter import _parse_position
+    pos = _parse_position({"position": {"dealId": "D1"}, "market": {}})
+    assert pos.deal_id == "D1"
+    assert pos.epic == ""
+    assert pos.direction == "BUY"  # IG default when absent
+    assert pos.stop_level is None
+    assert pos.limit_level is None
+
+
+# -- open_position lifecycle (submit -> poll confirms) ------------------------
+
+
+def test_open_position_accepted_happy_path():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.side_effect = [
+            _mock_response(json_body={"dealReference": "bot-1"}),  # POST /positions/otc
+            _mock_response(json_body={  # GET /confirms/{ref}
+                "dealStatus": "ACCEPTED", "dealId": "D1", "level": 18000.0,
+            }),
+        ]
+        env = a.open_position("IX.D.DAX.IFMM.IP", "BUY", 1.0)
+
+    assert env.ok is True
+    assert env.data["status"] == "ACCEPTED"
+    assert env.data["deal_id"] == "D1"
+    assert env.data["level"] == 18000.0
+    assert env.data["deal_reference"].startswith("bot-")
+
+
+def test_open_position_rejected_surfaces_reason():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.side_effect = [
+            _mock_response(json_body={"dealReference": "bot-2"}),
+            _mock_response(json_body={
+                "dealStatus": "REJECTED", "reason": "INSUFFICIENT_FUNDS",
+            }),
+        ]
+        env = a.open_position("IX.D.DAX.IFMM.IP", "SELL", 1.0)
+
+    assert env.ok is True  # submission itself succeeded; REJECTED is a valid outcome
+    assert env.data["status"] == "REJECTED"
+    assert env.data["reason"] == "INSUFFICIENT_FUNDS"
+    assert env.data["level"] is None
+
+
+# -- reconcile_positions --------------------------------------------------------
+
+
+def test_reconcile_positions_present_missing_unexpected():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body={
+            "positions": [
+                {"position": {"dealId": "D1", "dealReference": "ref-1", "direction": "BUY",
+                              "size": 1.0, "level": 18000.0}, "market": {"epic": "E1"}},
+                {"position": {"dealId": "D2", "dealReference": "ref-unexpected",
+                              "direction": "BUY", "size": 1.0, "level": 18000.0},
+                 "market": {"epic": "E1"}},
+            ],
+        })
+        env = a.reconcile_positions(expected_references=["ref-1", "ref-missing"])
+
+    assert env.ok is True
+    assert env.data["present"] == ["ref-1"]
+    assert env.data["missing"] == ["ref-missing"]
+    assert env.data["unexpected"] == ["ref-unexpected"]
+    assert env.data["broker_position_count"] == 2
+
+
+def test_reconcile_positions_without_expected_references_omits_diff_keys():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body={"positions": []})
+        env = a.reconcile_positions()
+
+    assert env.ok is True
+    assert env.data["broker_position_count"] == 0
+    assert "present" not in env.data
+
+
+# -- _poll_confirms timeout path (no real sleeping — time module mocked) ------
+
+
+def test_poll_confirms_timeout_returns_pending():
+    a = _authed_adapter()
+    fake_time = {"t": 0.0}
+    with patch("broker_wrapper.adapters.ig_adapter.time.monotonic",
+               side_effect=lambda: fake_time["t"]), \
+         patch("broker_wrapper.adapters.ig_adapter.time.sleep",
+               side_effect=lambda s: fake_time.__setitem__("t", fake_time["t"] + s)), \
+         patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body={"dealStatus": "PENDING"})
+        body = a._poll_confirms("bot-timeout")
+
+    assert body["dealStatus"] == "PENDING"
+    assert body["reason"] == "confirm timeout — reconcile later"
+
+
+# -- _base_headers / _request 403 (Step 3, remaining plan §5 point 5) ---------
+
+
+def test_base_headers_unauthenticated_no_session_tokens():
+    a = _adapter()
+    headers = a._base_headers(version="2", auth=False)
+    assert headers["Version"] == "2"
+    assert "CST" not in headers
+    assert "X-SECURITY-TOKEN" not in headers
+
+
+def test_base_headers_authenticated_includes_session_tokens():
+    a = _authed_adapter()
+    headers = a._base_headers(version="3", auth=True)
+    assert headers["Version"] == "3"
+    assert headers["CST"] == "x"
+    assert headers["X-SECURITY-TOKEN"] == "y"
+
+
+def test_base_headers_auth_without_session_raises():
+    a = _adapter()
+    with pytest.raises(AuthenticationError):
+        a._base_headers(version="2", auth=True)
+
+
+def test_request_403_maps_to_authentication_error():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(status=403, json_body={"errorCode": "forbidden"})
+        env = a.get_price("IX.D.DAX.IFMM.IP")
+
+    assert env.ok is False
+    assert env.error["code"] == "AUTH_ERROR"

@@ -144,3 +144,70 @@ min_deal_size: 0.5 · lot_size: 1.0 €/point · spread ~1.8 pts
 ### Offene Punkte / blockers
 - Keine technischen. **Commit-fertig, wartet auf Nikinger-Trigger** (Claude
   committet nicht automatisch).
+
+---
+
+## Session stopped — 2026-07-04 (Hardening plan Step 3: Test-Backfill — Plan ABGESCHLOSSEN)
+
+> **Auslöser:** direkte Fortsetzung nach Steps 0–2 (committed a089126), gleiche
+> Session. Nikinger-Freigabe: „commit mit Note, und außer Live-Tests/Validierung
+> — geh weiter" — Step 3 ist reiner Mock/Offline-Test-Backfill, kein Live-Test
+> nötig, also direkt weitergemacht statt auf einen neuen Trigger zu warten.
+
+### Completed — Test-Backfill nach Live-Risiko-Reihenfolge (Plan §5)
+- **`_parse_bar`/`get_ohlcv`/`get_historical_ohlcv`** (höchstes Risiko — P9s
+  `IGBarProvider`-Wiring vom 2026-07-04 verlässt sich exakt auf diese Shape):
+  Mid-Berechnung (beide Seiten, nur-bid, nur-ask, leer/`None`), volle
+  Envelope-Shape `{"bars":[{timestamp,open,high,low,close,volume}], "allowance":...}`,
+  invalid-resolution-Guard auf `get_historical_ohlcv` (vorher nur auf `get_ohlcv`
+  getestet).
+- **`_parse_transaction`/`get_trade_history`:** vorzeichenbehaftete `size`
+  (`"-1.0"` → `-1.0`), `E12.34`-Currency-Stripping, fehlende Felder → `None`
+  statt Crash, `days`-Bounds-Guard (`<=0`, `>365`).
+- **`search_markets`:** Feld-Mapping (`instrumentType`→`type`, `bid`/`offer`→
+  `bid`/`ask`, `market_status`-Normalisierung).
+- **`get_account`:** Account-ID-Match, Fallback auf erstes Konto bei
+  Nicht-Match, leere Accounts-Liste → `PROTOCOL_ERROR`-Envelope.
+- **`get_open_positions`/`_parse_position`:** Happy-Path + fehlende optionale
+  Felder (Direction-Default `"BUY"`, `stop_level`/`limit_level` → `None`).
+- **`open_position`-Lebenszyklus:** ACCEPTED (Level+deal_id gesetzt) und
+  REJECTED (Reason durchgereicht, `level=None`) — beide Fälle `env.ok=True`
+  (Submission selbst war erfolgreich, der Deal-Status ist das eigentliche
+  Ergebnis, nicht ein Fehler).
+- **`reconcile_positions`:** present/missing/unexpected-Diff gegen
+  `expected_references`, und der Fall ohne `expected_references` (Diff-Keys
+  fehlen ganz statt leer zu sein).
+- **`_poll_confirms`-Timeout-Pfad:** `time.monotonic`/`time.sleep` im
+  `ig_adapter`-Modul gemockt (kein echtes 5s-Warten) — beweist den
+  PENDING-Fallback + die `reason`-Message nach Timeout.
+- **`_base_headers`/403:** unauthenticated (keine CST/Token-Header),
+  authenticated (Header gesetzt), `auth=True` ohne Session →
+  `AuthenticationError`; `_request`s 403-Mapping auf `AUTH_ERROR`.
+- **+24 Tests** (52 → 61 nach Steps 1–2 → **85** nach Step 3, exakt in der vom
+  Plan geschätzten Größenordnung +25–35 für den Gesamt-Backfill inkl. Steps 1–2).
+
+### Verifiziert (gemockt/offline)
+- `pytest phase1_broker_wrapper/tests -q` → **85 passed**, kein echtes Sleep
+  in der ganzen Suite (0.24s Laufzeit — `_poll_confirms`-Timeout-Test wäre ohne
+  Mock ~5s gewesen).
+- Volle Cross-Phase-Regression unverändert grün, kein Test außerhalb P1
+  editiert: P2 76 · P3 100 · P4 141 · P5 154 · P6 70 · P7 133 · P8 217 · P9 69 ·
+  root 77. `py_compile` clean.
+- Plan-Akzeptanz (§7) erfüllt: P1-Suite verdichtet (52→85), 429-Burst wird
+  selbst überlebt (bewiesen), `get_market_info` trägt die drei Pip-Felder,
+  kein Public-Surface-Bruch, P1 hat jetzt ein `CLAUDE.md` mit
+  `## Session stopped`-Konvention (dieses selbst).
+
+### Next
+- **`docs/concepts/phase1_hardening_plan.md` ist damit vollständig abgearbeitet**
+  (Steps 0–3). Kein weiterer Schritt in diesem Plan offen.
+- **Operator (sobald möglich):** die zwei ausstehenden Phase-9-Live-Läufe
+  (`--enable-ig-bars`-Beobachtung, Step 7a Lightstreamer-Diagnose) — unverändert
+  offen, unabhängig von dieser P1-Arbeit. Ein `verify_instrument`-Lauf gegen die
+  DAX-Epic würde jetzt zusätzlich die neuen Pip-Felder im `market_info`-Envelope
+  zeigen (Step 2 dieser Session).
+- **Commit:** dieser Stand (Step 3 + dieser Block) ist commit-fertig.
+
+### Offene Punkte / blockers
+- Keine technischen. Alles Live-Bezogene bleibt beim Nikinger (Phase-9 V2b-Läufe,
+  unverändert seit den vorherigen Sessions).
