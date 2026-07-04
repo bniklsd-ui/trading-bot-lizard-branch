@@ -153,6 +153,84 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 
 ---
 
+## Session stopped — 2026-07-04 (Step 7a: Lightstreamer-Diagnose-Harness gebaut — Live-Lauf steht aus)
+
+> **Auslöser:** direkte Fortsetzung nach Step 6. **Nur das Script** — der eigentliche
+> diagnostische Wert entsteht erst, wenn der Nikinger es live gegen IG-Demo laufen
+> lässt (braucht eine echte Lightstreamer-Session während der Handelszeiten,
+> Mo–Fr 08:00–22:30 CET). Step 7b (der Fix) ist **nicht** Teil dieser Session —
+> er folgt der Diagnose, nicht ihr voraus.
+
+### Completed
+- **`scripts/diag_lightstreamer_multi.py`** (neu, repo-root, phasenlos — mirrort
+  `resolve_epics.py`/`verify_instrument.py`s Konvention). Abonniert den aktiven
+  Phase-9-Universum-Epic-Satz (Fallback: die kuratierte 4er-Liste, inkl. der
+  live-verifizierten DAX-Anchor als Sanity-Kontrolle) in zwei Modi:
+  - **M1** — eine `Subscription` pro Epic (das heutige `IGLightstreamerClient`-
+    Verhalten, `_do_subscribe` in `ig_lightstreamer.py`).
+  - **M2** — eine `Subscription` mit einer Item-Liste
+    (`["PRICE:{acct}:{e1}", "PRICE:{acct}:{e2}", ...]`).
+  Fängt je Epic/Modus `onSubscription`/`onSubscriptionError`/`onItemUpdate`-Zähler
+  + den Client-Status am Ende. **`classify_hypotheses(m1, m2)`** — reine Funktion,
+  markiert H1 (Item-String-Problem: gleicher Epic scheitert in beiden Modi), H2
+  (Subscription-Limit: nur M1 scheitert), H3 (Modus-abhängig: unterschiedliche
+  Fail-Sets), H4 (Instrumentklasse: nie aus diesem Harness allein auflösbar, immer
+  `False` — braucht menschlichen Abgleich gegen `instrument_universe.instrument_type`).
+- **`tests/test_diag_lightstreamer_multi.py`** (root, importlib-Pattern wie
+  `test_resolve_epics.py`) — **13 Tests**: `EpicOutcome`/`ModeReport`-Dataclasses,
+  alle vier Hypothesen-Kombinationen von `classify_hypotheses` (inkl. „identische
+  Fails in beiden Modi ⇒ H3 False"), `run_mode` gegen eine Fake-SDK-Client/
+  -Subscription (M1 = N Subscriptions, M2 = 1 Subscription mit Item-Liste, invalider
+  Modus wirft, Pacing via injiziertem `sleep_fn`), `--help` exit 0. **Nur die reine
+  Logik ist getestet** — das eigentliche Subscribe-und-auf-SDK-Callbacks-warten ist
+  Live-only (kein sinnvolles Fake für Lightstreamers async Callback-Threading-
+  Modell), konsistent mit `scripts/test_lightstreamer.py`, das aus demselben Grund
+  ebenfalls keine pytest-Tests hat.
+
+### ⚠ Bekannte Einschränkung (im Code dokumentiert, ehrlich)
+M2s Listener-Registrierung (`sub.addListener(...)` einmal je Epic auf **derselben**
+Subscription) kann `onItemUpdate` nicht zuverlässig einem einzelnen Epic zuordnen,
+falls die SDK-Version die Item-Position nicht im Callback trägt — das Script
+dokumentiert das an Ort und Stelle. Für die Diagnose ist das unkritisch: die
+harten Signale (`onSubscriptionError` pro Epic, `client.getStatus()`) sind
+Modus-übergreifend eindeutig; nur die feingranulare Update-Zählung in M2 ist mit
+Vorbehalt zu lesen.
+
+### Verifiziert
+- `pytest tests/test_diag_lightstreamer_multi.py -v` → **13 passed**. `python
+  scripts/diag_lightstreamer_multi.py --help` → exit 0, kein Netz-/Keyring-Import
+  (`main()`s Broker-/SDK-Imports bleiben lazy). `pytest tests -q` (root) → **77
+  passed** (64 + 13). Volle Regression unverändert: P1 52 · P2 76 · P3 100 ·
+  P4 141 · P5 154 · P6 70 · P7 133 · P8 215 · P9 67.
+- **Ein Python-Fallstrick gefunden + gefixt:** `dataclass`-Decorators in einem via
+  `importlib.util.module_from_spec` geladenen Modul crashen, wenn das Modul nicht
+  vorher in `sys.modules` registriert wird (`dataclasses`-Internals lesen
+  `sys.modules[cls.__module__]` nach) — `resolve_epics.py`/`verify_instrument.py`
+  hatten dieses Problem nie, weil sie keine `@dataclass`-Klassen auf Modul-Ebene
+  definieren. Fix im Testfile: `sys.modules[_spec.name] = diag` **vor**
+  `_spec.loader.exec_module(diag)`.
+
+### Next
+- **Der Nikinger:** `python scripts/diag_lightstreamer_multi.py` während der
+  Handelszeiten laufen lassen (optional `--settle-s 15` bei wenig Ticks, `--epic`
+  wiederholbar für einen anderen Epic-Satz). Ergebnis-JSON als neue datierte
+  Sektion in `phase1_broker_wrapper/lightstreamer_integration_notes.md`
+  dokumentieren (bestehende Konvention der Datei).
+- **Danach (Step 7b, separate Session):** der Fix in
+  `phase1_broker_wrapper/broker_wrapper/streaming/ig_lightstreamer.py` folgt aus
+  der Diagnose — Plan §10 nennt als wahrscheinlichste Form „Subscribe-Strategie
+  auf eine Subscription je Epic normieren + Epic-String-Validierung vor Subscribe
+  + `onSubscriptionError`-Handler mit per-Epic-Fehlerdurchreichung statt
+  Silent-Fail", aber das ist eine Vermutung, keine Vorwegnahme der echten Ursache.
+  Danach `LiveQuoteCache` + P4-Kontext-Enrichment (Flag default aus).
+- Step 8 (Operator-Live-Runs: Autonomie-Beweis + Breaker-Fire) folgt nach 7b.
+
+### Offene Punkte / blockers
+- **Blockiert auf den Nikinger:** der eigentliche Diagnose-Lauf. Ohne ihn bleibt
+  H1–H4 unentschieden — das Script kann nicht mehr tun, als bereitzustehen.
+
+---
+
 ## Session stopped — 2026-07-04 (Step 6: V2b-i BarProvider-Kette + Circuit-Breaker + Divergenz-Check — abgeschlossen)
 
 > **Auslöser:** direkte Fortsetzung nach Step 5, gleiche Session, Auto-Modus. Erster
