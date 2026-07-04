@@ -28,7 +28,7 @@ import logging
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Callable
 
 import requests
 
@@ -100,6 +100,12 @@ class IGAdapter(BrokerAdapter):
         demo: if True, use the demo endpoint.
         request_timeout: per-request HTTP timeout in seconds.
         max_retries: number of retries on transient network errors.
+        retry_429_attempts: number of paced retries on HTTP 429 before
+            raising RateLimitError. 0 disables retrying (immediate raise).
+        retry_429_base_s: base seconds for the 429 backoff (exponential:
+            base * 2**attempt).
+        sleep_fn: injectable sleep, used for the 429 backoff. Tests inject
+            a no-op to avoid real delays.
     """
 
     name = "ig"
@@ -114,6 +120,9 @@ class IGAdapter(BrokerAdapter):
         demo: bool = False,
         request_timeout: float = 10.0,
         max_retries: int = 2,
+        retry_429_attempts: int = 2,
+        retry_429_base_s: float = 1.0,
+        sleep_fn: Callable[[float], None] = time.sleep,
     ) -> None:
         if not all([username, password, api_key, account_id]):
             raise ValueError("IGAdapter requires username, password, api_key, account_id")
@@ -125,6 +134,9 @@ class IGAdapter(BrokerAdapter):
         self._base_url = DEMO_BASE_URL if demo else LIVE_BASE_URL
         self._timeout = request_timeout
         self._max_retries = max_retries
+        self._retry_429_attempts = retry_429_attempts
+        self._retry_429_base_s = retry_429_base_s
+        self._sleep_fn = sleep_fn
 
         self._session = requests.Session()
         self._cst: str | None = None
@@ -260,11 +272,13 @@ class IGAdapter(BrokerAdapter):
         json_body: dict[str, Any] | None = None,
         extra_headers: dict[str, str] | None = None,
         attempt: int = 1,
+        retry_429_count: int = 0,
     ) -> dict[str, Any]:
         """Execute an HTTP request and return parsed JSON.
 
         Maps HTTP error codes onto BrokerError subclasses. Performs one
-        re-login on 401 and limited retries on network errors.
+        re-login on 401, limited retries on network errors, and paced
+        exponential-backoff retries on 429 (see retry_429_attempts).
         """
         url = f"{self._base_url}{path}"
         headers = self._base_headers(version=version, auth=auth)
@@ -283,6 +297,7 @@ class IGAdapter(BrokerAdapter):
                     method, path, version=version, auth=auth,
                     params=params, json_body=json_body,
                     extra_headers=extra_headers, attempt=attempt + 1,
+                    retry_429_count=retry_429_count,
                 )
             raise NetworkError(f"timeout after {self._max_retries} retries: {e}",
                                retryable=True) from e
@@ -309,6 +324,7 @@ class IGAdapter(BrokerAdapter):
                 method, path, version=version, auth=auth,
                 params=params, json_body=json_body,
                 extra_headers=extra_headers, attempt=attempt + 1,
+                retry_429_count=retry_429_count,
             )
 
         if resp.status_code == 403:
@@ -319,6 +335,15 @@ class IGAdapter(BrokerAdapter):
             # IG returns 405 when a market is offline. Map accordingly.
             raise MarketOfflineError(f"405 market offline: {path}")
         if resp.status_code == 429:
+            if retry_429_count < self._retry_429_attempts:
+                sleep_s = self._retry_429_base_s * (2 ** retry_429_count)
+                self._sleep_fn(sleep_s)
+                return self._request(
+                    method, path, version=version, auth=auth,
+                    params=params, json_body=json_body,
+                    extra_headers=extra_headers, attempt=attempt,
+                    retry_429_count=retry_429_count + 1,
+                )
             raise RateLimitError(f"429 rate limited: {resp.text[:200]}", retryable=True)
         if 500 <= resp.status_code < 600:
             if attempt <= self._max_retries:
@@ -327,6 +352,7 @@ class IGAdapter(BrokerAdapter):
                     method, path, version=version, auth=auth,
                     params=params, json_body=json_body,
                     extra_headers=extra_headers, attempt=attempt + 1,
+                    retry_429_count=retry_429_count,
                 )
             raise BrokerError(
                 f"5xx broker error after {self._max_retries} retries: "
@@ -458,6 +484,9 @@ class IGAdapter(BrokerAdapter):
                     market_status=_STATUS_MAP.get(
                         snap.get("marketStatus", "UNKNOWN"), "UNKNOWN"
                     ),  # type: ignore[arg-type]
+                    value_of_one_pip=instr.get("valueOfOnePip"),
+                    one_pip_means=instr.get("onePipMeans"),
+                    contract_size=instr.get("contractSize"),
                 )
                 return ok_envelope(
                     broker=self.name, method="get_market_info",

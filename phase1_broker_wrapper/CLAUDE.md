@@ -79,3 +79,68 @@ min_deal_size: 0.5 · lot_size: 1.0 €/point · spread ~1.8 pts
   - What was completed (with file names and function names)
   - What is next
   - Any open questions or blockers
+
+---
+
+## Session stopped — 2026-07-04 (Hardening plan Steps 0–2 — 429 retry + MarketInfo pip-field passthrough)
+
+> **Auslöser:** Nikinger-Auftrag — Phase-9 Live-Tests stehen aus (können gerade nicht
+> gefahren werden), also Ausführung von `docs/concepts/phase1_hardening_plan.md` (Fable/
+> Opus-Plan) vorziehen, da dieser Plan keine Live-Tests braucht. Auto-Modus, medium.
+
+### Completed
+- **Step 0 (Baseline):** volle Regression lief exakt wie erwartet (P1 52 · P2 76 ·
+  P3 100 · P4 141 · P5 154 · P6 70 · P7 133 · P8 217 · P9 69 · root 77). Kein Drift.
+  `phase1_broker_wrapper/CLAUDE.md` existierte bereits (Plan-[VERIFY] war falsch —
+  keine Skeleton-Erstellung nötig).
+- **Step 1 — 429-Retry/Backoff in `_request`** (`ig_adapter.py`): additive
+  Konstruktor-Parameter `retry_429_attempts=2`, `retry_429_base_s=1.0`,
+  `sleep_fn=time.sleep`. Neuer `retry_429_count`-Parameter auf `_request`
+  (unabhängig vom bestehenden `attempt`-Zähler für Timeout/5xx/401-Relogin —
+  keine Vermischung der Retry-Semantiken). 429 → bis zu `retry_429_attempts`
+  gepacte Retries (`base * 2**count`), danach unverändert `RateLimitError`.
+  Die fünf Call-Site-Pacings (`resolve_epics.py`, `verify_instrument.py`,
+  `discovery.py`, `promotion.py` — `diag_lightstreamer_multi.py`s `sleep_fn` ist
+  unrelated LS-Settle-Wait, nicht HTTP-Pacing, Plan war hier leicht ungenau)
+  bleiben unangetastet + bekamen je einen dated Kommentar. **+5 Tests**
+  (429→Erfolg nach 1 Retry, 429×3→Erschöpfung+RateLimitError, `retry_429_attempts=0`
+  Opt-out, kein Sleep bei 200, 401-Relogin-Regressionsguard — zuvor ungetestet).
+- **Step 2 — `get_market_info` Pip-/Contract-Feld-Passthrough:** `MarketInfo`
+  (`models.py`) bekam drei additive `str | None = None`-Felder:
+  `value_of_one_pip`, `one_pip_means`, `contract_size`. `get_market_info` mappt sie
+  aus `instr.get("valueOfOnePip"/"onePipMeans"/"contractSize")`, fehlende Keys →
+  `None`, kein Crash. **P9s `pricing.resolve_point_value` liest exakt diese
+  Feldnamen bereits fixture-getestet** (`test_ig_fields_value_of_one_pip_resolves`
+  etc.) — Pfad 1 (`ig_fields`) aktiviert sich damit ohne jede P9-Änderung, sobald
+  ein Operator-Lauf gegen echte IG-Demo-Daten geht. **+4 Tests** (Happy-Path
+  Passthrough, fehlende Keys → `None`, bestehende 8 Felder byte-identisch,
+  `to_dict`-Key-Set-Roundtrip) — vorher gab es **null** Tests für
+  `get_market_info` (Plan §0 Befund 3 bestätigt).
+
+### Verifiziert (gemockt/offline)
+- `pytest phase1_broker_wrapper/tests -v` → **61 passed** (52 → 61, +9: 5 vom
+  429-Retry + 4 vom Pip-Passthrough).
+- Volle Cross-Phase-Regression unverändert grün (kein Test außerhalb P1 editiert):
+  P2 76 · P3 100 · P4 141 · P5 154 · P6 70 · P7 133 · P8 217 · P9 69 · root 77.
+- `py_compile` clean auf allen berührten Dateien. Kein Public-Surface-Bruch: alle
+  neuen Felder additiv mit `None`-Default, `_poll_confirms` erbt den 429-Schutz
+  gratis (ruft `_request` intern auf, kein eigener Edit nötig).
+
+### Next
+- **Step 3 — Test-Backfill** (Plan §5, größter verbleibender Step: `_parse_bar`/
+  `get_ohlcv`-Happy-Path zuerst — Regressionsschutz für P9s `IGBarProvider`-Wiring
+  —, dann `_parse_transaction`/`get_trade_history`, `search_markets`,
+  `open_position`-Happy-Path/`_poll_confirms`/`reconcile_positions`, restliche
+  `_request`-Pfade). Erwartung ~52→~80+, bewusst als **eigener Step/Commit**
+  belassen (Plan-Konvention: ein Step = ein Commit), nicht in dieser Session
+  mitgezogen.
+- **Operator (sobald möglich):** ein `verify_instrument`-Lauf gegen die DAX-Epic
+  zeigt jetzt `value_of_one_pip`/`one_pip_means`/`contract_size` im
+  `market_info`-Envelope — das wäre der erste echte Beweis, ob P9s Pfad 1
+  gegenüber Pfad 2 (Namens-/lot_size-Kreuzcheck) übereinstimmt oder abweicht.
+- Danach unverändert offen (aus Phase-9-Notizen, nicht Teil dieser Session):
+  die zwei Phase-9-Live-Läufe (`--enable-ig-bars`, Step 7a LS-Diagnose).
+
+### Offene Punkte / blockers
+- Keine technischen. **Commit-fertig, wartet auf Nikinger-Trigger** (Claude
+  committet nicht automatisch).

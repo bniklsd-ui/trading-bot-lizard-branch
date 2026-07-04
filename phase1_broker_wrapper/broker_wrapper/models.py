@@ -56,6 +56,12 @@ class MarketInfo:
     min_deal_size: float
     lot_size: float          # value per point/pip in the instrument's currency
     market_status: MarketStatus
+    # Additive (2026-07-04, Phase 1 hardening Step 2): IG's raw pip/contract fields,
+    # passed through as-is (strings, as IG returns them). None if IG omits them.
+    # Parsing them into a resolved point_value is Phase 9's job (pricing.py).
+    value_of_one_pip: str | None = None
+    one_pip_means: str | None = None
+    contract_size: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -161,7 +161,11 @@ def _passes_code_filter(
 def _resolve_hit(
     broker: Any, epic: str, *, sleep_fn: Callable[[float], None], pace_s: float
 ) -> dict[str, Any]:
-    """One ``get_market_info`` probe, paced. Fail-soft — never raises."""
+    """One ``get_market_info`` probe, paced. Fail-soft — never raises.
+
+    2026-07-04: IGAdapter._request now also retries 429s itself (Phase 1 hardening
+    Step 1) — this pacing stays belt-and-braces, not duplication.
+    """
     try:
         env = broker.get_market_info(epic)
     except Exception:  # noqa: BLE001 — one bad epic must never kill the sweep

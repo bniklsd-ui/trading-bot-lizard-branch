@@ -140,6 +140,9 @@ def run_promotion_cycle(
 
     Fail-closed, demo-only, hart (Decision D4): raises :class:`UniverseSafetyError`
     immediately if ``is_demo`` is not ``True`` — no exception path, no "for now" bypass.
+
+    2026-07-04: IGAdapter._request now also retries 429s itself (Phase 1 hardening
+    Step 1) — the pace_s/sleep_fn pacing here stays belt-and-braces, not duplication.
     """
     if not is_demo:
         raise UniverseSafetyError("promotion is demo-only")

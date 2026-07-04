@@ -69,6 +69,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 # Mirrors resolve_epics.py / Phase-3's own RateLimiter minimum-spacing convention.
+# 2026-07-04: IGAdapter._request also retries 429s itself now (Phase 1 hardening Step 1) —
+# this pacing stays belt-and-braces (avoids 429s; the adapter retry survives them).
 _DEFAULT_PACE_S = 0.6
 
 # A tiny probe for real-time bar availability (the momentum VETO source, P5). Kept minimal,

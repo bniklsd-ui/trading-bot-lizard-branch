@@ -33,6 +33,11 @@ between every broker call (``--pace-s``, default 0.6s — matches Phase-3's own
 ``RateLimiter`` minimum spacing convention) fixes this; injectable ``sleep_fn`` keeps unit
 tests instant.
 
+⚠ **2026-07-04 update:** ``IGAdapter._request`` now also retries 429s itself (paced
+exponential backoff, `retry_429_attempts` default 2 — Phase 1 hardening plan Step 1). This
+pacing stays as belt-and-braces (it *avoids* 429s; the adapter-level retry *survives* them) —
+no duplication removed.
+
 The live run is the **operator's** job (keyring + network — project rule). This module's
 resolution functions take a **duck-typed broker** so they are unit-testable offline with a
 fake; only ``main()`` builds the real ``ig_demo`` broker (imported lazily).

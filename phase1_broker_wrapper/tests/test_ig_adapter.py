@@ -229,3 +229,174 @@ def test_disconnect_idempotent_when_not_connected():
     env = a.disconnect()
     assert env.ok is True
     assert env.data["already_disconnected"] is True
+
+
+# --- 429 retry/backoff in _request (Phase 1 hardening, Step 1) ---------------
+
+
+def _adapter_with_sleep(sleeps, **kwargs):
+    a = IGAdapter(
+        username="u", password="p", api_key="k", account_id="A1",
+        demo=True, request_timeout=1.0, max_retries=0,
+        sleep_fn=lambda s: sleeps.append(s),
+        **kwargs,
+    )
+    a._cst = "x"; a._security_token = "y"
+    from datetime import datetime, timezone, timedelta
+    a._session_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    return a
+
+
+def test_429_succeeds_after_one_retry():
+    sleeps = []
+    a = _adapter_with_sleep(sleeps)
+    with patch.object(a._session, "request") as req:
+        req.side_effect = [
+            _mock_response(status=429, json_body={"errorCode": "rate-limit"}),
+            _mock_response(status=200, json_body={"snapshot": {
+                "bid": 18000.0, "offer": 18001.0, "marketStatus": "TRADEABLE",
+                "updateTime": "2026-05-14T12:00:00Z",
+            }}),
+        ]
+        env = a.get_price("IX.D.DAX.IFMM.IP")
+
+    assert env.ok is True
+    assert sleeps == [1.0]
+    assert req.call_count == 2
+
+
+def test_429_exhausts_retries_and_raises_rate_limit_error():
+    sleeps = []
+    a = _adapter_with_sleep(sleeps)
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(status=429, json_body={"errorCode": "rate-limit"})
+        env = a.get_price("IX.D.DAX.IFMM.IP")
+
+    assert env.ok is False
+    assert env.error["code"] == "RATE_LIMIT"
+    assert sleeps == [1.0, 2.0]
+    assert req.call_count == 3  # initial + 2 retries (retry_429_attempts default = 2)
+
+
+def test_429_retry_opt_out_raises_immediately():
+    sleeps = []
+    a = _adapter_with_sleep(sleeps, retry_429_attempts=0)
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(status=429, json_body={"errorCode": "rate-limit"})
+        env = a.get_price("IX.D.DAX.IFMM.IP")
+
+    assert env.ok is False
+    assert env.error["code"] == "RATE_LIMIT"
+    assert sleeps == []
+    assert req.call_count == 1
+
+
+def test_no_sleep_on_200():
+    sleeps = []
+    a = _adapter_with_sleep(sleeps)
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(status=200, json_body={"snapshot": {
+            "bid": 18000.0, "offer": 18001.0, "marketStatus": "TRADEABLE",
+            "updateTime": "2026-05-14T12:00:00Z",
+        }})
+        env = a.get_price("IX.D.DAX.IFMM.IP")
+
+    assert env.ok is True
+    assert sleeps == []
+
+
+def test_401_relogin_path_unchanged_by_429_retry_addition():
+    """Regression guard: the 401 re-login retry (previously untested) still works
+    alongside the new retry_429_count plumbing threaded through every recursive call."""
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req, \
+         patch.object(a._session, "post") as post:
+        req.side_effect = [
+            _mock_response(status=401, json_body={"errorCode": "expired"}),
+            _mock_response(status=200, json_body={"snapshot": {
+                "bid": 18000.0, "offer": 18001.0, "marketStatus": "TRADEABLE",
+                "updateTime": "2026-05-14T12:00:00Z",
+            }}),
+        ]
+        post.return_value = _mock_response(
+            status=200,
+            headers={"CST": "cst-2", "X-SECURITY-TOKEN": "tok-2"},
+            json_body={"currentAccountId": "A1"},
+        )
+        env = a.get_price("IX.D.DAX.IFMM.IP")
+
+    assert env.ok is True
+    assert a._cst == "cst-2"
+    assert req.call_count == 2
+
+
+# --- get_market_info pip/contract field passthrough (Phase 1 hardening, Step 2) ----
+
+
+def _market_info_body(**instr_extra):
+    return {
+        "instrument": {
+            "name": "France 40", "type": "INDICES", "currencies": [{"code": "EUR"}],
+            "expiry": "-", "lotSize": 1.0,
+            **instr_extra,
+        },
+        "dealingRules": {"minDealSize": {"value": 0.5}},
+        "snapshot": {"marketStatus": "TRADEABLE"},
+    }
+
+
+def test_get_market_info_passes_through_pip_fields():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body=_market_info_body(
+            valueOfOnePip="1", onePipMeans="1 index point", contractSize="1",
+        ))
+        env = a.get_market_info("IX.D.FTSE.IFD.IP")
+
+    assert env.ok is True
+    assert env.data["value_of_one_pip"] == "1"
+    assert env.data["one_pip_means"] == "1 index point"
+    assert env.data["contract_size"] == "1"
+
+
+def test_get_market_info_missing_pip_fields_are_none_not_crash():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body=_market_info_body())
+        env = a.get_market_info("IX.D.FTSE.IFD.IP")
+
+    assert env.ok is True
+    assert env.data["value_of_one_pip"] is None
+    assert env.data["one_pip_means"] is None
+    assert env.data["contract_size"] is None
+
+
+def test_get_market_info_existing_fields_byte_identical():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body=_market_info_body())
+        env = a.get_market_info("IX.D.FTSE.IFD.IP")
+
+    assert env.ok is True
+    assert env.data["name"] == "France 40"
+    assert env.data["instrument_type"] == "INDICES"
+    assert env.data["currency"] == "EUR"
+    assert env.data["expiry"] is None
+    assert env.data["min_deal_size"] == 0.5
+    assert env.data["lot_size"] == 1.0
+    assert env.data["market_status"] == "TRADEABLE"
+
+
+def test_get_market_info_to_dict_roundtrip_keys():
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body=_market_info_body(
+            valueOfOnePip="1", contractSize="1",
+        ))
+        env = a.get_market_info("IX.D.FTSE.IFD.IP")
+
+    assert set(env.data.keys()) == {
+        "epic", "name", "instrument_type", "currency", "expiry",
+        "min_deal_size", "lot_size", "market_status",
+        "value_of_one_pip", "one_pip_means", "contract_size",
+    }
