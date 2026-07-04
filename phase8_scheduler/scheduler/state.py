@@ -96,6 +96,9 @@ class SchedulerState:
     Cross-day (kept across rollover — genuine last-action timestamps, not counters):
         last_research_ts: ISO timestamp of the last real research trigger.
         last_reconcile_ts: ISO timestamp of the last reconcile pass.
+        last_universe_refresh_ts: ISO timestamp of the last Phase-9 (V2) universe
+            discover/promotion refresh (``None`` until the wiring injects a
+            ``universe_refresher`` — default behaviour untouched otherwise).
     """
 
     date: str = ""
@@ -103,6 +106,7 @@ class SchedulerState:
     realized_pnl_today: float = 0.0
     last_research_ts: str | None = None
     last_reconcile_ts: str | None = None
+    last_universe_refresh_ts: str | None = None
     consecutive_failures: int = 0
     kill_reason: str | None = None
     last_no_trade_reason: str | None = None

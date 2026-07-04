@@ -96,9 +96,9 @@ immer → Variety + Clamp/Floor + echte Lessons). **Token-Budget by-default scha
 | `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ✅ (Modul 8, 14 Tests) |
 | `scheduler/observability.py` | v1.6 Step 0 — per-Zyklus JSONL-Diagnose-Log (`record_cycle`/`iter_records`), Sicherheitsnetz für Rückfälle | ✅ (v1.6, 9 Tests) |
 | `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ✅ (7 Tests) |
-| `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown + `request_stop()` | ✅ (Modul 10, 18 Tests) |
+| `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown + `request_stop()` + optionaler `universe_refresher` (Phase 9/V2, Default `None` = bit-identisch) | ✅ (Modul 10, 24 Tests — 18 + 6 v2) |
 | `scheduler/run.py` | `python -m scheduler.run` Entry (in-package, lazy `scripts.wiring`, SIGTERM/SIGINT → `request_stop`) | ✅ (Modul 11, 6 Tests) |
-| `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures | ✅ (Modul 11, operator-run) |
+| `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures + `universe_refresher`-Closure (Phase 9/V2) | ✅ (Modul 11, operator-run) |
 | `scripts/run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Operator-Tools (Start-Script · offline Sim-Tag mit Fakes · echter unbeaufsichtigter IG-Demo-Zyklus) | ✅ (Modul 11, operator-run) |
 | `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes. **+ Token-Meter-Card** (`/api/token_usage`) **+ Last-Cycle-Reasoning** (`/api/last_cycle` zeigt jetzt Research-Pick + Bull/Bear/Judge-Transkript) — s. `## UI-Erweiterung — 2026-06-29`. **v1.7 (2026-07-02): `/api/status`s `trades_today`/`realized_pnl_today` DB-gespeist** (nicht mehr der lagging `scheduler_state.json`-Snapshot) — s. `## Session stopped — 2026-07-02 (v1.7: /api/status DB-gespeist)` | ✅ (Modul 12, 20 Tests) |
 | `tests/*` | gemockt, kein Netz/LLM/echter sleep (199, Schwerpunkt `test_runner` + `test_safety` + `test_webui`) | ✅ |
@@ -219,6 +219,57 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
   damit der heiße Klassifikations-Pfad stdlib-only bleibt).
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
+
+---
+
+## Session stopped — 2026-07-04 (Phase 9 / V2 Step 5 — `universe_refresher`-Naht, additiv)
+
+> **Auslöser:** Phase 9 (V2)-Kickoff-Session, Step 5 des Ausführungsplans
+> (`docs/concepts/phase9_v2_foundation_plan(1).md`) — die P8-Integrationshälfte der
+> DB-Universum-Anbindung. Phase 8 selbst bleibt sonst unverändert.
+
+### Completed (additiv, Default-Pfad bit-identisch)
+- **`scheduler/config.py`:** neues `universe_refresh_interval_min: int = 240`.
+- **`scheduler/state.py`:** neues Cross-Day-Feld `last_universe_refresh_ts: str | None =
+  None` (wie `last_reconcile_ts` — von `rollover_if_new_day` unberührt, self-healing via
+  den bestehenden Feld-Filter).
+- **`scheduler/runner.py`:** `SchedulerRunner.__init__` bekam einen optionalen
+  keyword-only `universe_refresher: Callable[[], Any] | None = None` (Default `None` =
+  heutiges Verhalten, bit-identisch). Aufgerufen (a) einmalig in `preflight()`
+  (fail-soft, guarded — ein Refresh-Fehler stoppt den Daemon-Start nicht), (b) danach
+  höchstens 1× je `universe_refresh_interval_min` in der WINDOW-Phase (throttled via
+  neuem generischem `_due_after()`, aus dem bestehenden `_due()` extrahiert — **niemals**
+  innerhalb von `research_tick.ensure_candidates`, ein Discover/Promote-Pass ist
+  unabhängig von einem Gate-2-Pick). **+6 neue Tests** in `test_runner.py`
+  (None→nie gerufen, Preflight-Call, Never-run→sofort due, Throttle innerhalb des
+  Intervalls, Re-Run nach Intervall-Ablauf, Fail-soft bei Exception — kein Crash, kein
+  Backoff-Trip). **P8 199 → 205.**
+- **`scripts/wiring.py`:** neue `_build_universe_from_db()` (dupliziert — nicht
+  importiert — aus P4s `scripts.wiring.build_universe_from_db`, gleicher Grund wie
+  `_build_research` direkt aus dem `research`-Paket baut statt P4s Factory zu
+  importieren: die `scripts.wiring`-Namenskollision über die Phasen). `_build_research`
+  nutzt sie jetzt statt hartkodiertem `EXTENDED_UNIVERSE`. Neue `universe_refresher`-
+  Closure in `build_scheduler()` (Discover + `run_promotion_cycle` über den geteilten
+  Broker + `research.market_data`, `is_demo=(config.account=="demo")`), an
+  `SchedulerRunner(...)` durchgereicht.
+- **Manuell end-to-end verifiziert** (kein pytest, `scripts/wiring.py` wird laut
+  Konvention nicht von pytest importiert): eine echte Migration-004-DB mit 1 geseedeten
+  DAX-Record → `build_universe_from_db` liefert `[DAX]`; leere/fehlende DB → Fallback
+  auf `EXTENDED_UNIVERSE` (4 Instrumente), kein Crash, korrekt geloggte Warnung.
+
+### Verifiziert
+- `pytest phase8_scheduler/tests -q` → **205 passed** (199 + 6). Volle Regression
+  unverändert grün: P1 52 · P2 76 · P3 73 · P4 141 (+6, s. `phase4_research/CLAUDE.md`) ·
+  P5 154 · P6 70 · P7 133 · root 64 · P9 67.
+- `py_compile` clean auf allen berührten Dateien.
+
+### Next
+- Phase 9 (V2) Steps 6–7 (BarProvider-Kette + Lightstreamer, V2b) sind noch offen —
+  siehe `phase9_universe/CLAUDE.md` für den aktuellen Stand des Universe-Pakets selbst.
+- Operator-Live-Runs (Step 8: Autonomie-Beweis + Breaker-Fire) folgen erst nach V2b.
+
+### Offene Punkte / blockers
+- Keine technischen.
 
 ---
 

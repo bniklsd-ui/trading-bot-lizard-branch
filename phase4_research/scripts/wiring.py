@@ -19,6 +19,7 @@ uses for ``cache/``.
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
@@ -35,9 +36,11 @@ for _p in (
         sys.path.insert(0, str(_p))
 
 # Phase-4 (own package) — safe to import without network.
-from research import EXTENDED_UNIVERSE, Research, ResearchConfig  # noqa: E402
+from research import EXTENDED_UNIVERSE, Research, ResearchConfig, universe_from_records  # noqa: E402
 from research.credentials import get_credential  # noqa: E402  (Decision-6 shim)
 from research.llm_client import LLMClient  # noqa: E402
+
+logger = logging.getLogger(__name__)
 
 # --- Runtime data locations (gitignored) -------------------------------------
 _DATA_DIR = _REPO_ROOT / "data"
@@ -45,6 +48,33 @@ _DB_PATH = _DATA_DIR / "trading_bot.sqlite"
 _STATE_DIR = _DATA_DIR / "state"
 _CACHE_DIR = _DATA_DIR / "cache"
 _USAGE_LOG = _STATE_DIR / "llm_usage.json"
+
+
+def build_universe_from_db(db_path: str | Path | None = None) -> tuple:
+    """Build the research universe from the Phase-9 (V2) ``instrument_universe`` table.
+
+    Falls back to ``EXTENDED_UNIVERSE`` with a ``logger.warning`` if the DB is
+    unreachable (Phase 9 not built/seeded yet on this checkout, wrong path, locked
+    file, ...) or has no active rows — never silently, never a crash. Lazy
+    cross-phase import (the ``universe`` package, Phase 9) so this module's own
+    import stays network/DB-free (mirrors every other cross-phase import here).
+    """
+    path = Path(db_path) if db_path is not None else _DB_PATH
+    try:
+        from universe import UniverseStore  # noqa: PLC0415 — lazy, phase isolation
+
+        store = UniverseStore(path)
+        try:
+            records = [rec.to_instrument_spec() for rec in store.active_universe()]
+        finally:
+            store.close()
+    except Exception as exc:  # noqa: BLE001 — any DB problem is a graceful fallback, not a crash
+        logger.warning(
+            "build_universe_from_db: instrument_universe unreachable (%s) — "
+            "falling back to EXTENDED_UNIVERSE", exc,
+        )
+        return EXTENDED_UNIVERSE
+    return universe_from_records(records, fallback=EXTENDED_UNIVERSE)
 
 
 def build_research(config: ResearchConfig | None = None) -> Research:
@@ -60,16 +90,19 @@ def build_research(config: ResearchConfig | None = None) -> Research:
     key), so this must run with the keyring available and the demo creds seeded.
 
     Args:
-        config: the run config; defaults to :class:`ResearchConfig` widened to the
-            v1.5 confirmed multi-instrument universe (``EXTENDED_UNIVERSE`` — DAX +
-            Euro Stoxx 50), the §1 floors/clamp. Pass an explicit ``config`` (as
-            ``smoke_test.py``/``live_test.py`` do via ``--epic``) to constrain to one
-            instrument for a deterministic single-epic test run.
+        config: the run config; defaults to :class:`ResearchConfig` built from the
+            Phase-9 (V2) DB-backed universe (:func:`build_universe_from_db`), which
+            itself falls back to the v1.5 curated ``EXTENDED_UNIVERSE`` (DAX + Euro
+            Stoxx 50 + CAC 40 + IBEX 35) if the ``instrument_universe`` table is
+            empty/unreachable — so an unbuilt/unseeded Phase 9 on a given checkout
+            behaves exactly like pre-Phase-9 (bit-identical). Pass an explicit
+            ``config`` (as ``smoke_test.py``/``live_test.py`` do via ``--epic``) to
+            constrain to one instrument for a deterministic single-epic test run.
 
     Returns:
         A ready-to-``run`` :class:`Research`.
     """
-    config = config if config is not None else ResearchConfig(universe=EXTENDED_UNIVERSE)
+    config = config if config is not None else ResearchConfig(universe=build_universe_from_db())
 
     # Phase-1 broker — keyring-backed, no network at construction.
     from broker_wrapper import get_broker  # noqa: E402

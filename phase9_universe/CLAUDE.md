@@ -106,7 +106,7 @@ Konzept C3, gleiche Disziplin wie P3s Brain-Context-Degradierung).
 | `universe/pricing.py` | Deterministischer `point_value`-Resolver (`resolve_point_value`/`confirm_curated`) | ✅ (Step 2, 15 Tests) |
 | `universe/discovery.py` | Seed-Sweep + Code-Filter (`discover`/`DiscoveryReport`) | ✅ (Step 3, 14 Tests) |
 | `universe/promotion.py` | Statusmaschine + Safety (`run_promotion_cycle`/`PromotionReport`) | ✅ (Step 4, 14 Tests) |
-| P4/P8-Integration | DB-Universum statt `EXTENDED_UNIVERSE`, Refresh-Naht | ⬜ (Step 5) |
+| P4/P8-Integration | DB-Universum statt `EXTENDED_UNIVERSE`, Refresh-Naht | ✅ (Step 5) |
 | `scripts/dev_install.sh` | `phase9_universe` in die editable-install-Kette aufgenommen | ✅ |
 
 ## Step 1 — Ergebnisse (2026-07-04)
@@ -150,6 +150,80 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 `universe_refresher`-Naht default `None`, `observability.py` neue Event-Typen), Wiring
 (`scripts/wiring.py` — zentraler Cross-Phase-Konfig-Ort). **Nicht angefasst:** P5
 (Gates/VETOs/Sizing), P6 (Debatte), P7 (Reward). Null LLM-Änderungen.
+
+---
+
+## Session stopped — 2026-07-04 (Step 5: P4/P8-Integration — abgeschlossen)
+
+> **Auslöser:** direkte Fortsetzung nach Step 4, gleiche Session, Auto-Modus. Der erste
+> Step, der **außerhalb** von `phase9_universe/` schreibt (P4 `research/models.py` +
+> `scripts/wiring.py`, P8 `scheduler/{config,state,runner}.py` + `scripts/wiring.py`) —
+> alles additiv, Default-Pfad bit-identisch, per Plan §11 Cross-Phase-Edit-Register
+> sanktioniert.
+
+### Completed
+- **P4 `research/models.py`:** neue `universe_from_records(records, *,
+  fallback=EXTENDED_UNIVERSE) -> tuple[InstrumentSpec, ...]` — baut+validiert eine
+  Instrument-Universe-Tupel aus `InstrumentSpec`-förmigen Plain-Dicts (z. B.
+  `UniverseRecord.to_instrument_spec()`), fällt bei leerem Input auf
+  `EXTENDED_UNIVERSE` zurück (`logger.warning`, nie still, nie Crash). **Phase 4
+  importiert weiterhin nichts aus `universe`** — die Dict-Grenze wahrt die
+  Phasen-Isolation. Exportiert aus `research.__init__`. **+6 Tests**
+  (`test_universe.py`) → **P4 135 → 141**.
+- **P4 `scripts/wiring.py`:** neue `build_universe_from_db(db_path=None) ->
+  tuple[InstrumentSpec, ...]` — öffnet einen `universe.UniverseStore` (lazy Import),
+  liest `active_universe()`, mappt via `universe_from_records`; Fallback bei
+  Unreachable/Empty auf `EXTENDED_UNIVERSE` (fail-soft, `logger.warning`).
+  `build_research()`s Default nutzt jetzt diese Funktion statt hartkodiertem
+  `EXTENDED_UNIVERSE` — ein unbeautes/unreachable Phase-9-Checkout verhält sich
+  **bit-identisch** zum Vor-Phase-9-Stand.
+- **P8 `scheduler/config.py`/`state.py`/`runner.py`:** `universe_refresh_interval_min`
+  (Default 240), `last_universe_refresh_ts` (Cross-Day-Feld), optionaler
+  `universe_refresher`-Konstruktor-Parameter am `SchedulerRunner` (Default `None` =
+  heutiges Verhalten). Aufgerufen einmalig in `preflight()` + danach throttled in der
+  WINDOW-Phase (nie im Research-Tick selbst) via einem aus `_due()` extrahierten
+  generischen `_due_after()`. Fail-soft (Exception → `logger.critical`, nie ein
+  Cycle-Crash/Backoff-Trip). **+6 Tests** → **P8 199 → 205.** Details im
+  `phase8_scheduler/CLAUDE.md`-Session-Block von heute.
+- **P8 `scripts/wiring.py`:** `_build_universe_from_db()` (dupliziert aus P4s
+  Funktion — die `scripts.wiring`-Namenskollision über Phasen verbietet den Import),
+  `_build_research()` nutzt sie statt hartkodiertem `EXTENDED_UNIVERSE`. Neue
+  `universe_refresher`-Closure in `build_scheduler()` (Discover + `run_promotion_cycle`
+  über den geteilten Broker + `research.market_data`), an `SchedulerRunner`
+  durchgereicht.
+
+### ⚠ Reconciliation (Code = Wahrheit)
+- Da `scripts/wiring.py` laut etablierter Repo-Konvention **nicht** von pytest
+  importiert wird (würde Keyring/Netzwerk-Imports ziehen), sind
+  `build_universe_from_db`/`_build_universe_from_db`/die `universe_refresher`-Closure
+  **nicht unit-getestet** — konsistent mit jeder anderen Funktion in diesen Dateien.
+  Stattdessen: **manuelle End-to-End-Verifikation** dieser Session (echte Migration-
+  004-DB, 1 geseedeter DAX-Record → `build_universe_from_db` liefert `[DAX]`; leere/
+  fehlende DB → korrekter Fallback auf `EXTENDED_UNIVERSE`, kein Crash, korrekt
+  geloggte Warnung) — die pure Logik dahinter (`universe_from_records`) trägt die
+  volle Testabdeckung.
+
+### Verifiziert
+- `pytest phase9_universe/tests -q` → **67 passed** (unverändert — Step 5 fügt der
+  `universe`-Package selbst keine neuen Dateien hinzu, nur Konsumenten in P4/P8).
+- Volle Regression: P1 52 · P2 76 · P3 73 · **P4 141 (+6)** · P5 154 · P6 70 · P7 133 ·
+  **P8 205 (+6)** · root 64 · P9 67. Import-Isolation aller vier `universe`-Module
+  weiterhin bestätigt (0 cross-phase Leaks, unverändert seit Step 4).
+- `py_compile` clean auf allen berührten Dateien in P4/P8/P9.
+
+### Next
+- **Step 6 — V2b-i: BarProvider-Kette + yFinance-Härtung + Divergenz-Check** (P3
+  `external_data/providers.py` neu, `fetcher.py` additiv: Backoff + Circuit-Breaker).
+  Vor dem Bau: P3s Off-Hours-Check-Ort + exakte yfinance-Call-Sites in `fetcher.py`
+  gegenlesen (Plan §14 Punkt 3).
+- Danach Step 7 (V2b-ii: Lightstreamer-Multi-Epic-Diagnose → Fix → `LiveQuoteCache`),
+  Step 8 (Operator-Live-Runs).
+
+### Offene Punkte / blockers
+- Keine technischen. Die vier Kernmodule + die P4/P8-Integration sind fertig — die
+  Discover→Verify→Promote-Pipeline ist jetzt vollständig **end-to-end verdrahtet**
+  (wenn auch mangels Operator-Live-Lauf noch nicht live bewiesen). V2b (Steps 6–7)
+  ist der einzige verbleibende Baustein vor den Operator-Live-Runs.
 
 ---
 

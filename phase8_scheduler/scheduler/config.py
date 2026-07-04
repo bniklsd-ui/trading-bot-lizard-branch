@@ -89,6 +89,12 @@ class SchedulerConfig:
         reconcile_interval_min: cadence of the idempotent ``CLOSED_BY_BROKER`` P&L
             catch-up pass (Decision 11) — also run on startup + shutdown.
 
+    Universe refresh (Phase 9 / V2, consumed by ``runner.py``'s injected
+    ``universe_refresher`` — default ``None`` = today's behaviour, bit-identical):
+        universe_refresh_interval_min: cadence of the discover/promote refresh pass
+            (Plan §8 Step 5). Makes zero LLM calls; 240 min default is conservative
+            against IG's per-instrument REST rate limits.
+
     Paths (gitignored ``data/`` tree, the layout Phase-2 ``init_db.py`` provisions):
         live_db_path: the **real** Phase-2 SQLite DB — ``data/trading_bot.sqlite``
             (matches the Phase-7 wiring ``_DB_PATH``; the concept's ``…/trading_bot.db``
@@ -129,6 +135,9 @@ class SchedulerConfig:
 
     # --- reconcile ---
     reconcile_interval_min: int = 15
+
+    # --- universe refresh (Phase 9 / V2) ---
+    universe_refresh_interval_min: int = 240
 
     # --- paths (gitignored data/ tree) ---
     live_db_path: str = "data/trading_bot.sqlite"          # the real P2 DB

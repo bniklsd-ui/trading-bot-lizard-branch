@@ -41,6 +41,9 @@ def test_defaults_match_locked_concept_values() -> None:
     # reconcile
     assert cfg.reconcile_interval_min == 15
 
+    # universe refresh (Phase 9 / V2)
+    assert cfg.universe_refresh_interval_min == 240
+
     # paths (gitignored data/ tree)
     assert cfg.live_db_path == "data/trading_bot.sqlite"
     assert cfg.state_path == "data/state/scheduler_state.json"
@@ -137,6 +140,7 @@ def test_full_override_roundtrips() -> None:
         backoff_cap_s=120.0,
         daily_token_budget=1_000_000,
         reconcile_interval_min=30,
+        universe_refresh_interval_min=60,
         live_db_path="/tmp/x.sqlite",
         state_path="/tmp/state.json",
         kill_path="/tmp/KILL",
@@ -152,6 +156,7 @@ def test_full_override_roundtrips() -> None:
     assert cfg.max_consecutive_failures == 5
     assert cfg.daily_token_budget == 1_000_000
     assert cfg.reconcile_interval_min == 30
+    assert cfg.universe_refresh_interval_min == 60
     assert cfg.live_db_path == "/tmp/x.sqlite"
     assert cfg.observability_path == "/tmp/health.jsonl"
 

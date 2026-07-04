@@ -227,6 +227,7 @@ def _make_runner(
     executor=None,
     broker=None,
     preflight_fn=None,
+    universe_refresher=None,
     max_iterations: int | None = 1,
 ):
     cfg = config or _config(tmp_path)
@@ -244,6 +245,7 @@ def _make_runner(
         executor=executor or _FakeExecutor(),
         broker=broker or _FakeBroker(),
         preflight_fn=preflight_fn or (lambda: None),
+        universe_refresher=universe_refresher,
         max_iterations=max_iterations,
     )
     return runner, sleep, store, cfg
@@ -278,6 +280,74 @@ def test_window_happy_path_runs_research_then_bare_execute(tmp_path) -> None:
     assert ex.run_calls == 1
     assert store.load().trades_today == 1                 # OPEN is a real trade (Contract E)
     assert cfg.cycle_interval_min * 60 in sleep.sleeps    # WINDOW sleeps one cycle interval
+
+
+# --- universe refresher (Phase 9 / V2, Plan §8 Step 5) ----------------------
+
+
+def test_universe_refresher_none_is_never_called(tmp_path) -> None:
+    """Default (no wiring opt-in) -> today's behaviour, bit-identical: never called, no field set."""
+    runner, _, store, _ = _make_runner(tmp_path, times=[_WINDOW_T], universe_refresher=None)
+    runner.run()
+    assert store.load().last_universe_refresh_ts is None
+
+
+def test_universe_refresher_called_once_in_preflight(tmp_path) -> None:
+    calls: list[int] = []
+    runner, _, _, _ = _make_runner(
+        tmp_path, times=[_PRE_OPEN_T], universe_refresher=lambda: calls.append(1)
+    )
+    runner.preflight()
+    assert calls == [1]
+
+
+def test_universe_refresher_runs_in_window_when_never_run_before(tmp_path) -> None:
+    calls: list[int] = []
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T], universe_refresher=lambda: calls.append(1)
+    )
+    runner.run()
+    # Once in preflight() (unconditional) + once in the WINDOW phase (never-run -> due).
+    assert calls == [1, 1]
+    assert store.load().last_universe_refresh_ts is not None
+
+
+def test_universe_refresher_throttled_within_interval(tmp_path) -> None:
+    calls: list[int] = []
+    cfg = _config(tmp_path, universe_refresh_interval_min=240)
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T, _WINDOW_T + timedelta(minutes=5)],
+        config=cfg, universe_refresher=lambda: calls.append(1), max_iterations=2,
+    )
+    runner.run()
+    # preflight (1) + first WINDOW iteration (never-run -> due, 1) + second iteration only
+    # 5 minutes later, well under the 240-minute interval -> not due again.
+    assert calls == [1, 1]
+
+
+def test_universe_refresher_runs_again_after_interval_elapses(tmp_path) -> None:
+    calls: list[int] = []
+    cfg = _config(tmp_path, universe_refresh_interval_min=1)  # 1 minute — trivially elapses
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T, _WINDOW_T + timedelta(minutes=5)],
+        config=cfg, universe_refresher=lambda: calls.append(1), max_iterations=2,
+    )
+    runner.run()
+    assert calls == [1, 1, 1]  # preflight + both WINDOW iterations (5 min > 1 min interval)
+
+
+def test_universe_refresher_failure_is_fail_soft(tmp_path) -> None:
+    """A refresher exception must never crash the cycle or trip backoff."""
+    def _boom() -> None:
+        raise RuntimeError("promotion cycle exploded")
+
+    backoff = _FakeBackoff()
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T], universe_refresher=_boom, backoff=backoff,
+    )
+    runner.run()  # must not raise
+    assert backoff.failures == 0
+    assert store.load().kill_reason is None
 
 
 def test_window_cycle_writes_one_observability_record(tmp_path) -> None:

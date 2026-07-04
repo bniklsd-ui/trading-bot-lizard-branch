@@ -183,6 +183,14 @@ class SchedulerRunner:
         broker: anything satisfying :class:`_BrokerLike` (the Phase-1 adapter), for the warm-up.
         preflight_fn: a zero-arg callable the wiring backs with the keyring + DB/migrations checks;
             it **raises** on a failed prerequisite (the runner wraps that to ``PreflightError``).
+        universe_refresher: optional zero-arg callable (Phase 9 / V2, Plan §8 Step 5) the wiring
+            backs with a discover + ``run_promotion_cycle`` pass against the ``instrument_universe``
+            table. Default ``None`` ⇒ never called — today's behaviour, bit-identical. When set, it
+            runs once in :meth:`preflight` and then at most once per
+            ``config.universe_refresh_interval_min`` inside the WINDOW phase (never nested inside a
+            research tick — a Gate-2 candidate pick and a universe refresh are independent passes).
+            Best-effort/fail-soft (a refresh failure is logged ``critical``, never propagated — a
+            stale universe is a data-freshness concern, not a safety one).
         max_iterations: optional loop bound. ``None`` (default) ⇒ run forever (the real daemon);
             a positive int ⇒ stop after that many iterations (deterministic tests).
     """
@@ -200,6 +208,7 @@ class SchedulerRunner:
         executor: _ExecutorLike,
         broker: _BrokerLike,
         preflight_fn: Callable[[], None],
+        universe_refresher: Callable[[], Any] | None = None,
         max_iterations: int | None = None,
     ) -> None:
         self._clock = clock
@@ -212,6 +221,7 @@ class SchedulerRunner:
         self._executor = executor
         self._broker = broker
         self._preflight_fn = preflight_fn
+        self._universe_refresher = universe_refresher
         self._max_iterations = max_iterations
         # Non-sticky graceful-stop flag (set by request_stop(), checked at the loop top).
         # Deliberately NOT the kill-switch file: a SIGTERM-driven stop must not persist a
@@ -242,6 +252,8 @@ class SchedulerRunner:
         env = self._broker.connect()
         if not env.ok:  # Envelope is a dataclass (.ok / .error), NOT a mapping — see _EnvelopeLike
             raise PreflightError(f"broker connect failed: {env.error}")
+
+        self._run_universe_refresher()
 
     # --- graceful stop -----------------------------------------------------
 
@@ -330,6 +342,7 @@ class SchedulerRunner:
         elif phase is Phase.WINDOW:
             self._warm_session()
             self._maybe_reconcile(state, now)
+            self._maybe_refresh_universe(state, now)
             ok, reason = self._auto_confirm.can_open(state)
             if ok:
                 research_result = self._research_tick.ensure_candidates(state)
@@ -412,6 +425,14 @@ class SchedulerRunner:
         treated as due (fail-soft toward reconciling). Both instants are compared in UTC so a DST
         boundary cannot distort the elapsed seconds.
         """
+        return self._due_after(last_ts, now, self._reconcile_interval_s)
+
+    def _due_after(self, last_ts: str | None, now: datetime, interval_s: float) -> bool:
+        """Generic tz-safe "has ``interval_s`` elapsed since ``last_ts``" check.
+
+        Shared by :meth:`_due` (reconcile) and the universe-refresh throttle (Plan §8 Step 5) —
+        same fail-soft-toward-running semantics (missing/unparseable ``last_ts`` → due).
+        """
         if not last_ts:
             return True
         try:
@@ -421,7 +442,37 @@ class SchedulerRunner:
         if last.tzinfo is None:
             last = last.replace(tzinfo=timezone.utc)
         elapsed = (now.astimezone(timezone.utc) - last.astimezone(timezone.utc)).total_seconds()
-        return elapsed >= self._reconcile_interval_s
+        return elapsed >= interval_s
+
+    def _run_universe_refresher(self) -> None:
+        """Fire-and-forget call of the injected ``universe_refresher`` (fail-soft).
+
+        No-op when ``None`` (default — the daemon's behaviour stays bit-identical without a
+        wiring opt-in). A refresh failure is logged ``critical`` and never propagated: a stale
+        ``instrument_universe`` table is a data-freshness concern, not a safety one — it must
+        never trip backoff/kill the way a cycle exception does.
+        """
+        if self._universe_refresher is None:
+            return
+        try:
+            self._universe_refresher()
+        except Exception:  # noqa: BLE001 — fail-soft, see docstring
+            logger.critical("universe refresher failed", exc_info=True)
+
+    def _maybe_refresh_universe(self, state: SchedulerState, now: datetime) -> None:
+        """Run the universe refresher, throttled to ``config.universe_refresh_interval_min``.
+
+        Called from the WINDOW phase only, deliberately **not** nested inside
+        ``research_tick.ensure_candidates`` — a discover/promote pass and a Gate-2 candidate
+        pick are independent passes (Plan §8 Step 5: "nie innerhalb eines Research-Ticks").
+        """
+        if self._universe_refresher is None:
+            return
+        interval_s = self._config.universe_refresh_interval_min * 60
+        if not self._due_after(state.last_universe_refresh_ts, now, interval_s):
+            return
+        self._run_universe_refresher()
+        state.last_universe_refresh_ts = now.isoformat()
 
     def _startup_reconcile(self, state: SchedulerState) -> None:
         """One forced reconcile before the loop (Decision 11 "Startup"). Fail-soft; saves state.

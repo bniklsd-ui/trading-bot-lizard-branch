@@ -140,6 +140,18 @@ is kicked off in the browser concept session, not here.
 > `test_research.py`). Detail: `docs/concepts/phase8_v1.6_hotfix_plan.md` Step 0 +
 > `phase8_scheduler/CLAUDE.md` → `## Session stopped` (v1.6 „Wie").
 
+> 🔁 **Phase-9 (V2) additive edit (2026-07-04, Step 5 — DB-backed universe, code = source of
+> truth):** `research/models.py` gained `universe_from_records(records, *, fallback=
+> EXTENDED_UNIVERSE)` — builds+validates an `InstrumentSpec` tuple from plain dicts (e.g. a
+> Phase-9 `UniverseRecord.to_instrument_spec()`), falling back (with a `logger.warning`, never
+> silent/never a crash) when `records` is empty. Phase 4 still imports **nothing** from the
+> Phase-9 `universe` package — the dict boundary preserves phase isolation. `scripts/wiring.py`'s
+> `build_research()` default now calls a new `build_universe_from_db()` (opens a Phase-9
+> `UniverseStore`, lazy import, wrapped fail-soft) instead of hardcoding `EXTENDED_UNIVERSE`; an
+> unbuilt/unseeded/unreachable Phase-9 DB on any given checkout still falls back to
+> `EXTENDED_UNIVERSE` — **bit-identical to pre-Phase-9 behaviour** in that case. +6 P4 tests
+> (**135 → 141**). Detail: `phase9_universe/CLAUDE.md` → `## Session stopped` (Step 5).
+
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which
 candidate?"). Everything else is plain code:

@@ -457,6 +457,35 @@ def load_universe(specs: Any) -> tuple[InstrumentSpec, ...]:
     return tuple(validated)
 
 
+def universe_from_records(
+    records: Any,
+    *,
+    fallback: tuple[InstrumentSpec, ...] = EXTENDED_UNIVERSE,
+) -> tuple[InstrumentSpec, ...]:
+    """Build+validate a universe from ``InstrumentSpec``-shaped plain dicts.
+
+    The Phase-9 (V2) integration seam (Plan §8 Step 5): ``records`` are plain dicts
+    (e.g. ``UniverseRecord.to_instrument_spec()`` from the Phase-9 ``universe``
+    package's DB-backed instrument pipeline) — Phase 4 builds its **own** typed
+    :class:`InstrumentSpec` from them here rather than importing the Phase-9
+    package (phase isolation is preserved: ``research`` still imports nothing
+    cross-phase). Empty ``records`` falls back to ``EXTENDED_UNIVERSE`` (or an
+    explicit ``fallback``) with a ``logger.warning`` — never silent, never a
+    crash (an empty universe is a hard ``ValueError`` from ``load_universe``
+    otherwise, and this function's whole point is to degrade gracefully instead).
+    Every record still passes through :func:`load_universe`'s per-entry
+    validation (fail-closed, unchanged) once turned into an ``InstrumentSpec``.
+    """
+    record_list = list(records)
+    if not record_list:
+        log.warning(
+            "universe_from_records: no records supplied — falling back to the curated universe"
+        )
+        return fallback
+    specs = tuple(InstrumentSpec(**r) for r in record_list)
+    return load_universe(specs)
+
+
 def _derive_universe(
     epic_allowlist: tuple[str, ...], volume_proxy: str | None
 ) -> tuple[InstrumentSpec, ...]:

@@ -97,6 +97,36 @@ def _no_research() -> list[dict[str, Any]]:
     return []
 
 
+def _build_universe_from_db(db_path: Any = None) -> tuple:
+    """Build the research universe from the Phase-9 (V2) ``instrument_universe`` table.
+
+    Duplicated (not imported) from Phase 4's ``scripts.wiring.build_universe_from_db`` —
+    every phase's ``scripts/wiring.py`` shares the module name ``scripts.wiring``, so P8
+    cannot import P4's directly (the established reason ``_build_research`` below is
+    built straight from the ``research`` package instead of importing P4's factory).
+    Falls back to ``EXTENDED_UNIVERSE`` with a ``logger.warning`` if the DB is
+    unreachable or empty — never silently, never a crash.
+    """
+    from research import EXTENDED_UNIVERSE, universe_from_records
+
+    path = Path(db_path) if db_path is not None else _DB_PATH
+    try:
+        from universe import UniverseStore  # noqa: PLC0415 — lazy, phase isolation
+
+        store = UniverseStore(path)
+        try:
+            records = [rec.to_instrument_spec() for rec in store.active_universe()]
+        finally:
+            store.close()
+    except Exception as exc:  # noqa: BLE001 — any DB problem is a graceful fallback, not a crash
+        logger.warning(
+            "_build_universe_from_db: instrument_universe unreachable (%s) — "
+            "falling back to EXTENDED_UNIVERSE", exc,
+        )
+        return EXTENDED_UNIVERSE
+    return universe_from_records(records, fallback=EXTENDED_UNIVERSE)
+
+
 def _build_research(broker: Any, db: Any, state: Any) -> Any:
     """Build the real Phase-4 :class:`Research` over the shared broker/db/state (Contract G).
 
@@ -106,18 +136,19 @@ def _build_research(broker: Any, db: Any, state: Any) -> Any:
     ``^GDAXI`` does not degrade to ``volume_available=False`` (Decision 5). The Anthropic key is read
     from the keyring here; the SDK is lazy (fires inside ``Research.run``).
 
-    v1.5 Issue C, Step 2B: the daemon's ``ResearchConfig`` is built with
-    ``universe=EXTENDED_UNIVERSE`` (DAX + Euro Stoxx 50, confirmed via
-    ``scripts/resolve_epics.py`` 2026-07-01) — unconditionally, since this function takes
-    no config override (unlike Phase-4's own ``build_research``). This is the actual
-    daemon-critical widening: every autonomous cycle now sees both instruments.
+    v1.5 Issue C, Step 2B: the daemon's ``ResearchConfig`` used to be built
+    unconditionally with ``universe=EXTENDED_UNIVERSE`` (DAX + Euro Stoxx 50, confirmed
+    via ``scripts/resolve_epics.py`` 2026-07-01). **Phase 9 (V2) Step 5:** the universe
+    now comes from the ``instrument_universe`` DB table (:func:`_build_universe_from_db`),
+    falling back to ``EXTENDED_UNIVERSE`` if that table is empty/unreachable — an
+    unbuilt/unseeded Phase 9 on a given checkout behaves exactly like before (bit-identical).
     """
     from external_data import FileCache, MarketDataFetcher, TickerMapper
-    from research import EXTENDED_UNIVERSE, Research, ResearchConfig
+    from research import Research, ResearchConfig
     from research.credentials import get_credential
     from research.llm_client import LLMClient
 
-    config = ResearchConfig(universe=EXTENDED_UNIVERSE)
+    config = ResearchConfig(universe=_build_universe_from_db())
     mapper = TickerMapper()
     # v1.5 (Issue C): register each curated instrument's yFinance ticker + volume proxy
     # from the typed universe (SoT). DAX default unchanged → daemon behaviour identical.
@@ -332,6 +363,32 @@ def build_scheduler(
 
     reconciler = Reconciler(reward_sink, pending_reconcile_fn, now_fn=_now)
 
+    def universe_refresher() -> None:
+        """Phase 9 (V2) discover + promote pass over the shared broker (Plan §8 Step 5).
+
+        Makes zero LLM calls (Bauprinzip: null new AI in this layer). Reuses the same
+        warm broker + the already-built Phase-4 ``Research``'s Phase-3 fetcher
+        (``research.market_data`` — same ticker-mapper registrations, no second
+        ``MarketDataFetcher`` instance). Lazy import of ``universe`` so a checkout
+        without Phase 9 built yet still imports this wiring module cleanly — the
+        runner never calls this closure unless it is actually wired in (only on the
+        line that passes it to ``SchedulerRunner`` below), so an ``ImportError`` here
+        would only surface at daemon start, not at module import time.
+        """
+        from universe import UniverseStore, discover, run_promotion_cycle
+
+        universe_store = UniverseStore(_DB_PATH)
+        try:
+            discover(broker, universe_store)
+            run_promotion_cycle(
+                broker,
+                research.market_data,
+                universe_store,
+                is_demo=(config.account == "demo"),
+            )
+        finally:
+            universe_store.close()
+
     def preflight_fn() -> None:
         """Fail-closed startup probe: keyring reachable + DB migration 002 applied."""
         # 1) Keyring / Secret-Service reachable (the deployment top-risk, concept Q3). Raises if the
@@ -357,5 +414,6 @@ def build_scheduler(
         executor=executor,
         broker=broker,
         preflight_fn=preflight_fn,
+        universe_refresher=universe_refresher,
         max_iterations=max_iterations,
     )

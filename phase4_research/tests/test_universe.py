@@ -18,6 +18,7 @@ from research.models import (
     ResearchConfig,
     _DEFAULT_UNIVERSE,
     load_universe,
+    universe_from_records,
 )
 
 DAX = "IX.D.DAX.IFMM.IP"
@@ -171,3 +172,59 @@ def test_config_can_opt_into_extended_universe() -> None:
     # reduced-signal, tolerated (concept C3), not a crash.
     assert by_epic["IX.D.CAC.IFE.IP"].volume_proxy is None
     assert by_epic["IX.D.IBEX.IFM.IP"].volume_proxy is None
+
+
+# --------------------------------------------------------------------------- #
+# universe_from_records (Phase 9 / V2 Step 5 — the DB-integration seam)       #
+# --------------------------------------------------------------------------- #
+def _record_dict(epic: str, **over: object) -> dict[str, object]:
+    base: dict[str, object] = dict(
+        epic=epic,
+        yf_ticker=None,
+        volume_proxy=None,
+        point_value=1.0,
+        min_deal_size=0.5,
+        currency="EUR",
+        source="research_promoted",
+    )
+    base.update(over)
+    return base
+
+
+def test_universe_from_records_builds_validated_universe() -> None:
+    records = [_record_dict(DAX, yf_ticker="^GDAXI"), _record_dict("IX.D.STXE.IFM.IP", point_value=2.0)]
+    universe = universe_from_records(records)
+    assert [s.epic for s in universe] == [DAX, "IX.D.STXE.IFM.IP"]
+    assert isinstance(universe[0], InstrumentSpec)
+
+
+def test_universe_from_records_empty_falls_back_to_extended_universe(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("WARNING"):
+        universe = universe_from_records([])
+    assert universe is EXTENDED_UNIVERSE
+    assert any("falling back" in r.message for r in caplog.records)
+
+
+def test_universe_from_records_empty_uses_explicit_fallback() -> None:
+    fallback = (_spec(DAX),)
+    universe = universe_from_records([], fallback=fallback)
+    assert universe is fallback
+
+
+def test_universe_from_records_still_validates_each_entry() -> None:
+    records = [_record_dict(DAX), _record_dict("IX.D.BAD.IP", currency="USD")]
+    universe = universe_from_records(records)
+    assert [s.epic for s in universe] == [DAX]  # the USD entry is dropped, not crashed
+
+
+def test_universe_from_records_all_invalid_raises() -> None:
+    with pytest.raises(ValueError):
+        universe_from_records([_record_dict("X", currency="USD")])
+
+
+def test_universe_from_records_accepts_generator_not_just_list() -> None:
+    records = (r for r in [_record_dict(DAX)])
+    universe = universe_from_records(records)
+    assert [s.epic for s in universe] == [DAX]
