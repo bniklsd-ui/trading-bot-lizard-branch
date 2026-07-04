@@ -103,7 +103,7 @@ Konzept C3, gleiche Disziplin wie P3s Brain-Context-Degradierung).
 | `universe/models.py` | `UniverseRecord` (frozen, `to_row`/`from_row`/`to_instrument_spec`) + Status-/Source-/Pricing-Source-Konstanten | ✅ (Step 1) |
 | `universe/exceptions.py` | `UniverseError` → `UniverseSafetyError`/`UniverseStoreError` | ✅ (Step 1) |
 | `universe/store.py` | `UniverseStore` — eigene sqlite3-Connection (kein `persistence.Database`-Import, Phasen-Isolation) | ✅ (Step 1, 19 Tests) |
-| `universe/pricing.py` | Deterministischer `point_value`-Resolver | ⬜ (Step 2) |
+| `universe/pricing.py` | Deterministischer `point_value`-Resolver (`resolve_point_value`/`confirm_curated`) | ✅ (Step 2, 15 Tests) |
 | `universe/discovery.py` | Seed-Sweep + Code-Filter | ⬜ (Step 3) |
 | `universe/promotion.py` | Statusmaschine + Safety | ⬜ (Step 4) |
 | P4/P8-Integration | DB-Universum statt `EXTENDED_UNIVERSE`, Refresh-Naht | ⬜ (Step 5) |
@@ -150,6 +150,53 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 `universe_refresher`-Naht default `None`, `observability.py` neue Event-Typen), Wiring
 (`scripts/wiring.py` — zentraler Cross-Phase-Konfig-Ort). **Nicht angefasst:** P5
 (Gates/VETOs/Sizing), P6 (Debatte), P7 (Reward). Null LLM-Änderungen.
+
+---
+
+## Session stopped — 2026-07-04 (Step 2: `pricing.py` — abgeschlossen)
+
+> **Auslöser:** direkte Fortsetzung nach Step 1, gleiche Session, Auto-Modus.
+
+### Completed
+- `universe/pricing.py` (neu): `resolve_point_value(market_info: dict) -> tuple[float,str]|None`
+  (Auflösungsordnung: IG-Rohfelder → Namens-/lot_size-Kreuzcheck → `None`) +
+  `confirm_curated(record, market_info) -> bool | None`.
+- **15 neue Tests** (`test_pricing.py`), inkl. der im Plan geforderten Akzeptanz-Fixtures
+  (STXE `"(2€)"`/lot_size 2.0 → `(2.0, "name_lotsize_agree")`; widersprüchliche Fixture → `None`).
+- `universe/__init__.py`: `resolve_point_value`/`confirm_curated` exportiert.
+
+### ⚠ Reconciliation (Code = Wahrheit — vor dem Bau verifiziert, kein P1-Edit nötig)
+- **P1s `MarketInfo.to_dict()`** (`phase1_broker_wrapper/broker_wrapper/models.py`) exponiert
+  **nur** `epic`/`name`/`instrument_type`/`currency`/`expiry`/`min_deal_size`/`lot_size`/
+  `market_status` — **keine** rohen IG-Pip-/Contract-Felder. Der `ig_fields`-Pfad im Resolver
+  ist damit **gegen echte P1-Daten aktuell dormant** (feuert nie, bis P1 sie additiv
+  durchreicht) — bewusst **trotzdem gebaut + fixture-getestet** (reine Funktion, aktiviert sich
+  automatisch ohne Code-Änderung hier, sobald P1 die Felder liefert). **Kein P1-Touch in
+  diesem Step** — nicht „extremely necessary" jetzt, da Pfad 2 (Namens-/lot_size-Kreuzcheck)
+  bereits jedes aktuell geseedete Instrument mit einem echten Beweis versorgt. Offener Punkt
+  für eine spätere Session, falls IG-Pip-Felder wirklich gebraucht werden.
+- **`confirm_curated`-Rückgabetyp bewusst `bool | None`** statt des Plan-Wortlauts `bool` —
+  der Plan-Fließtext selbst beschreibt drei reale Zustände (bestätigt/widerlegt/nicht auflösbar),
+  die ein reiner `bool` nicht ohne Informationsverlust abbilden kann. Dokumentierte, minimale
+  Abweichung (Docstring in `pricing.py`).
+
+### Verifiziert
+- `pytest phase9_universe/tests -v` → **34 passed** (19 store + 15 pricing).
+- Import-Isolation erneut bestätigt (0 cross-phase Leaks); `grep -rn "import anthropic"
+  phase9_universe/universe/` → 0 Treffer (Grep-Assertion aus der Test-Konvention erfüllt).
+- Volle Regression unverändert grün: P1 52 · P2 76 · P3 73 · P4 135 · P5 154 · P6 70 ·
+  P7 133 · P8 199 · root 64 · **P9 34**.
+
+### Next
+- **Step 3 — `discovery.py`:** Seed-Suchbegriff-Sweep + IG `search_markets` + Code-Filter.
+  Vor dem Bau `scripts/resolve_epics.py` als Referenznutzung + die echte `search_markets`-
+  Envelope-Form gegenlesen (Plan §14 Punkt 2 — Feldnamen `instrument_type`/`market_status`
+  sind an `search_markets` **bereits** bestätigt snake_case+gemappt, s. `ig_adapter.py:480-493`
+  oben in dieser Session gelesen).
+
+### Offene Punkte / blockers
+- Keine technischen. Der `ig_fields`-Pfad bleibt dormant bis zu einer möglichen künftigen
+  P1-Erweiterung (kein Blocker für Steps 3–5, die den Namens-/lot_size-Pfad nutzen).
 
 ---
 

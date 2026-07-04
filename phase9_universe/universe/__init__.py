@@ -24,6 +24,7 @@ from .models import (
     STATUS_VERIFIED,
     UniverseRecord,
 )
+from .pricing import confirm_curated, resolve_point_value
 from .store import UniverseStore
 
 __all__ = [
@@ -42,4 +43,6 @@ __all__ = [
     "POINT_VALUE_SOURCE_CURATED_CONFIRMED",
     "UniverseRecord",
     "UniverseStore",
+    "resolve_point_value",
+    "confirm_curated",
 ]
