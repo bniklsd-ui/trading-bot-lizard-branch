@@ -82,6 +82,11 @@ def record_cycle(
         "reason": reason,
         "abort_detail": abort_detail,
     }
+    _append(path, record)
+
+
+def _append(path: str, record: dict[str, Any]) -> None:
+    """Shared fail-soft JSONL append (see module docstring: plain append, never atomic)."""
     try:
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -89,6 +94,47 @@ def record_cycle(
             f.write(json.dumps(record) + "\n")
     except OSError:
         logger.critical("failed to append observability record to %s", path, exc_info=True)
+
+
+def record_event(path: str, event: dict[str, Any]) -> None:
+    """Append an arbitrary event dict to the same log (Phase 9 / V2 Step 6).
+
+    The generic sibling of :func:`record_cycle`'s fixed per-cycle schema — for the
+    provider-chain (``bar_fetch``), circuit-breaker (``circuit_open``), divergence
+    (``quote_divergence``), and universe (``universe_*``) event types the Plan's
+    Cross-Phase-Edit-Register calls for. ``event`` must carry its own ``"event"``
+    key (the caller decides the shape); a ``ts`` is stamped here if the caller did
+    not already supply one. Same fail-soft discipline as :func:`record_cycle` — a
+    write failure is logged ``critical`` and swallowed, never raised.
+    """
+    record = dict(event)
+    record.setdefault("ts", datetime.now().isoformat())
+    _append(path, record)
+
+
+# -- divergence check (Phase 9 / V2 Step 6) -----------------------------------
+# Deterministic, gates nothing (root rule 3) — a diagnostic cross-check between the
+# IG-bar close (the momentum VETO's actual data source) and yFinance's last price
+# (the ~15-min-delayed research signal), never the other way around.
+
+def compute_divergence_pct(ig_close: float, yf_last: float) -> float:
+    """``abs(ig_close - yf_last) / ig_close * 100`` — undefined (0.0) if ``ig_close`` is 0."""
+    if ig_close == 0:
+        return 0.0
+    return abs(ig_close - yf_last) / abs(ig_close) * 100.0
+
+
+def check_divergence(
+    epic: str, ig_close: float, yf_last: float, *, threshold_pct: float = 0.5
+) -> dict[str, Any] | None:
+    """Return a ``quote_divergence`` event dict if the two sources disagree beyond
+    ``threshold_pct``, else ``None`` (no event — the common case). Pure, no I/O; the
+    caller passes the result to :func:`record_event` if not ``None``.
+    """
+    pct = compute_divergence_pct(ig_close, yf_last)
+    if pct <= threshold_pct:
+        return None
+    return {"event": "quote_divergence", "epic": epic, "pct": pct}
 
 
 def iter_records(path: str) -> Iterator[dict[str, Any]]:

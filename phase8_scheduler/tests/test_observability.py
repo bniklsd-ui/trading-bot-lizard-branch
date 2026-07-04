@@ -151,3 +151,74 @@ def test_iter_records_skips_malformed_trailing_line(
 def test_exported_from_package_root() -> None:
     """``from scheduler import observability`` is the same module object."""
     assert exported_observability is observability
+
+
+# -- record_event (Phase 9 / V2 Step 6 — the generic sibling) ----------------
+
+
+def test_record_event_appends_valid_jsonl(tmp_path) -> None:
+    path = str(tmp_path / "state" / "research_health.jsonl")
+    observability.record_event(path, {"event": "bar_fetch", "provider": "ig", "epic": "X", "ok": True})
+    lines = open(path, encoding="utf-8").read().splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["event"] == "bar_fetch"
+    assert record["provider"] == "ig"
+    assert "ts" in record  # stamped, since the caller didn't supply one
+
+
+def test_record_event_preserves_caller_supplied_ts(tmp_path) -> None:
+    path = str(tmp_path / "research_health.jsonl")
+    observability.record_event(path, {"event": "circuit_open", "ticker": "^FCHI", "ts": "2026-01-01T00:00:00Z"})
+    record = json.loads(open(path, encoding="utf-8").read().splitlines()[0])
+    assert record["ts"] == "2026-01-01T00:00:00Z"
+
+
+def test_record_event_shares_the_same_log_as_record_cycle(tmp_path) -> None:
+    path = str(tmp_path / "research_health.jsonl")
+    observability.record_cycle(
+        path, ts=datetime(2026, 7, 2, 9, 0, tzinfo=timezone.utc),
+        context_health={}, picked=False, n=0, reason="LLM_ABSTAIN", abort_detail=None,
+    )
+    observability.record_event(path, {"event": "universe_activated", "epic": "Y"})
+    lines = open(path, encoding="utf-8").read().splitlines()
+    assert len(lines) == 2
+    assert "reason" in json.loads(lines[0])
+    assert json.loads(lines[1])["event"] == "universe_activated"
+
+
+def test_record_event_write_failure_is_fail_soft(tmp_path, caplog: pytest.LogCaptureFixture) -> None:
+    blocked = tmp_path / "not_a_dir"
+    blocked.write_text("i am a file, not a directory")
+    path = str(blocked / "research_health.jsonl")
+    with caplog.at_level(logging.CRITICAL, logger="scheduler.observability"):
+        observability.record_event(path, {"event": "bar_fetch"})  # must not raise
+    assert any(r.levelno == logging.CRITICAL for r in caplog.records)
+
+
+# -- divergence check (Phase 9 / V2 Step 6) ----------------------------------
+
+
+def test_compute_divergence_pct_identical_is_zero() -> None:
+    assert observability.compute_divergence_pct(100.0, 100.0) == 0.0
+
+
+def test_compute_divergence_pct_computes_correctly() -> None:
+    assert observability.compute_divergence_pct(100.0, 101.0) == pytest.approx(1.0)
+
+
+def test_compute_divergence_pct_zero_ig_close_is_zero_not_a_crash() -> None:
+    assert observability.compute_divergence_pct(0.0, 50.0) == 0.0
+
+
+def test_check_divergence_under_threshold_returns_none() -> None:
+    assert observability.check_divergence("EPIC", 100.0, 100.4, threshold_pct=0.5) is None
+
+
+def test_check_divergence_over_threshold_returns_event() -> None:
+    event = observability.check_divergence("EPIC", 100.0, 101.0, threshold_pct=0.5)
+    assert event == {"event": "quote_divergence", "epic": "EPIC", "pct": pytest.approx(1.0)}
+
+
+def test_check_divergence_exactly_at_threshold_is_not_an_event() -> None:
+    assert observability.check_divergence("EPIC", 100.0, 100.5, threshold_pct=0.5) is None

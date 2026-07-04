@@ -58,3 +58,20 @@ class RateLimitError(ExternalDataError):
 
     code = "RATE_LIMIT"
     retryable = True
+
+
+class CircuitOpenError(ExternalDataError):
+    """The per-ticker circuit breaker is open — no network call was even attempted.
+
+    Phase 9 (V2) Step 6: the structural answer to a ticker that fails
+    persistently (the ``^FCHI``/``^IBEX`` intermittency this arc kept
+    resurfacing) — after ``open_after`` consecutive failures the fetcher stops
+    hammering that symbol for ``cooldown_s``, degrading immediately instead of
+    spending another retry budget on a symbol that is currently unhealthy.
+    Same ``ExternalDataError`` family as :class:`DataUnavailableError`, so every
+    existing ``except ExternalDataError`` caller (``get_brain_context``'s
+    ``field_errors``) degrades gracefully with zero changes.
+    """
+
+    code = "CIRCUIT_OPEN"
+    retryable = True

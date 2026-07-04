@@ -34,13 +34,14 @@ from __future__ import annotations
 import logging
 import time as _time
 from datetime import timedelta
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from . import indicators, timeutil
 from .cache import FileCache
-from .exceptions import DataUnavailableError, ExternalDataError, RateLimitError
+from .exceptions import CircuitOpenError, DataUnavailableError, ExternalDataError, RateLimitError
 from .market_hours import is_market_open
 from .models import (
     BrainContext,
@@ -164,6 +165,55 @@ def _fetch_with_retry(
 
     # Unreachable: the loop either returns or raises on the last attempt.
     raise DataUnavailableError(f"no usable data for {symbol!r}", retryable=True)
+
+
+class _TickerCircuit:
+    """Per-symbol circuit breaker (Phase 9 / V2 Step 6 — the structural answer to a
+    ticker that fails persistently, e.g. the ``^FCHI``/``^IBEX`` intermittency the
+    v1.5/v1.6 hotfix arc kept tolerating rather than fixing).
+
+    After ``open_after`` **consecutive** failures for a symbol, the circuit opens:
+    further calls degrade immediately (no network attempt) for ``cooldown_s``. Once
+    the cooldown elapses the circuit is half-open — the next call is a real probe;
+    success closes it (fail count resets to 0), another failure reopens it with a
+    fresh cooldown window. A healthy symbol never touches this class's counters
+    beyond an occasional reset-to-0.
+
+    Time comes from an injected ``now_fn`` (default ``time.monotonic``) so tests
+    never sleep for real ``cooldown_s`` seconds.
+    """
+
+    def __init__(
+        self,
+        *,
+        open_after: int = 4,
+        cooldown_s: float = 900.0,
+        now_fn: Callable[[], float] = _time.monotonic,
+    ) -> None:
+        self._open_after = open_after
+        self._cooldown_s = cooldown_s
+        self._now_fn = now_fn
+        self._fail_counts: dict[str, int] = {}
+        self._opened_at: dict[str, float] = {}
+
+    def is_open(self, symbol: str) -> bool:
+        """Whether ``symbol`` is currently circuit-open (degrade without a call)."""
+        opened = self._opened_at.get(symbol)
+        if opened is None:
+            return False
+        if self._now_fn() - opened >= self._cooldown_s:
+            return False  # cooldown elapsed -> half-open, let the next call probe
+        return True
+
+    def record_success(self, symbol: str) -> None:
+        self._fail_counts[symbol] = 0
+        self._opened_at.pop(symbol, None)
+
+    def record_failure(self, symbol: str) -> None:
+        count = self._fail_counts.get(symbol, 0) + 1
+        self._fail_counts[symbol] = count
+        if count >= self._open_after:
+            self._opened_at[symbol] = self._now_fn()
 
 
 # -- (de)serialisation between DataFrames and cacheable records ----------------
@@ -301,15 +351,29 @@ class MarketDataFetcher:
         ticker_mapper: TickerMapper,
         cache: FileCache,
         rate_limiter: RateLimiter | None = None,
+        circuit: "_TickerCircuit | None" = None,
+        bar_provider: Any | None = None,
     ) -> None:
         """Args:
         ticker_mapper: Resolves IG epics to yFinance symbols (+ volume proxies).
         cache: On-disk TTL cache for serialised bars.
         rate_limiter: Optional shared limiter; a 0.5 s default is used if omitted.
+        circuit: Optional per-symbol circuit breaker (Phase 9 / V2 Step 6); a
+            default (``open_after=4``, ``cooldown_s=900``) is created if omitted —
+            on by default, since a healthy symbol never trips it (mirrors the
+            ``rate_limiter`` default pattern). Pass one explicitly to share state
+            across fetcher instances or to inject a fake ``now_fn`` in tests.
+        bar_provider: Optional ``providers.BarProvider`` (Phase 9 / V2 Step 6,
+            typically a ``ChainedBarProvider``) that ``get_bars`` delegates to
+            when set. Default ``None`` ⇒ ``get_bars`` uses the original yFinance
+            path unchanged (bit-identical). The off-hours guard stays here
+            regardless (not duplicated per-provider).
         """
         self._mapper = ticker_mapper
         self._cache = cache
         self._rate_limiter = rate_limiter or RateLimiter()
+        self._circuit = circuit or _TickerCircuit()
+        self._bar_provider = bar_provider
 
     # -- core fetch+cache helper ------------------------------------------
 
@@ -324,8 +388,11 @@ class MarketDataFetcher:
     ) -> list[dict]:
         """Return cached records for ``symbol``/``resolution`` or fetch + cache them.
 
-        A cache hit returns immediately (no network). A miss waits on the rate
-        limiter, fetches with retry, serialises and caches the result.
+        A cache hit returns immediately (no network). A miss checks the circuit
+        breaker first (open → :class:`CircuitOpenError`, no network attempt), then
+        waits on the rate limiter, fetches with retry, serialises and caches the
+        result. A successful fetch resets the circuit; ``DataUnavailableError``/
+        ``RateLimitError`` count toward it.
         """
         key = self._cache.make_key(symbol, resolution, _today_berlin_str())
         cached = self._cache.get(key)
@@ -333,9 +400,18 @@ class MarketDataFetcher:
             log.debug("cache hit %s", key)
             return cached
 
+        if self._circuit.is_open(symbol):
+            log.warning("circuit open for %s — degrading without a network attempt", symbol)
+            raise CircuitOpenError(f"circuit open for {symbol!r} — degraded, no call attempted")
+
         log.debug("cache miss %s — fetching", key)
         self._rate_limiter.wait()
-        df = _fetch_with_retry(symbol, period=period, interval=interval, min_expected=min_expected)
+        try:
+            df = _fetch_with_retry(symbol, period=period, interval=interval, min_expected=min_expected)
+        except (DataUnavailableError, RateLimitError):
+            self._circuit.record_failure(symbol)
+            raise
+        self._circuit.record_success(symbol)
         records = _df_to_records(df)
         self._cache.set(key, records, _ttl_for_resolution(resolution))
         return records
@@ -362,9 +438,21 @@ class MarketDataFetcher:
         Intraday resolutions are off-hours guarded → ``None`` when the market is
         closed (concept §17.2; reconciles the §11 ``list[PriceBar]`` signature, which
         did not account for the off-hours discipline). A ``1d`` resolution always runs.
+
+        Phase 9 (V2) Step 6: when a ``bar_provider`` was injected at construction,
+        delegates to it instead of the yFinance path below (the off-hours guard
+        still applies here, uniformly, rather than being duplicated per-provider).
+        Default (``bar_provider=None``) keeps this method's original order
+        (map epic → yf symbol, *then* the off-hours check) exactly unchanged.
         """
-        symbol = self._mapper.epic_to_yf(epic)
         intraday = _is_intraday_resolution(resolution)
+        if self._bar_provider is not None:
+            if intraday and not is_market_open():
+                log.info("market closed, skipping intraday bars for %s", epic)
+                return None
+            return self._bar_provider.get_bars(epic, resolution=resolution, count=count)
+
+        symbol = self._mapper.epic_to_yf(epic)
         if intraday and not is_market_open():
             log.info("market closed, skipping intraday bars for %s", symbol)
             return None

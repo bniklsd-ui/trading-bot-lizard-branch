@@ -103,6 +103,26 @@ single network point.
 > separate, unrelated hygiene fix — not a fix for the live failure. Detail:
 > `docs/concepts/phase8_v1.6_hotfix_plan.md` Step 3 + `phase8_scheduler/CLAUDE.md`.
 
+> 🔁 **Phase-9 (V2) additive edit (2026-07-04, Step 6 — BarProvider chain + circuit
+> breaker + divergence check, code = source of truth):** new `CircuitOpenError`
+> (`exceptions.py`, same `ExternalDataError` family as `DataUnavailableError` — every
+> existing `except ExternalDataError` caller, e.g. `get_brain_context`'s
+> `field_errors`, degrades gracefully with zero changes). `fetcher.py` gained a
+> per-symbol `_TickerCircuit` (on by default, `open_after=4`/`cooldown_s=900`,
+> injectable `now_fn`) wired into `_get_records` — no existing behaviour changes for
+> a healthy symbol. **The plan's requested backoff already existed** (`_fetch_with_retry`,
+> exp. 1s→2s→4s) — not duplicated, only the circuit (the actual gap) was added. New
+> `providers.py`: `BarProvider` Protocol + `IGBarProvider`/`YFinanceBarProvider`/
+> `ChainedBarProvider` (first non-`None` wins, `health_sink` events). `fetcher.py`'s
+> constructor gained an additive `bar_provider: Any | None = None` — `get_bars()`
+> delegates to it when set, default `None` = the original yFinance-only path,
+> bit-identical order. **Deliberately not wired into production** (`scripts/wiring.py`
+> in P4/P8 still build the daemon without a `bar_provider` — flipping the live research
+> data path to prefer IG bars is a separate, later activation decision, mirroring the
+> plan's own caution for the Step-7 `LiveQuoteCache` flag). +27 tests (**73 → 100**:
+> 9 `test_circuit.py`, 18 `test_providers.py`). Detail: `phase9_universe/CLAUDE.md` →
+> `## Session stopped` (Step 6).
+
 ## ⚠ Phase-5 momentum-VETO flag (cross-phase notice)
 
 The concept (§13) explicitly states: a **hard momentum VETO in Phase 5 must

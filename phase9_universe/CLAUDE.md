@@ -153,6 +153,89 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 
 ---
 
+## Session stopped — 2026-07-04 (Step 6: V2b-i BarProvider-Kette + Circuit-Breaker + Divergenz-Check — abgeschlossen)
+
+> **Auslöser:** direkte Fortsetzung nach Step 5, gleiche Session, Auto-Modus. Erster
+> V2b-Step (Daten-Input-Zuverlässigkeit) — alles in P3 (`external_data`) + P8
+> (`observability.py`), additiv, Default-Pfad bit-identisch.
+
+### Reconciliation (Code = Wahrheit — vor dem Bau verifiziert)
+- **Backoff existierte bereits.** Der Plan verlangte einen `_with_backoff`-Helper um
+  die rohen yfinance-Calls — `fetcher.py` hat das **schon**: `_fetch_with_retry`
+  (exponentiell 1s→2s→4s, ≤3 Versuche, unterscheidet Rate-Limit vs. leer/kurz).
+  Keine Duplikation gebaut, nur der **Circuit-Breaker** (der echte Lückenschluss)
+  kam neu dazu.
+
+### Completed
+- **`external_data/exceptions.py`:** neue `CircuitOpenError(ExternalDataError)` —
+  gleiche Familie wie `DataUnavailableError`/`RateLimitError`, degradiert also
+  automatisch überall dort, wo schon `except ExternalDataError` steht
+  (`get_brain_context`'s `field_errors`), ohne einen einzigen Call-Site anzufassen.
+- **`fetcher.py`:** neue `_TickerCircuit`-Klasse (per-Symbol, `open_after=4`,
+  `cooldown_s=900`, injizierbarer `now_fn` — kein echtes Sleep in Tests). In
+  `_get_records` verdrahtet: offen → sofortiger `CircuitOpenError` **ohne**
+  Netz-Versuch; Erfolg → Reset; `DataUnavailableError`/`RateLimitError` → Failure
+  gezählt. **On-by-Default** (mirrort das `RateLimiter`-Default-Muster — ein
+  gesundes Symbol trippt ihn nie, kein bestehender Test simuliert 4 konsekutive
+  Fails). **+9 Tests** (`test_circuit.py`).
+- **`fetcher.py` (additiv):** neuer Konstruktor-Parameter `bar_provider: Any | None
+  = None`. `get_bars()` delegiert an ihn, wenn gesetzt (Off-Hours-Guard bleibt
+  **im Fetcher**, nicht dupliziert pro Provider); Default `None` → exakt der
+  ursprüngliche yFinance-Pfad, **Reihenfolge unverändert** (erst `epic_to_yf`,
+  dann Off-Hours-Check — bit-identisch für jeden bestehenden Aufrufer).
+- **`external_data/providers.py`** (neu): `BarProvider`-Protocol,
+  `IGBarProvider` (mapped IG-`get_ohlcv`-Envelopes → `PriceBar`, Resolution-Map
+  `5m→MINUTE_5` etc., nie ein Crash — jeder Fehlerpfad → `None`), `YFinanceBarProvider`
+  (delegiert an einen injizierten Fetcher, kein Re-Implement), `ChainedBarProvider`
+  (erster Non-`None` gewinnt, `health_sink`-Events `{"event":"bar_fetch","provider":
+  ...,"epic":...,"ok":bool}`, fail-soft bei Provider- **und** Sink-Exceptions).
+  **+18 Tests** (`test_providers.py`).
+- **`phase8_scheduler/scheduler/observability.py`:** neue generische
+  `record_event(path, event)` (Geschwister zu `record_cycle`s festem Schema — für
+  `bar_fetch`/`circuit_open`/`quote_divergence`/`universe_*`, teilt sich denselben
+  Log via einem extrahierten `_append`-Helper) + `compute_divergence_pct`/
+  `check_divergence` (reine Funktionen, `> 0.5% Default-Schwelle` → ein
+  `quote_divergence`-Event, sonst `None` — gated nichts, root rule 3). **+10 Tests**.
+
+### ⚠ Bewusst NICHT in dieser Session: Wiring-Aktivierung
+Die Kette (`ChainedBarProvider`) ist **gebaut + vollständig getestet**, aber
+**noch nicht** in `phase4_research/scripts/wiring.py` / `phase8_scheduler/scripts/
+wiring.py` verdrahtet (der Live-Daemon nutzt weiterhin ausschließlich den
+yFinance-Pfad für `get_bars`). Begründung: das Umschalten des tatsächlichen
+Research-Datenpfads (IG-Echtzeit-Bars statt yFinance) ist eine Live-Verhalten-
+Entscheidung mit realer Trading-Relevanz — dieselbe Vorsicht, die der Plan selbst
+für Step 7s `LiveQuoteCache`-Flag vorschreibt ("default aus, Wiring schaltet erst
+nach 7a/7b-PASS an"). Aktivierung bleibt ein bewusster, separater Schritt (Nikinger-
+Entscheidung), sobald gewünscht — der Fetcher-Konstruktor nimmt `bar_provider`
+bereits entgegen, es fehlt nur der Wiring-Aufruf, der ihn tatsächlich baut+übergibt.
+
+### Verifiziert
+- `pytest phase3_external_data/tests -q` → **100 passed** (73 + 27: 9 circuit +
+  18 providers). `pytest phase8_scheduler/tests -q` → **215 passed** (205 + 10).
+- Import-Isolation: `import external_data` zieht weiterhin **NONE** cross-phase
+  (broker_wrapper/persistence/universe/research/execution/reward/debate/scheduler/
+  anthropic — alle abwesend, `providers.py`s `IGBarProvider`/`ChainedBarProvider`
+  sind rein duck-typed, kein `broker_wrapper`-Import nötig).
+- Volle Regression: P1 52 · P2 76 · **P3 100 (+27)** · P4 141 · P5 154 · P6 70 ·
+  P7 133 · **P8 215 (+10)** · root 64 · P9 67. `py_compile` clean auf allen
+  berührten Dateien.
+
+### Next
+- **Step 7 — V2b-ii: Lightstreamer Multi-Epic (Diagnose → Fix → LiveQuoteCache).**
+  7a (Diagnose-Harness `scripts/diag_lightstreamer_multi.py`) ist ein **Operator-
+  Live-Lauf** — kann nicht von Claude Code allein abgeschlossen werden (braucht
+  echte IG-Demo-Verbindung während der Handelszeiten). 7b (Fix + `LiveQuoteCache`)
+  folgt erst **nach** 7a-PASS.
+- Danach Step 8 (Operator-Live-Runs: Autonomie-Beweis + Breaker-Fire).
+
+### Offene Punkte / blockers
+- **Step 7a braucht den Nikinger** (Live-Lauf gegen IG-Demo während Handelszeiten
+  Mo–Fr 08:00–22:30 CET). Bis dahin kann der 7a-Diagnose-Harness selbst gebaut
+  werden (reines Script, kein Fix), aber nicht ausgeführt/ausgewertet.
+- Die Wiring-Aktivierung von Step 6 (s. o.) bleibt eine offene Nikinger-Entscheidung.
+
+---
+
 ## Session stopped — 2026-07-04 (Step 5: P4/P8-Integration — abgeschlossen)
 
 > **Auslöser:** direkte Fortsetzung nach Step 4, gleiche Session, Auto-Modus. Der erste
