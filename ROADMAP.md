@@ -275,48 +275,119 @@ weiterlaufenden Betriebs, ist aber **nicht** Bedingung dieses ✅-Flips (der dec
 
 > 📌 **2026-07-03:** [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md)
 > closes out Phase 8 (written before the ✅ flip above landed; still the fuller writeup of the
-> v1.5–v1.7 arc) and proposes reframing Phase 9 below into V2 (autonomous epic research + reliable
-> lightstreamer/yfinance data-input — the yFinance intermittency noted above is its trigger) → V3
-> (DB reform + no-trade lessons + UI) → V4 (the current 9a–9f, deferred) — input for the next
-> browser planning session. **Not yet applied here**; reshaping this Phase 9 section is itself
-> deferred to that track's housekeeping step.
+> v1.5–v1.7 arc) and proposed reframing the old Phase 9 into V2 (autonomous epic research +
+> reliable lightstreamer/yfinance data-input) → V3 (DB reform + no-trade lessons + UI) → V4 (the
+> old 9a–9f, deferred). **The reshape below applies that proposal** — done as the initial
+> housekeeping step of the V2 track (2026-07-03), per a detailed execution plan from a browser
+> planning session: [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md).
 
 ---
 
-## Phase 9 — V2 Erweiterungen
+## Phase 9 — V2: Foundation (Autonome Epic-Research + Daten-Input-Zuverlässigkeit)
+
+> **Status: in Arbeit.** Reshape aus dem alten Phase-9-Block (s. Pointer oben) — noch nicht in
+> Claude Code gestartet, Ausführungsplan liegt vor:
+> [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md).
+> Neues Paket: `phase9_universe/` *(pkg `universe`)* — Skeleton:
+> [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md).
+
+**Goal:** die zwei strukturellen Lücken schließen, die den gesamten v1.5→v1.7-Hotfix-Arc
+getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 11/V4)
+auf einem unzuverlässigen Datenfundament aufbaut.
+
+### 9a — Autonome Epic-Research (discover → validate → promote)
+- [ ] `discovery.py` — Seed-Suchbegriff-Sweep + IG `search_markets` + Code-Filter (EUR, Index-CFD,
+  TRADEABLE, Kassa-Variante, min size) — kein LLM
+- [ ] `pricing.py` — deterministischer `point_value`-Resolver (IG-Felder + Namens-/lot_size-Kreuzcheck)
+- [ ] `promotion.py` — Statusmaschine `discovered → verified → active` voll autonom auf Demo;
+  Auto-Demotion (`active → quarantined`) bei wiederholten IG-Verify-Fails
+- [ ] Migration 004 (`instrument_universe`) + `UniverseStore`; `EXTENDED_UNIVERSE` wird einmaliger
+  Seed (`source="curated"`)
+- [ ] P4 liest das aktive DB-Universum; P8-Runner bekommt eine Universe-Refresh-Naht
+
+### 9b — Daten-Input-Zuverlässigkeit
+- [ ] `BarProvider`-Kette IG→yFinance + yFinance-Härtung (Backoff, Circuit-Breaker)
+- [ ] Deterministischer Divergenz-Check (IG-Bar-Close vs. yFinance-Last), gated nichts
+- [ ] Lightstreamer-Multi-Epic-Diagnose (heute nur 1 Epic live bewiesen) → Fix → `LiveQuoteCache`
+  in den P4-Research-Kontext verdrahtet (Momentum-VETO bleibt unangetastet auf P1-IG-Bars)
+
+**Leitplanke:** kein neues AI im Daten-/Universum-Layer (Discovery-/Promotion-Kriterien sind
+100 % code-evaluiert); VETOs/Gates unangetastet; demo-only fail-closed.
+
+**Done when:** mindestens ein net-new Epic durchläuft `discovered → verified → active` ohne
+manuellen Code-Edit und erscheint im nächsten Research-Zyklus; ein Safety-Breaker feuert live
+(carried-over 5b aus dem v1.5-Plan); STXE/CAC/IBEX-`point_value` wird per Code bestätigt oder
+ehrlich quarantänisiert.
+
+**Directory:** `phase9_universe/` *(pkg `universe`)*
+**Plan:** [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md)
+
+---
+
+## Phase 10 — V3: Persistenz-Reform + No-Trade-Lessons + (optionales) UI
+
+> **Status: geplant, gegatet auf Phase 9.** Noch keine Konzept-Session — Vorschlag im
+> Phase-8-Closeout-Handover §5.
+
+**Goal:** die aktuellen SQLite-V2-Erweiterungen bauen + „warum tradet der Bot nicht" zu einem
+lernbaren Signal machen, nicht nur einem verworfenen Reason-Code.
+
+### 10a — SQLite V2 Extensions
+- [ ] `+ market_regime_snapshots` (volatility, spread, time per trade) — seit Phase 2 leerer Platzhalter
+- [ ] `+ decision_context` (Bull/Bear-Argumente, VETO-Faktoren, Confidence-Kurve) — seit Phase 2 leerer Platzhalter
+- [ ] `+ lesson_embeddings` (vector store, semantic similarity) — optional/später
+
+### 10b — No-Trade (Abstain) Lessons
+- [ ] P8 `research_tick.py`s reservierte `REASON_EMPTY_UNIVERSE`/`REASON_VALIDATOR_REJECT`/
+  `REASON_FILTER_FAIL`-Taxonomie tatsächlich befüllen (P4 muss den feineren Grund melden)
+- [ ] `reflect()` (P7) auf ABSTAIN-Zyklen erweitern — die bereits vorhandene, aber ungenutzte
+  Abstain-Prosa (`Research.last_no_pick_reasoning`, `SchedulerState.last_no_trade_detail`)
+  persistieren + reflektieren, Lessons zurück in den Prompt (mirror des Closed-Trade-Loops)
+
+### 10c — UI-Erweiterungen (optional, niedrigere Priorität als 10a/10b)
+- [ ] Aufbauend auf dem v1.6-Observability-Log + dem v1.7-DB-gespeisten Status
+
+**Done when:** Abstain-Zyklen erzeugen genauso Lessons wie geschlossene Trades; `decision_context`/
+`market_regime_snapshots` sind befüllt statt leer.
+
+**Directory:** *(noch nicht angelegt)*
+
+---
+
+## Phase 11 — V4: Sophisticated / Optional *(die alte Phase 9, deferred)*
+
+> **Status: deferred, gegatet auf Phase 9+10 UND reale Outcomes** (unverändert aus der
+> ursprünglichen Phase-9-Formulierung — nur numerisch verschoben, kein Inhalt geändert).
 
 **Goal:** Implement the V2 improvements identified in the Council analysis.
 
-### 9a — Council Skill Integration
+### 11a — Council Skill Integration *(vormals 9a)*
 - [ ] Integrate `verbesserungsvorschlaege` as structured input to pipeline
 - [ ] Trigger detection for ad-hoc strategy evaluation
 
-### 9b — Handover-Logik (Bull/Bear/Judge)
+### 11b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b)*
 - [ ] Context-window monitoring during debate (~60–70 %)
 - [ ] Compression of Bull/Bear/Judge state into summary
 - [ ] New session continuation
 
-### 9c — SQLite V2 Extensions
-- [ ] `+ market_regime_snapshots` (volatility, spread, time per trade)
-- [ ] `+ decision_context` (Bull/Bear args, VETO factors, confidence curve)
-- [ ] `+ lesson_embeddings` (vector store, semantic similarity) — optional/later
-
-### 9d — Reward/Punishment Reform
+### 11c — Reward/Punishment Reform *(vormals 9d)*
 - [ ] `+ process_quality_score` (VETOs, confidence, debate quality, gate path)
 - [ ] Anti-emotionality: separate process score from outcome score
 
-### 9e — Force Trigger Safeguard
-- [ ] Lock force trigger when daily PNL < 0
+### 11d — Force Trigger Safeguard *(vormals 9e)*
+- [ ] Lock force trigger when daily PNL < 0 — das P2-Schema-Feld `force_trigger_locked` existiert
+  bereits seit Phase 2, wird aber von keiner Funktion durchgesetzt (kein Force-Trigger existiert
+  bisher überhaupt)
 
-### 9f — Instinct-Promotion (ECC) + Longterm VETO *(aus Phase 7 hierher verschoben)*
+### 11e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f, aus Phase 7 hierher verschoben)*
 - [ ] AI extrahiert strukturierte Instincts (`trigger` / `domain` / `confidence` / `evidence_trade_ids`) aus P7 `trade_lessons` + `reward_pts`
 - [ ] Code **validiert** Instincts gegen reale Outcomes; bewährte werden zu **deterministischen Regeln promotet** (`longterm_pre_trade_check()` VETO), mit Prune→Archiv der widerlegten
 - [ ] **Harte Leitplanke:** Promotion in die VETO-Schicht **nur** über einen deterministischen / menschlich gegateten Schritt — eine promotete Regel wird deterministischer Code, die AI sitzt nie in der VETO-Auswertung. Gegatet auf reale Outcomes (≫ `n_min`)
 
-**Done when:** All V2 changes operational, bot demonstrates improved learning signal (process-score
+**Done when:** All V4 changes operational, bot demonstrates improved learning signal (process-score
 divergence from outcome-score on bad-market days).
 
-**Directory:** `phase9_v2/` *(to be created)*
+**Directory:** `phase11_v4/` *(to be created)*
 
 ---
 

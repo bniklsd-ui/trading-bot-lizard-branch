@@ -20,6 +20,13 @@
 > in scope). Next track: a proposed V2/V3/V4 reframe (autonomous epic research + reliable
 > lightstreamer/yfinance data input first) — see
 > [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md).
+>
+> **Update (2026-07-03): the V2/V3/V4 reframe is applied.** `ROADMAP.md`'s Phase 9 is now the V2
+> foundation track (autonomous epic research + data-input reliability); Phase 10 = V3
+> (persistence reform + no-trade lessons + UI); Phase 11 = V4 (the old Phase 9's sophisticated/
+> optional items, unchanged content, renumbered). Execution plan:
+> [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md).
+> New package skeleton: [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md).
 
 ---
 
@@ -63,17 +70,17 @@
                               ↓                                           ↓
                               └────────────→ SQLITE (P2) ←────────────────┘
                                             trade_outcomes / reward_pts /
-                                            trade_lessons (V2: market_regime_
+                                            trade_lessons (V3/P10: market_regime_
                                             snapshots / decision_context /
-                                            lesson_embeddings — future, P9)
+                                            lesson_embeddings — future)
 
 ┌────────────────────────────────────────────────────────────────────┐
 │  SCHEDULER (P8) — unsupervised daemon driving the cycle above on a  │
 │  market-hours loop: auto-confirm, file kill-switch, daily-loss      │
 │  breaker, token budget, idempotent reconcile, read-mostly web UI.   │
-│  🟡 code-complete, v1.5+v1.6+v1.7 merged — first net-new autonomous │
-│  trade proven live (2026-07-02); quality-data run + breaker-trip    │
-│  proof still in progress, no final ✅ flip yet                      │
+│  ✅ live-verified (2026-07-03) — two net-new autonomous trades AND  │
+│  a safety breaker (token budget) actually tripping live, both       │
+│  Nikinger-confirmed. Mechanics only — no edge/profitability claim.  │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -90,7 +97,10 @@
 ### 5-Gate Pipeline (`execution/gates.py` + `execution/sizing.py`, `ig_bot.py` orchestrator)
 1. **Gate 1: Time Window** — `09:00`–`17:30` (`config.tz`, full market window)
 2. **Gate 2: Load Candidates** — fresh `turbo_candidates.json` (frozen legacy filename, TTL
-   30 min); runs research if stale/empty
+   30 min); runs research if stale/empty. Research (P4) picks per-epic across a curated
+   4-instrument EUR universe (`EXTENDED_UNIVERSE`: DAX, Euro Stoxx 50, CAC 40, IBEX 35 —
+   v1.5, `research/models.py`); Phase 9/V2 replaces this hand-curated tuple with an
+   autonomous discover→validate→promote pipeline (planned, not yet built)
 3. **Gate 3: Constraints** — budget available, room under `max_parallel_positions`
 4. **Gate 4: Sizing** (`sizing.py`) — **risk-per-trade ÷ stop-distance** (not notional ÷ price;
    v1-tunable `risk_pct`)
@@ -125,7 +135,7 @@
   free-text lesson (language only — no number/score/decision); failures never break the close path
 - **Confidence** (Wilson lower-bound / expectancy-R / N-min) is **observe-only** — it does not
   gate `risk_pct` or anything else in v1. Promotion to an actual VETO ("Instinct→VETO ECC") is
-  deferred to **Phase 9f**, gated on real outcomes
+  deferred to **Phase 11e (V4)**, gated on real outcomes **and** on Phase 9/10 (V2/V3) landing first
 - **No VETO touch.** Reward/lessons sit entirely downstream of order execution
 
 ### Scheduler (Phase 8 — ✅ live-verified 2026-07-03, v1.5+v1.6+v1.7 merged)
@@ -155,14 +165,18 @@
   current state.
 
 ### Dual State
-- **SQLite (persistent):** `trade_lessons`, `trade_outcomes`, `reward_pts`,
-  `ig_config_state` + (future, P9) `market_regime_snapshots`, `decision_context`,
-  `lesson_embeddings`
+- **SQLite (persistent):** `trade_lessons`, `trade_outcomes` (migration 003 added a
+  `provenance` column — distinguishes verification/seed trades from autonomous ones in the
+  P4 research prompt, v1.6), `reward_pts`, `ig_config_state` + (future, Phase 10/V3)
+  `market_regime_snapshots`, `decision_context`, `lesson_embeddings`. Phase 9/V2 adds
+  migration 004 (`instrument_universe`, planned — not yet built).
 - **JSON (operational, TTL):** `ig_state.json` (account/positions, fresh <60s),
   `ig_config.json` (static bot config), `turbo_candidates.json` (frozen legacy name, TTL
   30 min) + later-phase runtime files (all gitignored): `llm_usage.json` (P4 token meter),
   `execution_state.json` (P5 write-ahead idempotency), `debate_log.json` (P6 audit),
-  `scheduler_state.json`/`scheduler_command.json`/`KILL` (P8 daemon state + control)
+  `scheduler_state.json`/`scheduler_command.json`/`KILL` (P8 daemon state + control),
+  `research_health.jsonl` (P8 v1.6 per-cycle/per-epic observability log — brain-context
+  health, bar-fetch/circuit/divergence events)
 
 ### Council Skill (standalone, optional)
 - 5 philosopher personas + neutral narrator (Sokrates, Machiavelli, Epiktet,
@@ -179,7 +193,7 @@
    on losing days. Recommendation: lock when daily PNL < 0 (root `CLAUDE.md`
    Hard Rule 5). The P2 schema already carries a `force_trigger_locked` flag
    (`persistence/defaults.py`), but no Force Trigger feature exists yet to
-   enforce it against — tracked for whenever manual override is built (P9+).
+   enforce it against — tracked as Phase 11d (V4), whenever manual override is built.
 2. **Score-as-emotion** — addressed by Phase 7: `reward_pts` measures process
    quality (clean exit vs. time-stop, spread tightness, debate signal)
    independently from the outcome component, instead of punishing unlucky
@@ -205,3 +219,6 @@ Per-phase concept + implementation:
 - Phase 6 — [`docs/concepts/phase6_debate_concept.md`](./docs/concepts/phase6_debate_concept.md) · [`phase6_debate/`](./phase6_debate/)
 - Phase 7 — [`docs/concepts/phase7_reward_concept.md`](./docs/concepts/phase7_reward_concept.md) · [`phase7_reward/`](./phase7_reward/)
 - Phase 8 — [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md) · [`phase8_scheduler/`](./phase8_scheduler/) · hotfix history: [`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md) · [`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.6_HANDOVER.md) · closeout + V2/V3/V4 proposal: [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md) · session journal: [`phase8_scheduler/CLAUDE.md`](./phase8_scheduler/CLAUDE.md)
+- Phase 9 (V2 — Foundation, in Arbeit) — [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md) · [`phase9_universe/`](./phase9_universe/)
+- Phase 10 (V3 — Persistence Reform + No-Trade Lessons + UI, geplant) — no concept doc yet
+- Phase 11 (V4 — Sophisticated/Optional, deferred) — no concept doc yet

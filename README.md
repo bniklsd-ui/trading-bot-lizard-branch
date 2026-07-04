@@ -21,7 +21,9 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 6     | Bull/Bear/Judge Debate              | ✅ Abgeschlossen — live-**verifiziert** (Debatte-Pfad, Demo), noch nicht profit-validiert ³ |
 | 7     | Reward/Punishment + Brain           | ✅ live-verifiziert (Demo, 2026-06-26) — `live_test.py` 5/5; 128 Unit-Tests ⁴ |
 | 8     | Scheduler                           | ✅ **live-verifiziert (2026-07-03)** — zwei autonome Trades + ein tatsächlich auslösender Safety-Breaker (Token-Budget) live bewiesen, noch nicht profit-validiert ⁵ |
-| 9     | V2 (Council, Handover, SQLite V2)   | Konzept fertig (Council standalone existiert)       |
+| 9     | V2 — Foundation (autonome Epic-Research + Daten-Zuverlässigkeit) | 🔄 in Arbeit — Ausführungsplan fertig, Build noch nicht gestartet ⁶ |
+| 10    | V3 — Persistenz-Reform + No-Trade-Lessons + UI | Geplant, gegatet auf Phase 9 (kein Konzept noch) |
+| 11    | V4 — Sophisticated/Optional (Council, Handover-Logik, Reward-Reform, Force-Trigger, Instinct-ECC) | Deferred, gegatet auf Phase 9+10 und reale Outcomes (Council standalone existiert bereits) |
 
 ¹ **Live-getestet ≠ profit-validiert.** Die Research-Pipeline läuft nachweislich
 korrekt end-to-end (IG Demo + echter LLM-Call): korrekter Kontext, contract-valider
@@ -101,6 +103,17 @@ dieses Flips). Details: `phase8_scheduler/CLAUDE.md` (Session-Journal, aktuellst
 `phase8_scheduler/PHASE8_V1.6_HANDOVER.md` (v1.5-Kontext: `PHASE8_V1.5_HOTFIX_HANDOVER.md`),
 `docs/concepts/phase8_v1.6_hotfix_plan.md`, `docs/concepts/phase8_v1.7_hotfix_plan.md`. Konzept:
 `docs/concepts/phase8_scheduler_concept.md`.
+
+⁶ **Phase 9 (V2 — Foundation), 2026-07-03: Ausführungsplan aus dem Closeout-Handover.** Zwei
+gleichgewichtete Ziele: **V2a** autonome Epic-Research als Code-Pipeline (discover → validate →
+promote, ersetzt die hand-kuratierte `EXTENDED_UNIVERSE`-Tupel ohne manuellen Code-Edit je neuem
+Instrument) und **V2b** Daten-Input-Zuverlässigkeit (BarProvider-Kette IG→yFinance mit Backoff/
+Circuit-Breaker, Lightstreamer-Multi-Epic-Diagnose → `LiveQuoteCache` in den Research-Kontext).
+**Null neues AI.** Neues Paket `phase9_universe/` (Skeleton angelegt, Steps 1–8 noch offen).
+`ROADMAP.md`s alte Phase 9 (Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC) ist jetzt
+**Phase 11 (V4)** — unverändert im Inhalt, nur numerisch verschoben und gegatet auf Phase 9+10 und
+reale Outcomes; die dazwischenliegende **Phase 10 (V3)** bündelt Persistenz-Reform + No-Trade-
+Lessons + optionales UI. Plan: [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md).
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)
