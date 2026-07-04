@@ -26,6 +26,7 @@ from .models import (
     UniverseRecord,
 )
 from .pricing import confirm_curated, resolve_point_value
+from .promotion import PromotionReport, run_promotion_cycle
 from .store import UniverseStore
 
 __all__ = [
@@ -51,4 +52,6 @@ __all__ = [
     "SEARCH_TERMS",
     "KNOWN_YF_TICKERS",
     "KNOWN_VOLUME_PROXIES",
+    "run_promotion_cycle",
+    "PromotionReport",
 ]

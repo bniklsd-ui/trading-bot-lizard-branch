@@ -212,6 +212,31 @@ def test_set_status_missing_epic_raises(store: UniverseStore):
         store.set_status("IX.D.NOPE.IFM.IP", STATUS_VERIFIED)
 
 
+def test_set_status_reset_fail_count(store: UniverseStore):
+    rec = _record(epic="IX.D.NEW.IFM.IP", status=STATUS_ACTIVE, fail_count=2)
+    store.upsert_discovered(rec)
+    store.set_status("IX.D.NEW.IFM.IP", STATUS_ACTIVE, reset_fail_count=True)
+    assert store.get("IX.D.NEW.IFM.IP").fail_count == 0
+
+
+def test_set_status_data_degraded_set_and_clear(store: UniverseStore):
+    rec = _record(epic="IX.D.NEW.IFM.IP", status=STATUS_ACTIVE, data_degraded=False)
+    store.upsert_discovered(rec)
+    store.set_status("IX.D.NEW.IFM.IP", STATUS_ACTIVE, data_degraded=True)
+    assert store.get("IX.D.NEW.IFM.IP").data_degraded is True
+    store.set_status("IX.D.NEW.IFM.IP", STATUS_ACTIVE, data_degraded=False)
+    assert store.get("IX.D.NEW.IFM.IP").data_degraded is False
+
+
+def test_set_status_default_kwargs_preserve_existing_fields(store: UniverseStore):
+    rec = _record(epic="IX.D.NEW.IFM.IP", status=STATUS_ACTIVE, fail_count=2, data_degraded=True)
+    store.upsert_discovered(rec)
+    store.set_status("IX.D.NEW.IFM.IP", STATUS_ACTIVE)
+    fetched = store.get("IX.D.NEW.IFM.IP")
+    assert fetched.fail_count == 2
+    assert fetched.data_degraded is True
+
+
 def test_set_pricing(store: UniverseStore):
     rec = _record(epic="IX.D.NEW.IFM.IP", point_value=None, point_value_source=None)
     store.upsert_discovered(rec)

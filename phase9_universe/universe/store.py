@@ -145,19 +145,38 @@ class UniverseStore:
         *,
         checks: dict | None = None,
         fail_increment: bool = False,
+        reset_fail_count: bool = False,
+        data_degraded: bool | None = None,
     ) -> None:
+        """Update status (+ optionally checks/fail_count/data_degraded) for ``epic``.
+
+        ``fail_increment`` and ``reset_fail_count`` are mutually exclusive knobs on
+        the same counter (IG-side health tracking, Konzept C3): a health-recheck
+        failure increments it toward demotion, a clean recheck resets it to 0.
+        ``data_degraded`` is an independent yFinance-side signal — it never affects
+        ``fail_count``/demotion (Decision: reduced-signal is tolerated, not
+        demotion-worthy). Leaving both at their defaults changes neither field
+        (additive, bit-identical to the pre-Step-4 behaviour for existing callers).
+        """
         existing = self.get(epic)
         if existing is None:
             raise UniverseStoreError(f"no instrument_universe row for epic={epic!r}")
         now = utc_iso_now()
-        fail_count = existing.fail_count + 1 if fail_increment else existing.fail_count
+        if reset_fail_count:
+            fail_count = 0
+        elif fail_increment:
+            fail_count = existing.fail_count + 1
+        else:
+            fail_count = existing.fail_count
+        degraded = int(data_degraded) if data_degraded is not None else (1 if existing.data_degraded else 0)
         checks_json = (
             json.dumps(checks) if checks is not None else existing.to_row()["checks_json"]
         )
         self.conn.execute(
             "UPDATE instrument_universe SET status = ?, checks_json = ?, "
-            "fail_count = ?, last_verified_at = ?, updated_at = ? WHERE epic = ?",
-            (status, checks_json, fail_count, now, now, epic),
+            "fail_count = ?, data_degraded = ?, last_verified_at = ?, updated_at = ? "
+            "WHERE epic = ?",
+            (status, checks_json, fail_count, degraded, now, now, epic),
         )
         self.conn.commit()
 

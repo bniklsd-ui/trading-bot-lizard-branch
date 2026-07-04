@@ -105,7 +105,7 @@ Konzept C3, gleiche Disziplin wie P3s Brain-Context-Degradierung).
 | `universe/store.py` | `UniverseStore` — eigene sqlite3-Connection (kein `persistence.Database`-Import, Phasen-Isolation) | ✅ (Step 1, 19 Tests) |
 | `universe/pricing.py` | Deterministischer `point_value`-Resolver (`resolve_point_value`/`confirm_curated`) | ✅ (Step 2, 15 Tests) |
 | `universe/discovery.py` | Seed-Sweep + Code-Filter (`discover`/`DiscoveryReport`) | ✅ (Step 3, 14 Tests) |
-| `universe/promotion.py` | Statusmaschine + Safety | ⬜ (Step 4) |
+| `universe/promotion.py` | Statusmaschine + Safety (`run_promotion_cycle`/`PromotionReport`) | ✅ (Step 4, 14 Tests) |
 | P4/P8-Integration | DB-Universum statt `EXTENDED_UNIVERSE`, Refresh-Naht | ⬜ (Step 5) |
 | `scripts/dev_install.sh` | `phase9_universe` in die editable-install-Kette aufgenommen | ✅ |
 
@@ -150,6 +150,79 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 `universe_refresher`-Naht default `None`, `observability.py` neue Event-Typen), Wiring
 (`scripts/wiring.py` — zentraler Cross-Phase-Konfig-Ort). **Nicht angefasst:** P5
 (Gates/VETOs/Sizing), P6 (Debatte), P7 (Reward). Null LLM-Änderungen.
+
+---
+
+## Session stopped — 2026-07-04 (Step 4: `promotion.py` — abgeschlossen)
+
+> **Auslöser:** direkte Fortsetzung nach Step 3, gleiche Session, Auto-Modus.
+
+### ⚠ Reconciliation (Code = Wahrheit, vor dem Bau verifiziert)
+- **Der Plan zitiert `phase8_scheduler/scripts/verify_instrument.py` — das Skript liegt
+  tatsächlich phasenlos im Repo-Root: `scripts/verify_instrument.py`.** Signaturen
+  (`check_ig_side(broker, epic, *, sleep_fn, pace_s)`, `check_yf_side(fetcher, epic, *,
+  volume_proxy=None)`, `verdict_for(epic, ig_checks, yf_checks)`, plus eine bereits
+  komponierte `verify_instrument(broker, fetcher, epic, *, volume_proxy=None, sleep_fn,
+  pace_s) -> dict`) stimmen exakt mit der Plan-Beschreibung überein — nur der Ordner war
+  falsch zitiert. `promotion.py` importiert die **komponierte** `verify_instrument(...)`
+  (spart die einzelne `check_ig_side`+`check_yf_side`+`verdict_for`-Orchestrierung) via
+  `importlib.util.spec_from_file_location`, exakt das in `tests/test_resolve_epics.py`
+  etablierte Muster.
+
+### Completed
+- `universe/promotion.py` (neu): `run_promotion_cycle(broker, fetcher, store, *,
+  is_demo, max_active=8, demote_after_fails=3, pace_s=1.0, sleep_fn, health_sink=None,
+  now_fn) -> PromotionReport`. Safety-Raise zuerst (`is_demo=False` → `UniverseSafetyError`,
+  hart, kein Bypass). Drei Schritte: (1) `discovered`/`quarantined`-Kandidaten mit
+  Backoff-Treppe (`2**fail_count` Stunden gegen `last_verified_at`) verifizieren + Pricing
+  auflösen — PASS+Pricing → `verified`+`set_pricing`; PASS ohne Pricing → bleibt
+  `discovered`; FAIL → `quarantined`+`fail_count++`. (2) alle `verified` → `active` bis
+  `max_active`. (3) Health-Recheck aller `active`: IG-seitiger Fail → `fail_count++` →
+  `demote_after_fails` erreicht → `quarantined`; **Erfolg → `fail_count` auf 0
+  zurückgesetzt** (Konzept C3, IG-spezifischer Zähler); yFinance-seitiger Fail →
+  **ausschließlich** `data_degraded=True`, **nie** eine Demotion — unabhängig vom IG-Status
+  gesetzt/gelöscht. Kuratierte Bestätigung (`point_value_source IS NULL` + IG-Seite
+  gesund) via `confirm_curated`: `True` → `set_pricing` mit dem aufgelösten Source-Tag;
+  `False` → Quarantäne + `logger.warning` (ein widerlegter kuratierter Wert ist
+  gefährlicher als ein fehlender); `None` → keine Änderung.
+- **`universe/store.py` erweitert (additiv):** `set_status()` bekam zwei neue
+  keyword-only Parameter, `reset_fail_count: bool = False` (Alternative zu
+  `fail_increment`, beide betreffen denselben Zähler) und `data_degraded: bool | None
+  = None` (unabhängiges Feld — betroffen war vorher **gar nicht** in `set_status`
+  schreibbar, ein echter Gap gegenüber Migration 004s Spalte). **Default-Verhalten
+  bit-identisch** für alle bestehenden Aufrufer (Steps 1–3 berühren `data_degraded`/
+  `reset_fail_count` nirgends).
+- **14 neue Tests** (`test_promotion.py`): Safety-Raise, Happy-Path
+  discovered→verified→active, PASS-ohne-Pricing bleibt liegen, Verify-Fail→Quarantäne,
+  `max_active`-Kappung, Demotion nach 3 IG-Fails (Zyklus-für-Zyklus), yF-Fail demotiert
+  nie + setzt `data_degraded` (+ ein Recovery-Test, der es wieder löscht), Backoff-Treppe
+  (blockiert + erlaubt nach Ablauf), nie-verifiziert = sofort eligible, kuratierte
+  Bestätigung + Widerspruchs-Quarantäne, `health_sink`-Events, Report-Defaults. **+6 neue
+  Tests** in `test_store.py` für die zwei neuen `set_status`-Kwargs (Reset, Set/Clear,
+  Default-Kwargs-No-Op).
+- `universe/__init__.py`: `run_promotion_cycle`/`PromotionReport` exportiert.
+
+### Verifiziert
+- `pytest phase9_universe/tests -v` → **67 passed** (19+6 store + 15 pricing + 14
+  discovery + 14 promotion — die 6 store-Zusatztests kamen in diesem Step dazu, s. o.).
+- Import-Isolation erneut bestätigt (0 cross-phase Leaks) — der dynamische
+  `verify_instrument.py`-Load bleibt lazy in `_load_verify_instrument()`, nie am
+  Modul-Top von `promotion.py`. Kein `import anthropic` irgendwo im Paket.
+- Volle Regression unverändert grün: P1 52 · P2 76 · P3 73 · P4 135 · P5 154 · P6 70 ·
+  P7 133 · P8 199 · root 64 · **P9 67**.
+
+### Next
+- **Step 5 — P4/P8-Integration:** `build_universe_from_db(store) -> tuple[InstrumentSpec,
+  ...]` in `scripts/wiring.py` (P4), optionale `universe_refresher`-Naht in
+  `phase8_scheduler/scheduler/runner.py` (P8, Default `None` = heutiges Verhalten
+  bit-identisch). **Cross-Phase-Edits — vor dem Bau** die exakten Stellen gegenlesen, an
+  denen P4/P8-Wiring heute `EXTENDED_UNIVERSE`/`TickerMapper` verdrahten (Plan §14 Punkt 4
+  + 5).
+
+### Offene Punkte / blockers
+- Keine technischen. Alle vier universe-Kernmodule (models/store/pricing/discovery/
+  promotion) sind jetzt fertig — Step 5 ist der erste Schritt, der **außerhalb** von
+  `phase9_universe/` schreibt (P4 `scripts/wiring.py`, P8 `scheduler/runner.py`).
 
 ---
 
