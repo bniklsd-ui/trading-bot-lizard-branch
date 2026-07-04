@@ -153,6 +153,59 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 
 ---
 
+## Session stopped — 2026-07-04 (Handover: BarProvider-Kette verdrahten — nächste Aktion, kein Nikinger-Blocker)
+
+> **Auslöser:** Nikinger-Anweisung nach Abschluss von Step 7a — dieser Block ist
+> **kein neuer Baustein**, sondern eine explizite Handover-Notiz, damit die nächste
+> Session direkt mit der Step-6-Wiring-Aktivierung starten kann, statt auf den
+> Step-7-Diagnose-Lauf zu warten (der bleibt Nikingers Job, ist aber **kein**
+> Blocker für diese Aktion — Step 6 und Step 7 sind unabhängig).
+
+### Ausgangslage (Code = Wahrheit, jetzt gegengelesen)
+Step 6 baute `ChainedBarProvider`/`IGBarProvider`/`YFinanceBarProvider`
+(`phase3_external_data/external_data/providers.py`) + einen additiven
+`bar_provider`-Konstruktor-Parameter auf `MarketDataFetcher`
+(`phase3_external_data/external_data/fetcher.py`) — **beides fertig, 27 Tests
+grün**, aber **bewusst nicht verdrahtet**: beide Composition Roots bauen den
+Fetcher weiterhin ohne `bar_provider`:
+- `phase4_research/scripts/wiring.py:132` — `market_data = MarketDataFetcher(mapper,
+  FileCache(str(_CACHE_DIR)))`
+- `phase8_scheduler/scripts/wiring.py:160` — identische Zeile, in `_build_research`
+
+### Nächste Aktion (konkret, für den direkten Einstieg)
+1. **Zirkularitäts-Falle beachten:** `YFinanceBarProvider` braucht einen bereits
+   gebauten `MarketDataFetcher` als Delegat — der aber selbst der Fetcher ist, der
+   den `bar_provider` bekommen soll. Auflösung (im Recap der Vorsession bereits
+   durchdacht, s. `## Session stopped` Step 6 oben): **zwei** Fetcher-Instanzen
+   bauen — ein „roher" `raw_fetcher = MarketDataFetcher(mapper, cache)` (ohne
+   `bar_provider`, rein yFinance) als `YFinanceBarProvider`-Delegat, und der
+   „äußere" `market_data = MarketDataFetcher(mapper, cache, bar_provider=chain)`
+   (der an `Research`/Consumer geht). Nur `get_bars()` prüft `bar_provider` —
+   `get_drift`/`get_history`/`get_momentum`/`get_volume_anomaly` bleiben von der
+   äußeren Instanz unberührt (nutzen weiterhin ihre eigene `_get_records`-Logik).
+2. In beiden Wiring-Dateien: `chain = ChainedBarProvider([("ig",
+   IGBarProvider(broker)), ("yf", YFinanceBarProvider(raw_fetcher))],
+   health_sink=...)` bauen — `health_sink` sollte auf `observability.record_event`
+   zeigen (P8-Fall; P4 hat keinen Observability-Sink, dort `health_sink=None`).
+3. **Vor dem Schreiben:** mit dem Nikinger klären, ob die Aktivierung **jetzt**
+   gewünscht ist (ändert den echten Research-Datenpfad — IG-Echtzeit-Bars statt
+   reinem yFinance) oder ob sie — wie Step 7s `LiveQuoteCache`-Flag — hinter einem
+   Default-aus-Flag bleiben soll, bis ein Live-Lauf sie bestätigt. **Das ist eine
+   Nikinger-Entscheidung**, keine rein technische — s. die Reconciliation-Notiz im
+   Step-6-Block unten für die Begründung, warum die Vorsession das offen gelassen hat.
+4. Nach der Verdrahtung: manuelle End-to-End-Verifikation wie bei Step 5
+   (`scripts/wiring.py` wird nicht von pytest importiert) — echte/Fake-Broker
+   gegen einen laufenden `get_bars()`-Aufruf, prüfen dass IG-Bars bevorzugt werden
+   und der yFinance-Fallback bei simuliertem IG-Ausfall greift.
+
+### Offene Punkte / blockers
+- Keine technischen Blocker für diese Aktion. Die einzige offene Frage ist die
+  Nikinger-Entscheidung aus Punkt 3 oben (jetzt scharf schalten vs. hinter einem Flag).
+- Step 7 (Lightstreamer-Diagnose-Lauf + Fix) bleibt **separat** blockiert auf den
+  Nikinger und hat keine Abhängigkeit zu dieser Aktion.
+
+---
+
 ## Session stopped — 2026-07-04 (Step 7a: Lightstreamer-Diagnose-Harness gebaut — Live-Lauf steht aus)
 
 > **Auslöser:** direkte Fortsetzung nach Step 6. **Nur das Script** — der eigentliche
