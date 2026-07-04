@@ -139,6 +139,16 @@ class SchedulerConfig:
     # --- universe refresh (Phase 9 / V2) ---
     universe_refresh_interval_min: int = 240
 
+    # --- data path (Phase 9 / V2, consumed by scripts/wiring.py) ---
+    # When True, the wiring builds a ChainedBarProvider (IG real-time REST bars
+    # primary, yFinance fallback) and injects it into the research MarketDataFetcher
+    # so get_bars() prefers IG. Default False ⇒ the fetcher is built without a
+    # bar_provider = the original yFinance-only path, bit-identical. Flipping the live
+    # research data path is a conscious operator step (mirrors the Step-7 LiveQuoteCache
+    # flag's "default off, activate only after a live PASS" discipline) — arm it with
+    # `--enable-ig-bars` on scheduler.run once a live run has confirmed the chain.
+    enable_ig_bars: bool = False
+
     # --- paths (gitignored data/ tree) ---
     live_db_path: str = "data/trading_bot.sqlite"          # the real P2 DB
     state_path: str = "data/state/scheduler_state.json"

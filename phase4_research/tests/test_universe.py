@@ -98,6 +98,7 @@ def test_load_universe_empty_raises() -> None:
 def test_default_config_universe_matches_default_and_allowlist() -> None:
     cfg = ResearchConfig()
     assert cfg.epic_allowlist == (DAX,)
+    assert cfg.enable_ig_bars is False  # Phase 9 / V2 Step 6 — IG bar chain OFF by default
     assert cfg.universe is not None
     assert [s.epic for s in cfg.universe] == [DAX]
     # Derived default reproduces the curated default universe (DAX 1.0 €/pt, proxies).

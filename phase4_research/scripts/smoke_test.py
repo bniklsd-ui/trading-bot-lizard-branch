@@ -64,6 +64,7 @@ def _build_config(args: argparse.Namespace) -> ResearchConfig:
         model=args.model,
         epic_allowlist=(args.epic,),
         volume_proxy=args.volume_proxy or None,
+        enable_ig_bars=args.enable_ig_bars,
     )
 
 
@@ -76,6 +77,9 @@ def main(argv: list[str] | None = None) -> int:
                              "pass empty to disable)")
     parser.add_argument("--model", default=ResearchConfig().model,
                         help="Anthropic model id")
+    parser.add_argument("--enable-ig-bars", action="store_true",
+                        help="prefer IG real-time bars over yFinance for get_bars "
+                             "(Phase 9 / V2 Step 6; default OFF = yFinance-only)")
     parser.add_argument("--verbose", action="store_true", help="DEBUG logging")
     args = parser.parse_args(argv)
 

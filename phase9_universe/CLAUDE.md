@@ -107,6 +107,8 @@ Konzept C3, gleiche Disziplin wie P3s Brain-Context-Degradierung).
 | `universe/discovery.py` | Seed-Sweep + Code-Filter (`discover`/`DiscoveryReport`) | ✅ (Step 3, 14 Tests) |
 | `universe/promotion.py` | Statusmaschine + Safety (`run_promotion_cycle`/`PromotionReport`) | ✅ (Step 4, 14 Tests) |
 | P4/P8-Integration | DB-Universum statt `EXTENDED_UNIVERSE`, Refresh-Naht | ✅ (Step 5) |
+| BarProvider-Kette (Step 6) gebaut | `external_data/providers.py` + Circuit + Divergenz | ✅ (Step 6) |
+| BarProvider-Kette **verdrahtet** (P4+P8 wiring) | `_build_market_data` hinter `enable_ig_bars`-Flag (Default **aus**) | ✅ (Wiring 2026-07-04) |
 | `scripts/dev_install.sh` | `phase9_universe` in die editable-install-Kette aufgenommen | ✅ |
 
 ## Step 1 — Ergebnisse (2026-07-04)
@@ -150,6 +152,80 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 `universe_refresher`-Naht default `None`, `observability.py` neue Event-Typen), Wiring
 (`scripts/wiring.py` — zentraler Cross-Phase-Konfig-Ort). **Nicht angefasst:** P5
 (Gates/VETOs/Sizing), P6 (Debatte), P7 (Reward). Null LLM-Änderungen.
+
+---
+
+## Session stopped — 2026-07-04 (Review von Steps 1–7a + BarProvider-Kette verdrahtet — hinter Default-aus-Flag)
+
+> **Auslöser:** Nikinger-Auftrag — (a) mit der Review-Skill die von Sonnet (medium,
+> Auto-Modus) bis Step 7a durchgezogene Phase-9-Arbeit als das fähigere Modell
+> gegenprüfen, (b) danach die in Step 6 gebaute, aber bewusst nicht verdrahtete
+> BarProvider-Kette verdrahten. Nikinger-Entscheidung (via AskUserQuestion):
+> **hinter einem Default-aus-Flag**, nicht sofort scharf.
+
+### Review-Verdikt (Steps 1–7a, Code = Wahrheit gegengelesen — nicht nur die Notizen)
+- **Sauber. Keine schweren Probleme, kein Hotfix-Planfile nötig.** Kern gegengelesen:
+  universe (store/pricing/discovery/promotion), P3 providers/fetcher/circuit, P8
+  observability, P4/P8-Wiring-Nähte. Alle 6 gemockten Suiten grün **und exakt in den
+  von Sonnet dokumentierten Zahlen** (P9 67 · P3 100 · P8 215 · P4 141 · P2 76 · root 77).
+- **Höchstes Risiko war der `IGBarProvider`-Envelope-Mapping** (stille Null-Bars, falls
+  Feldnamen nicht passen) — gegen den echten `IGAdapter.get_ohlcv` verifiziert: der
+  Envelope trägt `{"bars": [OHLCBar.__dict__, …]}`, Keys `timestamp/open/high/low/close/
+  volume` **stimmen exakt**, Resolution-Map deckt `VALID_RESOLUTIONS`. **Korrekt.**
+- **Drei kleine, nicht-schwere Polish-Punkte** (bewusst NICHT als Hotfix behandelt,
+  Nikinger-informiert): (1) `pricing.resolve_point_value` Pfad 2 fehlt der `> 0`-Guard,
+  den Pfad 1 hat (nur ein hypothetisches „(0€)"/lot_size 0 → point_value 0; kann bei
+  echten Index-CFDs nicht auftreten, Discovery filtert `min_deal_size>0`); (2)
+  `observability.record_event` stempelt ein **naives** `datetime.now()`, `record_cycle`
+  ein tz-aware `ts` → gemischte Zeitformate im selben JSONL; (3) `run_promotion_cycle`
+  verifiziert ein frisch aktiviertes Instrument **zweimal pro Zyklus** (Step 1 Verify →
+  Step 2 Activate → Step 3 Health-Recheck) — Extra-IG-Calls, kein Korrektheitsfehler.
+  Offen für einen späteren kleinen Cleanup-Commit, kein Blocker.
+
+### Completed — BarProvider-Kette verdrahtet (additiv, Default-Pfad bit-identisch)
+- **Flag auf beiden Configs (additiv, Default `False` → alter yFinance-Pfad bit-identisch):**
+  `SchedulerConfig.enable_ig_bars` (`scheduler/config.py`), `ResearchConfig.enable_ig_bars`
+  (`research/models.py`).
+- **Verdrahtung in beiden Composition Roots** über einen neuen Helper `_build_market_data`
+  (P4 `scripts/wiring.py`, P8 `scripts/wiring.py`): Flag aus → `MarketDataFetcher(mapper,
+  cache)` wie bisher; Flag an → `ChainedBarProvider([("ig", IGBarProvider(broker)),
+  ("yf", YFinanceBarProvider(raw_fetcher))])` als `bar_provider`. **Zirkularität gelöst:**
+  ein `raw_fetcher` **ohne** `bar_provider` ist der yF-Delegat; nur `get_bars()` konsultiert
+  die Kette, drift/momentum/history/volume bleiben unberührt.
+- **Zwei latente Fallen beim Verdrahten proaktiv gefixt:** raw- und äußerer Fetcher teilen
+  **eine** `RateLimiter`-Instanz (sonst halbierte Anti-429-Spacing auf dem yF-Pfad) **und
+  einen** `_TickerCircuit` (sonst zwei unabhängige Circuits für dieselben Symbole).
+- **health_sink:** P8 → Closure auf `observability.record_event(_OBSERVABILITY_PATH, …)`
+  (jeder Versuch ein `bar_fetch`-Event in `research_health.jsonl`); P4-Standalone → `None`.
+- **Flag flippbar ohne Code-Edit:** `scheduler/run.py` `--enable-ig-bars` (in
+  `config_from_args`), P4 `smoke_test.py`/`live_test.py` `--enable-ig-bars`.
+
+### Verifiziert (gemockt/offline — Live = Operator)
+- Volle gemockte Regression pro Phase separat grün: **P8 215 → 216** (+1
+  `test_enable_ig_bars_flag_threads_through`; +Default-Assert in `test_config`), **P4 141**
+  (Default-Assert in `test_universe`, kein neuer Test), P3 100 · P9 67 · root 77 · P2 76
+  unverändert. `py_compile` clean auf allen berührten Dateien.
+- **Manuelle End-to-End-Verifikation** (Wiring wird nicht von pytest importiert): beide
+  `_build_market_data` in getrennten Prozessen (wegen `scripts.wiring`-Namenskollision)
+  gebaut — Flag aus → `bar_provider is None`; Flag an → `ChainedBarProvider`, geteilte
+  Limiter+Circuit bestätigt, und der P8-health_sink schreibt nachweislich ein
+  `bar_fetch`-Record nach `research_health.jsonl`. (Der eine Test-Record wurde danach
+  wieder aus dem Log entfernt.)
+
+### Next — **Nikinger (Live, sein Job):** die Kette scharf schalten + beobachten
+1. Daemon mit `--enable-ig-bars` starten (oder `live_test.py --enable-ig-bars`) während
+   der Handelszeiten.
+2. `data/state/research_health.jsonl` beobachten: `bar_fetch`-Events sollen `provider:"ig"`
+   bevorzugen, `provider:"yf"` nur bei IG-Leerlauf feuern.
+3. Zurückmelden → dann entscheiden wir, ob `enable_ig_bars` Default-**an** wird
+   (Ein-Zeilen-Default-Flip, eigener Commit).
+
+### Offene Punkte / blockers
+- Keine technischen. **Commit-fertig, wartet auf Nikinger-Trigger** (Working Agreement:
+  Claude committet nicht automatisch). Noch offen im Phase-9-Bogen (unverändert, NICHT
+  Teil dieser Session): der Divergenz-Check (`observability.compute_divergence_pct`/
+  `check_divergence` gebaut, aber an **keinen** Consumer verdrahtet); Step 7a Live-Lauf
+  (LS-Diagnose); Step 7b (LS-Fix + `LiveQuoteCache`); Step 8 (Operator-Live-Runs).
 
 ---
 

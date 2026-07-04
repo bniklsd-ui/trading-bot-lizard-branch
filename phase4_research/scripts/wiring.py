@@ -77,6 +77,49 @@ def build_universe_from_db(db_path: str | Path | None = None) -> tuple:
     return universe_from_records(records, fallback=EXTENDED_UNIVERSE)
 
 
+def _build_market_data(mapper, cache, broker, *, enable_ig_bars: bool):
+    """Build the research ``MarketDataFetcher``, optionally with the IG→yFinance chain.
+
+    ``enable_ig_bars=False`` (default) ⇒ exactly ``MarketDataFetcher(mapper, cache)`` —
+    the yFinance-only path, bit-identical. ``True`` (Phase 9 / V2 Step 6) injects a
+    :class:`~external_data.providers.ChainedBarProvider` (IG real-time REST bars primary,
+    yFinance fallback) so ``get_bars()`` prefers IG. The yFinance leg delegates to a
+    *raw* fetcher (no ``bar_provider`` — breaks the self-reference); the raw and outer
+    fetchers share **one** ``RateLimiter`` and **one** circuit breaker so the anti-429
+    spacing and per-symbol circuit state are not duplicated across the two instances.
+    Only ``get_bars()`` consults the chain — the fetcher's other methods
+    (drift/momentum/history/volume) are unaffected.
+    """
+    from external_data import MarketDataFetcher  # noqa: PLC0415 — lazy, phase isolation
+
+    if not enable_ig_bars:
+        return MarketDataFetcher(mapper, cache)
+
+    from external_data.fetcher import RateLimiter, _TickerCircuit  # noqa: PLC0415
+    from external_data.providers import (  # noqa: PLC0415
+        ChainedBarProvider,
+        IGBarProvider,
+        YFinanceBarProvider,
+    )
+
+    shared_limiter = RateLimiter()
+    shared_circuit = _TickerCircuit()
+    raw_fetcher = MarketDataFetcher(
+        mapper, cache, rate_limiter=shared_limiter, circuit=shared_circuit
+    )
+    chain = ChainedBarProvider(
+        [("ig", IGBarProvider(broker)), ("yf", YFinanceBarProvider(raw_fetcher))],
+        health_sink=None,  # P4 standalone has no observability sink (P8 wires one)
+    )
+    return MarketDataFetcher(
+        mapper,
+        cache,
+        rate_limiter=shared_limiter,
+        circuit=shared_circuit,
+        bar_provider=chain,
+    )
+
+
 def build_research(config: ResearchConfig | None = None) -> Research:
     """Construct a fully wired :class:`Research` against IG Demo + the real LLM.
 
@@ -117,7 +160,7 @@ def build_research(config: ResearchConfig | None = None) -> Research:
 
     # Phase-3 market data — register the ETF volume proxy on the anchor epic so
     # ^GDAXI does not degrade to volume_available=False (Decision 5).
-    from external_data import FileCache, MarketDataFetcher, TickerMapper  # noqa: E402
+    from external_data import FileCache, TickerMapper  # noqa: E402
 
     mapper = TickerMapper()
     # v1.5 (Issue C): register each curated instrument's yFinance ticker + volume proxy
@@ -129,7 +172,9 @@ def build_research(config: ResearchConfig | None = None) -> Research:
             mapper.register(spec.epic, spec.yf_ticker)
         if spec.volume_proxy:
             mapper.register_volume_proxy(spec.epic, spec.volume_proxy)
-    market_data = MarketDataFetcher(mapper, FileCache(str(_CACHE_DIR)))
+    market_data = _build_market_data(
+        mapper, FileCache(str(_CACHE_DIR)), broker, enable_ig_bars=config.enable_ig_bars
+    )
 
     # Phase-4 LLM client — the single AI call site. Key from the keyring shim.
     llm = LLMClient(

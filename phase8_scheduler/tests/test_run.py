@@ -53,6 +53,12 @@ def test_config_from_args_is_demo_locked_with_caps() -> None:
     assert cfg.max_trades_per_day == 5
     assert cfg.cycle_interval_min == 5
     assert cfg.max_consecutive_failures == 3
+    assert cfg.enable_ig_bars is False           # IG bar chain OFF by default
+
+
+def test_enable_ig_bars_flag_threads_through() -> None:
+    assert config_from_args(parse_args([])).enable_ig_bars is False
+    assert config_from_args(parse_args(["--enable-ig-bars"])).enable_ig_bars is True
 
 
 def test_config_from_args_threads_overrides() -> None:

@@ -86,6 +86,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=3,
         help="consecutive cycle exceptions before the backoff trips the kill-switch (default 3).",
     )
+    parser.add_argument(
+        "--enable-ig-bars",
+        action="store_true",
+        help="prefer IG real-time REST bars over yFinance for research get_bars (Phase 9 / V2 "
+        "Step 6 — yFinance stays the fallback). Default OFF = yFinance-only path, bit-identical. "
+        "Flip on only after a live run has confirmed the IG→yFinance chain.",
+    )
     parser.add_argument("--verbose", action="store_true", help="DEBUG logging to stderr.")
     return parser
 
@@ -110,6 +117,7 @@ def config_from_args(args: argparse.Namespace) -> SchedulerConfig:
         max_trades_per_day=args.max_trades,
         cycle_interval_min=args.cycle_interval_min,
         max_consecutive_failures=args.max_consecutive_failures,
+        enable_ig_bars=args.enable_ig_bars,
     )
 
 

@@ -44,6 +44,9 @@ def test_defaults_match_locked_concept_values() -> None:
     # universe refresh (Phase 9 / V2)
     assert cfg.universe_refresh_interval_min == 240
 
+    # data path (Phase 9 / V2) — IG bar chain OFF by default (yFinance-only, bit-identical)
+    assert cfg.enable_ig_bars is False
+
     # paths (gitignored data/ tree)
     assert cfg.live_db_path == "data/trading_bot.sqlite"
     assert cfg.state_path == "data/state/scheduler_state.json"

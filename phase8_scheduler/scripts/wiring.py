@@ -127,7 +127,56 @@ def _build_universe_from_db(db_path: Any = None) -> tuple:
     return universe_from_records(records, fallback=EXTENDED_UNIVERSE)
 
 
-def _build_research(broker: Any, db: Any, state: Any) -> Any:
+def _build_market_data(mapper: Any, cache: Any, broker: Any, *, enable_ig_bars: bool) -> Any:
+    """Build the research ``MarketDataFetcher``, optionally with the IG→yFinance chain.
+
+    ``enable_ig_bars=False`` (default) ⇒ ``MarketDataFetcher(mapper, cache)`` — the
+    yFinance-only path, bit-identical. ``True`` (Phase 9 / V2 Step 6) injects a
+    :class:`~external_data.providers.ChainedBarProvider` (IG real-time REST bars primary,
+    yFinance fallback) so ``get_bars()`` prefers IG; each attempt's ``bar_fetch`` event
+    lands in the v1.6 ``research_health.jsonl`` log via ``observability.record_event``.
+    The yFinance leg delegates to a *raw* fetcher (no ``bar_provider`` — breaks the
+    self-reference); the raw and outer fetchers share **one** ``RateLimiter`` and **one**
+    circuit breaker so the anti-429 spacing / per-symbol circuit state are not duplicated.
+    Only ``get_bars()`` consults the chain — drift/momentum/history/volume are unaffected.
+    """
+    from external_data import MarketDataFetcher
+
+    if not enable_ig_bars:
+        return MarketDataFetcher(mapper, cache)
+
+    from external_data.fetcher import RateLimiter, _TickerCircuit
+    from external_data.providers import (
+        ChainedBarProvider,
+        IGBarProvider,
+        YFinanceBarProvider,
+    )
+    from scheduler.observability import record_event
+
+    obs_path = str(_OBSERVABILITY_PATH)
+
+    def _health_sink(event: dict[str, Any]) -> None:
+        record_event(obs_path, event)
+
+    shared_limiter = RateLimiter()
+    shared_circuit = _TickerCircuit()
+    raw_fetcher = MarketDataFetcher(
+        mapper, cache, rate_limiter=shared_limiter, circuit=shared_circuit
+    )
+    chain = ChainedBarProvider(
+        [("ig", IGBarProvider(broker)), ("yf", YFinanceBarProvider(raw_fetcher))],
+        health_sink=_health_sink,
+    )
+    return MarketDataFetcher(
+        mapper,
+        cache,
+        rate_limiter=shared_limiter,
+        circuit=shared_circuit,
+        bar_provider=chain,
+    )
+
+
+def _build_research(broker: Any, db: Any, state: Any, *, enable_ig_bars: bool = False) -> Any:
     """Build the real Phase-4 :class:`Research` over the shared broker/db/state (Contract G).
 
     Mirrors Phase-4 ``scripts.wiring.build_research`` but takes the *shared* broker/db/state so the
@@ -143,7 +192,7 @@ def _build_research(broker: Any, db: Any, state: Any) -> Any:
     falling back to ``EXTENDED_UNIVERSE`` if that table is empty/unreachable — an
     unbuilt/unseeded Phase 9 on a given checkout behaves exactly like before (bit-identical).
     """
-    from external_data import FileCache, MarketDataFetcher, TickerMapper
+    from external_data import FileCache, TickerMapper
     from research import Research, ResearchConfig
     from research.credentials import get_credential
     from research.llm_client import LLMClient
@@ -157,7 +206,9 @@ def _build_research(broker: Any, db: Any, state: Any) -> Any:
             mapper.register(spec.epic, spec.yf_ticker)
         if spec.volume_proxy:
             mapper.register_volume_proxy(spec.epic, spec.volume_proxy)
-    market_data = MarketDataFetcher(mapper, FileCache(str(_CACHE_DIR)))
+    market_data = _build_market_data(
+        mapper, FileCache(str(_CACHE_DIR)), broker, enable_ig_bars=enable_ig_bars
+    )
     llm = LLMClient(
         model=config.model,
         api_key=get_credential("anthropic_api_key"),
@@ -321,7 +372,7 @@ def build_scheduler(
     state = StateManager(str(_STATE_DIR))
     exec_state = ExecutionState(str(_EXEC_STATE_PATH))
 
-    research = _build_research(broker, db, state)
+    research = _build_research(broker, db, state, enable_ig_bars=config.enable_ig_bars)
     debate_runner = _make_debate_runner(broker)
     reward_sink = _build_reward_sink(broker, db)
 

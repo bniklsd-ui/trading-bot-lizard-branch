@@ -615,6 +615,13 @@ class ResearchConfig:
     # ``InstrumentSpec`` to widen the universe; ``epic_allowlist`` is then re-derived
     # from it so every consumer sees a consistent epic list.
     universe: tuple[InstrumentSpec, ...] | None = None
+    # --- data path (Phase 9 / V2) ---
+    # When True, wiring builds a ChainedBarProvider (IG real-time REST bars primary,
+    # yFinance fallback) and injects it into the MarketDataFetcher so get_bars() prefers
+    # IG. Default False ⇒ the yFinance-only path, bit-identical. Flipping the live data
+    # path is a conscious operator step (see phase9 Step 6); arm via --enable-ig-bars on
+    # the smoke/live scripts, or the daemon's own SchedulerConfig.enable_ig_bars.
+    enable_ig_bars: bool = False
 
     # --- confidence floor (provisional — Decision 4; Phase 7 outcome-anchoring replaces it) ---
     confidence_floor_below_score: float = 50.0  # boundary below which the low-score floor applies
