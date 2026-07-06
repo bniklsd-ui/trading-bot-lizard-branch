@@ -1,3 +1,14 @@
+---
+status: live
+purpose: Lightstreamer/TLCP integration chronicle — bug-fix reference v3–v10 + newest findings (Step 7a multi-epic negative result)
+read-when: working on Lightstreamer streaming or debugging TLCP/SDK behavior
+detail: L2
+up: ./CLAUDE.md
+down:
+  - ./lightstreamer_ig_reference.md   # protocol/field reference (L3)
+  - ./SESSIONS_ARCHIVE.md             # old session blocks (L3)
+updated: 2026-07-06
+---
 # Lightstreamer Integration Notes (Phase 1-V2)
 
 > Supplement to `phase1_broker_api_konzept.md`.
@@ -525,63 +536,55 @@ Tests: **49/49 passing** (mocked, no network).
 
 ---
 
-## Session stopped — 2026-05-21
+## Step 7a finding — multi-epic LS diagnosis is a NEGATIVE result (2026-07-06)
 
-### Completed
-- v8: subscription migrated to `PRICE:{account_id}:{epic}` (dead `L1:`/`MARKET:` feed).
-- v9: protocol bumped to `TLCP-2.4.0.lightstreamer.com` — still HTTP 400 at create_session.
-- **v10 (current): `IGLightstreamerClient` rewritten to wrap the official Lightstreamer
-  SDK (`lightstreamer-client-lib>=2.2.2`).** Raw TLCP deleted. `requirements.txt`,
-  `phase1_broker_wrapper/CLAUDE.md`, and `scripts/test_lightstreamer.py` docstring updated.
-- `tests/test_lightstreamer.py`: rewritten for the SDK. Full suite **49/49 green**.
+**Verdict: no multi-epic subscription bug reproduced on the active/curated 4-epic set.**
+All of DAX / STXE / CAC / IBEX subscribed successfully in **both** modes (M1 = one
+`Subscription` per epic; M2 = one multi-item `Subscription`), zero `onSubscriptionError`,
+ticks flowing, `CONNECTED:WS-STREAMING`, and **all four hypotheses H1–H4 = False**.
 
-### Live test result — ✅ PASS (2026-05-21, 08:04 UTC, DAX open)
-```
-[CONOK ] session established  (+0.3s)   status CONNECTED:WS-STREAMING
-[SUBOK ] subscription confirmed for IX.D.DAX.IFMM.IP
-[TICK #01] bid=24745.5  ask=24747.3  ts=2026-05-21T08:04:30.231Z
-[TICK #02] bid=24745.0  ask=24746.8  ts=2026-05-21T08:04:30.702Z
-[TICK #03] bid=24744.8  ask=24746.6  ts=2026-05-21T08:04:30.831Z
-result: PASS  (3 ticks in 0.5s)
-```
-The official-SDK rewrite (v10) connected over WebSocket and delivered live `PRICE` ticks —
-the raw-TLCP HTTP 400 wall is gone. Phase 1 Lightstreamer is complete.
+Reading the numbers correctly:
+- **M1 is the trustworthy signal:** 21 / 2 / 15 / 7 updates — real per-epic throughput,
+  all healthy, all `subscribed: true`. This is today's `_do_subscribe` behaviour
+  (one Subscription per epic) and it works for every active epic.
+- **M2's "60 for every epic" is NOT throughput** — it's the known M2 attribution
+  limitation documented in `scripts/diag_lightstreamer_multi.py`'s header (a shared
+  multi-item subscription can't reliably map `onItemUpdate` back to one epic on this
+  SDK, so the counter is capped/duplicated). Don't read the 60s as per-epic data. The
+  hard signals (per-epic `onSubscriptionError`, client status) are mode-independent and
+  both say "no error".
 
-### Done
-- Phase 1 Lightstreamer marked ✅ in `phase1_broker_wrapper/CLAUDE.md` + `README.md`,
-  root `CLAUDE.md` ("Current state") + `README.md`, and this file.
+**Consequence for Step 7b:** the LS fix has **no defect to fix** on the current active
+universe. Single-Subscription-per-epic already works. 7b is unblocked but empty.
 
-### Open questions / blockers
-- `lightstreamerEndpoint` URL ✅ confirmed live: `https://demo-apd.marketdatasystems.com`
-- SDK connects to IG demo (→ CONOK) ✅ confirmed live (`CONNECTED:WS-STREAMING`)
-- PRICE feed delivers ticks ✅ confirmed live (3 ticks, real DAX bid/ask)
-- IG Europe GmbH live account still pending (noted in CLAUDE.md) — re-test against live before go-live
+**Caveat (only unprobed scenario):** only 4 epics were tested (the curated fallback).
+H2 (the ~40-concurrent subscription limit) cannot trigger at 4 by construction. If the
+active universe ever grows toward ~10+ epics, **re-run this diagnostic** before declaring
+the LS track fully closed. Until then: LS multi-epic is treated as "no bug found, held
+open pending a higher-epic-count re-run".
 
----
+**Plausible link (hypothesis, not confirmed):** the *original* operator report of "certain
+LS syntaxes fail at <10 epics" may itself have been a **parallel IG-session artifact** —
+an LS stream running while a second IG login was live — not a real Lightstreamer bug. See
+the parallel-login auth note below; the clean 4-epic run is consistent with that reading.
 
-## Session stopped — 2026-05-20
+### Parallel-login auth trap (root cause of the 2026-07-06 auth failure)
 
-### Completed
-- `broker_wrapper/adapters/ig_adapter.py`: added `self._lightstreamer_endpoint = ""` in `__init__`; capture `body_meta.get("lightstreamerEndpoint", "")` in `_login()`; added `lightstreamer_endpoint` property
-- `broker_wrapper/streaming/ig_lightstreamer.py`: full TLCP-2.1.0 implementation — `_create_ls_session`, `_open_bind_stream`, `_send_subscribe`, `_resubscribe_all`, `_reader_loop`, `_read_from_response`, `_handle_line`, `_handle_update`, plus helpers `_ensure_scheme` and `_utm_to_iso`
-- `broker_wrapper/factory.py`: added `get_stream(adapter) -> IGLightstreamerClient`
-- `broker_wrapper/streaming/__init__.py`: exported `IGLightstreamerClient` and `PriceCallback`
-- `tests/test_lightstreamer.py`: 19 tests — all green; full suite 50/50 passing
-- **stop() hang fix (v2)**: `socket.shutdown(SHUT_RD)` via `resp.raw._connection.sock` in `_interrupt_response()`
-- **create_session hang fix (v3)**: `stream=True`, parse headers only
-- **iter_content GC fix (v4)**: replaced `for chunk in iter_content():` with `resp.raw.read()` in header parse loop
-- **dual-decoder fix (v5)**: replaced `iter_content()` in main read loop with `resp.raw.read()`
-- **bind_session fix (v6)**: `create_session.txt` sends preamble messages but NOT CONOK — CONOK/PROBE/U come from `bind_session.txt`. Added `_open_bind_stream()` method; `create_session.txt` response is now closed after header parsing.
-- **LS_cid fix (v7)**: added `LS_cid=mgQkwtwdysogQz2BJ4Ji kOj2Bg` to `create_session.txt` POST — mandatory TLCP-2.1.0 key; without it IG returns SYNC ERROR on all subsequent requests.
+The auth error the operator hit while running `live_test` **in parallel** with the LS
+diagnostic was **not** a keyring / API-key / rogue-daemon problem — all three were clean
+by design. Root cause: **IG demo rotates the account's `X-SECURITY-TOKEN` on every
+`POST /session`, and both processes logged in with the same credentials.** The second
+login invalidated the first's token; each side's 401-handler (`ig_adapter.py:316-328`)
+re-logged-in, invalidating the other's token → a re-login ping-pong that eventually
+surfaced as `AuthenticationError("re-login failed after 401")`.
 
-### Next
-- Run `python scripts/test_lightstreamer.py --timeout 30 --ticks 3 --debug` during market hours (Mon–Fri 08:00–22:30 CET)
-  - PASS (exit 0): all confirmed, Phase 1 Lightstreamer is complete
-  - PARTIAL (exit 2): CONOK+SUBOK confirmed (connection layer OK), re-run during market hours for ticks
-- If PASS/PARTIAL: mark open questions below as ✅ and close Phase 1 Lightstreamer
+Tokens are **in-memory only** (`self._cst`/`self._security_token`, no on-disk session
+file) → nothing on the machine is corrupted and no reboot is needed; the session self-heals
+on the next **solo** `connect()`. If IG's server-side briefly locks after the re-login
+thrash, wait a few minutes (server-side, a reboot does not touch it).
 
-### Open questions / blockers
-- `lightstreamerEndpoint` URL format ✅ confirmed live: `https://demo-apd.marketdatasystems.com`
-- `ControlAddress` response format ✅ confirmed live: bare hostname (e.g. `apd245f.marketdatasystems.com`), normalised by `_ensure_scheme()`
-- `bind_session.txt` URL ✅ confirmed: uses `control_address + "/lightstreamer/bind_session.txt"`
-- IG Europe GmbH live account still pending (noted in CLAUDE.md)
+**Operator rule:** never run two IG-authenticating processes against the same demo account
+concurrently. Run the LS diagnostic and the live test **sequentially**.
+
+
+> **Ältere Session-Blöcke dieser Notes** (verbatim ausgelagert): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) (Abschnitt `lightstreamer_integration_notes.md`).

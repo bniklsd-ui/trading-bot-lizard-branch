@@ -1,3 +1,14 @@
+---
+status: closed-phase
+purpose: Phase-3 head — yFinance external data + brain context, momentum-VETO flag notice
+read-when: working in phase3_external_data/ — read this head + its newest Session-stopped block first
+detail: L2
+up: ../CLAUDE.md
+down:
+  - ./README.md
+  - ../docs/concepts/phase3_external_data_konzept.md   # full concept/plan snapshot (L3)
+updated: 2026-07-06
+---
 # external_data — Claude Code context
 
 ## Project

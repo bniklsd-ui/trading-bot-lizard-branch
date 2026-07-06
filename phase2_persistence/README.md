@@ -1,3 +1,11 @@
+---
+status: live
+purpose: What phase2_persistence built — components, limitations, integration points
+read-when: needing this phase's public surface without its full head
+detail: L2
+up: ./CLAUDE.md
+updated: 2026-07-06
+---
 # persistence — Phase 2
 
 > **Status:** ✅ live-verified 2026-05-22 — 59 unit tests + `scripts/live_test.py`

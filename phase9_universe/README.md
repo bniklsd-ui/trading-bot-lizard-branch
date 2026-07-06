@@ -1,3 +1,11 @@
+---
+status: live
+purpose: What phase9_universe built — components, limitations, integration points
+read-when: needing this phase's public surface without its full head
+detail: L2
+up: ./CLAUDE.md
+updated: 2026-07-06
+---
 # Phase 9 (V2 — Foundation) — `phase9_universe/`
 
 Autonomous instrument discovery → verify → promote pipeline (package `universe`), plus

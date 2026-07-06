@@ -1,3 +1,11 @@
+---
+status: live
+purpose: What phase8_scheduler built — components, limitations, integration points
+read-when: needing this phase's public surface without its full head
+detail: L2
+up: ./CLAUDE.md
+updated: 2026-07-06
+---
 # phase8_scheduler — Scheduler (autonomous unattended demo trading)
 
 Phase 8 of the DAX intraday CFD trading bot. Importable package: **`scheduler`**.

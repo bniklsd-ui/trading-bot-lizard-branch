@@ -1,3 +1,11 @@
+---
+status: live
+purpose: IG-specific Lightstreamer reference — endpoints, auth format, PRICE subscription fields
+read-when: needing exact LS field names/protocol details
+detail: L3
+up: ./lightstreamer_integration_notes.md
+updated: 2026-07-06
+---
 # IG Lightstreamer — Implementation Reference for Claude Code
 
 > **This document exists because the previous implementation used a deprecated API

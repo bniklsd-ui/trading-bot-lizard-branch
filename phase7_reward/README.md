@@ -1,3 +1,11 @@
+---
+status: live
+purpose: What phase7_reward built — components, limitations, integration points
+read-when: needing this phase's public surface without its full head
+detail: L2
+up: ./CLAUDE.md
+updated: 2026-07-06
+---
 # Phase 7 — Reward/Brain (`phase7_reward/`)
 
 The phase where the bot **starts learning**. After every closed trade it (1) scores

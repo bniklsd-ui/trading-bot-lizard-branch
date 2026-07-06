@@ -1,3 +1,11 @@
+---
+status: live
+purpose: What phase1_broker_wrapper built — components, limitations, integration points
+read-when: needing this phase's public surface without its full head
+detail: L2
+up: ./CLAUDE.md
+updated: 2026-07-06
+---
 # broker_wrapper — Phase 1
 
 Unified broker abstraction for the trading bot. Pure REST + Lightstreamer streaming,

@@ -1,3 +1,11 @@
+---
+status: live
+purpose: What phase3_external_data built — components, limitations, integration points
+read-when: needing this phase's public surface without its full head
+detail: L2
+up: ./CLAUDE.md
+updated: 2026-07-06
+---
 # external_data — Phase 3
 
 > **Status:** ✅ **live-verified 2026-06-02** — all 10 build steps done, **70 mocked

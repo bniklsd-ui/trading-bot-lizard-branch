@@ -1,3 +1,14 @@
+---
+status: closed-phase
+purpose: Phase-2 head — SQLite/JSON persistence layer, migrations, whitelist
+read-when: working in phase2_persistence/ — read this head + its newest Session-stopped block first
+detail: L2
+up: ../CLAUDE.md
+down:
+  - ./README.md
+  - ../docs/concepts/phase2_persistence_konzept.md   # full concept/plan snapshot (L3)
+updated: 2026-07-06
+---
 # persistence — Claude Code context
 
 ## Project
