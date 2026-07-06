@@ -327,14 +327,25 @@ class IGAdapter(BrokerAdapter):
                 retry_429_count=retry_429_count,
             )
 
-        if resp.status_code == 403:
+        # IG signals allowance exhaustion as 403 with an
+        # error.public-api.exceeded-*-allowance body, NOT as 429 — a pacing
+        # problem, not a credentials one. Route it through the 429 retry path
+        # below so a request burst degrades to backoff + RATE_LIMIT instead of
+        # a misleading AUTH_ERROR (live finding 2026-07-06: the universe
+        # discovery sweep tripped this and research/executor failed closed).
+        allowance_403 = (
+            resp.status_code == 403
+            and "exceeded" in resp.text
+            and "allowance" in resp.text
+        )
+        if resp.status_code == 403 and not allowance_403:
             raise AuthenticationError(f"403 forbidden: {resp.text[:200]}")
         if resp.status_code == 404:
             raise EpicNotFoundError(f"404 not found: {path}")
         if resp.status_code == 405:
             # IG returns 405 when a market is offline. Map accordingly.
             raise MarketOfflineError(f"405 market offline: {path}")
-        if resp.status_code == 429:
+        if resp.status_code == 429 or allowance_403:
             if retry_429_count < self._retry_429_attempts:
                 sleep_s = self._retry_429_base_s * (2 ** retry_429_count)
                 self._sleep_fn(sleep_s)
@@ -344,7 +355,9 @@ class IGAdapter(BrokerAdapter):
                     extra_headers=extra_headers, attempt=attempt,
                     retry_429_count=retry_429_count + 1,
                 )
-            raise RateLimitError(f"429 rate limited: {resp.text[:200]}", retryable=True)
+            raise RateLimitError(
+                f"{resp.status_code} rate limited: {resp.text[:200]}", retryable=True
+            )
         if 500 <= resp.status_code < 600:
             if attempt <= self._max_retries:
                 time.sleep(0.5 * attempt)

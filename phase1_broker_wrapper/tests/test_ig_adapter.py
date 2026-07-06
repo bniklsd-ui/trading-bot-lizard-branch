@@ -291,6 +291,44 @@ def test_429_retry_opt_out_raises_immediately():
     assert req.call_count == 1
 
 
+# IG signals allowance exhaustion as 403 (error.public-api.exceeded-*-allowance),
+# not 429 — it must take the same retry path, NOT map to AUTH_ERROR
+# (live finding 2026-07-06: discovery burst → misleading AUTH_ERROR fail-closed).
+
+_ALLOWANCE_BODY = {"errorCode": "error.public-api.exceeded-api-key-allowance"}
+
+
+def test_403_allowance_retries_like_429():
+    sleeps = []
+    a = _adapter_with_sleep(sleeps)
+    with patch.object(a._session, "request") as req:
+        req.side_effect = [
+            _mock_response(status=403, json_body=_ALLOWANCE_BODY),
+            _mock_response(status=200, json_body={"snapshot": {
+                "bid": 18000.0, "offer": 18001.0, "marketStatus": "TRADEABLE",
+                "updateTime": "2026-05-14T12:00:00Z",
+            }}),
+        ]
+        env = a.get_price("IX.D.DAX.IFMM.IP")
+
+    assert env.ok is True
+    assert sleeps == [1.0]
+    assert req.call_count == 2
+
+
+def test_403_allowance_exhausts_to_rate_limit_not_auth_error():
+    sleeps = []
+    a = _adapter_with_sleep(sleeps)
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(status=403, json_body=_ALLOWANCE_BODY)
+        env = a.get_price("IX.D.DAX.IFMM.IP")
+
+    assert env.ok is False
+    assert env.error["code"] == "RATE_LIMIT"  # not AUTH_ERROR — pacing, not credentials
+    assert sleeps == [1.0, 2.0]
+    assert req.call_count == 3
+
+
 def test_no_sleep_on_200():
     sleeps = []
     a = _adapter_with_sleep(sleeps)
