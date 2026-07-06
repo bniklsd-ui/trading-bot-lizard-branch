@@ -426,10 +426,16 @@ def build_scheduler(
         line that passes it to ``SchedulerRunner`` below), so an ``ImportError`` here
         would only surface at daemon start, not at module import time.
         """
+        from research import EXTENDED_UNIVERSE
         from universe import UniverseStore, discover, run_promotion_cycle
 
         universe_store = UniverseStore(_DB_PATH)
         try:
+            # Idempotent (INSERT OR IGNORE on epic): the live-verified curated
+            # four seed as status=active so the DB universe is never empty on
+            # day one. Was never called anywhere (2026-07-06 finding) — the
+            # store method existed since Step 1, callerless.
+            universe_store.seed_curated(EXTENDED_UNIVERSE)
             discover(broker, universe_store)
             run_promotion_cycle(
                 broker,
