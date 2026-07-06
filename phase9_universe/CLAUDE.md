@@ -207,10 +207,31 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
   startet, Discovery paced sauber, Research-Zyklus gesund (LLM-Abstain on merit —
   legitimes No-Pick, kein Fehler).
 
+### Nachtrag (gleiche Session, ~16:00) — der Curated-Fallback persistierte → C3-Bug gefunden + gefixt
+- **Befund (DB-Forensik `instrument_universe`):** Discovery fand 14 Instrumente, aber
+  **alle 14 quarantined** — zwei Gruppen: (1) 7 Rows mit vergifteten Check-Ergebnissen
+  aus dem 14:19-Allowance-Sturm (selbst DAX mit `currency_eur: false`), (2) 7 Rows aus
+  dem gesunden 14:48-Lauf mit **IG-Checks alle grün, aber yf-Checks false** → FAIL.
+- **Konzept-Verstoß (C3):** `promotion.py` Step 1 quarantinierte auf das rohe
+  `verdict_for`-FAIL (inkl. yf-Seite) — Step 3 tolerierte yf-Fails korrekt als
+  `data_degraded`. Dazu Todesspirale: `2**fail_count`-Backoff + wiederholte yf-Flakes
+  = Universum stundenlang eingefroren.
+- **Fix A (`universe/promotion.py`):** Step 1 quarantiniert nur noch bei
+  `_ig_side_failed`; yf-only-Fail → verified/active mit `data_degraded=1` (C3-konform,
+  spiegelt Step 3). **+2 Tests → P9 71.**
+- **Fix B (`phase8_scheduler/scripts/wiring.py`):** `store.seed_curated(EXTENDED_UNIVERSE)`
+  hatte **null Caller** — jetzt idempotent im `universe_refresher` vor `discover()`
+  (offline gegen frische Migrations-DB verifiziert: 4 seeded/active, Re-Seed 0).
+- **DB-Reset (Nikinger-approved, Daemon gestoppt):** die 12 noch quarantined Rows →
+  `status='discovered', fail_count=0, last_verified_at=NULL`. Stand danach: **2 active
+  (DAX + CAC, `point_value_source='ig_fields'` — Pricing-Pfad 1 lebt, dank
+  P1-Pip-Feld-Passthrough!) + 12 discovered.**
+
 ### Next
-- **Nächster Daemon-(Re-)Start prüfen:** lädt `universe_from_records` jetzt Records aus
-  der DB (Discovery hat sie diese Session erstmals sauber geschrieben) statt der
-  curated-Fallback-Warnung? Erst dann ist die V2a-Kette end-to-end bewiesen.
+- **Nächster Daemon-Start = der V2a-End-to-End-Beweis:** (a) `universe_from_records`
+  lädt jetzt ≥2 Records (Warnung weg), (b) Refresher re-verifiziert die 12 discovered
+  unter C3-Logik → IG-grüne aktivieren bis `max_active`, yf-Flakes nur noch
+  `data_degraded`.
 - Unverändert offen: `--enable-ig-bars`-Beobachtungslauf (`bar_fetch`-Events),
   Step 7b nur bei ~10+ aktiven Epics re-runnen, Divergenz-Check-Verdrahtung nach den
   Live-Läufen, Step 8 (mehrtägiger Autonomie-Lauf).
@@ -218,6 +239,8 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 ### Offene Punkte / blockers
 - Keine technischen. Beobachtung: zwei LLM-Abstains in Folge (14:25, 14:53) — on merit,
   aber im Auge behalten (v1.5-Variety-Thema), sobald das DB-Universum >4 Epics aktiviert.
+- yFinance fiel im 14:48-Lauf für **alle** Ticker aus (auch ^GSPC/^DJI) — mit Fix A
+  nicht mehr fatal, aber ein Auge auf Yahoo-Rate-Limiting der VM halten (V2b-Thema).
 
 ---
 

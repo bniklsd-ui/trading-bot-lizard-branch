@@ -209,6 +209,41 @@ def test_verify_fail_quarantines_candidate(store: UniverseStore):
     assert rec.fail_count == 1
 
 
+def test_yf_only_fail_at_discovery_activates_degraded(store: UniverseStore):
+    # Konzept C3 at Step 1 (2026-07-06 live finding): a yFinance-side failure
+    # during the INITIAL verify must not quarantine an IG-green candidate —
+    # it proceeds to verified/active with data_degraded=1, mirroring what
+    # Step 3 already grants established actives.
+    epic = "IX.D.DAX.IFMM.IP"
+    store.upsert_discovered(_discovered(epic))
+    broker = _FakeBroker({epic: _passing_market_info()})
+    fetcher = _FakeFetcher(history_ok=False, bars_ok=False, volume_ok=False)
+
+    report = run_promotion_cycle(broker, fetcher, store, is_demo=True, sleep_fn=_no_sleep)
+
+    assert report.quarantined == []
+    assert report.verified == [epic]
+    assert report.activated == [epic]
+    rec = store.get(epic)
+    assert rec.status == STATUS_ACTIVE
+    assert rec.data_degraded is True
+    assert rec.fail_count == 0  # IG side healthy — nothing counted
+
+
+def test_ig_fail_at_discovery_still_quarantines_despite_healthy_yf(store: UniverseStore):
+    # The inverse guard: C3 tolerance is yF-only — an IG-side failure at Step 1
+    # quarantines regardless of a fully healthy yFinance side.
+    epic = "IX.D.BADCUR2.IP"
+    store.upsert_discovered(_discovered(epic))
+    broker = _FakeBroker({epic: _env(True, {"currency": "USD", "min_deal_size": 0.5, "name": "x", "lot_size": 1.0})})
+    fetcher = _FakeFetcher()  # yf all green
+
+    report = run_promotion_cycle(broker, fetcher, store, is_demo=True, sleep_fn=_no_sleep)
+
+    assert report.quarantined == [epic]
+    assert store.get(epic).status == STATUS_QUARANTINED
+
+
 # -- max_active cap -------------------------------------------------------------
 
 

@@ -162,27 +162,39 @@ def run_promotion_cycle(
             broker, fetcher, rec.epic, volume_proxy=rec.volume_proxy,
             sleep_fn=sleep_fn, pace_s=pace_s,
         )
-        if verdict["verdict"] == "FAIL":
+        # Konzept C3: only an IG-side failure quarantines — a yFinance-side
+        # failure is tolerated as reduced-signal (data_degraded), exactly like
+        # Step 3 already does for active instruments. The raw ``verdict_for``
+        # FAIL covers both sides, so it must NOT gate here (2026-07-06 live
+        # finding: one flaky-yf afternoon quarantined 7 IG-green instruments
+        # at discovery, and the 2**fail_count backoff then froze the whole
+        # universe for hours — an activation obstacle C3 explicitly forbids).
+        if _ig_side_failed(verdict):
             store.set_status(
                 rec.epic, STATUS_QUARANTINED, checks=verdict, fail_increment=True
             )
             report.quarantined.append(rec.epic)
             _emit(health_sink, {"event": "universe_quarantined", "epic": rec.epic, "verdict": verdict})
             continue
+        yf_degraded = _yf_side_failed(verdict)
 
         market_info_env = broker.get_market_info(rec.epic)
         market_info = getattr(market_info_env, "data", None) or {}
         resolved = resolve_point_value(market_info)
         if resolved is None:
-            # PASS but no point_value proof yet — stays discovered, checks_json
-            # documents why (Decision D6: no proof, no activation).
-            store.set_status(rec.epic, STATUS_DISCOVERED, checks=verdict)
+            # IG-side PASS but no point_value proof yet — stays discovered,
+            # checks_json documents why (Decision D6: no proof, no activation).
+            store.set_status(
+                rec.epic, STATUS_DISCOVERED, checks=verdict, data_degraded=yf_degraded
+            )
             report.unchanged += 1
             continue
 
         point_value, source = resolved
         store.set_pricing(rec.epic, point_value, source)
-        store.set_status(rec.epic, STATUS_VERIFIED, checks=verdict)
+        store.set_status(
+            rec.epic, STATUS_VERIFIED, checks=verdict, data_degraded=yf_degraded
+        )
         report.verified.append(rec.epic)
         _emit(health_sink, {"event": "universe_verified", "epic": rec.epic, "point_value": point_value})
 
