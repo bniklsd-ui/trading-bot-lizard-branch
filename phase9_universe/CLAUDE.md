@@ -169,65 +169,56 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
 
 ---
 
-## Session stopped — 2026-07-04 (Wochenend-Session: Review-Polish-Fixes + Phase-1-Hardening-Plan geschrieben)
+## Session stopped — 2026-07-06 (Doc-Layers-Restrukturierung + Auth-Debugging + IG-Allowance-Fixes — erster Step-8-naher Live-Lauf gesund)
 
-> **Auslöser:** Nikinger-Auftrag (Wochenende, keine Live-Tests möglich): (a) die drei
-> kosmetischen Punkte aus der Review-Session umsetzen, (b) die am schwächsten
-> geschriebene Phase scannen und einen Verbesserungsplan **nur schreiben** — Umsetzung
-> später durch Sonnet, NACH den Live-Tests, als Teil von V2. Auto-Modus (Tests frei),
-> für (b) ausdrücklich keine Code-Änderungen.
+> **Auslöser:** Nikinger-Session (Montag): (a) Doc-Layers-Plan ausführen (Session-Budget
+> reichte doch), (b) das Auth-Problem vom Wochenende diagnostizieren, (c) die daraus
+> gefundenen Fixes einbauen. Fable-Session, Auto-Modus.
 
-### Completed (a) — die drei Review-Polish-Fixes (klein, additiv, alle getestet)
-- **`universe/pricing.py`:** Pfad 2 (name/lot_size) trägt jetzt denselben `> 0`-Guard
-  wie Pfad 1 — ein hypothetisches „(0€)"/lot_size 0 kann nicht mehr zu
-  `point_value=0` auflösen (würde P5-Sizing nullen). **+1 Test** (`test_pricing.py`).
-- **`scheduler/observability.py`:** `record_event` stempelt jetzt ein **tz-aware**
-  `datetime.now().astimezone()` statt naiv — keine gemischten Zeitformate mehr im
-  selben JSONL wie `record_cycle`s tz-aware `clock.now()`. **+1 Test** → **P8 217**.
-- **`universe/promotion.py`:** Step 3 (Health-Recheck) überspringt Epics, die in
-  **diesem** Zyklus aktiviert wurden (Step-1-Verify liegt Sekunden zurück — der
-  zweite `verify_instrument`-Call war reiner Doppel-Traffic). Ab dem Folgezyklus
-  normale Recheck-Teilnahme. **+1 Test** (beweist: 1 `get_ohlcv`-Call im
-  Aktivierungszyklus, 1 im Folgezyklus) → **P9 69**.
+### Completed
+- **Doc-Layers-Konvention repo-weit eingeführt** (Commits `d3421de`…`c9922e6`): per-Phase
+  `SESSIONS_ARCHIVE.md` (verbatim rotiert, cmp-verifiziert), L1-Header-Cards auf allen
+  lebenden Docs, `docs/INDEX.md` (L0), `docs/DOC_LAYERS_CONVENTION.md` (generisch),
+  Rotationsregel + `## Working style` in Root-`CLAUDE.md`. Phase-Heads: P8 211→21KB.
+- **Auth-Diagnose (zweistufig):** (1) `error.security.invalid-details` war ein
+  **Passwort-Tippfehler im Keyring** (nicht der neue API-Key, nicht die
+  Parallel-Login-Falle — die heilt sich selbst). (2) Der Folgefehler im Daemon
+  (`get_account AUTH_ERROR` im ersten Zyklus, Zyklus 2 gesund) war **IGs
+  Request-Allowance**: der Discovery-Sweep mit `pace_s=1.0` (~60 req/min) riss die
+  ~30/min-Demo-Allowance; IG antwortet **403** `exceeded-api-key-allowance`, das der
+  Adapter blind auf `AUTH_ERROR` mappte.
+- **Fix 1 (`universe/discovery.py` + `promotion.py`, Commit `b72ad53`):** `pace_s`
+  Default 1.0 → **2.5s** (~24 req/min). Live bestätigt: Discovery braucht jetzt ~4min
+  (14:48→14:52), Zyklus 1 direkt gesund, kein AUTH_ERROR mehr.
+- **Fix 2 (`broker_wrapper/adapters/ig_adapter.py`, Commit `142771b`, cross-phase
+  Nikinger-approved):** 403 mit `exceeded-*-allowance`-Body nimmt jetzt den
+  429-Retry-Pfad und erschöpft zu `RATE_LIMIT` statt irreführendem `AUTH_ERROR`;
+  plain 403 bleibt `AUTH_ERROR`. +2 Tests (P1 85→**87**).
+- **Fix 3 (`phase8_scheduler/scripts/smoke_test.py`, Commit `d9ae9a2`):** der
+  Offline-Smoke-Test war seit `032dd1c` (2026-06-29) latent kaputt — dict-Fake statt
+  Envelope-Shape (`'dict' object has no attribute 'ok'`) + `ensure_candidates`-Fake
+  ohne `ResearchResult` (v1.6-Observability-Drift). Beide Fakes auf die realen Shapes
+  gezogen → **3/3 Szenarien PASS**.
 
-### Completed (b) — Scan + Plan (NUR Plan, kein Code — Nikinger-Vorgabe)
-- **Scan aller 9 Phasen** (Zeilen, Testdichte, Debt-Marker, qualitative Reads):
-  **Phase 1 (`broker_wrapper`) ist der klare Schwächste** — Testdichte 2.3
-  Tests/100 Zeilen (nächster: 4.7), größte Einzeldatei (`ig_adapter.py` 930 Zeilen),
-  und zwei live-gebissene strukturelle Löcher: 429 → sofortiger Raise ohne Retry
-  (verursachte den v1.5-CAC/AEX/IBEX-Ausfall; **fünf** Call-Sites reimplementieren
-  deshalb Pacing) und der fehlende `valueOfOnePip`/`contractSize`-Passthrough in
-  `get_market_info` (hält P9s Pricing-Pfad 1 dauerhaft dormant). Dazu ungetestete
-  Envelope-Shapes genau in der bewiesenen Live-Bug-Klasse („Fake ≠ echte Shape",
-  s. der 2026-06-29-`env.get`-Bug).
-- **Plan geschrieben:** [`docs/concepts/phase1_hardening_plan.md`](../docs/concepts/phase1_hardening_plan.md)
-  — §0 Scan-Evidenz · §2 Step 0 Baseline + P1-CLAUDE.md-Skeleton · §3 Step 1
-  429-Retry/Backoff zentral in `_request` (injizierbares `sleep_fn`, Opt-out,
-  Call-Site-Pacing bleibt als belt-and-braces) · §4 Step 2 MarketInfo-Feld-
-  Passthrough (aktiviert P9-Pricing Pfad 1 ohne P9-Änderung) · §5 Step 3
-  Test-Backfill nach Live-Risiko (Parser + Envelope-Shapes zuerst, ~52 → ~80+ Tests)
-  · §6 Cross-Phase-Register · **bewusst verworfen:** `ig_adapter.py`-Split (Risiko >
-  Ästhetik) und alles Lightstreamer (gehört zu Step 7b, keine Doppelung).
-- **Ausführung gelockt:** durch Sonnet (medium, Auto-Modus), erst NACH den
-  Phase-9-Live-Tests, als Teil des V2-Bogens.
-
-### Verifiziert (gemockt/offline)
-- Volle per-Phase-Regression grün: P1 52 · P2 76 · P3 100 · P4 141 · P5 154 ·
-  P6 70 · P7 133 · **P8 217 (+1)** · **P9 69 (+2)** · root 77.
+### Verifiziert
+- Volle per-Phase-Regression grün: P1 **87** (+2) · P2 76 · P3 100 · P4 141 · P5 154 ·
+  P6 70 · P7 133 · P8 217 · P9 69 · root 77. P8-Offline-Smoke 3/3.
+- **Live (Nikinger-run):** P1-Smoke-Test PASS (voller REST-Zyklus); Scheduler-Daemon
+  startet, Discovery paced sauber, Research-Zyklus gesund (LLM-Abstain on merit —
+  legitimes No-Pick, kein Fehler).
 
 ### Next
-- **Nikinger (Montag/Handelszeiten):** die zwei Live-Läufe aus dem Wiring-Handover
-  unten — (1) `--enable-ig-bars`-Lauf + `bar_fetch`-Events beobachten, (2) Step 7a
-  `python scripts/diag_lightstreamer_multi.py`. Danach: 7b, Step 8, und (separat,
-  Sonnet) der Phase-1-Hardening-Plan.
-- **Commit:** dieser Stand (3 Fixes + 3 Tests + Plan-Datei + dieser Block) ist
-  commit-fertig, wartet auf Nikinger-Trigger.
+- **Nächster Daemon-(Re-)Start prüfen:** lädt `universe_from_records` jetzt Records aus
+  der DB (Discovery hat sie diese Session erstmals sauber geschrieben) statt der
+  curated-Fallback-Warnung? Erst dann ist die V2a-Kette end-to-end bewiesen.
+- Unverändert offen: `--enable-ig-bars`-Beobachtungslauf (`bar_fetch`-Events),
+  Step 7b nur bei ~10+ aktiven Epics re-runnen, Divergenz-Check-Verdrahtung nach den
+  Live-Läufen, Step 8 (mehrtägiger Autonomie-Lauf).
 
 ### Offene Punkte / blockers
-- Keine technischen. Der Divergenz-Check (gebaut, kein Consumer) bleibt der einzige
-  unverdrahtete Step-6-Baustein — bewusst offen bis nach den Live-Läufen.
+- Keine technischen. Beobachtung: zwei LLM-Abstains in Folge (14:25, 14:53) — on merit,
+  aber im Auge behalten (v1.5-Variety-Thema), sobald das DB-Universum >4 Epics aktiviert.
 
 ---
-
 
 > **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).
