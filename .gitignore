@@ -165,3 +165,7 @@ debug_snapshots/
 .claude/
 .agents/
 skills-lock.json
+
+# Offline smoke_test.py run from phase8_scheduler/ writes its observability
+# JSONL cwd-relative (runtime artifact, same as root data/state/).
+phase8_scheduler/data/
