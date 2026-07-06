@@ -131,7 +131,7 @@ def run_promotion_cycle(
     is_demo: bool,
     max_active: int = 8,
     demote_after_fails: int = 3,
-    pace_s: float = 1.0,
+    pace_s: float = 2.5,
     sleep_fn: Callable[[float], None] = time.sleep,
     health_sink: Callable[[dict], None] | None = None,
     now_fn: Callable[[], datetime] = _utc_now,

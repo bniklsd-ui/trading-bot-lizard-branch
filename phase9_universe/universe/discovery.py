@@ -190,17 +190,20 @@ def discover(
     store: UniverseStore,
     *,
     search_terms: tuple[str, ...] = SEARCH_TERMS,
-    pace_s: float = 1.0,
+    pace_s: float = 2.5,
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> DiscoveryReport:
     """Sweep ``search_terms`` via the broker and persist newly-discovered epics.
 
     Fail-soft per term (one 500 never kills the whole sweep — mirrors
     ``resolve_epics.resolve_term``'s discipline). Already-known epics (any status)
-    are skipped, never overwritten. Paced 1.0s default between broker calls (the
-    confirmed anti-rate-limit spacing from the v1.5 hotfix's ``resolve_epics.py``
-    fix, at the more conservative end since discovery makes far more calls than a
-    one-off operator resolver).
+    are skipped, never overwritten. Paced 2.5s default between broker calls —
+    ~24 req/min, safely under IG demo's ~30/min non-trading allowance. The
+    original 1.0s (the v1.5 ``resolve_epics.py`` spacing) allowed ~60 req/min
+    and tripped the allowance on the first live daemon start (2026-07-06): IG
+    answers **403** ``error.public-api.exceeded-api-key-allowance``, the adapter
+    surfaces it as AUTH_ERROR, and research/executor fail closed for the rest
+    of that minute/cycle.
     """
     report = DiscoveryReport()
     for term in search_terms:
