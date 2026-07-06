@@ -24,6 +24,7 @@ from scheduler import killswitch  # noqa: E402
 from scheduler.backoff import BackoffTracker  # noqa: E402
 from scheduler.clock import Clock  # noqa: E402
 from scheduler.config import SchedulerConfig  # noqa: E402
+from scheduler.research_tick import ResearchResult  # noqa: E402
 from scheduler.runner import SchedulerRunner  # noqa: E402
 from scheduler.state import StateStore  # noqa: E402
 
@@ -58,6 +59,21 @@ class _Result:
         self.status, self.profit_loss = status, profit_loss
 
 
+class _Env:
+    """Envelope-shaped fake — attribute access, like the real Phase-1 dataclass.
+
+    The 2026-06-29 live preflight bug (runner read ``env.get("ok")`` against the
+    real ``Envelope``) was fixed by switching the runner to ``env.ok`` and updating
+    the unit-test fakes — but this script's dict-returning ``_Broker`` was missed,
+    so the smoke test itself crashed with ``'dict' object has no attribute 'ok'``
+    (found 2026-07-06). Same lesson as runner.py's _EnvelopeLike note: a fake that
+    diverges from the real return shape hides exactly this bug class.
+    """
+
+    def __init__(self, ok: bool = True, error: dict | None = None) -> None:
+        self.ok, self.error = ok, error
+
+
 class _Broker:
     def __init__(self) -> None:
         self.connected = False
@@ -65,13 +81,13 @@ class _Broker:
     def is_connected(self) -> bool:
         return self.connected
 
-    def connect(self) -> dict:
+    def connect(self) -> _Env:
         self.connected = True
-        return {"ok": True}
+        return _Env(ok=True)
 
-    def disconnect(self) -> dict:
+    def disconnect(self) -> _Env:
         self.connected = False
-        return {"ok": True}
+        return _Env(ok=True)
 
 
 class _Executor:
@@ -85,8 +101,11 @@ class _Executor:
 
 
 class _ResearchTick:
-    def ensure_candidates(self, state) -> None:
+    def ensure_candidates(self, state) -> ResearchResult:
+        # Real ResearchResult, not a fake shape — the runner hands it to
+        # observability.record_cycle (v1.6), which reads it by attribute.
         _log("    · research_tick → fresh candidate written (fake)")
+        return ResearchResult(picked=True, n=1, reason=None)
 
 
 class _Reconciler:
