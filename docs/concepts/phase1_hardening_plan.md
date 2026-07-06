@@ -1,6 +1,13 @@
 # Phase 1 (broker_wrapper) — Hardening Plan (V2-Nachzügler)
 ## Detaillierter Implementierungsplan für Claude Code (Sonnet)
 
+> ✅ **ABGESCHLOSSEN 2026-07-04.** Steps 0–3 alle umgesetzt + committed
+> (`a089126` Steps 0–2, `330f531` Step 3). Code-verifiziert 2026-07-06: 429-Retry-Knobs
+> in `_request`, `MarketInfo`-Pip-Felder, P1-Suite **85 passed**. Vollständige As-Built-
+> Notizen in `phase1_broker_wrapper/CLAUDE.md` (zwei `## Session stopped`-Blöcke). Das
+> unten stehende „erst NACH den Live-Tests"-Sequencing wurde durch Nikinger-Freigabe
+> überholt (der Plan brauchte keine Live-Tests) — als Historie belassen.
+
 > **Author:** Claude Code (Opus 4.8), 2026-07-04 — Ergebnis des Nikinger-Auftrags
 > „scanne die am wenigsten gut geschriebene Phase und schreibe einen Verbesserungsplan".
 > **Audience:** Claude Code (Sonnet, medium, Auto-Modus). Ausführungsreif — Entscheidungen
