@@ -1,3 +1,16 @@
+---
+status: live
+purpose: Single source of truth for project rules, conventions, hard rules, and current phase status
+read-when: always — auto-loaded at session start; everything else hangs off this file
+detail: L2
+up: docs/INDEX.md
+down:
+  - docs/INDEX.md          # L0 map of every project doc
+  - ROADMAP.md
+  - ARCHITECTURE.md
+  - phase9_universe/CLAUDE.md   # active phase head
+updated: 2026-07-06
+---
 # CLAUDE.md — Project Instructions
 
 > Read this file before doing anything in this repository.
@@ -93,6 +106,9 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 > (root `CLAUDE.md` war über der empfohlenen ~40KB-Grenze; reine Verschiebung, kein Umschreiben —
 > gleiche Auditability-Regel wie bei `## Session stopped`-Blöcken). Neue Phase-Status-Updates gehören
 > ab jetzt in die jeweilige Phasen-`CLAUDE.md`, nicht mehr hierher.
+> **Update 2026-07-06:** dieses Prinzip ist jetzt repo-weit generalisiert — Doc-Layers-Konvention
+> (L0-Index + Header-Cards + per-Phase `SESSIONS_ARCHIVE.md` + Rotationsregel), siehe
+> [`docs/INDEX.md`](./docs/INDEX.md) und [`docs/DOC_LAYERS_CONVENTION.md`](./docs/DOC_LAYERS_CONVENTION.md).
 
 **Kompakter Stand pro Phase** (Details im Archiv oben oder in der jeweiligen Phasen-`CLAUDE.md`):
 
@@ -183,6 +199,15 @@ happen only via well-defined contracts (e.g. Envelope JSON for broker_wrapper).
    relevant notes file — read it first. It records exactly where the previous
    session ended and what comes next.
 
+**Navigating docs (token discipline — the Doc-Layers model):**
+
+Start at [`docs/INDEX.md`](./docs/INDEX.md) (L0: one line per doc). Living docs carry a
+≤15-line YAML header card (L1) — read it via `Read` with `limit: 15` and decide from
+`purpose`/`read-when` whether the body (L2) is worth loading; hop between files via the card's
+`up:`/`down:` links instead of directory searches. Archives and dated snapshots (L3:
+`SESSIONS_ARCHIVE.md`, `docs/concepts/`, handovers) are read only when auditing history —
+never at session start. Full spec: [`docs/DOC_LAYERS_CONVENTION.md`](./docs/DOC_LAYERS_CONVENTION.md).
+
 **During a session:**
 
 - After every subtask: run `pytest tests/ -v` before moving on.
@@ -214,8 +239,52 @@ Without it, context is lost and the next session starts cold.
 
 Replace or update this block at the start of each new session once read.
 
+**Rotation rule (mandatory since 2026-07-06):** when appending the new `## Session stopped`
+block, move the previously-newest block **verbatim** to the phase's `SESSIONS_ARCHIVE.md`
+(newest-first). A phase `CLAUDE.md` carries exactly **one** session block; archives have no
+size cap. New .md file created ⇒ add its one-liner to `docs/INDEX.md` in the same commit.
+
 **When in doubt about scope or AI vs. code: default to code.**
 The "AI as little as possible" principle resolves most ambiguity.
+
+---
+
+## Working style (how to act, not just what to do)
+
+> Added 2026-07-06 (Fable-5 pass, Nikinger-approved): these calibrate judgment for capable
+> models — they complement the rules above, they don't replace them.
+
+- **Source-of-truth precedence: tested code > concept doc > README/status prose.**
+  On conflict, trust the code, fix the doc immediately, and leave a dated note in the doc
+  that it was corrected against code. Read docs first (cheaper), verify against code before
+  building on a contract.
+
+- **Act vs. ask.** Proceed without asking on reversible, in-phase steps that follow from the
+  agreed plan — asking permission for routine in-scope work wastes the session. Stop and ask
+  (the Nikinger decides) for: destructive or hard-to-reverse actions, cross-phase code edits,
+  anything touching live (non-demo) money paths, and genuine scope changes.
+
+- **Locked decisions stay locked.** Phase docs pin decisions and verified contracts
+  (e.g. "Decision A–J" blocks). Don't re-litigate or silently "improve" them mid-implementation.
+  If new evidence contradicts a locked decision, surface it as a finding and let the Nikinger
+  decide — never deviate quietly.
+
+- **Report outcomes faithfully.** If tests fail, say so and show the output. If a step was
+  skipped, say that. When something is done and verified, state it plainly — no hedging,
+  no "should work". A wrong "it works" costs more than an honest "it's broken";
+  this project trades real money on the difference.
+
+- **Root cause over symptom.** Before fixing a bug, find every caller of what you're about to
+  touch; fix once at the shared point, not per reported symptom. The smallest diff in the
+  wrong place is a second bug.
+
+- **Read enough, then act.** Read the minimum needed (phase head + newest `## Session stopped`
+  block first), but never skip comprehension of the code a change touches. Once you have
+  enough information to act, act — don't re-derive facts already established in the session.
+
+- **Handovers are written for a cold reader.** Lead with the outcome (what happened, what's
+  next), spell out terms instead of session-local shorthand, and make the next step specific
+  enough to start without re-reading everything.
 
 ---
 
@@ -245,3 +314,6 @@ If you see any of these, stop and discuss with the human:
 - Any direct broker call outside `broker_wrapper/` (always go through the wrapper)
 - A subtask marked done without passing `pytest tests/ -v`
 - A session ending without a `## Session stopped` block written
+- A phase `CLAUDE.md` accumulating >1 session block (rotation rule skipped), or a
+  new .md file missing from `docs/INDEX.md`
+- Editing a 📕 dated snapshot (concepts, handovers, archives) instead of superseding it

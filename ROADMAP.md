@@ -1,3 +1,13 @@
+---
+status: live
+purpose: Phase 1–11 build plan with per-phase status, scope, and links to concept docs
+read-when: planning a phase transition or checking what a phase covers/covered
+detail: L2
+up: CLAUDE.md
+down:
+  - docs/concepts/          # one snapshot concept/plan per phase
+updated: 2026-07-06
+---
 # Roadmap
 
 The build order is **strict**. Each phase depends on the previous one being
@@ -199,7 +209,7 @@ live-verifiziert ≠ profit-validiert (erst **ein** Trade; Edge-Metrik läuft be
 > ungefiltert in den Research-Prompt → v1.5 Block A (Lesson-Provenance-Quarantäne).
 
 **Directory:** `phase7_reward/` *(package `reward`)*
-**Concept:** [`docs/concepts/phase7_reward_concept.md`](./docs/concepts/phase7_reward_concept.md) · **Kickoff:** [`PHASE7_KICKOFF_HANDOVER.md`](./PHASE7_KICKOFF_HANDOVER.md)
+**Concept:** [`docs/concepts/phase7_reward_concept.md`](./docs/concepts/phase7_reward_concept.md) · **Kickoff:** ~~PHASE7_KICKOFF_HANDOVER.md~~ *(Link korrigiert 2026-07-06: Datei existierte nie im Repo — nur Browser-Session-Artefakt)*
 
 ---
 

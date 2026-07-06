@@ -1,3 +1,13 @@
+---
+status: live
+purpose: System-wide picture — layers, core components, seams, identified risks
+read-when: needing cross-phase architecture context or component boundaries
+detail: L2
+up: CLAUDE.md
+down:
+  - docs/architecture/tradingbot_v2_architecture.svg
+updated: 2026-07-06
+---
 # Architecture
 
 > Visual reference: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)

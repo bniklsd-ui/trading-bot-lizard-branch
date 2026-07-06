@@ -1,3 +1,11 @@
+---
+status: live
+purpose: Human-facing overview + machine setup (venv, keyring credentials, smoke test)
+read-when: onboarding or setting up a new machine
+detail: L2
+up: CLAUDE.md
+updated: 2026-07-06
+---
 # Trading Bot
 
 A multi-phase, AI-augmented CFD trading bot for the DAX.
