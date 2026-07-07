@@ -227,6 +227,12 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
   (DAX + CAC, `point_value_source='ig_fields'` — Pricing-Pfad 1 lebt, dank
   P1-Pip-Feld-Passthrough!) + 12 discovered.**
 
+### Nachtrag 2 (2026-07-07) — erster Live-Tag ausgewertet
+- Ergebnisse + offene Beweispunkte + Watch-Items (u. a. `fail_count`-Reset-Lücke):
+  **[PHASE9_V2_LIVE_RESULTS_HANDOVER.md](./PHASE9_V2_LIVE_RESULTS_HANDOVER.md)** (📕).
+  Kurzfassung: Pipeline bewiesen (8 active/7 verified/0 quarantined, alles `ig_fields`),
+  erster CAC-Pick+Debatte, 0 Trades bisher, Lauf läuft weiter (~2–3 Tage Baseline).
+
 ### Next
 - **Nächster Daemon-Start = der V2a-End-to-End-Beweis:** (a) `universe_from_records`
   lädt jetzt ≥2 Records (Warnung weg), (b) Refresher re-verifiziert die 12 discovered
