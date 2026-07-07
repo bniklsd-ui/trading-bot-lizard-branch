@@ -230,6 +230,25 @@ def test_yf_only_fail_at_discovery_activates_degraded(store: UniverseStore):
     assert rec.fail_count == 0  # IG side healthy — nothing counted
 
 
+def test_verify_pass_resets_inherited_fail_count(store: UniverseStore):
+    # 2026-07-07 live finding: DAX sat ACTIVE at fail_count=3 (== demote_after_fails)
+    # because a Step-1 verify PASS carried the quarantine-era counter forward —
+    # one later IG wobble would demote a healthy instrument straight from the
+    # threshold. An IG-green PASS must clear the counter.
+    epic = "IX.D.DAX.IFMM.IP"
+    # never-verified (last_verified_at=None -> backoff-eligible) but carrying an
+    # inherited counter, exactly the post-reset live state of 2026-07-06.
+    store.upsert_discovered(_discovered(epic, fail_count=3))
+    assert store.get(epic).fail_count == 3
+    broker = _FakeBroker({epic: _passing_market_info()})
+
+    run_promotion_cycle(broker, _FakeFetcher(), store, is_demo=True, sleep_fn=_no_sleep)
+
+    rec = store.get(epic)
+    assert rec.status == STATUS_ACTIVE
+    assert rec.fail_count == 0  # inherited counter cleared by the PASS
+
+
 def test_ig_fail_at_discovery_still_quarantines_despite_healthy_yf(store: UniverseStore):
     # The inverse guard: C3 tolerance is yF-only — an IG-side failure at Step 1
     # quarantines regardless of a fully healthy yFinance side.

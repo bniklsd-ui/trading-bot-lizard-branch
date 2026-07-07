@@ -233,11 +233,23 @@ Live-Quote-Enrichment, `enable_live_quotes` default aus), P8 (`runner.py`
   Kurzfassung: Pipeline bewiesen (8 active/7 verified/0 quarantined, alles `ig_fields`),
   erster CAC-Pick+Debatte, 0 Trades bisher, Lauf läuft weiter (~2–3 Tage Baseline).
 
+### Nachtrag 3 (2026-07-07 ~11:31) — Neustart-Beweis erbracht ✅
+- **Beweispunkt 1 geschlossen:** Neustart 11:26 → `context built: 8 tradeable epic(s),
+  brain=8/8 present` — die V2a-Kette discover→activate→**research-nutzt-es** ist damit
+  end-to-end live bewiesen (Nikinger-Lauf).
+- **403-Allowance-Fix live bestätigt:** erster Zyklus nach Start abortet weiterhin
+  fail-closed (Startup-Refresher verbraucht Allowance), aber jetzt ehrlich als
+  `RATE_LIMIT` klassifiziert statt irreführend `AUTH_ERROR` — selbstheilend ab Zyklus 2.
+- **`fail_count`-Reset-Lücke gefixt** (Watch-Item aus dem Handover): Step-1-Verify-PASS
+  resettet jetzt den ererbten Zähler (beide IG-grüne Pfade), +1 Test → **P9 72**. Live-DAX
+  (fail_count=3) heilt ohne DB-Eingriff über den bestehenden Step-3-Recovery-Reset.
+- Doku-Frische-Sweep: README (Zeile 9 + Fußnote ⁶), ROADMAP-P9-Status, Root-CLAUDE-Tabelle,
+  phase9-README-Modultabelle — alle trugen noch „Build nicht gestartet"-Stände.
+
 ### Next
-- **Nächster Daemon-Start = der V2a-End-to-End-Beweis:** (a) `universe_from_records`
-  lädt jetzt ≥2 Records (Warnung weg), (b) Refresher re-verifiziert die 12 discovered
-  unter C3-Logik → IG-grüne aktivieren bis `max_active`, yf-Flakes nur noch
-  `data_degraded`.
+- ~~Nächster Daemon-Start = der V2a-End-to-End-Beweis~~ ✅ **erbracht 2026-07-07 11:31**
+  (s. Nachtrag 3). Verbleibende Beweispunkte des Baseline-Laufs: **ein echter Trade
+  unter dem V2-Universum** + Variety-These mit 8 Epics (Abstain-Quote beobachten).
 - Unverändert offen: `--enable-ig-bars`-Beobachtungslauf (`bar_fetch`-Events),
   Step 7b nur bei ~10+ aktiven Epics re-runnen, Divergenz-Check-Verdrahtung nach den
   Live-Läufen, Step 8 (mehrtägiger Autonomie-Lauf).

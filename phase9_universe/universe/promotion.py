@@ -185,15 +185,22 @@ def run_promotion_cycle(
             # IG-side PASS but no point_value proof yet — stays discovered,
             # checks_json documents why (Decision D6: no proof, no activation).
             store.set_status(
-                rec.epic, STATUS_DISCOVERED, checks=verdict, data_degraded=yf_degraded
+                rec.epic, STATUS_DISCOVERED, checks=verdict,
+                data_degraded=yf_degraded, reset_fail_count=True,
             )
             report.unchanged += 1
             continue
 
         point_value, source = resolved
         store.set_pricing(rec.epic, point_value, source)
+        # reset_fail_count: an IG-green verify PASS clears the counter — without
+        # this, a fail_count inherited from the quarantine era survives the
+        # promotion and one later IG wobble demotes an otherwise healthy
+        # instrument straight from the threshold (2026-07-07 live finding:
+        # DAX active at fail_count=3 == demote_after_fails).
         store.set_status(
-            rec.epic, STATUS_VERIFIED, checks=verdict, data_degraded=yf_degraded
+            rec.epic, STATUS_VERIFIED, checks=verdict,
+            data_degraded=yf_degraded, reset_fail_count=True,
         )
         report.verified.append(rec.epic)
         _emit(health_sink, {"event": "universe_verified", "epic": rec.epic, "point_value": point_value})
