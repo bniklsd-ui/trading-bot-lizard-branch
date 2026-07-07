@@ -29,7 +29,7 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 6     | Bull/Bear/Judge Debate              | ✅ Abgeschlossen — live-**verifiziert** (Debatte-Pfad, Demo), noch nicht profit-validiert ³ |
 | 7     | Reward/Punishment + Brain           | ✅ live-verifiziert (Demo, 2026-06-26) — `live_test.py` 5/5; 128 Unit-Tests ⁴ |
 | 8     | Scheduler                           | ✅ **live-verifiziert (2026-07-03)** — zwei autonome Trades + ein tatsächlich auslösender Safety-Breaker (Token-Budget) live bewiesen, noch nicht profit-validiert ⁵ |
-| 9     | V2 — Foundation (autonome Epic-Research + Daten-Zuverlässigkeit) | 🔄 in Arbeit — Ausführungsplan fertig, Build noch nicht gestartet ⁶ |
+| 9     | V2 — Foundation (autonome Epic-Research + Daten-Zuverlässigkeit) | 🔄 in Arbeit (Stand 2026-07-07) — Steps 1–6 + 7a gebaut, **Live-Baseline-Lauf seit 2026-07-06**; Tag 1: Pipeline end-to-end bewiesen (8 active / 7 verified / 0 quarantined, alle `point_value` code-bewiesen via `ig_fields`), erster DB-Universum-Pick (CAC); offen: Neustart-Pickup, Trade unter V2 — Details `phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md` ⁶ |
 | 10    | V3 — Persistenz-Reform + No-Trade-Lessons + UI | Geplant, gegatet auf Phase 9 (kein Konzept noch) |
 | 11    | V4 — Sophisticated/Optional (Council, Handover-Logik, Reward-Reform, Force-Trigger, Instinct-ECC) | Deferred, gegatet auf Phase 9+10 und reale Outcomes (Council standalone existiert bereits) |
 
@@ -117,7 +117,9 @@ gleichgewichtete Ziele: **V2a** autonome Epic-Research als Code-Pipeline (discov
 promote, ersetzt die hand-kuratierte `EXTENDED_UNIVERSE`-Tupel ohne manuellen Code-Edit je neuem
 Instrument) und **V2b** Daten-Input-Zuverlässigkeit (BarProvider-Kette IG→yFinance mit Backoff/
 Circuit-Breaker, Lightstreamer-Multi-Epic-Diagnose → `LiveQuoteCache` in den Research-Kontext).
-**Null neues AI.** Neues Paket `phase9_universe/` (Skeleton angelegt, Steps 1–8 noch offen).
+**Null neues AI.** Neues Paket `phase9_universe/`. *(Update 2026-07-07: Steps 1–6 + 7a gebaut;
+Step 7b ohne Fix-Target — die LS-Diagnose fand keinen Bug; Live-Baseline-Lauf läuft, Tag-1-Ergebnisse:
+[`phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md`](./phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md).)*
 `ROADMAP.md`s alte Phase 9 (Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC) ist jetzt
 **Phase 11 (V4)** — unverändert im Inhalt, nur numerisch verschoben und gegatet auf Phase 9+10 und
 reale Outcomes; die dazwischenliegende **Phase 10 (V3)** bündelt Persistenz-Reform + No-Trade-

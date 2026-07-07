@@ -295,11 +295,14 @@ weiterlaufenden Betriebs, ist aber **nicht** Bedingung dieses ✅-Flips (der dec
 
 ## Phase 9 — V2: Foundation (Autonome Epic-Research + Daten-Input-Zuverlässigkeit)
 
-> **Status: in Arbeit.** Reshape aus dem alten Phase-9-Block (s. Pointer oben) — noch nicht in
-> Claude Code gestartet, Ausführungsplan liegt vor:
-> [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md).
-> Neues Paket: `phase9_universe/` *(pkg `universe`)* — Skeleton:
-> [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md).
+> **Status: in Arbeit (Stand 2026-07-07).** Steps 1–6 + 7a gebaut (7b ohne Fix-Target — die
+> LS-Diagnose fand keinen Bug); **Live-Baseline-Lauf seit 2026-07-06** — Tag 1: Pipeline
+> end-to-end bewiesen (8 active / 7 verified / 0 quarantined, alle `point_value` via
+> `ig_fields`), erster DB-Universum-Pick (CAC). Offen: Neustart-Pickup, Trade unter V2,
+> `--enable-ig-bars`. Tag-1-Ergebnisse:
+> [`phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md`](./phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md) ·
+> Plan: [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md) ·
+> Phase-Head: [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md).
 
 **Goal:** die zwei strukturellen Lücken schließen, die den gesamten v1.5→v1.7-Hotfix-Arc
 getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 11/V4)
