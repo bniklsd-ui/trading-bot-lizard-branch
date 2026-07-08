@@ -37,6 +37,7 @@ updated: 2026-07-06
 ## Meta-Strang (M — orthogonal, Build-/Laufzeit-Unabhängigkeit)
 - [meta_m1_harness/CLAUDE.md](../meta_m1_harness/CLAUDE.md) — 🔄 4KB · M1 phase head; Steps 0–4 in progress, Steps 5–10 gated on operator setup
 - [meta_m1_harness/META_M1_PREREGISTRATION.md](../meta_m1_harness/META_M1_PREREGISTRATION.md) — 📕 4KB · Δ/P/K/E/M + decision rule, committed before any trial, never edited (only superseded)
+- `meta_m1_harness/specs/S0.md`…`S7.md` — 📗 · self-contained bake-off trial specs (Abstain-/No-Trade-Lessons testfield); S0/S1–S5 measured, S6/S7 reference-build-only
 - [docs/concepts/meta_m1_harness_plan.md](./concepts/meta_m1_harness_plan.md) — 📕 36KB · execution-ready plan (Steps 0–10, locked decisions M1-D1…D13)
 - [docs/concepts/meta_phase_unabhaengigkeit_konzept.md](./concepts/meta_phase_unabhaengigkeit_konzept.md) — 📕 16KB · Hypothesis/theory doc (H_Build/H_Runtime, Decisions A–H)
 - [docs/concepts/PHASE10_META_KICKOFF_HANDOVER.md](./concepts/PHASE10_META_KICKOFF_HANDOVER.md) — 📕 8KB · kickoff handover from Phase 9 close-out into the Meta-Phase
