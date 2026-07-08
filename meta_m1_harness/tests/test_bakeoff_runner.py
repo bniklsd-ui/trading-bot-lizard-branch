@@ -10,6 +10,13 @@ import pytest
 import harness_bakeoff as bo
 
 
+@pytest.fixture(autouse=True)
+def _stub_keyring(monkeypatch):
+    """No test should ever touch the real OS keyring or need ANTHROPIC_API_KEY in the
+    environment — run_trial fetches the bake-off key via keyring.get_password."""
+    monkeypatch.setattr(bo.keyring, "get_password", lambda service, username: "dummy-bakeoff-key")
+
+
 class _FakeCompleted:
     def __init__(self, stdout: str = "", returncode: int = 0) -> None:
         self.stdout = stdout
@@ -117,6 +124,20 @@ def test_assert_clean_repo_clean_passes(tmp_path, monkeypatch):
     bo.assert_clean_repo(tmp_path)  # must not raise
 
 
+# --- _fetch_bakeoff_api_key: keyring only, never env/file ----------------------------------
+
+
+def test_fetch_bakeoff_api_key_reads_from_keyring(monkeypatch):
+    monkeypatch.setattr(bo.keyring, "get_password", lambda service, username: "the-real-key")
+    assert bo._fetch_bakeoff_api_key() == "the-real-key"
+
+
+def test_fetch_bakeoff_api_key_missing_exits(monkeypatch):
+    monkeypatch.setattr(bo.keyring, "get_password", lambda service, username: None)
+    with pytest.raises(SystemExit):
+        bo._fetch_bakeoff_api_key()
+
+
 # --- run_trial / run_matrix: reset discipline + JSONL schema -------------------------------
 
 
@@ -127,9 +148,13 @@ def test_run_trial_resets_before_and_after(tmp_path, monkeypatch):
     monkeypatch.setattr(bo, "snapshot_ref", lambda repo: "REF0")
     monkeypatch.setattr(bo, "changed_files", lambda repo, ref: ["foo.py"])
     monkeypatch.setattr(bo, "_load_preamble", lambda: "preamble")
-    monkeypatch.setattr(
-        bo.subprocess, "run", lambda argv, **kwargs: _FakeCompleted(stdout="tokens=42")
-    )
+    captured_env: dict = {}
+
+    def _fake_run(argv, **kwargs):
+        captured_env.update(kwargs.get("env") or {})
+        return _FakeCompleted(stdout="tokens=42")
+
+    monkeypatch.setattr(bo.subprocess, "run", _fake_run)
 
     harness = bo.HarnessConfig(
         name="fake", argv_template=["fake", "{prompt}"], usage_regex=r"tokens=(?P<tokens>\d+)"
@@ -140,6 +165,8 @@ def test_run_trial_resets_before_and_after(tmp_path, monkeypatch):
     assert resets == ["base-0", "REF0"]  # reset before the trial, reset back after
     assert result.gate_passed is True
     assert result.usage_tokens == 42.0
+    # the key reaches the subprocess's own env only — never the operator's shell/a file
+    assert captured_env["ANTHROPIC_API_KEY"] == "dummy-bakeoff-key"
 
 
 def test_run_trial_manual_spend_path_when_usage_unparseable(tmp_path, monkeypatch):

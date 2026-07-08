@@ -4,6 +4,13 @@ Never touches the live repo: every trial resets an isolated fork to a `base-N` g
 and after running, via ``git reset --hard`` + ``git clean -fdq``. See
 ``meta_m1_harness/META_M1_PREREGISTRATION.md`` for the locked measurement design this instrument
 implements, and ``docs/concepts/meta_m1_harness_plan.md`` §6 for the full spec.
+
+Credential handling (corrected 2026-07-08, Nikinger override of the plan's original M1-D5
+wording): the separate bake-off Anthropic key is never a shell-exported env var and never in
+a file — same OS-keyring strategy as the bot itself (see
+``phase1_broker_wrapper/broker_wrapper/credentials.py``). Seed it once via
+``store_bakeoff_key.py``; this module fetches it from the keyring and hands it to each harness
+subprocess's own environment only, in memory, per call — never the operator's shell.
 """
 
 from __future__ import annotations
@@ -21,7 +28,16 @@ from datetime import time as dt_time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import keyring
+
 logger = logging.getLogger(__name__)
+
+
+# Own dedicated keyring namespace — deliberately independent of broker_wrapper.credentials
+# ("tradingbot", the live bot's service) and of the fork's neutralized service
+# ("trading-bot-bakeoff-void", M1-D8). See store_bakeoff_key.py.
+BAKEOFF_KEYRING_SERVICE = "trading-bot-bakeoff-runner"
+BAKEOFF_KEYRING_USERNAME = "anthropic_api_key"
 
 
 class BudgetExceeded(Exception):
@@ -157,6 +173,19 @@ def _load_preamble() -> str:
     return (Path(__file__).parent / "preamble.txt").read_text(encoding="utf-8").strip()
 
 
+def _fetch_bakeoff_api_key() -> str:
+    """Reads the separate bake-off Anthropic key from the OS keyring — never a shell env var,
+    never a file. Seed it once via ``store_bakeoff_key.py``."""
+    value = keyring.get_password(BAKEOFF_KEYRING_SERVICE, BAKEOFF_KEYRING_USERNAME)
+    if not value:
+        raise SystemExit(
+            f"[safety] no bake-off Anthropic key in the OS keyring "
+            f"(service={BAKEOFF_KEYRING_SERVICE!r}, username={BAKEOFF_KEYRING_USERNAME!r}). "
+            "Run: python meta_m1_harness/bakeoff/store_bakeoff_key.py"
+        )
+    return value
+
+
 def run_trial(
     repo: Path, harness: HarnessConfig, spec: StepSpec, repeat: int, budget: BudgetGuard
 ) -> TrialResult:
@@ -174,8 +203,12 @@ def run_trial(
                 part.format(prompt=prompt, prompt_file=str(spec.spec_path))
                 for part in harness.argv_template
             ]
+            # Fetched fresh from the keyring for this one subprocess call only — never
+            # exported into the operator's own shell, never persisted anywhere.
+            proc_env = {**os.environ, "ANTHROPIC_API_KEY": _fetch_bakeoff_api_key()}
             proc = subprocess.run(
-                argv, cwd=repo, capture_output=True, text=True, timeout=harness.timeout_s
+                argv, cwd=repo, capture_output=True, text=True, timeout=harness.timeout_s,
+                env=proc_env,
             )
             exit_ok = proc.returncode == 0
             if harness.usage_regex:
@@ -254,11 +287,17 @@ def run_matrix(
 
 # --- Harness templates + step registry ------------------------------------------------
 
+# Verified 2026-07-08 against `claude --help` (this session) and https://opencode.ai/docs/cli/
+# (WebFetch). Model string is claude-sonnet-5 per M1-D4 (Sonnet 5, Effort Medium, both
+# harnesses). OpenCode's --variant value is still [VERIFY] — provider-specific naming,
+# confirm against the installed OpenCode instance at Step 5 (Setup-Smoke S0) before trusting it.
+
 CLAUDE_CODE = HarnessConfig(
     name="claude_code",
     argv_template=[
         "claude", "-p", "{prompt}",
-        "--model", "<MODEL>",  # [VERIFY] exact model string against `claude --help` first
+        "--model", "claude-sonnet-5",
+        "--effort", "medium",
         "--output-format", "json",
         "--dangerously-skip-permissions",  # defensible only inside the M1-D8 fork isolation
     ],
@@ -266,8 +305,13 @@ CLAUDE_CODE = HarnessConfig(
 
 OPENCODE = HarnessConfig(
     name="opencode",
-    argv_template=["opencode", "run", "{prompt}", "--model", "anthropic/<MODEL>"],
-    # [VERIFY] permission/effort parity against OpenCode's own --help before the first trial
+    argv_template=[
+        "opencode", "run", "{prompt}",
+        "--model", "anthropic/claude-sonnet-5",
+        "--variant", "<VARIANT>",  # [VERIFY] provider-specific effort value at Step 5
+        "--format", "json",
+        "--auto",  # non-interactive permission auto-approve, defensible only in the M1-D8 fork
+    ],
 )
 
 _HARNESS_BY_NAME: dict[str, HarnessConfig] = {"claude_code": CLAUDE_CODE, "opencode": OPENCODE}

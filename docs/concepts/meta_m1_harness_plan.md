@@ -47,7 +47,7 @@ nicht mehr Entscheidungsinput. Δ/X/M nach Sicht von Ergebnissen zu ändern ist 
 | M1-D2 | Strang & Namen | Eigener **Meta-Strang „M"**, hochzählbar (M2, M3, …). Verzeichnis `meta_m1_harness/`, Doku-Präfix `META_M1_*`. Funktionale Nummerierung unangetastet: Phase 10 = V3, Phase 11 = V4 bleiben wie in ROADMAP gelockt. |
 | M1-D3 | Harness-Set | **Claude Code (Referenz) vs. OpenCode (Challenger).** Aider nur als Ersatzkandidat, falls OpenCode am Setup-Smoke (§8, S0) irreparabel scheitert — dann Operator-Entscheidung, kein Auto-Swap. |
 | M1-D4 | Modell fixiert | **Sonnet 5, Effort Medium, in beiden Harnessen** (reale Execution-Config des Projekts). Exakter Model-String **[VERIFY]** bei Ausführung (`claude --help` / OpenCode-Modellliste). Ist Effort in OpenCode nicht settbar **[VERIFY]**: beide Harnesse auf das nächste gemeinsam settbare Setting stellen; wenn keines existiert, beide auf Default und als Validity-Note in `META_M1_RESULTS.md` dokumentieren. Temperatur/Toolset so weit wie möglich angleichen, Abweichungen dokumentieren. |
-| M1-D5 | Auth | **Kein Subscription-Plugin** (Anthropic-Legal-Request PR #18186; ToS-Risiko trifft den eigenen Account). Beide Harnesse laufen in Messläufen auf **demselben separaten Anthropic-API-Key** (`ANTHROPIC_API_KEY` nur als Env in der Bake-off-Shell, nie in Dateien — Hard Rule 1). Trials nur **außerhalb des Handelsfensters** (§9 Offhours-Guard). |
+| M1-D5 | Auth | **Kein Subscription-Plugin** (Anthropic-Legal-Request PR #18186; ToS-Risiko trifft den eigenen Account). Beide Harnesse laufen in Messläufen auf **demselben separaten Anthropic-API-Key**. ~~`ANTHROPIC_API_KEY` nur als Env in der Bake-off-Shell, nie in Dateien~~ — **korrigiert 2026-07-08 (Nikinger-Override):** auch kein Shell-Env-Export. Derselbe Keyring-Ansatz wie beim Bot selbst — eigener dedizierter Keyring-Service (`trading-bot-bakeoff-runner`, seed via `meta_m1_harness/bakeoff/store_bakeoff_key.py`), vom Runner (`harness_bakeoff.py`) pro Subprocess-Call frisch geholt und nur in dessen eigenes Environment gegeben, nie in die interaktive Operator-Shell exportiert. Drei getrennte Keyring-Namespaces (live `tradingbot`, fork-neutralisiert `trading-bot-bakeoff-void`, bakeoff-Runner `trading-bot-bakeoff-runner`) — keine Vermischung möglich. Trials nur **außerhalb des Handelsfensters** (§9 Offhours-Guard). |
 | M1-D6 | Budget | **50 € hart** für API-Spend der Messläufe + Smokes. Referenz-Build (§8b) läuft über die normale Claude-Code-Subscription-Session (= gewöhnliche Dev-Arbeit, kein API-Spend). Budget-Guard im Runner; bei Erreichen: sauberer Abbruch + Report mit Teilergebnis. |
 | M1-D7 | Testfeld | **Abstain-/No-Trade-Lessons-Modul** (V3-Item, vorgezogen als Messobjekt). Ziel-Verzeichnis im Fork: `phase10_v3/` mit Paket `abstain_lessons/`. Spec-Suite S1–S7 dient **doppelt**: Messinstrument jetzt, realer Build später (der echte Build auf `main` ist NICHT Teil von M1 — er gehört dem V3-Chat, der die Specs übernimmt/anpasst). |
 | M1-D8 | Isolation | Wegwerf-Fork außerhalb des Live-Trees, `git remote remove origin`, **Keyring-Service-Namen im Fork neutralisiert** (fail-fast statt Live-Creds), `git reset --hard` + `clean -fdq` zwischen Trials, `assert_clean_repo`-Guard. Live-Repo/DB/State/Keyring des Phase-9-Laufs sind unerreichbar zu machen, nicht nur „nicht angefasst". |
@@ -341,13 +341,22 @@ BudgetGuard-Trip; `assert_offhours` (innerhalb/außerhalb/Override); `assert_cle
 1. Live-Zustand sichern: Baseline-Scheduler gestoppt ODER Offhours bestätigt (Checkliste).
 2. `git clone ~/trading-bot ~/bakeoff/trading-bot-fork` (Pfad außerhalb des Live-Trees),
    im Fork: `git remote remove origin`.
-3. **Keyring-Neutralisierung (Base-Commit im Fork):** Service-Namen-Konstante in
-   `phase1_broker_wrapper/broker_wrapper/credentials.py` **[VERIFY: exaktes Symbol]** auf
-   `"trading-bot-bakeoff-void"` ändern (jeder echte Credential-Fetch schlägt sofort fehl);
-   dito für den Anthropic-Key-Service des Bots **[VERIFY]**. Commit, dann `git tag base-0`.
-4. OpenCode installieren + konfigurieren (Modell, Effort **[VERIFY]**, Provider Anthropic via
-   `ANTHROPIC_API_KEY`-Env). Claude Code: gleiche Env in der Bake-off-Shell. Key = der
-   **separate** Bake-off-Key (Operator legt ihn in der Anthropic-Console an).
+3. **Keyring-Neutralisierung (Base-Commit im Fork):** ~~Service-Namen-Konstante ... [VERIFY:
+   exaktes Symbol] ... dito für den Anthropic-Key-Service des Bots [VERIFY]~~ — **verifiziert
+   2026-07-08:** es gibt genau **ein** Symbol, `SERVICE_NAME: Final[str] = "tradingbot"` in
+   `phase1_broker_wrapper/broker_wrapper/credentials.py:40`, das sowohl IG-Creds als auch
+   `anthropic_api_key` gemeinsam trägt (differenziert nur über den `name`-Parameter). Ein
+   einziger Zeilen-Edit auf `"trading-bot-bakeoff-void"` neutralisiert beides. Commit, dann
+   `git tag base-0`.
+4. OpenCode installieren + konfigurieren (Modell `claude-sonnet-5`, Effort/Variant-Flag
+   **[VERIFY am installierten OpenCode]** — Flag heißt `--variant`, konkreter Wert
+   provider-spezifisch, siehe `harness_bakeoff.py`). ~~Provider Anthropic via
+   `ANTHROPIC_API_KEY`-Env ... Claude Code: gleiche Env in der Bake-off-Shell~~ — **korrigiert
+   2026-07-08 (Nikinger-Override, siehe M1-D5):** kein Shell-Env-Export. Key = der
+   **separate** Bake-off-Key (Operator legt ihn in der Anthropic-Console an, dann
+   `python meta_m1_harness/bakeoff/store_bakeoff_key.py` — Keyring-Service
+   `trading-bot-bakeoff-runner`, getrennt vom Live-Service und vom fork-neutralisierten
+   Service). `harness_bakeoff.py` holt den Key pro Subprocess-Call aus dem Keyring.
 5. **Setup-Smoke:** S0 je Harness 1× via Runner (`--steps S0 --repeats 1`). Beide grün ⇒
    weiter. OpenCode irreparabel rot ⇒ Stopp, Operator entscheidet Aider-Substitution (M1-D3).
 
@@ -360,8 +369,11 @@ Harnesse starten Messtrials von identischen (CC-autorisierten) Basen — symmetr
 ### §9 Step 7 — Messläufe
 `python meta_m1_harness/bakeoff/harness_bakeoff.py --repo ~/bakeoff/trading-bot-fork
 --steps S1,S2,S3,S4,S5 --harness claude_code,opencode --repeats 2` — außerhalb des
-Handelsfensters (Guard erzwingt es), `ANTHROPIC_API_KEY` gesetzt. Budget-Checkpoints nach
-jedem (Harness×Step)-Block; `BudgetExceeded` ⇒ sauberer Stopp, Teilergebnis zählt.
+Handelsfensters (Guard erzwingt es). ~~`ANTHROPIC_API_KEY` gesetzt~~ — **korrigiert
+2026-07-08:** kein Env-Setzen nötig/gewollt, der Runner holt den Key selbst aus dem Keyring
+(`store_bakeoff_key.py` vorher einmalig ausführen, s. Step 5 Punkt 4 / M1-D5). Budget-
+Checkpoints nach jedem (Harness×Step)-Block; `BudgetExceeded` ⇒ sauberer Stopp, Teilergebnis
+zählt.
 `results/trials.jsonl` nach `meta_m1_harness/results/` ins Haupt-Repo kopieren + committen.
 **Kostenschätzung (nur Planungsgröße, keine Zusage):** 20 Trials × grob 0,5–2 € ≈ 10–40 € —
 innerhalb 50 €, aber Checkpoints ernst nehmen.
