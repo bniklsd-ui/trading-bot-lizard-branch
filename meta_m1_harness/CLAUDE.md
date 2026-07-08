@@ -82,15 +82,37 @@ installieren, separater Bake-off-API-Key) — eigener Plan, sobald diese Prerequ
   20-Trial-Matrix (S1–S5 × 2 Repeats × 2 Harnesse) mit korrekten `base-N`-Tags,
   Step-major/Harness-alternierend, **ohne** ein einziges subprocess/git-Kommando
   auszulösen (per Test **und** per echtem Lauf bestätigt).
+- **Post-Step-4-Korrekturen** (`be4b7d7`, gleiche Session, Nikinger-Feedback): (a) Harness-
+  Templates auf `claude-sonnet-5`/`--effort medium` (Claude Code) bzw.
+  `anthropic/claude-sonnet-5`/`--variant <VERIFY>`/`--format json`/`--auto` (OpenCode)
+  präzisiert — verifiziert gegen `claude --help` (diese Session) + OpenCode-Docs (WebFetch).
+  (b) **Auth-Override:** M1-D5s ursprüngliches „`ANTHROPIC_API_KEY` als Bake-off-Shell-Env"
+  vom Nikinger verworfen — **kein Key je in einer Env-Var oder Datei**, auch nicht
+  experimentell. Stattdessen derselbe Keyring-Ansatz wie beim Bot: neues
+  `store_bakeoff_key.py` (Service `trading-bot-bakeoff-runner`, dediziert, getrennt vom
+  Live-Service `tradingbot` und vom fork-neutralisierten `trading-bot-bakeoff-void`);
+  `harness_bakeoff.py` holt den Key pro Subprocess-Call frisch aus dem Keyring, gibt ihn
+  nur ins jeweilige Subprocess-Environment. Plan-Doc an allen drei betroffenen Stellen mit
+  datierten Strikethrough-Korrekturen versehen (nicht stillschweigend umgeschrieben). 21
+  Tests grün.
 
 ### Next
-- Steps 5–10 brauchen Nikinger-Operator-Aktion zuerst: Fork anlegen
-  (`git clone ~/trading-bot ~/bakeoff/trading-bot-fork`, `origin` entfernen), OpenCode
-  installieren + konfigurieren, separaten Bake-off-Anthropic-API-Key anlegen. Danach: neuer,
-  eigener Anker-Plan für Step 5 (Fork-Setup + Setup-Smoke S0) — Harness-CLI-Flags
-  (`claude --help`, `opencode --help`) müssen vor dem ersten echten Trial gegen die
-  `[VERIFY]`-Platzhalter in `bakeoff/harness_bakeoff.py` geprüft werden.
-- Branch `meta-m1-harness` (4 Commits ab `phase9-v2-foundation`/`e7a8984`) liegt bereit,
+- **Vor Step 5, konkret:**
+  1. Live-Zustand sichern (Baseline-Scheduler läuft aktuell — stoppen oder Offhours
+     bestätigen).
+  2. Separaten Bake-off-Anthropic-Key in der Anthropic-Console anlegen.
+  3. `git clone ~/trading-bot ~/bakeoff/trading-bot-fork` (vom aktuellen Branch
+     `meta-m1-harness`, damit `meta_m1_harness/specs/` mitkommt), `git remote remove origin`.
+  4. Keyring-Neutralisierung im Fork: `SERVICE_NAME` in
+     `phase1_broker_wrapper/broker_wrapper/credentials.py:40` auf
+     `"trading-bot-bakeoff-void"` ändern, committen, `git tag base-0`.
+  5. OpenCode installieren (`curl -fsSL https://opencode.ai/install | bash` oder
+     `npm i -g opencode-ai@latest`); `--variant`-Wert gegen die installierte Instanz prüfen.
+  6. `python meta_m1_harness/bakeoff/store_bakeoff_key.py` — Key **in den Keyring**, nie in
+     eine Shell exportieren.
+  7. Setup-Smoke: `python meta_m1_harness/bakeoff/harness_bakeoff.py --repo
+     ~/bakeoff/trading-bot-fork --steps S0 --harness claude_code,opencode --repeats 1`.
+- Branch `meta-m1-harness` (7 Commits ab `phase9-v2-foundation`/`e7a8984`) liegt bereit,
   nicht gemergt — Merge-Entscheidung liegt beim Nikinger.
 
 ### Open questions / blockers
