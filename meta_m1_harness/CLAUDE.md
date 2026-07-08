@@ -49,10 +49,12 @@ meta_m1_harness/
 gemergt; aktiver Branch jetzt **`meta_working`**. Fork lebt unter `~/bakeoff/trading-bot-fork`,
 `base-0` (Keyring neutralisiert). **Setup-Smoke S0: claude_code ✅ grün, opencode ❌**
 (OpenCode ist schlicht noch nicht installiert/auf PATH — `[Errno 2] No such file or
-directory: 'opencode'`, **kein** M1-D3-Fall von „irreparabel rot"). 🔄 Step 6
-(Referenz-Build S1–S7 im Fork, Claude-Code-only, braucht kein OpenCode) läuft.
+directory: 'opencode'`, **kein** M1-D3-Fall von „irreparabel rot"). **✅ Step 6
+(Referenz-Build S1–S7 im Fork) fertig** — `base-1`…`base-7` getaggt, jedes Gate beim
+Committen grün, volle Cross-Phase-Regression im Fork danach bestätigt grün. Nächster
+Schritt braucht OpenCode-Install (Step 7, der gemessene Bake-off).
 
-## Session stopped — 2026-07-08 (Steps 0–5 teilweise + Step 6 in Arbeit, Branch `meta_working`)
+## Session stopped — 2026-07-08 (Steps 0–6 fertig, Branch `meta_working`, Step 7 gegatet auf OpenCode-Install)
 
 ### Completed
 - **Step 0** (`0c5773e`): Phasen-Skeleton (`meta_m1_harness/CLAUDE.md`) + INDEX-Einträge für
@@ -110,19 +112,43 @@ directory: 'opencode'`, **kein** M1-D3-Fall von „irreparabel rot"). 🔄 Step 
   gesetzt. Fix: Union aus `git diff` (tracked) + `git ls-files --others --exclude-standard`
   (untracked). 3 neue Tests gegen ein echtes Wegwerf-Git-Repo (nicht gemockt). 27 Tests grün.
 
+- **Step 6 — Referenz-Build S1–S7, komplett** (im Fork, eigene Commits/Tags dort, nicht in
+  diesem Repo): Claude-Code-only, normale Subscription-Session, kein API-Spend. Je Spec:
+  implementieren → Gate exakt wie in der Spec → Commit → `git tag base-<k>`.
+  - **S1** Modelle+Taxonomie (5 Tests) · **S2** Klassifizierer (19 Tests, table-driven, alle
+    12 Reasons) · **S3** `AbstainStore` (5 Tests, eigene sqlite3-Connection, kein
+    P2-Migrationsframework) · **S4** `reflect_abstain` (6 Tests, die einzige AI-Naht,
+    default aus) · **S5** Sink + Executor-Wiring (**der härteste Trial**, Cross-File-Edit in
+    `phase5_execution/`: `abstain_sink`-Param gehängt an `_no_trade()`, den einen
+    Choke-Point, den alle 8 NO_TRADE-Pfade schon durchlaufen — volle P5-Regression **vor**
+    neuen Tests bestätigt unverändert grün (154), dann +4+3 = 161) · **S6**
+    Research-Prompt-Injektion (`include_abstain_lessons`-Flag in `build_prompt()`,
+    **bewusst vom Spec-Wortlaut abgewichen** — `AbstainStore`-Fetch bleibt außerhalb, da
+    `build_prompt` explizit "no I/O" dokumentiert; P4-Regression vorher 141, danach 144) ·
+    **S7** Report-CLI (2 Tests, Golden-Output, standalone smoke-verifiziert).
+  - **Echter Bug live gefunden + gefixt:** die geteilte venv's editable Install von
+    `research` zeigt fest auf das **Original-Repo**, nicht den Fork — nur weil S6s eigenes
+    Gate-Kommando `phase4_research/tests/` mit einschließt, wurde das per
+    pyproject.toml-Sys.path-Insertion zufällig überdeckt. `phase10_v3/tests/conftest.py`
+    erzwingt jetzt zusätzlich den fork-lokalen `phase4_research/`-Pfad — Root-Fix, nicht nur
+    Symptom (jedes einzelne Spec-Gate war für sich schon robust, aber `pytest
+    phase10_v3/tests/` als Ganzes vorher nicht). `base-7` per `git tag -f` auf den Fix
+    vorgezogen.
+  - **Volle Cross-Phase-Regression im Fork danach:** P1 87 · P2 76 · P3 100 · P4 144 ·
+    P5 158 · P6 70 · P7 133 · P8 217 · P9 72 · phase10_v3 43 · root 77 — alles grün.
+
 ### Next
-- **Step 6 läuft** (diese Session): Referenz-Build S1–S7 im Fork, Claude-Code-only, normale
-  Subscription-Session (kein API-Spend), je Spec: implementieren → Gate grün → Commit →
-  `git tag base-<k>`.
-- **Vor Step 7** (der eigentliche gemessene Bake-off): OpenCode muss tatsächlich installiert
-  und auf PATH sein (`curl -fsSL https://opencode.ai/install | bash` oder
+- **Step 7** (der eigentliche gemessene Bake-off) braucht zuerst: OpenCode tatsächlich
+  installiert und auf PATH (`curl -fsSL https://opencode.ai/install | bash` oder
   `npm i -g opencode-ai@latest`), danach S0 für opencode erneut grün bekommen; `--variant`-
-  Wert gegen die installierte Instanz verifizieren.
+  Wert gegen die installierte Instanz verifizieren. Danach:
+  `python meta_m1_harness/bakeoff/harness_bakeoff.py --repo ~/bakeoff/trading-bot-fork
+  --steps S1,S2,S3,S4,S5 --harness claude_code,opencode --repeats 2` (außerhalb des
+  Handelsfensters, Budget-Cap 50 €).
 - Branch `meta_working` (ab `phase9-v2-foundation`, `meta-m1-harness` per FF gemergt) ist der
-  aktive Arbeits-Branch.
+  aktive Arbeits-Branch; alle Step-6-Commits/Tags leben nur im Fork, nicht hier.
 
 ### Open questions / blockers
 - `V2-Baseline-Auswertung` (echter Trade + Variety-These) bleibt offen, orthogonal, kein
   M1-Blocker (Merker in ROADMAP §Phase 9 hinterlegt).
-- OpenCode-Installationsstatus unklar (Operator-Prereq, s. o.) — blockt Step 7, **nicht**
-  Step 6.
+- OpenCode-Installationsstatus unklar (Operator-Prereq, s. o.) — einziger Blocker vor Step 7.
