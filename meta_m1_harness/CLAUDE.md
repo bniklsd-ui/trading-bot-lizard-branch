@@ -138,10 +138,14 @@ Schritt braucht OpenCode-Install (Step 7, der gemessene Bake-off).
     P5 158 · P6 70 · P7 133 · P8 217 · P9 72 · phase10_v3 43 · root 77 — alles grün.
 
 ### Next
-- **Step 7** (der eigentliche gemessene Bake-off) braucht zuerst: OpenCode tatsächlich
-  installiert und auf PATH (`curl -fsSL https://opencode.ai/install | bash` oder
-  `npm i -g opencode-ai@latest`), danach S0 für opencode erneut grün bekommen; `--variant`-
-  Wert gegen die installierte Instanz verifizieren. Danach:
+- **OpenCode ist bereits installiert** (2026-07-08, Nikinger bestätigt) — global unter
+  `~/.opencode/bin/opencode` (v1.17.15, **nicht** in der Python-venv — es ist kein
+  Python-Paket, braucht keine `pip install`). `~/.bashrc` trägt bereits
+  `export PATH=/home/trading-bot/.opencode/bin:$PATH` (Zeilen 121–122) — ein frisches
+  Terminal (oder `source ~/.bashrc`) sollte reichen. **[VERIFY nächste Session]:** `which
+  opencode` in einer echten interaktiven Shell bestätigen, dann Setup-Smoke S0 für opencode
+  erneut versuchen (`--variant`-Wert gegen `opencode run --help` prüfen, war noch offen).
+- **Step 7** (der eigentliche gemessene Bake-off), sobald S0 für **beide** Harnesse grün ist:
   `python meta_m1_harness/bakeoff/harness_bakeoff.py --repo ~/bakeoff/trading-bot-fork
   --steps S1,S2,S3,S4,S5 --harness claude_code,opencode --repeats 2` (außerhalb des
   Handelsfensters, Budget-Cap 50 €).
@@ -151,4 +155,4 @@ Schritt braucht OpenCode-Install (Step 7, der gemessene Bake-off).
 ### Open questions / blockers
 - `V2-Baseline-Auswertung` (echter Trade + Variety-These) bleibt offen, orthogonal, kein
   M1-Blocker (Merker in ROADMAP §Phase 9 hinterlegt).
-- OpenCode-Installationsstatus unklar (Operator-Prereq, s. o.) — einziger Blocker vor Step 7.
+- Kein echter Blocker mehr vor Step 7 — nur noch die S0-Re-Verifikation für opencode (s. o.).
