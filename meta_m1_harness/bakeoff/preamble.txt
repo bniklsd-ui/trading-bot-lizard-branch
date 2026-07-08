@@ -1,0 +1,4 @@
+Du arbeitest im Repo-Root eines isolierten Test-Forks. Implementiere exakt die folgende
+Spec. Lies CLAUDE.md und referenzierte Dateien nur bei Bedarf (@ref on need-to-know).
+Führe nach der Implementierung das Gate-Kommando der Spec aus und iteriere, bis es grün ist
+oder du nicht weiterkommst. Ändere nichts außerhalb des Spec-Scopes. Committe nicht.
