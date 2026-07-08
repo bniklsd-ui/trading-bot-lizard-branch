@@ -45,13 +45,14 @@ meta_m1_harness/
 
 ## Status
 
-✅ Steps 0–4 fertig, getestet, committet auf Branch `meta-m1-harness` (nicht auf `main`/
-`phase9-v2-foundation` gemergt — Nikinger-Entscheidung, eigener Branch statt Direkt-Commit).
-Steps 5–10 (Fork, OpenCode-Install, 20-Trial-Messlauf, Ergebnisse, `AGENTS.md`,
-P4/P6-Kalt-Fallback) gegatet auf Nikinger-Operator-Aktion (Fork anlegen, OpenCode
-installieren, separater Bake-off-API-Key) — eigener Plan, sobald diese Prerequisites stehen.
+✅ Steps 0–4 fertig, getestet, `meta-m1-harness` per Fast-Forward in `phase9-v2-foundation`
+gemergt; aktiver Branch jetzt **`meta_working`**. Fork lebt unter `~/bakeoff/trading-bot-fork`,
+`base-0` (Keyring neutralisiert). **Setup-Smoke S0: claude_code ✅ grün, opencode ❌**
+(OpenCode ist schlicht noch nicht installiert/auf PATH — `[Errno 2] No such file or
+directory: 'opencode'`, **kein** M1-D3-Fall von „irreparabel rot"). 🔄 Step 6
+(Referenz-Build S1–S7 im Fork, Claude-Code-only, braucht kein OpenCode) läuft.
 
-## Session stopped — 2026-07-08 (Steps 0–4 fertig, Branch `meta-m1-harness`)
+## Session stopped — 2026-07-08 (Steps 0–5 teilweise + Step 6 in Arbeit, Branch `meta_working`)
 
 ### Completed
 - **Step 0** (`0c5773e`): Phasen-Skeleton (`meta_m1_harness/CLAUDE.md`) + INDEX-Einträge für
@@ -96,28 +97,32 @@ installieren, separater Bake-off-API-Key) — eigener Plan, sobald diese Prerequ
   datierten Strikethrough-Korrekturen versehen (nicht stillschweigend umgeschrieben). 21
   Tests grün.
 
+- **Post-Setup-Smoke-Fixes** (`7107913`, `0bf5ccd`, gleiche Session): zwei echte Bugs aus dem
+  ersten realen S0-Lauf gefunden und gefixt. (a) `_prompt_operator_for_manual_spend` crashte
+  auf deutsches Komma-Dezimal (`0,22` → `ValueError`) — normalisiert jetzt Komma→Punkt +
+  re-prompted statt abzustürzen (ein Absturz hätte einen bereits ausgeführten, bereits
+  bezahlten Trial ergebnislos verworfen). Verifiziert: der Fork blieb trotz Absturz sauber
+  auf `base-0` — der `finally: reset_to(...)`-Guard hielt. (b) **Echter Messfehler:**
+  `changed_files()` nutzte nur `git diff --name-only`, das neue **untracked** Dateien
+  (Harnesse committen laut Preamble nicht) unsichtbar macht — der claude_code/S0-Trial zeigte
+  `gate_passed=true, files_changed=0`, ein Widerspruch. Hätte `edit_failures` (eine
+  Kernmetrik) bei jedem Harness, der etwas schreibt aber am Gate scheitert, fälschlich auf 1
+  gesetzt. Fix: Union aus `git diff` (tracked) + `git ls-files --others --exclude-standard`
+  (untracked). 3 neue Tests gegen ein echtes Wegwerf-Git-Repo (nicht gemockt). 27 Tests grün.
+
 ### Next
-- **Vor Step 5, konkret:**
-  1. Live-Zustand sichern (Baseline-Scheduler läuft aktuell — stoppen oder Offhours
-     bestätigen).
-  2. Separaten Bake-off-Anthropic-Key in der Anthropic-Console anlegen.
-  3. `git clone ~/trading-bot ~/bakeoff/trading-bot-fork` (vom aktuellen Branch
-     `meta-m1-harness`, damit `meta_m1_harness/specs/` mitkommt), `git remote remove origin`.
-  4. Keyring-Neutralisierung im Fork: `SERVICE_NAME` in
-     `phase1_broker_wrapper/broker_wrapper/credentials.py:40` auf
-     `"trading-bot-bakeoff-void"` ändern, committen, `git tag base-0`.
-  5. OpenCode installieren (`curl -fsSL https://opencode.ai/install | bash` oder
-     `npm i -g opencode-ai@latest`); `--variant`-Wert gegen die installierte Instanz prüfen.
-  6. `python meta_m1_harness/bakeoff/store_bakeoff_key.py` — Key **in den Keyring**, nie in
-     eine Shell exportieren.
-  7. Setup-Smoke: `python meta_m1_harness/bakeoff/harness_bakeoff.py --repo
-     ~/bakeoff/trading-bot-fork --steps S0 --harness claude_code,opencode --repeats 1`.
-- Branch `meta-m1-harness` (7 Commits ab `phase9-v2-foundation`/`e7a8984`) liegt bereit,
-  nicht gemergt — Merge-Entscheidung liegt beim Nikinger.
+- **Step 6 läuft** (diese Session): Referenz-Build S1–S7 im Fork, Claude-Code-only, normale
+  Subscription-Session (kein API-Spend), je Spec: implementieren → Gate grün → Commit →
+  `git tag base-<k>`.
+- **Vor Step 7** (der eigentliche gemessene Bake-off): OpenCode muss tatsächlich installiert
+  und auf PATH sein (`curl -fsSL https://opencode.ai/install | bash` oder
+  `npm i -g opencode-ai@latest`), danach S0 für opencode erneut grün bekommen; `--variant`-
+  Wert gegen die installierte Instanz verifizieren.
+- Branch `meta_working` (ab `phase9-v2-foundation`, `meta-m1-harness` per FF gemergt) ist der
+  aktive Arbeits-Branch.
 
 ### Open questions / blockers
-- Preregistration-Commit-Historie (Step 2) ist branch-lokal, noch nicht auf `main` — der
-  Anti-Shopping-Beweis ("Preregistration committet vor jedem Trial") ist stichhaltig
-  solange der Branch bis zum ersten echten Trial unverändert bleibt.
 - `V2-Baseline-Auswertung` (echter Trade + Variety-These) bleibt offen, orthogonal, kein
   M1-Blocker (Merker in ROADMAP §Phase 9 hinterlegt).
+- OpenCode-Installationsstatus unklar (Operator-Prereq, s. o.) — blockt Step 7, **nicht**
+  Step 6.
