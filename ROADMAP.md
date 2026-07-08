@@ -303,26 +303,40 @@ weiterlaufenden Betriebs, ist aber **nicht** Bedingung dieses ✅-Flips (der dec
 > [`phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md`](./phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md) ·
 > Plan: [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md) ·
 > Phase-Head: [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md).
+>
+> **Offen (kein Blocker, separater docs-only-Auftrag):** V2-Baseline-Auswertung — ein echter
+> `open→close`-Trade unter dem V2-Universum + die Variety-These (sinkt die Abstain-Quote mit
+> 8 statt 2–4 aktiven Epics?). Nicht Teil von Meta-Phase M1 (orthogonal); einzuschieben, sobald
+> der Baseline-Lauf genug Marktdaten geliefert hat.
 
 **Goal:** die zwei strukturellen Lücken schließen, die den gesamten v1.5→v1.7-Hotfix-Arc
 getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 11/V4)
 auf einem unzuverlässigen Datenfundament aufbaut.
 
+> **Korrektur (2026-07-08, M1-Housekeeping):** die Checkliste unten stand noch auf `[ ]`,
+> obwohl der Status-Block oben + `phase9_universe/CLAUDE.md`s Kontrakt-Tabelle Steps 1–6 + 7a
+> längst als ✅ führen — gegen den Code verifiziert (`universe/{discovery,pricing,promotion,
+> store,models}.py` existieren, `phase2_persistence/migrations/004_phase9_instrument_universe.sql`
+> existiert). Getestetes Verhalten schlägt Doku-Prosa (Working-style-Regel); Boxen unten korrigiert.
+
 ### 9a — Autonome Epic-Research (discover → validate → promote)
-- [ ] `discovery.py` — Seed-Suchbegriff-Sweep + IG `search_markets` + Code-Filter (EUR, Index-CFD,
+- [x] `discovery.py` — Seed-Suchbegriff-Sweep + IG `search_markets` + Code-Filter (EUR, Index-CFD,
   TRADEABLE, Kassa-Variante, min size) — kein LLM
-- [ ] `pricing.py` — deterministischer `point_value`-Resolver (IG-Felder + Namens-/lot_size-Kreuzcheck)
-- [ ] `promotion.py` — Statusmaschine `discovered → verified → active` voll autonom auf Demo;
+- [x] `pricing.py` — deterministischer `point_value`-Resolver (IG-Felder + Namens-/lot_size-Kreuzcheck)
+- [x] `promotion.py` — Statusmaschine `discovered → verified → active` voll autonom auf Demo;
   Auto-Demotion (`active → quarantined`) bei wiederholten IG-Verify-Fails
-- [ ] Migration 004 (`instrument_universe`) + `UniverseStore`; `EXTENDED_UNIVERSE` wird einmaliger
+- [x] Migration 004 (`instrument_universe`) + `UniverseStore`; `EXTENDED_UNIVERSE` wird einmaliger
   Seed (`source="curated"`)
-- [ ] P4 liest das aktive DB-Universum; P8-Runner bekommt eine Universe-Refresh-Naht
+- [x] P4 liest das aktive DB-Universum; P8-Runner bekommt eine Universe-Refresh-Naht
 
 ### 9b — Daten-Input-Zuverlässigkeit
-- [ ] `BarProvider`-Kette IG→yFinance + yFinance-Härtung (Backoff, Circuit-Breaker)
-- [ ] Deterministischer Divergenz-Check (IG-Bar-Close vs. yFinance-Last), gated nichts
-- [ ] Lightstreamer-Multi-Epic-Diagnose (heute nur 1 Epic live bewiesen) → Fix → `LiveQuoteCache`
-  in den P4-Research-Kontext verdrahtet (Momentum-VETO bleibt unangetastet auf P1-IG-Bars)
+- [x] `BarProvider`-Kette IG→yFinance + yFinance-Härtung (Backoff, Circuit-Breaker)
+- [x] Deterministischer Divergenz-Check (IG-Bar-Close vs. yFinance-Last), gated nichts
+- [x] Lightstreamer-Multi-Epic-Diagnose (7a, live 2026-07-06) — **NEGATIV-Befund**, kein Bug,
+  kein Fix-Target (7b unblocked-aber-leer)
+- [ ] `LiveQuoteCache` in den P4-Research-Kontext verdrahtet — **weiterhin offen**, hing an
+  einem 7b-Fix, der mangels Bug nie kam; kein Blocker, re-run erst bei ~10+ aktiven Epics
+  (H2-Grenze bei 4 ungeprüft)
 
 **Leitplanke:** kein neues AI im Daten-/Universum-Layer (Discovery-/Promotion-Kriterien sind
 100 % code-evaluiert); VETOs/Gates unangetastet; demo-only fail-closed.
@@ -401,6 +415,32 @@ lernbaren Signal machen, nicht nur einem verworfenen Reason-Code.
 divergence from outcome-score on bad-market days).
 
 **Directory:** `phase11_v4/` *(to be created)*
+
+---
+
+## Meta-Strang (orthogonal, hochzählbar)
+
+> Läuft **quer** zur funktionalen Nummerierung oben (1–11) — keine echte Phase, keine
+> Verdrängung von Profit-Arbeit. Eigener Präfix `M`, hochzählbar (M2, M3, …).
+
+### M1 — Harness-Unabhängigkeit (Build-Front)
+**Ziel:** vorregistrierte Messung, ob der Bot-Code künftig mit einem offenen Harness
+(OpenCode) statt Claude Code gebaut werden kann, plus — unabhängig vom Ausgang — zwei
+Feuerlöscher: ein harness-neutraler Kontext-Einstieg (`AGENTS.md`) und ein getesteter, kalter
+provider-agnostischer LLM-Fallback für P4/P6. Kein Bot-Feature, kein Umbau der Live-Pfade.
+
+**DoD (Kurzform):** Preregistration committet vor jedem Trial · 20 Messtrials (oder
+dokumentierter Budget-Stopp) · Ergebnisse + Entscheidung nach vorregistrierter Regel ·
+`AGENTS.md` auf `main` · `OpenAICompatLLMClient` getestet, null Live-Pfad-Diff · alle
+Regressionen grün · Phase-9-Live-Test zu keinem Zeitpunkt berührt.
+
+**Bereits bekannt (kein Bug):** mit den gelockten Werten (Δ=10pp, E=73,50€, M=120€) gilt
+E < M — Migration ist unabhängig vom Messergebnis ausgeschlossen; der Bake-off liefert nur
+die Feuerlöscher-Zahl.
+
+**Verweise:** [`meta_m1_harness/CLAUDE.md`](./meta_m1_harness/CLAUDE.md) (Phasen-Kopf) ·
+[`docs/concepts/meta_m1_harness_plan.md`](./docs/concepts/meta_m1_harness_plan.md) (Plan,
+Steps 0–10) · [`docs/concepts/meta_phase_unabhaengigkeit_konzept.md`](./docs/concepts/meta_phase_unabhaengigkeit_konzept.md) (Hypothese).
 
 ---
 

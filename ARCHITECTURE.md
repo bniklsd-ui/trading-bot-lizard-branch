@@ -107,10 +107,12 @@ updated: 2026-07-06
 ### 5-Gate Pipeline (`execution/gates.py` + `execution/sizing.py`, `ig_bot.py` orchestrator)
 1. **Gate 1: Time Window** — `09:00`–`17:30` (`config.tz`, full market window)
 2. **Gate 2: Load Candidates** — fresh `turbo_candidates.json` (frozen legacy filename, TTL
-   30 min); runs research if stale/empty. Research (P4) picks per-epic across a curated
-   4-instrument EUR universe (`EXTENDED_UNIVERSE`: DAX, Euro Stoxx 50, CAC 40, IBEX 35 —
-   v1.5, `research/models.py`); Phase 9/V2 replaces this hand-curated tuple with an
-   autonomous discover→validate→promote pipeline (planned, not yet built)
+   30 min); runs research if stale/empty. Research (P4) picks per-epic across the **DB-backed
+   instrument universe** (`instrument_universe` table, `UniverseStore`) built and live-tested
+   by Phase 9/V2's autonomous discover→validate→promote pipeline; the old hand-curated
+   4-instrument tuple (`EXTENDED_UNIVERSE`: DAX, Euro Stoxx 50, CAC 40, IBEX 35 — v1.5,
+   `research/models.py`) now only serves as its one-time seed input (`source="curated"`).
+   *(Corrected 2026-07-08, M1-housekeeping — was still marked "planned, not yet built".)*
 3. **Gate 3: Constraints** — budget available, room under `max_parallel_positions`
 4. **Gate 4: Sizing** (`sizing.py`) — **risk-per-trade ÷ stop-distance** (not notional ÷ price;
    v1-tunable `risk_pct`)
@@ -179,7 +181,8 @@ updated: 2026-07-06
   `provenance` column — distinguishes verification/seed trades from autonomous ones in the
   P4 research prompt, v1.6), `reward_pts`, `ig_config_state` + (future, Phase 10/V3)
   `market_regime_snapshots`, `decision_context`, `lesson_embeddings`. Phase 9/V2 adds
-  migration 004 (`instrument_universe`, planned — not yet built).
+  migration 004 (`instrument_universe`) — built, live-tested, in active use since the V2
+  baseline run (2026-07-06). *(Corrected 2026-07-08, M1-housekeeping.)*
 - **JSON (operational, TTL):** `ig_state.json` (account/positions, fresh <60s),
   `ig_config.json` (static bot config), `turbo_candidates.json` (frozen legacy name, TTL
   30 min) + later-phase runtime files (all gitignored): `llm_usage.json` (P4 token meter),
