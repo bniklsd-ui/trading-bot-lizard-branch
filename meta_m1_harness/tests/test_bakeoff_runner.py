@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -8,6 +9,15 @@ from zoneinfo import ZoneInfo
 import pytest
 
 import harness_bakeoff as bo
+
+
+def _init_git_repo(repo: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "test"], cwd=repo, check=True)
+    (repo / "a.txt").write_text("a")
+    subprocess.run(["git", "add", "a.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=repo, check=True)
 
 
 @pytest.fixture(autouse=True)
@@ -122,6 +132,35 @@ def test_assert_clean_repo_clean_passes(tmp_path, monkeypatch):
     (tmp_path / ".git").mkdir()
     monkeypatch.setattr(bo, "_git", lambda repo, *a, **k: _FakeCompleted(stdout=""))
     bo.assert_clean_repo(tmp_path)  # must not raise
+
+
+# --- changed_files: real git, must see untracked new files too -----------------------------
+# Regression test for a live bug: git diff alone missed brand-new untracked files (harnesses
+# are told not to commit), so a real S0 trial reported files_changed=0 despite the gate
+# passing (which requires files to exist on disk).
+
+
+def test_changed_files_sees_untracked_new_files(tmp_path):
+    _init_git_repo(tmp_path)
+    ref = bo.snapshot_ref(tmp_path)
+    (tmp_path / "smoke.py").write_text("def smoke(): return 'ok'")
+
+    assert bo.changed_files(tmp_path, ref) == ["smoke.py"]
+
+
+def test_changed_files_sees_tracked_modifications_too(tmp_path):
+    _init_git_repo(tmp_path)
+    ref = bo.snapshot_ref(tmp_path)
+    (tmp_path / "a.txt").write_text("modified")
+
+    assert bo.changed_files(tmp_path, ref) == ["a.txt"]
+
+
+def test_changed_files_empty_when_nothing_changed(tmp_path):
+    _init_git_repo(tmp_path)
+    ref = bo.snapshot_ref(tmp_path)
+
+    assert bo.changed_files(tmp_path, ref) == []
 
 
 # --- _fetch_bakeoff_api_key: keyring only, never env/file ----------------------------------

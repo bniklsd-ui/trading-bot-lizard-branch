@@ -142,8 +142,11 @@ def reset_to(repo: Path, ref: str) -> None:
 
 
 def changed_files(repo: Path, ref: str) -> list[str]:
-    diff = _git(repo, "diff", "--name-only", ref)
-    return [line for line in diff.stdout.splitlines() if line.strip()]
+    # git diff alone misses brand-new untracked files (harnesses are told not to commit) -
+    # combine tracked-file diffs against ref with untracked-but-not-gitignored new files.
+    tracked = _git(repo, "diff", "--name-only", ref).stdout.splitlines()
+    untracked = _git(repo, "ls-files", "--others", "--exclude-standard").stdout.splitlines()
+    return sorted({line.strip() for line in (*tracked, *untracked) if line.strip()})
 
 
 # --- Guards -------------------------------------------------------------------------
