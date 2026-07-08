@@ -34,6 +34,13 @@ updated: 2026-07-06
 - [docs/concepts/phase1_hardening_plan.md](./concepts/phase1_hardening_plan.md) — 📗 14KB · P1-hardening side-track plan (Steps 0–3 done)
 - [docs/concepts/doc_layers_token_efficiency_plan.md](./concepts/doc_layers_token_efficiency_plan.md) — 📕 11KB · this restructure's plan (executed 2026-07-06)
 
+## Meta-Strang (M — orthogonal, Build-/Laufzeit-Unabhängigkeit)
+- [meta_m1_harness/CLAUDE.md](../meta_m1_harness/CLAUDE.md) — 🔄 4KB · M1 phase head; Steps 0–4 in progress, Steps 5–10 gated on operator setup
+- [docs/concepts/meta_m1_harness_plan.md](./concepts/meta_m1_harness_plan.md) — 📕 36KB · execution-ready plan (Steps 0–10, locked decisions M1-D1…D13)
+- [docs/concepts/meta_phase_unabhaengigkeit_konzept.md](./concepts/meta_phase_unabhaengigkeit_konzept.md) — 📕 16KB · Hypothesis/theory doc (H_Build/H_Runtime, Decisions A–H)
+- [docs/concepts/PHASE10_META_KICKOFF_HANDOVER.md](./concepts/PHASE10_META_KICKOFF_HANDOVER.md) — 📕 8KB · kickoff handover from Phase 9 close-out into the Meta-Phase
+- [docs/concepts/market_snapshot_middleman_konzept.md](./concepts/market_snapshot_middleman_konzept.md) — 📕 8KB · gated V2.5/V3 idea capture (MarketSnapshot middleman); not built, not part of M1
+
 ## Closed phases (head 📗 + archive 📦 each; READMEs = public surface)
 - [phase1_broker_wrapper/CLAUDE.md](../phase1_broker_wrapper/CLAUDE.md) — 📗 10KB · IG wrapper head (Envelope, auth, hardening) · [README](../phase1_broker_wrapper/README.md) · [archive](../phase1_broker_wrapper/SESSIONS_ARCHIVE.md) 11KB
 - [phase1_broker_wrapper/lightstreamer_integration_notes.md](../phase1_broker_wrapper/lightstreamer_integration_notes.md) — 📗 26KB · LS/TLCP chronicle + Step-7a finding
