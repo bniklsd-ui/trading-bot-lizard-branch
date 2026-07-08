@@ -45,11 +45,57 @@ meta_m1_harness/
 
 ## Status
 
-🔄 Steps 0–4 in Arbeit (docs + Instrument, kein Fork/Operator-Prereq nötig). Steps 5–10
-(Fork, OpenCode-Install, 20-Trial-Messlauf, Ergebnisse, `AGENTS.md`, P4/P6-Kalt-Fallback)
-gegatet auf Nikinger-Operator-Aktion (Fork anlegen, OpenCode installieren, separater
-Bake-off-API-Key) — eigener Plan, sobald diese Prerequisites stehen.
+✅ Steps 0–4 fertig, getestet, committet auf Branch `meta-m1-harness` (nicht auf `main`/
+`phase9-v2-foundation` gemergt — Nikinger-Entscheidung, eigener Branch statt Direkt-Commit).
+Steps 5–10 (Fork, OpenCode-Install, 20-Trial-Messlauf, Ergebnisse, `AGENTS.md`,
+P4/P6-Kalt-Fallback) gegatet auf Nikinger-Operator-Aktion (Fork anlegen, OpenCode
+installieren, separater Bake-off-API-Key) — eigener Plan, sobald diese Prerequisites stehen.
 
-## Session stopped — <offen>
+## Session stopped — 2026-07-08 (Steps 0–4 fertig, Branch `meta-m1-harness`)
 
-Wird am Ende dieser Session befüllt (Rotationsregel: genau ein Block pro Phasen-CLAUDE.md).
+### Completed
+- **Step 0** (`0c5773e`): Phasen-Skeleton (`meta_m1_harness/CLAUDE.md`) + INDEX-Einträge für
+  alle drei M1-Quelldokumente (Plan, Konzept, Kickoff-Handover) + eine vierte, unabhängige
+  Idee-Notiz (`market_snapshot_middleman_konzept.md`), die zeitgleich vom Nikinger eingefügt
+  wurde.
+- **Step 1** (`c936945`): Legacy-Grep sauber (nur bekannter `turbo_candidates.json`-Rest).
+  Voller Regressions-Baseline **grün** und deckungsgleich mit dem Plan: P1 87 · P2 76 ·
+  P3 100 · P4 141 · P5 154 · P6 70 · P7 133 · P8 217 · P9 72 · root 77 — eigene Memory
+  (`reference_running_phase_tests.md`) mit dem frischen Stand aktualisiert. **Echte Doku-
+  Drift gefunden und gefixt:** ROADMAP Phase-9-Checkliste stand komplett auf `[ ]`, obwohl
+  Steps 1–6+7a längst als ✅ im Phasenkopf standen — Boxen korrigiert, `LiveQuoteCache`-
+  Wiring bewusst offen gelassen (echt noch nicht verdrahtet, per grep verifiziert).
+  ARCHITECTURE.md nannte Migration 004 fälschlich "planned, not yet built" — korrigiert.
+  ROADMAP-Meta-Strang-Sektion + V2-Baseline-Merker ergänzt.
+- **Step 2** (`796f96f`): `META_M1_PREREGISTRATION.md` — Δ=10pp, P=0,35, K=210€, E=73,50€,
+  M=120€, Migrationsregel, Rausch-Regel, Messdesign. Verbatim aus Konzept §1/§3/§4, vor
+  jedem Trial committet (Git-History = Anti-Shopping-Beweis).
+  **⚠ Auffälligkeit:** dieser Commit landet auf einem lokalen Feature-Branch, nicht auf
+  `main` — die "Git-History als Beweis"-Eigenschaft des Preregistration-Locks hält nur,
+  solange der Branch nicht umgeschrieben/gerebased wird, bevor der erste Trial läuft.
+- **Step 3** (`769f2b8`): Specs S0–S7 (Abstain-/No-Trade-Lessons-Testfeld) — self-contained,
+  verbatim aus dem Plan transkribiert. Ein Selbstwiderspruch beim ersten Entwurf der S2-Gate-
+  Mapping-Zeile wurde noch in derselben Bearbeitung bemerkt und bereinigt (G2→NO_CANDIDATES
+  ist jetzt eindeutig, ohne die widersprüchliche erste Fassung).
+- **Step 4** (`74611b0`): `harness_bakeoff.py` + `analyze.py` + `preamble.txt` + 19 gemockte
+  Tests, alle grün. `--dry-run` live gegen dieses Repo verifiziert: druckt die volle
+  20-Trial-Matrix (S1–S5 × 2 Repeats × 2 Harnesse) mit korrekten `base-N`-Tags,
+  Step-major/Harness-alternierend, **ohne** ein einziges subprocess/git-Kommando
+  auszulösen (per Test **und** per echtem Lauf bestätigt).
+
+### Next
+- Steps 5–10 brauchen Nikinger-Operator-Aktion zuerst: Fork anlegen
+  (`git clone ~/trading-bot ~/bakeoff/trading-bot-fork`, `origin` entfernen), OpenCode
+  installieren + konfigurieren, separaten Bake-off-Anthropic-API-Key anlegen. Danach: neuer,
+  eigener Anker-Plan für Step 5 (Fork-Setup + Setup-Smoke S0) — Harness-CLI-Flags
+  (`claude --help`, `opencode --help`) müssen vor dem ersten echten Trial gegen die
+  `[VERIFY]`-Platzhalter in `bakeoff/harness_bakeoff.py` geprüft werden.
+- Branch `meta-m1-harness` (4 Commits ab `phase9-v2-foundation`/`e7a8984`) liegt bereit,
+  nicht gemergt — Merge-Entscheidung liegt beim Nikinger.
+
+### Open questions / blockers
+- Preregistration-Commit-Historie (Step 2) ist branch-lokal, noch nicht auf `main` — der
+  Anti-Shopping-Beweis ("Preregistration committet vor jedem Trial") ist stichhaltig
+  solange der Branch bis zum ersten echten Trial unverändert bleibt.
+- `V2-Baseline-Auswertung` (echter Trade + Variety-These) bleibt offen, orthogonal, kein
+  M1-Blocker (Merker in ROADMAP §Phase 9 hinterlegt).
