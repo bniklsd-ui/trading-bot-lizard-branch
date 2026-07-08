@@ -186,6 +186,31 @@ def test_run_trial_manual_spend_path_when_usage_unparseable(tmp_path, monkeypatc
     assert budget.spent_eur == pytest.approx(1.23)
 
 
+# --- _prompt_operator_for_manual_spend: German comma decimals + reprompt on garbage ---------
+
+
+def test_prompt_operator_accepts_comma_decimal(monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda prompt="": "0,22")
+    harness = bo.HarnessConfig(name="fake", argv_template=["fake"])
+    spec = bo.StepSpec(step_id="S0", spec_path=Path("x"), base_tag="base-0", gate_argv=["true"])
+    assert bo._prompt_operator_for_manual_spend(harness, spec) == pytest.approx(0.22)
+
+
+def test_prompt_operator_accepts_dot_decimal(monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda prompt="": "1.5")
+    harness = bo.HarnessConfig(name="fake", argv_template=["fake"])
+    spec = bo.StepSpec(step_id="S0", spec_path=Path("x"), base_tag="base-0", gate_argv=["true"])
+    assert bo._prompt_operator_for_manual_spend(harness, spec) == pytest.approx(1.5)
+
+
+def test_prompt_operator_reprompts_on_invalid_input(monkeypatch):
+    responses = iter(["not-a-number", "0,50"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+    harness = bo.HarnessConfig(name="fake", argv_template=["fake"])
+    spec = bo.StepSpec(step_id="S0", spec_path=Path("x"), base_tag="base-0", gate_argv=["true"])
+    assert bo._prompt_operator_for_manual_spend(harness, spec) == pytest.approx(0.50)
+
+
 def test_run_matrix_resets_after_last_trial_and_writes_stable_jsonl(tmp_path, monkeypatch):
     resets: list[str] = []
     monkeypatch.setattr(bo, "assert_clean_repo", lambda repo: None)

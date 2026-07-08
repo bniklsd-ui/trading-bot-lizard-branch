@@ -257,11 +257,15 @@ def run_trial(
 
 
 def _prompt_operator_for_manual_spend(harness: HarnessConfig, spec: StepSpec) -> float:
-    raw = input(
-        f"[bakeoff] usage unparseable for {harness.name}/{spec.step_id} — enter cumulative "
-        "console spend in EUR for this trial: "
-    )
-    return float(raw)
+    while True:
+        raw = input(
+            f"[bakeoff] usage unparseable for {harness.name}/{spec.step_id} — enter cumulative "
+            "console spend in EUR for this trial (e.g. 0.22 or 0,22): "
+        )
+        try:
+            return float(raw.strip().replace(",", "."))
+        except ValueError:
+            print(f"  not a number: {raw!r} — try again")
 
 
 def run_matrix(
