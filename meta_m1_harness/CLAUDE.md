@@ -63,8 +63,13 @@ belastbarer Fallback-Build-Pfad, nicht nur eine Theorie — auch der Kontext-Por
 (M1-D11, hat OpenCode die `CLAUDE.md`-Navigation befolgt?) fiel positiv aus (zitierte Beispiele
 in `META_M1_RESULTS.md`).
 
-**Offen: Steps 9–10** (`AGENTS.md`, P4/P6-Kalt-Fallback) — orthogonal zu dieser Entscheidung,
-nicht davon gegatet. Noch nicht begonnen.
+**Step 9 ✅ fertig:** [`AGENTS.md`](../AGENTS.md) (Repo-Root, 34 Zeilen) — harness-neutraler
+Einstieg, `CLAUDE.md`-Verweis, Doc-Layers-Navigation inkl. expliziter „`up:`/`down:` werden
+nicht automatisch geladen"-Klarstellung, Working-Style-Präzedenz, Kurz-Verbotsliste.
+INDEX-Eintrag im selben Schritt ergänzt.
+
+**Offen: Step 10** (P4/P6-Kalt-Fallback, `OpenAICompatLLMClient`) — orthogonal zur
+Migrationsentscheidung, nicht davon gegatet. Noch nicht begonnen.
 
 ## Session stopped — 2026-07-09 (Step 7 Messlauf komplett + Step 8 Auswertung: keine Migration, Gap=0pp)
 
@@ -135,14 +140,23 @@ nicht davon gegatet. Noch nicht begonnen.
   **keine Migration**, Feuerlöscher-Befund dokumentiert).
 
 ### Next
-- **Steps 9–10** (`AGENTS.md`, P4/P6-Kalt-Fallback, §11–§12 im Plan) sind der verbleibende
-  M1-Scope — noch nicht begonnen, orthogonal zur jetzt geschlossenen Migrationsfrage.
-- Branch `meta_working` ist der aktive Arbeits-Branch. Alle Code-Fixes + Doku-Updates dieser
-  und der Vorsession, plus `results/trials.jsonl` (**Korrektur zur vorherigen Session-Notiz:**
-  Plan §9 verlangt explizit "`results/trials.jsonl` ... ins Haupt-Repo kopieren + committen" —
-  die frühere Einordnung als "bewusst uncommittete Rohdaten" war falsch für die
-  Preregistration-Trials und wird mit diesem Commit korrigiert), sind jetzt committet
-  (Nikinger-Entscheidung 2026-07-09: "seems fine").
+- **Step 9 ✅ fertig** (`AGENTS.md`, Repo-Root, 34 Zeilen + INDEX-Eintrag) — harness-neutraler
+  Einstieg, verweist auf `CLAUDE.md` als Single Source of Truth, Doc-Layers-Navigation inkl.
+  expliziter „`up:`/`down:` sind kein Auto-Load"-Klarstellung (spiegelt die reale Beobachtung
+  aus dem Portabilitäts-Annex: OpenCode las Phase-Heads nur, wenn im Prompt/Preamble explizit
+  dazu aufgefordert — nichts lädt das automatisch). Working-Style-Präzedenz + Kurz-
+  Verbotsliste aus `CLAUDE.md` übernommen, nicht neu erfunden.
+- **Step 10** (P4/P6-Kalt-Fallback, `OpenAICompatLLMClient`, §12 im Plan) ist der letzte
+  verbleibende M1-Scope — noch nicht begonnen, orthogonal zur geschlossenen Migrationsfrage.
+  Touches `phase4_research/` (anderer, geschlossener Phasen-Ordner) — vom Plan §14
+  Cross-Phase-Edit-Register bereits als M1-Scope vorautorisiert, keine gesonderte Rückfrage
+  nötig, aber **[VERIFY zuerst]** laut Plan: `phase4_research/research/llm_client.py` lesen,
+  bevor irgendwas geschrieben wird (exakte Interface-Signatur spiegeln).
+- Branch `meta_working` ist der aktive Arbeits-Branch. Steps 7–8 (inkl. `results/trials.jsonl`,
+  **Korrektur zur vorherigen Session-Notiz:** Plan §9 verlangt explizit dessen Commit, die
+  frühere Einordnung als "bewusst uncommittete Rohdaten" war falsch) sind committet
+  (`404cc17`, Nikinger-Entscheidung 2026-07-09: "seems fine"). `AGENTS.md`/Step 9 ist
+  zum Zeitpunkt dieser Notiz noch **uncommitted**.
 - `results/logs/*.log` bleiben bewusst uncommitted (volle Agenten-Transkripte, teils >400KB,
   kein vom Plan benanntes Artefakt — nur `results/trials.jsonl` ist es) — bereits durch die
   bestehende generische `logs/`-Regel in `.gitignore` (Zeile 134) abgedeckt, kein neuer Eintrag
@@ -150,6 +164,6 @@ nicht davon gegatet. Noch nicht begonnen.
 
 ### Open questions / blockers
 - Kein Blocker mehr — M1s Kernfrage (Migration ja/nein) ist beantwortet und dokumentiert.
-  Nächster Schritt ist reine Fortsetzung (Steps 9–10) oder Commit, beides Nikinger-Entscheidung.
+  Nächster Schritt ist Step 10 oder Commit von Step 9, beides Nikinger-Entscheidung.
 - `V2-Baseline-Auswertung` (echter Trade + Variety-These) bleibt offen, orthogonal, kein
   M1-Blocker (Merker in ROADMAP §Phase 9 hinterlegt).

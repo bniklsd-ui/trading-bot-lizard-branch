@@ -22,6 +22,7 @@ updated: 2026-07-06
 
 ## Root & governance
 - [CLAUDE.md](../CLAUDE.md) — 📗 14KB · rules, conventions, working style, current state; auto-loaded every session
+- [AGENTS.md](../AGENTS.md) — 📗 1KB · harness-neutral entry point for non-Claude-Code agents; points to `CLAUDE.md` + doc-layers navigation (M1 Step 9)
 - [README.md](../README.md) — 📗 13KB · human overview + machine setup (venv, keyring, smoke test)
 - [ROADMAP.md](../ROADMAP.md) — 📗 25KB · Phase 1–11 plan + status per phase
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — 📗 18KB · system layers, components, risks
