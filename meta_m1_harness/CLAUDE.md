@@ -9,7 +9,8 @@ down:
   - ../docs/concepts/meta_m1_harness_plan.md          # ausführungsreifer Plan (L3, Quelle der Schritte)
   - ../docs/concepts/meta_phase_unabhaengigkeit_konzept.md   # Hypothese/Theorie-Dokument (L3)
   - ./META_M1_PREREGISTRATION.md                      # Δ/P/K/E/M gelockt (Step 2)
-updated: 2026-07-08
+  - ./SESSIONS_ARCHIVE.md                             # ältere Session-stopped-Blöcke (L3)
+updated: 2026-07-09
 ---
 
 # Meta-Phase M1 — Harness-Unabhängigkeit — Claude Code context
@@ -40,119 +41,115 @@ meta_m1_harness/
 ├── specs/                         ← Step 3 (S0–S7, self-contained Trial-Prompts)
 ├── bakeoff/                       ← Step 4 (harness_bakeoff.py, analyze.py, preamble.txt)
 ├── tests/                         ← Step 4 (mocked, kein Subprocess/Netz)
-└── results/                       ← Step 7+ (trials.jsonl, META_M1_RESULTS.md, META_M1_DECISION.md)
+└── results/                       ← Step 7+ ✅ (trials.jsonl, META_M1_RESULTS.md, META_M1_DECISION.md)
 ```
 
 ## Status
 
-✅ Steps 0–4 fertig, getestet, `meta-m1-harness` per Fast-Forward in `phase9-v2-foundation`
-gemergt; aktiver Branch jetzt **`meta_working`**. Fork lebt unter `~/bakeoff/trading-bot-fork`,
-`base-0` (Keyring neutralisiert). **Setup-Smoke S0: claude_code ✅ grün, opencode ❌**
-(OpenCode ist schlicht noch nicht installiert/auf PATH — `[Errno 2] No such file or
-directory: 'opencode'`, **kein** M1-D3-Fall von „irreparabel rot"). **✅ Step 6
-(Referenz-Build S1–S7 im Fork) fertig** — `base-1`…`base-7` getaggt, jedes Gate beim
-Committen grün, volle Cross-Phase-Regression im Fork danach bestätigt grün. Nächster
-Schritt braucht OpenCode-Install (Step 7, der gemessene Bake-off).
+✅ **Steps 0–8 fertig.** Skeleton, Legacy-Grep, Preregistration, Specs, Runner+Tests,
+Referenz-Build S1–S7 im Fork (Steps 0–6); der gemessene Bake-off, 20/20 Trials, kein
+Budget-/Isolations-Zwischenfall (Step 7, Nikinger-ausgeführt 2026-07-09); Auswertung +
+Entscheidung dokumentiert in [`META_M1_RESULTS.md`](./META_M1_RESULTS.md) +
+[`META_M1_DECISION.md`](./META_M1_DECISION.md) (Step 8). `meta-m1-harness` per Fast-Forward
+in `phase9-v2-foundation` gemergt; aktiver Branch **`meta_working`**. Fork lebt unter
+`~/bakeoff/trading-bot-fork`, `base-0`…`base-7` getaggt (Keyring neutralisiert).
 
-## Session stopped — 2026-07-08 (Steps 0–6 fertig, Branch `meta_working`, Step 7 gegatet auf OpenCode-Install)
+**Ergebnis (Details in `META_M1_DECISION.md`): keine Migration** — determiniert bereits vor
+der Messung (E=73,50€ < M=120€), jetzt zusätzlich durch die Messung selbst bestätigt: `gate_pass_rate`
+90% vs. 90% (Gap = 0,00 pp, "not distinguishable" per Rausch-Regel), beide Harnesse mit genau
+einem Fehlschlag von 10 (auf S1, gleiche Root Cause, siehe `META_M1_RESULTS.md`). Der
+Feuerlöscher-Zweck ist damit erfüllt: im Zwangsfall ist OpenCode + Sonnet 5 auf diesem Repo ein
+belastbarer Fallback-Build-Pfad, nicht nur eine Theorie — auch der Kontext-Portabilitäts-Annex
+(M1-D11, hat OpenCode die `CLAUDE.md`-Navigation befolgt?) fiel positiv aus (zitierte Beispiele
+in `META_M1_RESULTS.md`).
+
+**Offen: Steps 9–10** (`AGENTS.md`, P4/P6-Kalt-Fallback) — orthogonal zu dieser Entscheidung,
+nicht davon gegatet. Noch nicht begonnen.
+
+## Session stopped — 2026-07-09 (Step 7 Messlauf komplett + Step 8 Auswertung: keine Migration, Gap=0pp)
+
+**Vorherige Session** (Steps 0–6 + der erste Isolationsbefund): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md).
 
 ### Completed
-- **Step 0** (`0c5773e`): Phasen-Skeleton (`meta_m1_harness/CLAUDE.md`) + INDEX-Einträge für
-  alle drei M1-Quelldokumente (Plan, Konzept, Kickoff-Handover) + eine vierte, unabhängige
-  Idee-Notiz (`market_snapshot_middleman_konzept.md`), die zeitgleich vom Nikinger eingefügt
-  wurde.
-- **Step 1** (`c936945`): Legacy-Grep sauber (nur bekannter `turbo_candidates.json`-Rest).
-  Voller Regressions-Baseline **grün** und deckungsgleich mit dem Plan: P1 87 · P2 76 ·
-  P3 100 · P4 141 · P5 154 · P6 70 · P7 133 · P8 217 · P9 72 · root 77 — eigene Memory
-  (`reference_running_phase_tests.md`) mit dem frischen Stand aktualisiert. **Echte Doku-
-  Drift gefunden und gefixt:** ROADMAP Phase-9-Checkliste stand komplett auf `[ ]`, obwohl
-  Steps 1–6+7a längst als ✅ im Phasenkopf standen — Boxen korrigiert, `LiveQuoteCache`-
-  Wiring bewusst offen gelassen (echt noch nicht verdrahtet, per grep verifiziert).
-  ARCHITECTURE.md nannte Migration 004 fälschlich "planned, not yet built" — korrigiert.
-  ROADMAP-Meta-Strang-Sektion + V2-Baseline-Merker ergänzt.
-- **Step 2** (`796f96f`): `META_M1_PREREGISTRATION.md` — Δ=10pp, P=0,35, K=210€, E=73,50€,
-  M=120€, Migrationsregel, Rausch-Regel, Messdesign. Verbatim aus Konzept §1/§3/§4, vor
-  jedem Trial committet (Git-History = Anti-Shopping-Beweis).
-  **⚠ Auffälligkeit:** dieser Commit landet auf einem lokalen Feature-Branch, nicht auf
-  `main` — die "Git-History als Beweis"-Eigenschaft des Preregistration-Locks hält nur,
-  solange der Branch nicht umgeschrieben/gerebased wird, bevor der erste Trial läuft.
-- **Step 3** (`769f2b8`): Specs S0–S7 (Abstain-/No-Trade-Lessons-Testfeld) — self-contained,
-  verbatim aus dem Plan transkribiert. Ein Selbstwiderspruch beim ersten Entwurf der S2-Gate-
-  Mapping-Zeile wurde noch in derselben Bearbeitung bemerkt und bereinigt (G2→NO_CANDIDATES
-  ist jetzt eindeutig, ohne die widersprüchliche erste Fassung).
-- **Step 4** (`74611b0`): `harness_bakeoff.py` + `analyze.py` + `preamble.txt` + 19 gemockte
-  Tests, alle grün. `--dry-run` live gegen dieses Repo verifiziert: druckt die volle
-  20-Trial-Matrix (S1–S5 × 2 Repeats × 2 Harnesse) mit korrekten `base-N`-Tags,
-  Step-major/Harness-alternierend, **ohne** ein einziges subprocess/git-Kommando
-  auszulösen (per Test **und** per echtem Lauf bestätigt).
-- **Post-Step-4-Korrekturen** (`be4b7d7`, gleiche Session, Nikinger-Feedback): (a) Harness-
-  Templates auf `claude-sonnet-5`/`--effort medium` (Claude Code) bzw.
-  `anthropic/claude-sonnet-5`/`--variant <VERIFY>`/`--format json`/`--auto` (OpenCode)
-  präzisiert — verifiziert gegen `claude --help` (diese Session) + OpenCode-Docs (WebFetch).
-  (b) **Auth-Override:** M1-D5s ursprüngliches „`ANTHROPIC_API_KEY` als Bake-off-Shell-Env"
-  vom Nikinger verworfen — **kein Key je in einer Env-Var oder Datei**, auch nicht
-  experimentell. Stattdessen derselbe Keyring-Ansatz wie beim Bot: neues
-  `store_bakeoff_key.py` (Service `trading-bot-bakeoff-runner`, dediziert, getrennt vom
-  Live-Service `tradingbot` und vom fork-neutralisierten `trading-bot-bakeoff-void`);
-  `harness_bakeoff.py` holt den Key pro Subprocess-Call frisch aus dem Keyring, gibt ihn
-  nur ins jeweilige Subprocess-Environment. Plan-Doc an allen drei betroffenen Stellen mit
-  datierten Strikethrough-Korrekturen versehen (nicht stillschweigend umgeschrieben). 21
-  Tests grün.
+- **Nikinger hat den vereinbarten S0-Retry selbst ausgeführt** (`--steps S0 --harness
+  claude_code,opencode --repeats 1`, `results/trials.jsonl` + `results/logs/` neu
+  hinzugekommen, ausgewertet diese Session). **Isolationsfix bestätigt gegen einen echten
+  Lauf:** kein Live-Repo-Escape — `git status` im Live-Repo nach dem Lauf sauber, und
+  OpenCodes eigener `git status --short` im Trial-Log zeigt `?? phase10_v3/` korrekt **im
+  Fork** (`~/bakeoff/trading-bot-fork`), nicht hier. `opencode`-Trial: `gate_passed=true`,
+  4 Dateien (`smoke.py`, `tests/test_smoke.py`, zwei `__init__.py` — vom Agenten selbst
+  begründet als für den Package-Import nötig, spec-konform: "kein `__init__.py` über das
+  hinaus, was `phase10_v3/` als importierbares Paket braucht"). Damit ist der offene Punkt aus
+  der letzten Session ("Fix ungetestet gegen echten Lauf") geschlossen.
+- **Nebenbefund, kein Bug — der unabhängige Gate-Check tat genau seinen Job:** derselbe
+  `claude_code`-Trial dieser Runde self-reportete "Gate command passes" im Ergebnistext, aber
+  der Harness' eigener, unabhängiger Gate-Check widersprach: `gate_passed=false`,
+  `files_changed=2` (nur `smoke.py` + `test_smoke.py`, kein `__init__.py` — der Agent hatte
+  angenommen, "pytest's rootdir insertion" mache den Import auch ohne `__init__.py` auflösbar,
+  was der frische Gate-Subprocess in der Praxis widerlegte). Genau das ist der Zweck des
+  Gate-Checks als unabhängige Quelle statt Vertrauen auf Modell-Selbstauskunft (S0 ist laut
+  Spec "ungemessen" — kein M1-Blocker, aber ein reales Beispiel, warum `gate_passed` nie aus
+  dem Harness-Output selbst geparst werden sollte).
+- **Budget-Blocker gefunden und noch in derselben Session behoben:** M1-D6 (Plan, gelockt)
+  setzt den Bake-off-Hard-Cap auf 50 €. Reale Kosten der bisherigen 5 gemessenen S0-Trials
+  (`usage_tokens` gesetzt) summieren sich auf ≈ 1,10 € — aber S0 ist der triviale
+  Zwei-Datei-Smoke-Test (44 Zeilen Spec). S1–S5 sind laut Referenz-Build (Step 6, Fork)
+  spürbar größer (62–76 Zeilen Spec je Datei, u.a. S5 = Cross-File-Wiring in
+  `phase5_execution/`, "der härteste Trial" laut Archiv) und die geplante Matrix ist 5 Specs
+  × 2 Repeats × 2 Harnesse = **20 Trials**. Bei einem anfänglich gemeldeten Kontostand von nur
+  ~10 € hätte das reale Guthaben nicht für die volle Matrix gereicht (der Code-seitige
+  50-€-Cap hätte dabei nie gegriffen, bevor die Anthropic-API selbst mit Insufficient-Credit
+  mitten in der Matrix abgebrochen wäre — unsauberer Abbruch statt sauberem Guard-Stop mit
+  Teilreport). Surfaced statt selbst editiert (M1-D6 ist eine gelockte Plan-Entscheidung) —
+  der Nikinger hat den Key noch in dieser Session auf **$54,03** aufgeladen, womit M1-D6s
+  50-€-Cap-Annahme wieder real hält. **Zusätzliche Session-Vereinbarung:** Claude Code führt
+  keinen kostenpflichtigen Bake-off-Lauf mehr selbst aus — vorher immer per interaktiver Frage
+  fragen und eine Kostenschätzung nennen (Memory-Erweiterung
+  `feedback_live_testing.md`).
 
-- **Post-Setup-Smoke-Fixes** (`7107913`, `0bf5ccd`, gleiche Session): zwei echte Bugs aus dem
-  ersten realen S0-Lauf gefunden und gefixt. (a) `_prompt_operator_for_manual_spend` crashte
-  auf deutsches Komma-Dezimal (`0,22` → `ValueError`) — normalisiert jetzt Komma→Punkt +
-  re-prompted statt abzustürzen (ein Absturz hätte einen bereits ausgeführten, bereits
-  bezahlten Trial ergebnislos verworfen). Verifiziert: der Fork blieb trotz Absturz sauber
-  auf `base-0` — der `finally: reset_to(...)`-Guard hielt. (b) **Echter Messfehler:**
-  `changed_files()` nutzte nur `git diff --name-only`, das neue **untracked** Dateien
-  (Harnesse committen laut Preamble nicht) unsichtbar macht — der claude_code/S0-Trial zeigte
-  `gate_passed=true, files_changed=0`, ein Widerspruch. Hätte `edit_failures` (eine
-  Kernmetrik) bei jedem Harness, der etwas schreibt aber am Gate scheitert, fälschlich auf 1
-  gesetzt. Fix: Union aus `git diff` (tracked) + `git ls-files --others --exclude-standard`
-  (untracked). 3 neue Tests gegen ein echtes Wegwerf-Git-Repo (nicht gemockt). 27 Tests grün.
-
-- **Step 6 — Referenz-Build S1–S7, komplett** (im Fork, eigene Commits/Tags dort, nicht in
-  diesem Repo): Claude-Code-only, normale Subscription-Session, kein API-Spend. Je Spec:
-  implementieren → Gate exakt wie in der Spec → Commit → `git tag base-<k>`.
-  - **S1** Modelle+Taxonomie (5 Tests) · **S2** Klassifizierer (19 Tests, table-driven, alle
-    12 Reasons) · **S3** `AbstainStore` (5 Tests, eigene sqlite3-Connection, kein
-    P2-Migrationsframework) · **S4** `reflect_abstain` (6 Tests, die einzige AI-Naht,
-    default aus) · **S5** Sink + Executor-Wiring (**der härteste Trial**, Cross-File-Edit in
-    `phase5_execution/`: `abstain_sink`-Param gehängt an `_no_trade()`, den einen
-    Choke-Point, den alle 8 NO_TRADE-Pfade schon durchlaufen — volle P5-Regression **vor**
-    neuen Tests bestätigt unverändert grün (154), dann +4+3 = 161) · **S6**
-    Research-Prompt-Injektion (`include_abstain_lessons`-Flag in `build_prompt()`,
-    **bewusst vom Spec-Wortlaut abgewichen** — `AbstainStore`-Fetch bleibt außerhalb, da
-    `build_prompt` explizit "no I/O" dokumentiert; P4-Regression vorher 141, danach 144) ·
-    **S7** Report-CLI (2 Tests, Golden-Output, standalone smoke-verifiziert).
-  - **Echter Bug live gefunden + gefixt:** die geteilte venv's editable Install von
-    `research` zeigt fest auf das **Original-Repo**, nicht den Fork — nur weil S6s eigenes
-    Gate-Kommando `phase4_research/tests/` mit einschließt, wurde das per
-    pyproject.toml-Sys.path-Insertion zufällig überdeckt. `phase10_v3/tests/conftest.py`
-    erzwingt jetzt zusätzlich den fork-lokalen `phase4_research/`-Pfad — Root-Fix, nicht nur
-    Symptom (jedes einzelne Spec-Gate war für sich schon robust, aber `pytest
-    phase10_v3/tests/` als Ganzes vorher nicht). `base-7` per `git tag -f` auf den Fix
-    vorgezogen.
-  - **Volle Cross-Phase-Regression im Fork danach:** P1 87 · P2 76 · P3 100 · P4 144 ·
-    P5 158 · P6 70 · P7 133 · P8 217 · P9 72 · phase10_v3 43 · root 77 — alles grün.
+- **Step 7 — der gemessene Bake-off, komplett** (Nikinger-ausgeführt, wie vereinbart, zwei
+  Kommandos): zuerst `--steps S1 --repeats 2` als Kalibrierung ($1,99 real — mittig in der
+  vorab geschätzten $1–3-Spanne), dann `--steps S2,S3,S4,S5 --repeats 2` (~$9,30 laut
+  Trial-Log-Summe für diesen zweiten Lauf; Nikinger meldete ~$7 Sonnet-5 + ~$0,08 Haiku vom
+  Console-Dashboard — Differenz untersucht, kein Doppelzählungs-Bug in OpenCodes
+  Pro-Step-Cost-Summierung gefunden [35 nicht-monotone Werte in einem Stichproben-Log, keine
+  kumulative Neuzählung], vermutlich ein grob überschlagener Konsolen-Blick; Haiku-Betrag
+  verifiziert **nicht** in irgendeiner Trial-eigenen Kostenrechnung versteckt — beide
+  Harness-Configs nennen nirgends ein Haiku-Modell, alle "haiku"-Treffer in den Logs sind
+  Prosa/Docstring-Inhalt (Zitate aus `phase7_reward`s echtem Haiku-`reflect()`), keine
+  Live-Calls. Details + volle Zahlen: `META_M1_RESULTS.md`). **20/20 Trials real gelaufen,
+  kein Budget-Stopp, kein Crash, keine Live-Repo-Kontamination** (vor und nach jedem Batch per
+  `git status --porcelain` verifiziert, Fork-Tags/HEAD unverändert).
+- **S1s gemischtes Ergebnis (dieser Sessions vorheriger Befund) hat sich NICHT wiederholt:**
+  S2–S5 liefen 16/16 grün, beide Harnesse. Beide Gesamt-Fehlschläge (1 von 10 je Harness)
+  liegen exakt auf S1, unabhängig reproduziert mit derselben Root Cause (bare `pytest` im
+  Gate-Kommando fügt kein Repo-Root zu `sys.path` hinzu, abhängig vom Agenten-Judgement zu
+  `__init__.py`-Markern) — bewusst NICHT als Gate-Command-Bug behandelt (siehe
+  `META_M1_RESULTS.md`), da der Gate-Befehl wörtlich der Spec-Text ist, den jeder Agent sieht.
+- **Step 8 — Auswertung + Entscheidung, komplett:** [`META_M1_RESULTS.md`](./META_M1_RESULTS.md)
+  (Zahlen, Rausch-Check, Validity-Notes, Portabilitäts-Annex mit zitierten Beispielen — S4 las
+  `phase7_reward/CLAUDE.md` für das Haiku-`reflect()`-Vorbild, S5 las
+  `phase5_execution/CLAUDE.md` für die Gate/VETO-Struktur, S2 las gar nichts, weil die
+  self-contained Spec ausreichte) + [`META_M1_DECISION.md`](./META_M1_DECISION.md) (Regel
+  wörtlich angewandt: Gap 0,00 pp ≤ Δ 10 pp = TRUE, aber E 73,50€ ≥ M 120€ = FALSE →
+  **keine Migration**, Feuerlöscher-Befund dokumentiert).
 
 ### Next
-- **OpenCode ist bereits installiert** (2026-07-08, Nikinger bestätigt) — global unter
-  `~/.opencode/bin/opencode` (v1.17.15, **nicht** in der Python-venv — es ist kein
-  Python-Paket, braucht keine `pip install`). `~/.bashrc` trägt bereits
-  `export PATH=/home/trading-bot/.opencode/bin:$PATH` (Zeilen 121–122) — ein frisches
-  Terminal (oder `source ~/.bashrc`) sollte reichen. **[VERIFY nächste Session]:** `which
-  opencode` in einer echten interaktiven Shell bestätigen, dann Setup-Smoke S0 für opencode
-  erneut versuchen (`--variant`-Wert gegen `opencode run --help` prüfen, war noch offen).
-- **Step 7** (der eigentliche gemessene Bake-off), sobald S0 für **beide** Harnesse grün ist:
-  `python meta_m1_harness/bakeoff/harness_bakeoff.py --repo ~/bakeoff/trading-bot-fork
-  --steps S1,S2,S3,S4,S5 --harness claude_code,opencode --repeats 2` (außerhalb des
-  Handelsfensters, Budget-Cap 50 €).
-- Branch `meta_working` (ab `phase9-v2-foundation`, `meta-m1-harness` per FF gemergt) ist der
-  aktive Arbeits-Branch; alle Step-6-Commits/Tags leben nur im Fork, nicht hier.
+- **Steps 9–10** (`AGENTS.md`, P4/P6-Kalt-Fallback, §11–§12 im Plan) sind der verbleibende
+  M1-Scope — noch nicht begonnen, orthogonal zur jetzt geschlossenen Migrationsfrage.
+- Branch `meta_working` ist der aktive Arbeits-Branch. Alle Code-Fixes + Doku-Updates dieser
+  und der Vorsession, plus `results/trials.jsonl` (**Korrektur zur vorherigen Session-Notiz:**
+  Plan §9 verlangt explizit "`results/trials.jsonl` ... ins Haupt-Repo kopieren + committen" —
+  die frühere Einordnung als "bewusst uncommittete Rohdaten" war falsch für die
+  Preregistration-Trials und wird mit diesem Commit korrigiert), sind jetzt committet
+  (Nikinger-Entscheidung 2026-07-09: "seems fine").
+- `results/logs/*.log` bleiben bewusst uncommitted (volle Agenten-Transkripte, teils >400KB,
+  kein vom Plan benanntes Artefakt — nur `results/trials.jsonl` ist es) — bereits durch die
+  bestehende generische `logs/`-Regel in `.gitignore` (Zeile 134) abgedeckt, kein neuer Eintrag
+  nötig (per `git check-ignore -v` verifiziert).
 
 ### Open questions / blockers
+- Kein Blocker mehr — M1s Kernfrage (Migration ja/nein) ist beantwortet und dokumentiert.
+  Nächster Schritt ist reine Fortsetzung (Steps 9–10) oder Commit, beides Nikinger-Entscheidung.
 - `V2-Baseline-Auswertung` (echter Trade + Variety-These) bleibt offen, orthogonal, kein
   M1-Blocker (Merker in ROADMAP §Phase 9 hinterlegt).
-- Kein echter Blocker mehr vor Step 7 — nur noch die S0-Re-Verifikation für opencode (s. o.).

@@ -134,6 +134,26 @@ def test_assert_clean_repo_clean_passes(tmp_path, monkeypatch):
     bo.assert_clean_repo(tmp_path)  # must not raise
 
 
+# --- live-repo lockdown: real bug, 2026-07-08 (opencode cd'd out of its assigned --dir and ---
+# wrote into the live repo despite cwd= being set correctly; subprocess cwd is not a hard
+# boundary, so every harness call is now wrapped in an OS-level write-lock of the live repo).
+
+
+def test_live_repo_lockdown_strips_and_restores_write_bit(tmp_path, monkeypatch):
+    monkeypatch.setattr(bo, "_LIVE_REPO_ROOT", tmp_path)
+    target = tmp_path / "subdir" / "file.txt"
+    target.parent.mkdir()
+    target.write_text("original")
+
+    original_perms = bo._live_repo_lockdown()
+    with pytest.raises(PermissionError):
+        target.write_text("should be blocked")
+
+    bo._restore_permissions(original_perms)
+    target.write_text("allowed again")  # must not raise
+    assert target.read_text() == "allowed again"
+
+
 # --- changed_files: real git, must see untracked new files too -----------------------------
 # Regression test for a live bug: git diff alone missed brand-new untracked files (harnesses
 # are told not to commit), so a real S0 trial reported files_changed=0 despite the gate
@@ -187,6 +207,9 @@ def test_run_trial_resets_before_and_after(tmp_path, monkeypatch):
     monkeypatch.setattr(bo, "snapshot_ref", lambda repo: "REF0")
     monkeypatch.setattr(bo, "changed_files", lambda repo, ref: ["foo.py"])
     monkeypatch.setattr(bo, "_load_preamble", lambda: "preamble")
+    monkeypatch.setattr(bo, "_write_trial_log", lambda *a, **k: None)
+    monkeypatch.setattr(bo, "_live_repo_lockdown", lambda: [])
+    monkeypatch.setattr(bo, "_restore_permissions", lambda original: None)
     captured_env: dict = {}
 
     def _fake_run(argv, **kwargs):
@@ -214,6 +237,9 @@ def test_run_trial_manual_spend_path_when_usage_unparseable(tmp_path, monkeypatc
     monkeypatch.setattr(bo, "snapshot_ref", lambda repo: "REF0")
     monkeypatch.setattr(bo, "changed_files", lambda repo, ref: ["foo.py"])
     monkeypatch.setattr(bo, "_load_preamble", lambda: "preamble")
+    monkeypatch.setattr(bo, "_write_trial_log", lambda *a, **k: None)
+    monkeypatch.setattr(bo, "_live_repo_lockdown", lambda: [])
+    monkeypatch.setattr(bo, "_restore_permissions", lambda original: None)
     monkeypatch.setattr(bo.subprocess, "run", lambda argv, **kwargs: _FakeCompleted(stdout="no usage here"))
     monkeypatch.setattr(bo, "_prompt_operator_for_manual_spend", lambda harness, spec: 1.23)
 
@@ -257,6 +283,9 @@ def test_run_matrix_resets_after_last_trial_and_writes_stable_jsonl(tmp_path, mo
     monkeypatch.setattr(bo, "snapshot_ref", lambda repo: "REF0")
     monkeypatch.setattr(bo, "changed_files", lambda repo, ref: ["foo.py"])
     monkeypatch.setattr(bo, "_load_preamble", lambda: "preamble")
+    monkeypatch.setattr(bo, "_write_trial_log", lambda *a, **k: None)
+    monkeypatch.setattr(bo, "_live_repo_lockdown", lambda: [])
+    monkeypatch.setattr(bo, "_restore_permissions", lambda original: None)
     monkeypatch.setattr(
         bo.subprocess, "run", lambda argv, **kwargs: _FakeCompleted(stdout="tokens=1")
     )

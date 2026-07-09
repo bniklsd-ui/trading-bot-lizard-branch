@@ -35,8 +35,10 @@ updated: 2026-07-06
 - [docs/concepts/doc_layers_token_efficiency_plan.md](./concepts/doc_layers_token_efficiency_plan.md) — 📕 11KB · this restructure's plan (executed 2026-07-06)
 
 ## Meta-Strang (M — orthogonal, Build-/Laufzeit-Unabhängigkeit)
-- [meta_m1_harness/CLAUDE.md](../meta_m1_harness/CLAUDE.md) — 🔄 4KB · M1 phase head; Steps 0–4 in progress, Steps 5–10 gated on operator setup
+- [meta_m1_harness/CLAUDE.md](../meta_m1_harness/CLAUDE.md) — 🔄 10KB · M1 phase head; Steps 0–8 done, decision = no migration (gap 0pp), Steps 9–10 remain · [archive](../meta_m1_harness/SESSIONS_ARCHIVE.md) 15KB
 - [meta_m1_harness/META_M1_PREREGISTRATION.md](../meta_m1_harness/META_M1_PREREGISTRATION.md) — 📕 4KB · Δ/P/K/E/M + decision rule, committed before any trial, never edited (only superseded)
+- [meta_m1_harness/META_M1_RESULTS.md](../meta_m1_harness/META_M1_RESULTS.md) — 📕 7KB · measured 2026-07-09: gate_pass_rate 90%/90%, gap 0pp not-distinguishable, portability annex
+- [meta_m1_harness/META_M1_DECISION.md](../meta_m1_harness/META_M1_DECISION.md) — 📕 3KB · rule applied literally: no migration (E<M); fire-extinguisher finding = gap 0pp
 - `meta_m1_harness/specs/S0.md`…`S7.md` — 📗 · self-contained bake-off trial specs (Abstain-/No-Trade-Lessons testfield); S0/S1–S5 measured, S6/S7 reference-build-only
 - `meta_m1_harness/bakeoff/` (`harness_bakeoff.py`, `analyze.py`, `preamble.txt`, `store_bakeoff_key.py`) — 📗 · the measurement instrument; `--dry-run` prints the trial matrix without executing anything; the bake-off Anthropic key lives only in the OS keyring (`store_bakeoff_key.py` seeds it), never a shell env var or file
 - [docs/concepts/meta_m1_harness_plan.md](./concepts/meta_m1_harness_plan.md) — 📕 36KB · execution-ready plan (Steps 0–10, locked decisions M1-D1…D13)
