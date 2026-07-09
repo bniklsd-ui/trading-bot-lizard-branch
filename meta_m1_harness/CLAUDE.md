@@ -1,11 +1,15 @@
 ---
-status: live
+status: closed-phase
 purpose: Meta-Phase M1 head — Harness-Unabhängigkeit (Build-Front). Vorregistrierter Bake-off
   Claude Code vs. OpenCode + kalter P4/P6-Provider-Fallback. Orthogonal zum funktionalen Strang.
-read-when: Arbeit an M1 — read this head + newest Session-stopped block first
+  ✅ CLOSED 2026-07-09 — Steps 0–10 fertig, Ergebnis: keine Migration.
+read-when: Auditing M1, oder Anschluss-Planung (siehe META_M1_CLOSEOUT_HANDOVER.md)
 detail: L2
 up: ../docs/INDEX.md
 down:
+  - ./META_M1_CLOSEOUT_HANDOVER.md                    # Delta + optionaler M2-Vorschlag (L3, nächster Chat)
+  - ./META_M1_RESULTS.md                              # gemessene Zahlen + Portabilitäts-Annex + Fallback-Smoke (L3)
+  - ./META_M1_DECISION.md                             # Regel wörtlich angewandt (L3)
   - ../docs/concepts/meta_m1_harness_plan.md          # ausführungsreifer Plan (L3, Quelle der Schritte)
   - ../docs/concepts/meta_phase_unabhaengigkeit_konzept.md   # Hypothese/Theorie-Dokument (L3)
   - ./META_M1_PREREGISTRATION.md                      # Δ/P/K/E/M gelockt (Step 2)

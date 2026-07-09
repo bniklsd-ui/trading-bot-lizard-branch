@@ -423,23 +423,25 @@ divergence from outcome-score on bad-market days).
 > Läuft **quer** zur funktionalen Nummerierung oben (1–11) — keine echte Phase, keine
 > Verdrängung von Profit-Arbeit. Eigener Präfix `M`, hochzählbar (M2, M3, …).
 
-### M1 — Harness-Unabhängigkeit (Build-Front)
+### M1 — Harness-Unabhängigkeit (Build-Front) — ✅ CLOSED (2026-07-09)
 **Ziel:** vorregistrierte Messung, ob der Bot-Code künftig mit einem offenen Harness
 (OpenCode) statt Claude Code gebaut werden kann, plus — unabhängig vom Ausgang — zwei
 Feuerlöscher: ein harness-neutraler Kontext-Einstieg (`AGENTS.md`) und ein getesteter, kalter
 provider-agnostischer LLM-Fallback für P4/P6. Kein Bot-Feature, kein Umbau der Live-Pfade.
 
-**DoD (Kurzform):** Preregistration committet vor jedem Trial · 20 Messtrials (oder
-dokumentierter Budget-Stopp) · Ergebnisse + Entscheidung nach vorregistrierter Regel ·
-`AGENTS.md` auf `main` · `OpenAICompatLLMClient` getestet, null Live-Pfad-Diff · alle
-Regressionen grün · Phase-9-Live-Test zu keinem Zeitpunkt berührt.
+**Ergebnis:** Steps 0–10 alle fertig. 20/20 Trials real gelaufen (kein Budget-Stopp, kein
+Isolationsvorfall). `gate_pass_rate` 90%/90%, Gap 0,00pp — **"not distinguishable"** per der
+vorregistrierten Rausch-Regel. Regel wörtlich angewandt: **keine Migration** — war bereits vor
+der Messung determiniert (E=73,50€ < M=120€), jetzt zusätzlich durch die Messung bestätigt.
+`AGENTS.md` auf `main` · `OpenAICompatLLMClient` getestet + Operator-Smoke-PASSed (real gegen
+OpenRouter), null Live-Pfad-Diff · alle Regressionen grün · Phase-9-Live-Test zu keinem
+Zeitpunkt berührt.
 
-**Bereits bekannt (kein Bug):** mit den gelockten Werten (Δ=10pp, E=73,50€, M=120€) gilt
-E < M — Migration ist unabhängig vom Messergebnis ausgeschlossen; der Bake-off liefert nur
-die Feuerlöscher-Zahl.
-
-**Verweise:** [`meta_m1_harness/CLAUDE.md`](./meta_m1_harness/CLAUDE.md) (Phasen-Kopf) ·
-[`docs/concepts/meta_m1_harness_plan.md`](./docs/concepts/meta_m1_harness_plan.md) (Plan,
+**Verweise:** [`meta_m1_harness/CLAUDE.md`](./meta_m1_harness/CLAUDE.md) (Phasen-Kopf,
+geschlossen) · [`meta_m1_harness/META_M1_RESULTS.md`](./meta_m1_harness/META_M1_RESULTS.md) +
+[`META_M1_DECISION.md`](./meta_m1_harness/META_M1_DECISION.md) (Zahlen + Entscheidung) ·
+[`META_M1_CLOSEOUT_HANDOVER.md`](./meta_m1_harness/META_M1_CLOSEOUT_HANDOVER.md) (Delta zum
+Plan + optionaler M2-Vorschlag, ungelockt) · [`docs/concepts/meta_m1_harness_plan.md`](./docs/concepts/meta_m1_harness_plan.md) (Plan,
 Steps 0–10) · [`docs/concepts/meta_phase_unabhaengigkeit_konzept.md`](./docs/concepts/meta_phase_unabhaengigkeit_konzept.md) (Hypothese).
 
 ---

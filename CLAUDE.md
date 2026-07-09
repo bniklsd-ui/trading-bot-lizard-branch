@@ -126,6 +126,14 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 | 10 — V3: Persistenz-Reform + No-Trade-Lessons + UI | Geplant, gegatet auf Phase 9 |
 | 11 — V4: Sophisticated/Optional (Council, Handover, Reward-Reform, Force-Trigger, Instinct-ECC) | Deferred, gegatet auf Phase 9+10 + reale Outcomes |
 
+**Meta-Strang M1 — Harness-Unabhängigkeit — ✅ CLOSED (2026-07-09):** orthogonal zur
+Nummerierung oben. Vorregistrierter Bake-off Claude Code vs. OpenCode: `gate_pass_rate`
+90%/90%, Gap 0,00pp → **keine Migration** (E<M, jetzt zusätzlich messbestätigt). Plus
+`AGENTS.md` + ein getesteter, kalter P4/P6-Fallback (`OpenAICompatLLMClient`), beide
+smoke-verifiziert. Details: [`meta_m1_harness/CLAUDE.md`](./meta_m1_harness/CLAUDE.md);
+optionaler nächster Schritt (ungelockt):
+[`META_M1_CLOSEOUT_HANDOVER.md`](./meta_m1_harness/META_M1_CLOSEOUT_HANDOVER.md).
+
 ---
 
 ## File organization (where things go)

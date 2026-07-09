@@ -71,6 +71,7 @@ updated: 2026-07-06
 - [phase8_v1.5_hotfix_plan.md](./concepts/phase8_v1.5_hotfix_plan.md) — 📕 33KB · [v1.6](./concepts/phase8_v1.6_hotfix_plan.md) 29KB · [v1.7](./concepts/phase8_v1.7_hotfix_plan.md) 10KB
 
 ## Handovers (📕 snapshots — session-to-session context transfers)
+- [META_M1_CLOSEOUT_HANDOVER.md](../meta_m1_harness/META_M1_CLOSEOUT_HANDOVER.md) — 📕 7KB · M1 closeout for the next Web-Chat: intentional plan drifts + an optional M2 (code-quality + cross-model) proposal
 - [PHASE9_V2_LIVE_RESULTS_HANDOVER.md](../phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md) — 📕 6KB · first V2 live-run results (2026-07-07): pipeline proven, open proof points, watch items
 - [PHASE8_CLOSEOUT_HANDOVER.md](../phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md) — 📕 17KB · V2/V3/V4 reframe proposal (P9 kickoff source)
 - [PHASE8_V1.5_HOTFIX_HANDOVER.md](../phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md) — 📕 23KB · [V1.6](../phase8_scheduler/PHASE8_V1.6_HANDOVER.md) 11KB

@@ -129,6 +129,19 @@ Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)
 Komponenten-Übersicht: [`ARCHITECTURE.md`](./ARCHITECTURE.md)
 
+**Meta-Strang M1 — Harness-Unabhängigkeit — ✅ CLOSED (2026-07-09).** Orthogonal zur
+Nummerierung 1–11 oben (keine Bot-Feature-Phase, kein Umbau der Live-Pfade). Vorregistrierte
+Messung Claude Code vs. OpenCode (20 Trials, gleiches Modell/Effort): `gate_pass_rate`
+90%/90%, Gap 0,00pp — **keine Migration** (war schon vor der Messung determiniert, E=73,50€
+< M=120€; die Messung bestätigt es zusätzlich). Zwei Feuerlöscher zusätzlich gebaut: ein
+harness-neutraler Einstieg ([`AGENTS.md`](./AGENTS.md)) und ein getesteter, **kalter**
+provider-agnostischer LLM-Fallback für Phase 4/6 (`OpenAICompatLLMClient`, OpenRouter,
+Operator-Smoke-PASSed) — nirgends live verdrahtet. Details:
+[`meta_m1_harness/CLAUDE.md`](./meta_m1_harness/CLAUDE.md),
+[`meta_m1_harness/META_M1_RESULTS.md`](./meta_m1_harness/META_M1_RESULTS.md) +
+[`META_M1_DECISION.md`](./meta_m1_harness/META_M1_DECISION.md). Optionaler nächster Schritt
+(nicht gelockt): [`META_M1_CLOSEOUT_HANDOVER.md`](./meta_m1_harness/META_M1_CLOSEOUT_HANDOVER.md).
+
 ---
 
 ## Kernkonzepte
