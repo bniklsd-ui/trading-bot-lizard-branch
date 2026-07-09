@@ -1,8 +1,10 @@
 ---
 status: closed
 purpose: Dated snapshot — measured M1 bake-off results (Step 8, §10 of the plan). Numbers,
-  variance, noise-check, validity notes, context-portability annex. Never edited after
-  commit — corrections are a new, dated, superseding document.
+  variance, noise-check, validity notes, context-portability annex, plus a Step-10 fallback
+  smoke appendix. The Step-8 content is never edited after commit — corrections are a new,
+  dated, superseding document; the Fallback section is a plan-specified additive append
+  (§12 point 4), clearly dated and demarcated, not a correction.
 read-when: auditing the M1 bake-off outcome, or applying the preregistered decision rule
 detail: L2
 up: ./CLAUDE.md
@@ -112,3 +114,46 @@ head-card navigation (`up:`/`down:` links, phase heads) exactly where it had a g
 cross-phase information need, and skipped it where the spec was already sufficient — the same
 selective behavior `AGENTS.md` (Step 9) is meant to make reproducible for any harness, not
 just Claude Code's native auto-load.
+
+---
+
+## Fallback — Step 10 operator smoke (appended 2026-07-09, additive, Step-8 content above unchanged)
+
+Per plan §12 point 4: the operator-run smoke test result, logged verbatim. Two real runs
+against OpenRouter, both via `phase4_research/scripts/openrouter_smoke.py` (`OpenAICompatLLMClient`,
+the real `research.prompt.build_prompt`, the real `research.validator.validate_candidate`):
+
+**Run 1 — `tencent/hy3:free` — FAIL (model capability, not an adapter bug):**
+```
+FAIL model=tencent/hy3:free reason=OpenRouter call failed: _HTTPStatusFault('HTTP 400:
+{"error":{"message":"Provider returned error","code":400,"metadata":{"raw":"{\"code\":400,
+\"reason\":\"INVALID_REQUEST_BODY\",\"message\":\"Model 'tencent/hy3' does not support
+'json_object' response format. Supported formats: json_schema.\",\"metadata\":{}}",
+"provider_name":"Novita","is_byok":false}
+```
+This model (via its Novita backend) only supports the stricter `json_schema` response
+format, not the `json_object` mode this adapter deliberately uses (the locked plan's design
+choice — see `llm_openai_compat.py`'s module docstring). **Not a defect:** the adapter
+correctly classified this as a non-transient 400 and raised `LLMResponseError` immediately
+with zero wasted retries — the same behavior `test_bad_request_400_raises_immediately_no_retry`
+asserts on a mocked response, now confirmed against a real provider. Some fraction of
+OpenRouter's catalog will fail this way; picking a `json_object`-capable model (as Run 2 did)
+avoids it.
+
+**Run 2 — `nvidia/nemotron-3-ultra-550b-a55b:free` — PASS (valid abstain):**
+```
+PASS (valid abstain) model=nvidia/nemotron-3-ultra-550b-a55b:free tokens=in=572 out=349
+```
+A genuine end-to-end round trip: real HTTP call → JSON parse (fence-strip path) → the real
+`validate_candidate` → a legitimate `abstain=true` response, correctly recognized as
+`valid=True, candidate=None`. Cost logged as $0.00 (no pricing row for this model in
+`ResearchConfig.pricing_usd_per_mtok` — the meter's documented graceful-unknown-model
+behavior, not a crash) — consistent with the model being OpenRouter's free tier.
+
+**Caveat (honest reporting):** this run exercised the abstain branch of the validator, not
+the full pick branch (epic/direction/confidence fields) — the model chose not to pick. The
+plumbing this smoke test exists to prove (prompt → OpenRouter → parse → validator) is fully
+exercised either way; a pick-branch round trip was not additionally forced.
+
+**Conclusion:** Step 10 smoke-PASS achieved (plan §12 acceptance). The adapter stays cold —
+`phase4_research/scripts/wiring.py` is untouched, nothing here is wired into any live path.

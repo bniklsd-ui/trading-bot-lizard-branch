@@ -46,7 +46,7 @@ meta_m1_harness/
 
 ## Status
 
-✅ **Steps 0–8 fertig.** Skeleton, Legacy-Grep, Preregistration, Specs, Runner+Tests,
+✅ **Steps 0–10 fertig — M1 abgeschlossen.** Skeleton, Legacy-Grep, Preregistration, Specs, Runner+Tests,
 Referenz-Build S1–S7 im Fork (Steps 0–6); der gemessene Bake-off, 20/20 Trials, kein
 Budget-/Isolations-Zwischenfall (Step 7, Nikinger-ausgeführt 2026-07-09); Auswertung +
 Entscheidung dokumentiert in [`META_M1_RESULTS.md`](./META_M1_RESULTS.md) +
@@ -68,8 +68,27 @@ Einstieg, `CLAUDE.md`-Verweis, Doc-Layers-Navigation inkl. expliziter „`up:`/`
 nicht automatisch geladen"-Klarstellung, Working-Style-Präzedenz, Kurz-Verbotsliste.
 INDEX-Eintrag im selben Schritt ergänzt.
 
-**Offen: Step 10** (P4/P6-Kalt-Fallback, `OpenAICompatLLMClient`) — orthogonal zur
-Migrationsentscheidung, nicht davon gegatet. Noch nicht begonnen.
+**Step 10 ✅ fertig — smoke-PASS erreicht (2026-07-09, Nikinger-ausgeführt):**
+`phase4_research/research/llm_openai_compat.py` — `OpenAICompatLLMClient`, spiegelt
+`LLMClient`s öffentliche Schnittstelle (`ask_candidate`/`.model`/`.last_usage`, exakt der
+`_LLMLike`-Protocol-Bedarf von `research.py`), OpenRouter via `requests` (kein SDK),
+Retry-Policy 1:1 wie Decision 8 (genau 1 Retry, nur transiente Fehler), Key aus eigenem
+Keyring-Service `openrouter` (nicht `tradingbot`) — adapter-intern, `wiring.py` bleibt
+unberührt. +7 Tests (`test_llm_openai_compat.py`, alle gemockt) — **P4 141→148 grün, P6
+unverändert 70 grün**, `git diff` zeigt außer 3 neuen Dateien **keinen** Live-Pfad-Diff
+(Plan-Akzeptanz erfüllt). **Operator-Smoke real gelaufen, zwei Versuche** (Details +
+wörtliches Ergebnis: `META_M1_RESULTS.md` → `## Fallback`): Run 1 (`tencent/hy3:free`)
+FAIL — echtes 400 vom Provider ("kein `json_object`-Support, nur `json_schema`"), **kein
+Adapter-Bug**, korrekt als nicht-transient klassifiziert, sofortiger `LLMResponseError`
+ohne verschwendeten Retry (bestätigt denselben Pfad, den `test_bad_request_400_raises_
+immediately_no_retry` gemockt prüft — jetzt gegen einen echten Provider). Run 2
+(`nvidia/nemotron-3-ultra-550b-a55b:free`) **PASS (valid abstain)**, `in=572 out=349`
+Tokens, $0 (kostenloses Modell, keine Pricing-Zeile → Meter loggt 0, kein Crash) — echter
+Prompt→OpenRouter→Parse→**echter** `validate_candidate`-Roundtrip bewiesen. Adapter bleibt
+**kalt** — `wiring.py` unverändert, nichts live verdrahtet.
+
+**M1 ist damit vollständig abgeschlossen** (Steps 0–10). Verbleibend nur noch: Commit von
+Step 10 (Nikinger-Entscheidung) und `docs/INDEX.md`-Statuszeile.
 
 ## Session stopped — 2026-07-09 (Step 7 Messlauf komplett + Step 8 Auswertung: keine Migration, Gap=0pp)
 
@@ -146,24 +165,30 @@ Migrationsentscheidung, nicht davon gegatet. Noch nicht begonnen.
   aus dem Portabilitäts-Annex: OpenCode las Phase-Heads nur, wenn im Prompt/Preamble explizit
   dazu aufgefordert — nichts lädt das automatisch). Working-Style-Präzedenz + Kurz-
   Verbotsliste aus `CLAUDE.md` übernommen, nicht neu erfunden.
-- **Step 10** (P4/P6-Kalt-Fallback, `OpenAICompatLLMClient`, §12 im Plan) ist der letzte
-  verbleibende M1-Scope — noch nicht begonnen, orthogonal zur geschlossenen Migrationsfrage.
-  Touches `phase4_research/` (anderer, geschlossener Phasen-Ordner) — vom Plan §14
-  Cross-Phase-Edit-Register bereits als M1-Scope vorautorisiert, keine gesonderte Rückfrage
-  nötig, aber **[VERIFY zuerst]** laut Plan: `phase4_research/research/llm_client.py` lesen,
-  bevor irgendwas geschrieben wird (exakte Interface-Signatur spiegeln).
+- **Step 10 ✅ fertig, inkl. Operator-Smoke** (P4/P6-Kalt-Fallback, `OpenAICompatLLMClient`,
+  §12 im Plan). `[VERIFY zuerst]` erledigt (`llm_client.py`, `models.py`, `credentials.py`,
+  `token_meter.py`, `validator.py` gelesen vor jedem Schreiben). `git diff` zeigt nur 3 neue
+  Dateien, kein Live-Pfad-Diff (Plan-Akzeptanz erfüllt). **Der Nikinger hat den Operator-Smoke
+  real ausgeführt** (2026-07-09, zwei Versuche): Run 1 (`tencent/hy3:free`) FAIL — echtes
+  Provider-400 ("kein `json_object`-Support"), korrekt nicht-transient klassifiziert, kein
+  Retry verschwendet — kein Adapter-Bug. Run 2 (`nvidia/nemotron-3-ultra-550b-a55b:free`)
+  **PASS (valid abstain)**, `in=572 out=349` Tokens, $0 — voller echter Roundtrip bewiesen.
+  Ergebnis wortgleich in `META_M1_RESULTS.md` → `## Fallback` protokolliert (additive
+  Ergänzung, Step-8-Inhalt unverändert, `updated:`-Feld im Header entsprechend angepasst).
+  **M1 ist damit inhaltlich komplett (Steps 0–10).**
 - Branch `meta_working` ist der aktive Arbeits-Branch. Steps 7–8 (inkl. `results/trials.jsonl`,
   **Korrektur zur vorherigen Session-Notiz:** Plan §9 verlangt explizit dessen Commit, die
-  frühere Einordnung als "bewusst uncommittete Rohdaten" war falsch) sind committet
-  (`404cc17`, Nikinger-Entscheidung 2026-07-09: "seems fine"). `AGENTS.md`/Step 9 ist
-  zum Zeitpunkt dieser Notiz noch **uncommitted**.
+  frühere Einordnung als "bewusst uncommittete Rohdaten" war falsch) und Step 9 (`AGENTS.md`)
+  sind committet (`404cc17`, `9eac305`). Step 10 (die 3 neuen `phase4_research/`-Dateien +
+  der `META_M1_RESULTS.md`-Fallback-Append + dieser Status-Block) ist zum Zeitpunkt dieser
+  Notiz noch **uncommitted**.
 - `results/logs/*.log` bleiben bewusst uncommitted (volle Agenten-Transkripte, teils >400KB,
   kein vom Plan benanntes Artefakt — nur `results/trials.jsonl` ist es) — bereits durch die
   bestehende generische `logs/`-Regel in `.gitignore` (Zeile 134) abgedeckt, kein neuer Eintrag
   nötig (per `git check-ignore -v` verifiziert).
 
 ### Open questions / blockers
-- Kein Blocker mehr — M1s Kernfrage (Migration ja/nein) ist beantwortet und dokumentiert.
-  Nächster Schritt ist Step 10 oder Commit von Step 9, beides Nikinger-Entscheidung.
+- Keine inhaltlichen Blocker mehr — M1 (Steps 0–10) ist vollständig beantwortet/dokumentiert.
+  Einziger offener Punkt ist der Commit von Step 10, reine Nikinger-Entscheidung.
 - `V2-Baseline-Auswertung` (echter Trade + Variety-These) bleibt offen, orthogonal, kein
   M1-Blocker (Merker in ROADMAP §Phase 9 hinterlegt).
