@@ -28,7 +28,13 @@ updated: 2026-07-06
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — 📗 18KB · system layers, components, risks
 - [DOC_LAYERS_CONVENTION.md](./DOC_LAYERS_CONVENTION.md) — 📗 · generic (project-agnostic) doc-layers spec
 
-## Active phase (9 — V2 Foundation)
+## Active phase (10 — V3: Abstain-Lessons + Persistenz-Reform + Paper-Trades)
+- [phase10_v3/CLAUDE.md](../phase10_v3/CLAUDE.md) — 🔄 phase head; Steps 0–3 (docs-only) done 2026-07-10, Block A/B gated on weekend windows
+- [phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md](../phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md) — 📕 dated Step-2 data analysis (V2-baseline, abstain reasons, gap-check)
+- [docs/concepts/phase10_v3_plan.md](./concepts/phase10_v3_plan.md) — 📕 execution-ready plan (locked decisions V3-D1…D10, Steps 0–11)
+- [docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md](./concepts/PHASE10_V3_KICKOFF_HANDOVER.md) — 📕 kickoff handover from M1-close into V3
+
+## Prior phase (9 — V2 Foundation, baseline collection continues weekdays)
 - [phase9_universe/CLAUDE.md](../phase9_universe/CLAUDE.md) — 🔄 16KB · phase head; Steps 2–8 open; read + newest Session-stopped block first
 - [phase9_universe/README.md](../phase9_universe/README.md) — 🔄 1KB · public surface
 - [docs/concepts/phase9_v2_foundation_plan(1).md](./concepts/phase9_v2_foundation_plan(1).md) — 📕 38KB · the full V2 plan (§-referenced from the phase head)
