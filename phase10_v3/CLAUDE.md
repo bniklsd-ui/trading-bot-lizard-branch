@@ -70,6 +70,41 @@ docs-only/read-only** — read-only auf `data/` (SQLite via `mode=ro`-URI), kein
 Scheduler-Restart, keine `live_test.py`. Details + volle Decision-Tabelle (V3-D1…D10):
 `../docs/concepts/phase10_v3_plan.md` §0.
 
+## Step 1 — Housekeeping (2026-07-10, Fr)
+
+**Legacy-Grep (Ritual):** `grep -rn -i "turbo\|CALL/PUT\|pre_trade_option_check\|expected hold" --include="*.py" --include="*.md"`
+→ **sauber.** Einziger aktiver Treffer ist der bekannte `turbo_candidates.json` (P5-Gate-2-
+Contract, "legacy name, do not rename"-annotiert an mehreren Stellen). Alle übrigen Treffer für
+`CALL/PUT`/`pre_trade_option_check`/`strike`/`otm` sind Doku-Zeilen, die die historische
+Bereinigung *bestätigen* ("kein `option_check`/`CALL`/`PUT` in Phase 5" — negative Assertion,
+kein Rest). `expected hold` hat null echte Treffer — nur als Zitat des Grep-Rituals selbst in
+anderen Plan-Docs. Nichts zu bereinigen.
+
+**Regression-Baseline (2026-07-10):** volle Suite je Phase separat (`pytest <phase>/tests -v`,
+projektübliche Trennung wegen `tests.conftest`-Namenskollision), geteilter Venv
+`phase1_broker_wrapper/.venv`. **1162 passed, 0 failed:**
+
+| Phase | Count | vs. Plan-Erwartung |
+|---|---|---|
+| P1 | 87 | = |
+| P2 | 76 | = |
+| P3 | 100 | = |
+| P4 | **148** | Plan erwartete 141 — **+7, Korrektur** (plausibel: spätere Hotfix-Arbeit an P4-Validator/Prompt nach Plan-Erstellung) |
+| P5 | 154 | = |
+| P6 | 70 | = |
+| P7 | 133 | = |
+| P8 | 217 | = |
+| P9 | 72 | = |
+| meta_m1_harness | 28 | (nicht im Plan-Baseline-Table, informativ) |
+| root `tests/` | 77 | = |
+
+**.md↔Code-Verify:** Root-`CLAUDE.md` zeigte M1 korrekt CLOSED, aber Phase 10 noch als
+"Geplant, gegatet auf Phase 9" statt aktiv — **gefixt** (Tabellen-Zeile aktualisiert, keine neue
+Prosa laut Doku-Hygiene-Regel). `ROADMAP.md`s Phase-10-Statuszeile behauptete noch "keine
+Konzept-Session" trotz vorliegendem `phase10_v3_plan.md` — **gefixt** (verweist jetzt auf Plan +
+Kickoff-Handover). Meta-Strang-Sektion in `ROADMAP.md` war bereits korrekt (M1 CLOSED). `data/`
+während der gesamten Housekeeping-Session unberührt (nur `mode=ro`-Reads für Step 2/3).
+
 ## Session stopped
 
 _(wird am Ende der heutigen Session befüllt)_

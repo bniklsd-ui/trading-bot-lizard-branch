@@ -353,8 +353,12 @@ ehrlich quarantänisiert.
 
 ## Phase 10 — V3: Persistenz-Reform + No-Trade-Lessons + (optionales) UI
 
-> **Status: geplant, gegatet auf Phase 9.** Noch keine Konzept-Session — Vorschlag im
-> Phase-8-Closeout-Handover §5.
+> **Status: 🔄 aktiv, Kickoff 2026-07-10.** Ausführungsreifer Plan liegt vor:
+> [`docs/concepts/phase10_v3_plan.md`](./docs/concepts/phase10_v3_plan.md) (Decisions
+> V3-D1…D10, Steps 0–11); Kickoff-Kontext:
+> [`docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md`](./docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md).
+> Phase head: [`phase10_v3/CLAUDE.md`](./phase10_v3/CLAUDE.md). Block C (UI) ist explizit
+> **nicht** Teil dieses Plans (geparkt, Plan §13) — Abschnitt 10c unten bleibt daher offen.
 
 **Goal:** die aktuellen SQLite-V2-Erweiterungen bauen + „warum tradet der Bot nicht" zu einem
 lernbaren Signal machen, nicht nur einem verworfenen Reason-Code.
