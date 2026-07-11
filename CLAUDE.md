@@ -123,7 +123,7 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 | 7 — Reward/Brain | ✅ live-verifiziert + gemerged (2026-06-26) |
 | 8 — Scheduler | ✅ **live-verifiziert (2026-07-03)** — zwei autonome Trades + ein tatsächlich auslösender Safety-Breaker (Token-Budget), Nikinger-bestätigt. Details: `phase8_scheduler/CLAUDE.md` |
 | 9 — V2: Foundation (autonome Epic-Research + Daten-Zuverlässigkeit) | 🔄 in Arbeit (Stand 2026-07-07) — Steps 1–6 + 7a ✅ (7b ohne Fix-Target), **Live-Baseline-Lauf seit 2026-07-06** (Tag 1: Pipeline bewiesen, 8 active/7 verified/0 quarantined, erster DB-Pick CAC; offen: Neustart-Pickup + Trade unter V2): [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md), [`phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md`](./phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md) |
-| 10 — V3: Persistenz-Reform + No-Trade-Lessons + Paper-Trades | 🔄 **aktiv (Kickoff 2026-07-10)** — Steps 0–3 (docs-only) fertig, Block A/B gegatet auf Wochenenden. Details: [`phase10_v3/CLAUDE.md`](./phase10_v3/CLAUDE.md) |
+| 10 — V3: Persistenz-Reform + No-Trade-Lessons + Paper-Trades | 🔄 **aktiv (WE 1 2026-07-11)** — Block A (Migration 005 + `abstain_lessons/`, alle Nähte default-inert außer Reflect) live auf main, Montag-Restart-Beweis aussstehend; Block B gegatet auf WE 2. Details: [`phase10_v3/CLAUDE.md`](./phase10_v3/CLAUDE.md) |
 | 11 — V4: Sophisticated/Optional (Council, Handover, Reward-Reform, Force-Trigger, Instinct-ECC) | Deferred, gegatet auf Phase 9+10 + reale Outcomes |
 
 **Meta-Strang M1 — Harness-Unabhängigkeit — ✅ CLOSED (2026-07-09):** orthogonal zur

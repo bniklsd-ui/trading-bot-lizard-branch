@@ -353,7 +353,8 @@ ehrlich quarantänisiert.
 
 ## Phase 10 — V3: Persistenz-Reform + No-Trade-Lessons + (optionales) UI
 
-> **Status: 🔄 aktiv, Kickoff 2026-07-10.** Ausführungsreifer Plan liegt vor:
+> **Status: 🔄 aktiv — Block A (Migration 005 + `abstain_lessons/`) live auf main seit WE 1
+> (2026-07-11), Block B gegatet auf WE 2.** Ausführungsreifer Plan liegt vor:
 > [`docs/concepts/phase10_v3_plan.md`](./docs/concepts/phase10_v3_plan.md) (Decisions
 > V3-D1…D10, Steps 0–11); Kickoff-Kontext:
 > [`docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md`](./docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md).

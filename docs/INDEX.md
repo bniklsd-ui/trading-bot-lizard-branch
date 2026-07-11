@@ -29,7 +29,7 @@ updated: 2026-07-06
 - [DOC_LAYERS_CONVENTION.md](./DOC_LAYERS_CONVENTION.md) — 📗 · generic (project-agnostic) doc-layers spec
 
 ## Active phase (10 — V3: Abstain-Lessons + Persistenz-Reform + Paper-Trades)
-- [phase10_v3/CLAUDE.md](../phase10_v3/CLAUDE.md) — 🔄 phase head; Steps 0–3 (docs-only) done 2026-07-10, Block A/B gated on weekend windows
+- [phase10_v3/CLAUDE.md](../phase10_v3/CLAUDE.md) — 🔄 phase head; Block A (Steps 0–6) live on main 2026-07-11 (Migration 005, `abstain_lessons/`, P5/P8/P4 seams, all default-inert except reflect); Block B (WE 2) open · [archive](../phase10_v3/SESSIONS_ARCHIVE.md)
 - [phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md](../phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md) — 📕 dated Step-2 data analysis (V2-baseline, abstain reasons, gap-check)
 - [docs/concepts/phase10_v3_plan.md](./concepts/phase10_v3_plan.md) — 📕 execution-ready plan (locked decisions V3-D1…D10, Steps 0–11)
 - [docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md](./concepts/PHASE10_V3_KICKOFF_HANDOVER.md) — 📕 kickoff handover from M1-close into V3
@@ -63,7 +63,7 @@ updated: 2026-07-06
 - [phase5_execution/CLAUDE.md](../phase5_execution/CLAUDE.md) — 📗 18KB · gates/VETOs head, decisions A–H · [README](../phase5_execution/README.md) · [archive](../phase5_execution/SESSIONS_ARCHIVE.md) 44KB
 - [phase6_debate/CLAUDE.md](../phase6_debate/CLAUDE.md) — 📗 19KB · debate head, decisions A–K · [README](../phase6_debate/README.md) · [archive](../phase6_debate/SESSIONS_ARCHIVE.md) 44KB
 - [phase7_reward/CLAUDE.md](../phase7_reward/CLAUDE.md) — 📗 33KB · reward head, decisions A–J, pinned contracts · [README](../phase7_reward/README.md) · [archive](../phase7_reward/SESSIONS_ARCHIVE.md) 65KB
-- [phase8_scheduler/CLAUDE.md](../phase8_scheduler/CLAUDE.md) — 📗 22KB · scheduler head, verified contracts (✅ live 2026-07-03) · [README](../phase8_scheduler/README.md) · [archive](../phase8_scheduler/SESSIONS_ARCHIVE.md) 192KB
+- [phase8_scheduler/CLAUDE.md](../phase8_scheduler/CLAUDE.md) — 📗 28KB · scheduler head, verified contracts (✅ live 2026-07-03; 2026-07-11 POST_WINDOW-sleep-cap hotfix) · [README](../phase8_scheduler/README.md) · [archive](../phase8_scheduler/SESSIONS_ARCHIVE.md) 196KB
 
 ## Concept docs (📕 snapshots — the plan a phase was built from)
 - [phase1_broker_api_konzept.md](./concepts/phase1_broker_api_konzept.md) — 📕 17KB
