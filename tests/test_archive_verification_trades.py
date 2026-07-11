@@ -123,8 +123,6 @@ def test_collect_related_pulls_lessons_and_rewards(db):
 
     assert len(related["trade_lessons"]) == 1
     assert len(related["reward_pts"]) == 1
-    assert related["market_regime_snapshots"] == []
-    assert related["decision_context"] == []
 
 
 def test_collect_related_empty_ids_returns_empty_shape(db):

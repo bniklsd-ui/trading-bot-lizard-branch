@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 #
-# dev_install.sh — composition root (concept §"Step C", Phase 5 + Phase 6 + Phase 7 + Phase 8 + Phase 9).
+# dev_install.sh — composition root (concept §"Step C", Phase 5 + Phase 6 + Phase 7 + Phase 8 + Phase 9 + Phase 10).
 #
 # Editable-install every phase package in dependency order (P1 -> P2 -> P3 -> P4
-# -> P5 -> P6 -> P7 -> P8 -> P9) into the *currently active* virtualenv, so that
-#   import broker_wrapper / persistence / external_data / research / execution / debate / reward / scheduler / universe
+# -> P5 -> P6 -> P7 -> P8 -> P9 -> P10) into the *currently active* virtualenv, so that
+#   import broker_wrapper / persistence / external_data / research / execution / debate / reward / scheduler / universe / abstain_lessons
 # all resolve at runtime WITHOUT any sys.path manipulation, and `pytest`
 # collects cleanly. Run once per fresh venv. (P6 + P7 import `research`, so they
 # are installed after P4; P7 also reuses the Phase-2 `persistence` Database. P8
 # composes the whole P1–P7 stack, so it is installed after P7. P9 (`universe`)
 # owns its own sqlite3 connection at runtime — no cross-phase import at load
 # time — so its position in this list is purely by phase number, not a real
-# dependency order.)
+# dependency order. P10 (`abstain_lessons`) is the same: own-connection store,
+# no cross-phase import at load time.)
 #
 # Usage:
 #   source <your-venv>/bin/activate
@@ -21,6 +22,7 @@
 #   pytest phase7_reward/tests -v          # green => Step C proven (P7)
 #   pytest phase8_scheduler/tests -v       # green => Step C proven (P8)
 #   pytest phase9_universe/tests -v        # green => Step C proven (P9)
+#   pytest phase10_v3/tests -v             # green => Step C proven (P10)
 #
 # Editable installs change only *packaging*, not code dependencies: each phase
 # still imports its siblings only through their defined contracts (cross-phase
@@ -45,10 +47,11 @@ for pkg in \
     phase6_debate \
     phase7_reward \
     phase8_scheduler \
-    phase9_universe
+    phase9_universe \
+    phase10_v3
 do
     echo "dev_install: pip install -e $pkg"
     "$PY" -m pip install -e "$ROOT/$pkg"
 done
 
-echo "dev_install: all nine packages installed editable. Run: pytest phase9_universe/tests -v"
+echo "dev_install: all ten packages installed editable. Run: pytest phase10_v3/tests -v"

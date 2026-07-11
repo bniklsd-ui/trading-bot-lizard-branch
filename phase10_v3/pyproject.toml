@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "abstain_lessons"
+version = "0.1.0"
+description = "Phase 10 (V3) — Abstain-/No-Trade-Lessons, own-connection SQLite store, best-effort reflect. Bauprinzip: no new AI beyond reflect_abstain (default off, capped)."
+requires-python = ">=3.11"
+# Packaging metadata only, enabling an editable install (`pip install -e`) so
+# `import abstain_lessons` resolves at runtime without sys.path hacks — mirrors
+# `phase9_universe`'s `universe` package. The sibling `tests`/`scripts` dirs are
+# deliberately excluded from the installed package.
+
+[tool.setuptools.packages.find]
+include = ["abstain_lessons*"]

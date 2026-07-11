@@ -204,43 +204,26 @@ def test_get_all_config_includes_seeds(db):
             "session_date", "force_trigger_locked"}.issubset(config)
 
 
-# -- cascade + V2 -----------------------------------------------------------
+# -- cascade -----------------------------------------------------------------
+# `market_regime_snapshots`/`decision_context` used to cascade from `trade_outcomes`
+# too (V2 placeholder era); migration 005 (2026-07-11) DROP+CREATE'd both to an
+# epic-scoped V3 schema with no `trade_id` FK — they're no longer children of
+# `trade_outcomes` and `Database.insert_regime_snapshot`/`insert_decision_context` were
+# removed (see `phase2_persistence/CLAUDE.md`). Their new schema is asserted in
+# `test_migrations.py::test_v3_learning_tables_present`.
+
 
 def test_cascade_delete_removes_children(db, base_trade):
     tid = db.insert_trade(base_trade)
     db.insert_reward(tid, {"score_after": 55.0, "win_loss": "WIN"})
     db.insert_lesson(tid, {"lesson_text": "x"})
-    db.insert_regime_snapshot(tid, {"spread_pct": 0.4})
-    db.insert_decision_context(tid, {"judge_confidence": 0.8})
 
     db.conn.execute("DELETE FROM trade_outcomes WHERE id = ?", (tid,))
     db.conn.commit()
 
-    for table in ("reward_pts", "trade_lessons",
-                  "market_regime_snapshots", "decision_context"):
+    for table in ("reward_pts", "trade_lessons"):
         count = db.conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
         assert count == 0, table
-
-
-def test_insert_regime_snapshot(db, base_trade):
-    tid = db.insert_trade(base_trade)
-    sid = db.insert_regime_snapshot(tid, {"volatility_pct": 1.2, "spread_pct": 0.4})
-    assert sid >= 1
-    row = db.conn.execute(
-        "SELECT * FROM market_regime_snapshots WHERE id = ?", (sid,)
-    ).fetchone()
-    assert row["snapshot_ts"] is not None
-
-
-def test_insert_decision_context_serializes_json(db, base_trade):
-    tid = db.insert_trade(base_trade)
-    cid = db.insert_decision_context(
-        tid, {"judge_confidence": 0.7, "veto_factors_json": {"spread": "ok"}}
-    )
-    row = db.conn.execute(
-        "SELECT * FROM decision_context WHERE id = ?", (cid,)
-    ).fetchone()
-    assert json.loads(row["veto_factors_json"]) == {"spread": "ok"}
 
 
 # -- trade_lessons: get_recent_lessons_for_prompt (v1.5 Phase-8 hotfix Step 4 A) ----

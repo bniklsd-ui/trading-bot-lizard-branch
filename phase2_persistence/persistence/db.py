@@ -42,16 +42,6 @@ _LESSON_COLUMNS = (
     "used_in_research", "last_used_ts", "embedding_json", "embedding_model",
     "extracted_at",
 )
-_REGIME_COLUMNS = (
-    "trade_id", "volatility_pct", "spread_pct", "drift_pct", "volume_z_score",
-    "time_of_day_h", "market_status", "snapshot_ts",
-)
-_DECISION_COLUMNS = (
-    "trade_id", "bull_summary", "bear_summary", "judge_reasoning",
-    "debate_rounds", "judge_confidence", "veto_factors_json",
-    "pre_trade_checks_json", "council_verdict", "council_summary", "stored_at",
-)
-
 # Score at/below which the bot stays conservative. The neutral start score is
 # 50.0 (see defaults.py), which maps to KONSERVATIV — the bot earns AGGRESSIV
 # only by pushing the score above neutral.
@@ -393,21 +383,9 @@ class Database:
         cur = self.conn.execute("SELECT key, value FROM ig_config_state")
         return {row["key"]: json.loads(row["value"]) for row in cur.fetchall()}
 
-    # -- V2 tables (Phase 9 fills; Phase 2 only stores) ---------------------
-
-    def insert_regime_snapshot(self, trade_id: int, snapshot: dict[str, Any]) -> int:
-        """Insert a market-regime snapshot for ``trade_id``. Defaults: snapshot_ts=now."""
-        record = dict(snapshot)
-        record["trade_id"] = trade_id
-        record.setdefault("snapshot_ts", utc_iso_now())
-        return self._insert("market_regime_snapshots", record, _REGIME_COLUMNS)
-
-    def insert_decision_context(self, trade_id: int, context: dict[str, Any]) -> int:
-        """Insert an AI decision-context row for ``trade_id``. Defaults: stored_at=now."""
-        record = dict(context)
-        record["trade_id"] = trade_id
-        record.setdefault("stored_at", utc_iso_now())
-        return self._insert(
-            "decision_context", record, _DECISION_COLUMNS,
-            json_fields=("veto_factors_json", "pre_trade_checks_json"),
-        )
+    # `market_regime_snapshots`/`decision_context` were trade_id-scoped V2 placeholder
+    # writes here (`insert_regime_snapshot`/`insert_decision_context`) until migration 005
+    # (2026-07-11) DROP+CREATE'd both to an epic-scoped V3 schema (see
+    # `phase2_persistence/CLAUDE.md` Don't-list + `phase10_v3/CLAUDE.md`). The real writer
+    # is now `phase10_v3/market_context/writer.py` (`MarketContextWriter`, own-connection,
+    # WE 2) — removed here rather than left dead/broken against the new schema.

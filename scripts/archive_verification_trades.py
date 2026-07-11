@@ -26,13 +26,18 @@ time-stops). `--ids` overrides both with an explicit `trade_outcomes.id` allow-l
 
 **Safety:** dry-run by default — prints exactly what would be archived + deleted, writes
 nothing, deletes nothing. Only `--commit` writes `data/archive/verification_<UTC-stamp>.json`
-(every selected `trade_outcomes` row plus its cascaded `trade_lessons`/`reward_pts`/
-`market_regime_snapshots`/`decision_context` rows, captured **before** any delete) and then
-deletes the selected `trade_outcomes` rows. Deletes are child-table-safe by construction: the
-live `Database` opens with `PRAGMA foreign_keys = ON` (`persistence/db.py`), and every child
-table's `trade_id` column is declared `... REFERENCES trade_outcomes(id) ON DELETE CASCADE`
-(`phase2_persistence/migrations/001_initial.sql`) — deleting the parent row cascades the
-children automatically; no separate child-table deletes needed.
+(every selected `trade_outcomes` row plus its cascaded `trade_lessons`/`reward_pts` rows,
+captured **before** any delete) and then deletes the selected `trade_outcomes` rows. Deletes
+are child-table-safe by construction: the live `Database` opens with `PRAGMA foreign_keys =
+ON` (`persistence/db.py`), and every child table's `trade_id` column is declared `...
+REFERENCES trade_outcomes(id) ON DELETE CASCADE` (`phase2_persistence/migrations/
+001_initial.sql`) — deleting the parent row cascades the children automatically; no separate
+child-table deletes needed.
+
+**⚠ 2026-07-11 (migration 005):** `market_regime_snapshots`/`decision_context` were
+DROP+CREATE'd to an epic-scoped V3 schema with no `trade_id` FK — they are no longer
+children of `trade_outcomes` and were removed from `_CHILD_TABLES` below (they would 500 on
+a `trade_id` column that no longer exists). See `phase2_persistence/CLAUDE.md`.
 
 Output discipline (repo convention, mirrors `verify_instrument.py`/`resolve_epics.py`): human
 narrative -> **stderr**; machine-readable JSON -> **stdout**, always. Exit 0 on every expected
@@ -59,7 +64,7 @@ _DEFAULT_HOLD_THRESHOLD_MIN = 2.0  # mirrors ResearchConfig.recent_trades_min_ho
 # (all declared "trade_id ... REFERENCES trade_outcomes(id) ON DELETE CASCADE" in
 # migrations/001_initial.sql). Collected here as an archive snapshot BEFORE the delete —
 # the DB's own FK cascade does the actual child-row removal.
-_CHILD_TABLES = ("trade_lessons", "reward_pts", "market_regime_snapshots", "decision_context")
+_CHILD_TABLES = ("trade_lessons", "reward_pts")
 
 
 def _eprint(message: str = "") -> None:
