@@ -7,10 +7,12 @@ into a single :class:`~scheduler.runner.SchedulerRunner`.
 
 It assembles the **full** trading cycle (unlike the Phase-6/7 wirings, which each wired only their
 own seam): one shared, warm IG-Demo broker drives the real Phase-4 :class:`Research`, the Phase-6
-``debate_runner`` **and** the Phase-7 ``reward_sink`` are both injected into one Phase-5
-:class:`Executor`, and the scheduler modules (clock / state / safety / backoff / budget /
-research_tick / reconcile / runner) wrap it. **No new AI** — the AI stays inside the reused P4 pick,
-P6 debate and P7 lesson; the scheduler is pure mechanics around them.
+``debate_runner``, the Phase-7 ``reward_sink``, **and** the Phase-10 (V3) ``abstain_sink`` are all
+injected into one Phase-5 :class:`Executor`, and the scheduler modules (clock / state / safety /
+backoff / budget / research_tick / reconcile / runner) wrap it. **No new AI beyond one more
+best-effort, capped call** — the AI stays inside the reused P4 pick, P6 debate, P7 lesson, and now
+P10's ``reflect_abstain`` (Haiku, off unless `enable_abstain_reflect`); the scheduler is pure
+mechanics around them.
 
 Five points worth pinning (code = source of truth — see the dated concept §11 annotation):
 
@@ -291,6 +293,96 @@ def _build_reward_sink(broker: Any, db: Any) -> Any:
     return RewardSink(db=db, broker=broker, scorer=Scorer(cfg), brain=Brain(llm, cfg), cfg=cfg)
 
 
+class _AbstainLLMAdapter:
+    """Wraps the reused Phase-4 ``LLMClient`` to satisfy ``AbstainLLM.complete(prompt,
+    timeout_s) -> str``. ``LLMClient`` has no free-text call, only the JSON-schema
+    ``ask_candidate`` — a one-field schema (``{"lesson": string}``) gets a plain string
+    back out. ``timeout_s`` is accepted for Protocol-compliance; the real per-call
+    timeout is already ``LLMClient``'s own ``timeout_s`` (set at construction below).
+    """
+
+    _SCHEMA = {
+        "type": "object",
+        "properties": {"lesson": {"type": "string"}},
+        "required": ["lesson"],
+    }
+
+    def __init__(self, client: Any) -> None:
+        self._client = client
+
+    def complete(self, prompt: str, timeout_s: float) -> str:
+        result = self._client.ask_candidate(system="", user=prompt, json_schema=self._SCHEMA)
+        return result["lesson"]
+
+
+def _build_abstain_sink(config: SchedulerConfig) -> Any:
+    """Build the Phase-10 (V3) :class:`AbstainLessonSink` over its own DB connection.
+
+    ``AbstainStore`` opens its **own** ``sqlite3`` connection (the UniverseStore
+    pattern — phase isolation, no ``persistence.Database`` import), so it needs no
+    shared broker/db argument, unlike ``_build_reward_sink``. The LLM adapter (Haiku,
+    reused Phase-4 ``LLMClient`` + ``RewardConfig.lesson_*`` knobs — same model/timeout
+    the reward-sink lesson extraction already uses) is only built when
+    ``config.enable_abstain_reflect`` — reflect stays best-effort/capped either way, but
+    skipping the client construction when reflect is off avoids touching the keyring
+    for a call that will never fire.
+    """
+    from abstain_lessons.sink import AbstainLessonSink
+    from abstain_lessons.store import AbstainStore
+
+    store = AbstainStore(str(_DB_PATH))
+    store.ensure_schema()
+
+    llm = None
+    if config.enable_abstain_reflect:
+        from research.llm_client import LLMClient
+        from research.models import ResearchConfig
+        from reward import RewardConfig
+        from reward.credentials import get_credential
+
+        cfg = RewardConfig()
+        client = LLMClient(
+            model=cfg.lesson_model,
+            api_key=get_credential("anthropic_api_key"),
+            max_tokens=cfg.lesson_max_tokens,
+            temperature=cfg.lesson_temperature,
+            timeout_s=cfg.lesson_timeout_s,
+            token_meter_path=str(_USAGE_LOG),
+            config=ResearchConfig(),
+        )
+        llm = _AbstainLLMAdapter(client)
+
+    return AbstainLessonSink(store, llm=llm, reflect_daily_cap=config.reflect_daily_cap)
+
+
+def _observed_abstain_sink(inner: Any, observability_path: str) -> Any:
+    """Wrap ``inner`` (an :class:`AbstainSink`) with the ``abstain_recorded`` observability
+    event (reason, stage, epic) — the generic ``record_event`` call, not ``record_cycle``'s
+    fixed schema (verified-anchors annex, ``phase10_v3/CLAUDE.md``). Classification is pure
+    and cheap (stdlib-only, no I/O) so re-running it here for the log line, alongside the
+    real classify+persist inside ``inner``, is simpler than threading the record back out
+    of the locked ``AbstainSink.on_no_trade(cycle_outcome) -> None`` contract.
+    """
+    from abstain_lessons.classifier import classify_abstain
+    from scheduler.observability import record_event
+
+    class _Observed:
+        def on_no_trade(self, cycle_outcome: Any) -> None:
+            inner.on_no_trade(cycle_outcome)
+            try:
+                record = classify_abstain(cycle_outcome)
+                record_event(observability_path, {
+                    "event": "abstain_recorded",
+                    "reason": record.reason.value,
+                    "stage": record.stage.value,
+                    "epic": record.epic,
+                })
+            except Exception as exc:  # noqa: BLE001 — observability must never break the cycle
+                logger.critical("abstain observability event failed: %s", exc)
+
+    return _Observed()
+
+
 def build_scheduler(
     config: SchedulerConfig,
     *,
@@ -375,6 +467,11 @@ def build_scheduler(
     research = _build_research(broker, db, state, enable_ig_bars=config.enable_ig_bars)
     debate_runner = _make_debate_runner(broker)
     reward_sink = _build_reward_sink(broker, db)
+    abstain_sink = None
+    if config.enable_abstain_lessons:
+        abstain_sink = _observed_abstain_sink(
+            _build_abstain_sink(config), config.observability_path
+        )
 
     # --- the scheduler modules ---
     state_store = StateStore(config.state_path)
@@ -401,6 +498,7 @@ def build_scheduler(
         auto_confirm,                 # Contract A: confirm_fn at the constructor; loop calls bare run()
         debate_runner=debate_runner,
         reward_sink=reward_sink,
+        abstain_sink=abstain_sink,
         now_fn=_now,                  # shared clock; executor keeps its own real sleep_fn
     )
 

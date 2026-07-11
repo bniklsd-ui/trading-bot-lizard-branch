@@ -102,6 +102,7 @@ def _build(
     runner: _Runner | None = None,
     debate_runner: Callable[[dict[str, Any]], Any] | None = None,
     reward_sink: Any | None = None,
+    abstain_sink: Any | None = None,
     now_fn: Callable[[], datetime] | None = None,
     config: ExecutionConfig | None = None,
     db: FakeDB | None = None,
@@ -117,6 +118,7 @@ def _build(
         confirm_fn,
         debate_runner=debate_runner,
         reward_sink=reward_sink,
+        abstain_sink=abstain_sink,
         now_fn=now_fn or _in_window(),
         sleep_fn=lambda _s: None,
     )
@@ -694,3 +696,141 @@ def test_build_closed_defaults_none_without_confirm(
 
     assert closed.close_level is None
     assert closed.profit_loss is None
+
+
+# --- 20–25) Phase-10 (V3) abstain-sink seam (Decision J) -------------------
+#
+# The seam wraps every NO_TRADE return path via the shared ``_no_trade`` helper — never
+# the trade path. Like the reward-sink seam, the sink is read duck-typed (a tiny
+# recording stand-in), and ``abstain_sink=None`` (the default) must leave every existing
+# NO_TRADE/TRADE behaviour bit-identical (proven by the full pre-existing suite staying
+# green + the explicit passthrough test below).
+
+
+class _RecordingAbstainSink:
+    """Duck-typed ``AbstainSink`` stand-in — records the ``cycle_outcome`` dicts it sees."""
+
+    def __init__(self, *, raise_on_call: bool = False) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._raise_on_call = raise_on_call
+
+    def on_no_trade(self, cycle_outcome: dict[str, Any]) -> None:
+        self.calls.append(cycle_outcome)
+        if self._raise_on_call:
+            raise RuntimeError("abstain_sink.on_no_trade boom")
+
+
+def test_abstain_sink_none_is_bit_identical_passthrough(exec_state: ExecutionState) -> None:
+    """``abstain_sink=None`` (the default) → a NO_TRADE cycle behaves exactly as before."""
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[])  # abstain
+    executor, _ = _build(broker, state, exec_state)  # no abstain_sink
+
+    result = executor.run()
+
+    assert result.status == "NO_TRADE"
+    assert "load_candidates" in result.detail
+
+
+def test_abstain_sink_fires_on_gate1_time_window(exec_state: ExecutionState,
+                                                   make_candidate: Callable[..., dict[str, Any]]) -> None:
+    """Gate 1 fail -> ``failed_gate="G1"``, ``epic=None`` (no candidate loaded yet)."""
+    broker = FakeBroker()
+    state = FakeState(fresh=True, candidates=[make_candidate()])
+    sink = _RecordingAbstainSink()
+    executor, _ = _build(broker, state, exec_state, abstain_sink=sink, now_fn=lambda: _at(20, 0))
+
+    executor.run()
+
+    assert len(sink.calls) == 1
+    outcome = sink.calls[0]
+    assert outcome["outcome"] == "NO_TRADE"
+    assert outcome["epic"] is None
+    assert outcome["failed_gate"] == "G1"
+    assert outcome["research_empty"] is False
+    assert outcome["veto"] is None
+    assert outcome["debate_decision"] is None
+    assert outcome["error"] is None
+
+
+def test_abstain_sink_fires_on_gate2_no_candidates(exec_state: ExecutionState) -> None:
+    """Gate 2 abstain (empty candidates) -> ``research_empty=True``."""
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[])
+    sink = _RecordingAbstainSink()
+    executor, _ = _build(broker, state, exec_state, abstain_sink=sink)
+
+    executor.run()
+
+    assert len(sink.calls) == 1
+    assert sink.calls[0]["research_empty"] is True
+    assert sink.calls[0]["failed_gate"] is None
+
+
+def test_abstain_sink_fires_on_veto_momentum(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A momentum VETO -> ``veto="momentum"``, ``epic`` set (candidate was loaded)."""
+    from tests.conftest import make_bars
+
+    broker = FakeBroker(
+        account_env=_account(1500.0),
+        ohlcv_env=_FakeEnv(ok=True, data={"bars": make_bars([18000.0, 17900.0])}),
+    )
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    sink = _RecordingAbstainSink()
+    executor, _ = _build(broker, state, exec_state, abstain_sink=sink)
+
+    executor.run()
+
+    assert len(sink.calls) == 1
+    outcome = sink.calls[0]
+    assert outcome["veto"] == "momentum"
+    assert outcome["epic"] == DEFAULT_EPIC
+    assert outcome["failed_gate"] is None
+
+
+def test_abstain_sink_fires_on_debate_abstain(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A debate ABSTAIN -> ``debate_decision="ABSTAIN"``, ``epic`` set."""
+    debate = _DebateRunner(_DebateOutcome("ABSTAIN", None, confidence=0.4))
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    sink = _RecordingAbstainSink()
+    executor, _ = _build(broker, state, exec_state, debate_runner=debate, abstain_sink=sink)
+
+    executor.run()
+
+    assert len(sink.calls) == 1
+    outcome = sink.calls[0]
+    assert outcome["debate_decision"] == "ABSTAIN"
+    assert outcome["epic"] == DEFAULT_EPIC
+
+
+def test_abstain_sink_not_fired_on_trade_path(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A full open->closed trade path never calls the abstain sink."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    sink = _RecordingAbstainSink()
+    executor, _ = _build(broker, state, exec_state, abstain_sink=sink)
+
+    result = executor.run()
+
+    assert result.status == "CLOSED_BY_BROKER"
+    assert sink.calls == []
+
+
+def test_abstain_sink_raising_does_not_crash_cycle(exec_state: ExecutionState) -> None:
+    """A throwing ``on_no_trade`` is swallowed -> the cycle still returns NO_TRADE (J)."""
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[])
+    sink = _RecordingAbstainSink(raise_on_call=True)
+    executor, _ = _build(broker, state, exec_state, abstain_sink=sink)
+
+    result = executor.run()
+
+    assert result.status == "NO_TRADE"
+    assert len(sink.calls) == 1

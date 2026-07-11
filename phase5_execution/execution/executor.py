@@ -78,6 +78,7 @@ class Executor:
         *,
         debate_runner: Callable[[dict[str, Any]], Any] | None = None,
         reward_sink: Any | None = None,
+        abstain_sink: Any | None = None,
         now_fn: Callable[[], datetime] = datetime.now,
         sleep_fn: Callable[[float], None] = time.sleep,
     ) -> None:
@@ -111,6 +112,12 @@ class Executor:
                 **passive** consumer of snapshots: it never receives the broker write
                 path, a Gate, or a VETO, so it cannot bypass one. Both calls are guarded
                 — a raising sink is logged ``critical`` and never crashes the cycle (J).
+            abstain_sink: optional Phase-10 (V3) no-trade-lessons hook, same DI pattern
+                as ``reward_sink``. ``None`` (the default) → the seam is skipped, Phase 5
+                stays bit-identical. When present, ``on_no_trade(cycle_outcome)`` is
+                called once on **every** NO_TRADE return path (never on a trade path)
+                via the shared ``_no_trade`` helper — see :class:`execution.protocols.
+                AbstainSink`. Also passive/guarded (Decision J), no Phase-10 import here.
             now_fn / sleep_fn: injected clock / sleep for deterministic tests.
         """
         self.broker = broker
@@ -122,15 +129,41 @@ class Executor:
         self.confirm_fn = confirm_fn
         self.debate_runner = debate_runner
         self.reward_sink = reward_sink
+        self.abstain_sink = abstain_sink
         self.now_fn = now_fn
         self.sleep_fn = sleep_fn
 
     # -- result helpers -----------------------------------------------------
 
-    @staticmethod
-    def _no_trade(rule: str, reason: str) -> ExecutionResult:
-        """A clean no-trade outcome (gate/VETO/abstain) — exit 0, no order placed."""
+    def _no_trade(
+        self,
+        rule: str,
+        reason: str,
+        *,
+        epic: str | None = None,
+        failed_gate: str | None = None,
+        veto: str | None = None,
+        debate_decision: str | None = None,
+        research_empty: bool = False,
+        error: str | None = None,
+    ) -> ExecutionResult:
+        """A clean no-trade outcome (gate/VETO/abstain) — exit 0, no order placed.
+
+        The single funnel every NO_TRADE return path already goes through — also the
+        Phase-10 (V3) abstain-sink seam (:meth:`_notify_no_trade`). The keyword-only
+        params are the S2 classifier contract fields the caller knows about at its
+        point in the cycle; unset ones default to their "nothing to report" value
+        (``None``/``False``) and are harmless when no sink is injected.
+        """
         logger.info("no trade: %s — %s", rule, reason)
+        self._notify_no_trade(
+            epic=epic,
+            failed_gate=failed_gate,
+            veto=veto,
+            debate_decision=debate_decision,
+            research_empty=research_empty,
+            error=error,
+        )
         return ExecutionResult(
             status="NO_TRADE", deal_id=None, plan=None, detail=f"{rule}: {reason}"
         )
@@ -165,14 +198,14 @@ class Executor:
         now = self.now_fn()
         g1 = gate_time_window(now, self.config)
         if not g1.ok:
-            return self._no_trade(g1.gate, g1.reason)
+            return self._no_trade(g1.gate, g1.reason, failed_gate="G1")
 
         # 4) Gate 2 — fresh research candidate (runs research lazily if stale).
         g2, candidate = gate_load_candidates(
             self.state, self.research_runner, self.config
         )
         if not g2.ok or candidate is None:
-            return self._no_trade(g2.gate, g2.reason)
+            return self._no_trade(g2.gate, g2.reason, research_empty=True)
 
         # 4.5) Phase-6 debate seam (Decision A) — between Gate 2 and Gate 3. When no
         # runner is injected this is skipped entirely (Phase 5 stays AI-free). The
@@ -188,10 +221,14 @@ class Executor:
             except Exception as exc:  # noqa: BLE001 — defense: the debate is contractually
                 # fail-closed (Decision J), but a throwing runner must never crash the
                 # cycle either → treat it as a clean NO_TRADE, never "trade anyway".
-                return self._no_trade("debate", f"debate_runner failed: {exc}")
+                return self._no_trade(
+                    "debate", f"debate_runner failed: {exc}",
+                    epic=candidate["epic"], error=str(exc),
+                )
             if getattr(outcome, "decision", "TRADE") == "ABSTAIN":
                 return self._no_trade(
-                    "debate", getattr(outcome, "rationale", "") or "abstain"
+                    "debate", getattr(outcome, "rationale", "") or "abstain",
+                    epic=candidate["epic"], debate_decision="ABSTAIN",
                 )
             direction = getattr(outcome, "direction", None)
             if direction:
@@ -201,10 +238,10 @@ class Executor:
         positions_env = self.broker.get_open_positions()
         g3 = gate_constraints(account_env, positions_env, candidate, self.config)
         if not g3.ok:
-            return self._no_trade(g3.gate, g3.reason)
+            return self._no_trade(g3.gate, g3.reason, epic=candidate["epic"], failed_gate="G3")
         g5 = gate_direction_consistency(candidate, positions_env)
         if not g5.ok:
-            return self._no_trade(g5.gate, g5.reason)
+            return self._no_trade(g5.gate, g5.reason, epic=candidate["epic"], failed_gate="G5")
 
         # 6) Gate 4 — sizing. One fresh price (reused by build_order_plan) + market info.
         epic = candidate["epic"]
@@ -215,12 +252,12 @@ class Executor:
             account_env, price_env, market_info_env, risk_pct, self.config, epic=epic
         )
         if size_reason is not None:
-            return self._no_trade("sizing", size_reason)
+            return self._no_trade("sizing", size_reason, epic=epic, failed_gate="G4")
 
         # 7) The four HARD VETOs on a fresh snapshot, immediately before the order.
         veto = pre_trade_check(self.broker, candidate, now, self.config)
         if not veto.ok:
-            return self._no_trade(veto.veto, veto.reason)
+            return self._no_trade(veto.veto, veto.reason, epic=epic, veto=veto.veto)
 
         # 8) Build the resolved order plan (reuse the Gate-4 fresh price + market info).
         plan = build_order_plan(candidate, size, price_env, market_info_env, self.config)
@@ -303,6 +340,40 @@ class Executor:
             self.reward_sink.on_trade_closed(build_closed(result, now=self.now_fn()))
         except Exception as exc:  # noqa: BLE001 - the sink must never kill the cycle (J)
             logger.critical("reward_sink.on_trade_closed failed: %s", exc)
+
+    # -- Phase-10 (V3) abstain-lessons seam (Decision J) ---------------------
+
+    def _notify_no_trade(
+        self,
+        *,
+        epic: str | None,
+        failed_gate: str | None,
+        veto: str | None,
+        debate_decision: str | None,
+        research_empty: bool,
+        error: str | None,
+    ) -> None:
+        """Fire ``abstain_sink.on_no_trade`` with the S2 classifier cycle-outcome dict.
+
+        No-op when no sink is injected (Phase 5 bit-identical). Fail-closed: a failure
+        building or delivering the dict is logged ``critical`` and never raised — every
+        NO_TRADE path is unaffected (Decision J), mirroring ``_notify_opened``.
+        """
+        if self.abstain_sink is None:
+            return
+        try:
+            cycle_outcome = {
+                "outcome": "NO_TRADE",
+                "epic": epic,
+                "failed_gate": failed_gate,
+                "veto": veto,
+                "debate_decision": debate_decision,
+                "research_empty": research_empty,
+                "error": error,
+            }
+            self.abstain_sink.on_no_trade(cycle_outcome)
+        except Exception as exc:  # noqa: BLE001 - the sink must never kill the cycle (J)
+            logger.critical("abstain_sink.on_no_trade failed: %s", exc)
 
     # -- internals ----------------------------------------------------------
 

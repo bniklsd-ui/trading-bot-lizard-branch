@@ -117,3 +117,21 @@ class RewardSink(Protocol):
     def on_trade_opened(self, opened: Any) -> None: ...
 
     def on_trade_closed(self, closed: Any) -> None: ...
+
+
+@runtime_checkable
+class AbstainSink(Protocol):
+    """Optional Phase-10 (V3) no-trade-lessons hook — injected, default ``None``.
+
+    The executor calls ``on_no_trade`` once, on every NO_TRADE return path (never on
+    a trade path), with a duck-typed ``cycle_outcome`` dict (the S2 classifier
+    contract: ``outcome``/``epic``/``failed_gate``/``veto``/``debate_decision``/
+    ``research_empty``/``error`` — declared ``Any`` here so Phase 5 imports nothing
+    from ``abstain_lessons``). Same trust boundary as ``RewardSink``: passive,
+    receives no broker/Gate/VETO access, so it structurally cannot bypass one
+    (Decision J). Default ``None`` → the seam is skipped entirely, Phase 5 stays
+    bit-identical. Implementations must be fail-closed (the executor also guards
+    the call, mirroring the ``RewardSink`` pattern — defence in depth).
+    """
+
+    def on_no_trade(self, cycle_outcome: Any) -> None: ...

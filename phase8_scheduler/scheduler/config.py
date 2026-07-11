@@ -149,6 +149,16 @@ class SchedulerConfig:
     # `--enable-ig-bars` on scheduler.run once a live run has confirmed the chain.
     enable_ig_bars: bool = False
 
+    # --- Phase 10 (V3) abstain-/no-trade-lessons (Block A) ---
+    # `enable_abstain_lessons` wires an `AbstainStore` + `AbstainLessonSink` into the
+    # Executor's `abstain_sink` seam (default None ⇒ bit-identical); `enable_abstain_reflect`
+    # additionally builds the Haiku `AbstainLLM` adapter (best-effort, capped) — off leaves
+    # classification+persistence running but skips the one AI call. `reflect_daily_cap` is
+    # the shared (abstain + WE-2 paper) daily reflect-call budget, DB-counted (restart-safe).
+    enable_abstain_lessons: bool = True
+    enable_abstain_reflect: bool = True
+    reflect_daily_cap: int = 10
+
     # --- paths (gitignored data/ tree) ---
     live_db_path: str = "data/trading_bot.sqlite"          # the real P2 DB
     state_path: str = "data/state/scheduler_state.json"

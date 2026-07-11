@@ -47,6 +47,12 @@ def test_defaults_match_locked_concept_values() -> None:
     # data path (Phase 9 / V2) — IG bar chain OFF by default (yFinance-only, bit-identical)
     assert cfg.enable_ig_bars is False
 
+    # Phase 10 (V3) abstain-lessons — on by default (classification+persistence),
+    # reflect (the one AI call) also on by default, shared daily cap 10
+    assert cfg.enable_abstain_lessons is True
+    assert cfg.enable_abstain_reflect is True
+    assert cfg.reflect_daily_cap == 10
+
     # paths (gitignored data/ tree)
     assert cfg.live_db_path == "data/trading_bot.sqlite"
     assert cfg.state_path == "data/state/scheduler_state.json"

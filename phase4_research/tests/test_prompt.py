@@ -183,3 +183,71 @@ def test_empty_universe_edge() -> None:
     assert schema["properties"]["epic"]["anyOf"][0]["enum"] == []
     assert {"type": "null"} in schema["properties"]["epic"]["anyOf"]
     assert "none right now" in user.lower()
+
+
+# --- Phase 10 (V3, S6) — dark abstain-/paper-lesson flags -------------------
+# Both default False; activation is explicitly out of scope for V3 (V3-D3) — these
+# tests only prove the flags are wired and bit-identical when off.
+
+
+def test_s6_flags_default_off_is_bit_identical(research_context: ResearchContext) -> None:
+    """No flags passed at all → identical output to explicitly passing both False."""
+    baseline = build_prompt(research_context, THRESHOLD, BOTH)
+    explicit_off = build_prompt(
+        research_context, THRESHOLD, BOTH,
+        include_abstain_lessons=False, include_paper_lessons=False,
+    )
+    assert baseline == explicit_off
+
+
+def test_include_abstain_lessons_off_omits_section(research_context: ResearchContext) -> None:
+    _, user, _ = build_prompt(
+        research_context, THRESHOLD, BOTH,
+        include_abstain_lessons=False, abstain_lessons=["should not appear"],
+    )
+    assert "Abstain lessons" not in user
+    assert "should not appear" not in user
+
+
+def test_include_abstain_lessons_on_renders_section(research_context: ResearchContext) -> None:
+    _, user, _ = build_prompt(
+        research_context, THRESHOLD, BOTH,
+        include_abstain_lessons=True, abstain_lessons=["review entry quality"],
+    )
+    assert "Abstain lessons:" in user
+    assert "- review entry quality" in user
+
+
+def test_include_abstain_lessons_on_empty_list_graceful(research_context: ResearchContext) -> None:
+    _, user, _ = build_prompt(
+        research_context, THRESHOLD, BOTH, include_abstain_lessons=True,
+    )
+    assert "Abstain lessons: none on record." in user
+
+
+def test_include_paper_lessons_off_omits_section(research_context: ResearchContext) -> None:
+    _, user, _ = build_prompt(
+        research_context, THRESHOLD, BOTH,
+        include_paper_lessons=False, paper_lessons=["should not appear"],
+    )
+    assert "Paper-trade lessons" not in user
+    assert "should not appear" not in user
+
+
+def test_include_paper_lessons_on_renders_section(research_context: ResearchContext) -> None:
+    _, user, _ = build_prompt(
+        research_context, THRESHOLD, BOTH,
+        include_paper_lessons=True, paper_lessons=["shadow BUY lost, shadow SELL won"],
+    )
+    assert "Paper-trade lessons:" in user
+    assert "- shadow BUY lost, shadow SELL won" in user
+
+
+def test_both_flags_on_renders_both_sections(research_context: ResearchContext) -> None:
+    _, user, _ = build_prompt(
+        research_context, THRESHOLD, BOTH,
+        include_abstain_lessons=True, abstain_lessons=["abstain lesson"],
+        include_paper_lessons=True, paper_lessons=["paper lesson"],
+    )
+    assert "Abstain lessons:" in user
+    assert "Paper-trade lessons:" in user

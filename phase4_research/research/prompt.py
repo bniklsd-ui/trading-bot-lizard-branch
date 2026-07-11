@@ -142,6 +142,16 @@ def _render_lessons(lessons: list[dict[str, Any]]) -> str:
     return "\n".join(rows)
 
 
+def _render_extra_lessons(label: str, lessons: list[str]) -> str:
+    """Render a Phase-10 (V3) lesson block (abstain/paper) — same shape as
+    ``_render_lessons``, kept separate since the source is a different store."""
+    if not lessons:
+        return f"{label}: none on record."
+    rows = [f"{label}:"]
+    rows.extend(f"- {text}" for text in lessons)
+    return "\n".join(rows)
+
+
 def _render_universe(tradeable_epics: list[dict[str, Any]]) -> str:
     """Render the code-vetted tradeable instruments as a table."""
     if not tradeable_epics:
@@ -199,6 +209,11 @@ def build_prompt(
     context: ResearchContext,
     threshold: float,
     allowed_directions: tuple[str, ...],
+    *,
+    include_abstain_lessons: bool = False,
+    abstain_lessons: list[str] | None = None,
+    include_paper_lessons: bool = False,
+    paper_lessons: list[str] | None = None,
 ) -> tuple[str, str, dict[str, Any]]:
     """Assemble the ``(system, user, json_schema)`` triple for the LLM call.
 
@@ -214,6 +229,19 @@ def build_prompt(
             (advisory — the real gate is the deterministic filter).
         allowed_directions: The permitted directions after the clamp; reflected in
             both the user message and the schema ``direction`` enum.
+        include_abstain_lessons: Phase 10 (V3, S6) — default ``False`` ⇒ this
+            function stays byte-identical to its pre-V3 output. When ``True``, the
+            caller must pass pre-fetched ``abstain_lessons`` text (e.g.
+            ``AbstainStore.recent_lessons(5)``) — this function does no I/O of its
+            own, keeping it pure. **Activation is explicitly out of scope for V3**
+            (V3-D3) — this flag exists so the wiring can flip it later after a
+            manual lesson-quality review; nothing in this repo sets it ``True`` yet.
+        abstain_lessons: pre-fetched lesson strings, rendered only when
+            ``include_abstain_lessons`` is ``True``.
+        include_paper_lessons: same contract as ``include_abstain_lessons``, for the
+            WE-2 paper-trade lesson channel (``PaperTradeStore.recent_lessons``).
+        paper_lessons: pre-fetched paper-lesson strings, rendered only when
+            ``include_paper_lessons`` is ``True``.
 
     Returns:
         ``(system, user, json_schema)``: the static system prompt, the
@@ -241,6 +269,18 @@ def build_prompt(
         ),
         _render_trades(context.recent_trades),
         _render_lessons(context.recent_lessons),
+    ]
+    # Phase 10 (V3, S6) — both default off, appended only when explicitly requested
+    # (never both branches at once change the pre-V3 section count/order).
+    if include_abstain_lessons:
+        sections.append(
+            _render_extra_lessons("Abstain lessons", abstain_lessons or [])
+        )
+    if include_paper_lessons:
+        sections.append(
+            _render_extra_lessons("Paper-trade lessons", paper_lessons or [])
+        )
+    sections += [
         decision_block,
         _render_universe(context.tradeable_epics),
         "Answer format: respond with abstain, epic, direction, confidence, "
