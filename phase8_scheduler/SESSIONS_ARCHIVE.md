@@ -4,7 +4,7 @@ purpose: Verbatim session-history archive rotated out of `CLAUDE.md`
 read-when: auditing how a past phase-8 decision came about — never needed at session start
 detail: L3
 up: ./CLAUDE.md
-updated: 2026-07-06
+updated: 2026-07-11
 ---
 
 # phase8_scheduler — Session Archive
@@ -14,6 +14,57 @@ updated: 2026-07-06
 > CLAUDE.md archive move). Source order preserved (newest-first unless noted). The newest
 > `## Session stopped` block always stays in the source file; at each session end, the
 > previously-newest block rotates here.
+
+---
+
+## Session stopped — 2026-07-04 (Phase 9 / V2 Step 5 — `universe_refresher`-Naht, additiv)
+
+> **Auslöser:** Phase 9 (V2)-Kickoff-Session, Step 5 des Ausführungsplans
+> (`docs/concepts/phase9_v2_foundation_plan(1).md`) — die P8-Integrationshälfte der
+> DB-Universum-Anbindung. Phase 8 selbst bleibt sonst unverändert.
+
+### Completed (additiv, Default-Pfad bit-identisch)
+- **`scheduler/config.py`:** neues `universe_refresh_interval_min: int = 240`.
+- **`scheduler/state.py`:** neues Cross-Day-Feld `last_universe_refresh_ts: str | None =
+  None` (wie `last_reconcile_ts` — von `rollover_if_new_day` unberührt, self-healing via
+  den bestehenden Feld-Filter).
+- **`scheduler/runner.py`:** `SchedulerRunner.__init__` bekam einen optionalen
+  keyword-only `universe_refresher: Callable[[], Any] | None = None` (Default `None` =
+  heutiges Verhalten, bit-identisch). Aufgerufen (a) einmalig in `preflight()`
+  (fail-soft, guarded — ein Refresh-Fehler stoppt den Daemon-Start nicht), (b) danach
+  höchstens 1× je `universe_refresh_interval_min` in der WINDOW-Phase (throttled via
+  neuem generischem `_due_after()`, aus dem bestehenden `_due()` extrahiert — **niemals**
+  innerhalb von `research_tick.ensure_candidates`, ein Discover/Promote-Pass ist
+  unabhängig von einem Gate-2-Pick). **+6 neue Tests** in `test_runner.py`
+  (None→nie gerufen, Preflight-Call, Never-run→sofort due, Throttle innerhalb des
+  Intervalls, Re-Run nach Intervall-Ablauf, Fail-soft bei Exception — kein Crash, kein
+  Backoff-Trip). **P8 199 → 205.**
+- **`scripts/wiring.py`:** neue `_build_universe_from_db()` (dupliziert — nicht
+  importiert — aus P4s `scripts.wiring.build_universe_from_db`, gleicher Grund wie
+  `_build_research` direkt aus dem `research`-Paket baut statt P4s Factory zu
+  importieren: die `scripts.wiring`-Namenskollision über die Phasen). `_build_research`
+  nutzt sie jetzt statt hartkodiertem `EXTENDED_UNIVERSE`. Neue `universe_refresher`-
+  Closure in `build_scheduler()` (Discover + `run_promotion_cycle` über den geteilten
+  Broker + `research.market_data`, `is_demo=(config.account=="demo")`), an
+  `SchedulerRunner(...)` durchgereicht.
+- **Manuell end-to-end verifiziert** (kein pytest, `scripts/wiring.py` wird laut
+  Konvention nicht von pytest importiert): eine echte Migration-004-DB mit 1 geseedeten
+  DAX-Record → `build_universe_from_db` liefert `[DAX]`; leere/fehlende DB → Fallback
+  auf `EXTENDED_UNIVERSE` (4 Instrumente), kein Crash, korrekt geloggte Warnung.
+
+### Verifiziert
+- `pytest phase8_scheduler/tests -q` → **205 passed** (199 + 6). Volle Regression
+  unverändert grün: P1 52 · P2 76 · P3 73 · P4 141 (+6, s. `phase4_research/CLAUDE.md`) ·
+  P5 154 · P6 70 · P7 133 · root 64 · P9 67.
+- `py_compile` clean auf allen berührten Dateien.
+
+### Next
+- Phase 9 (V2) Steps 6–7 (BarProvider-Kette + Lightstreamer, V2b) sind noch offen —
+  siehe `phase9_universe/CLAUDE.md` für den aktuellen Stand des Universe-Pakets selbst.
+- Operator-Live-Runs (Step 8: Autonomie-Beweis + Breaker-Fire) folgen erst nach V2b.
+
+### Offene Punkte / blockers
+- Keine technischen.
 
 ---
 

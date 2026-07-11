@@ -449,7 +449,7 @@ def test_pre_open_warms_and_reconciles_then_sleeps_until_window(tmp_path) -> Non
 def test_post_window_forces_reconcile_and_sleeps_to_next_pre_open(tmp_path) -> None:
     rec = _FakeReconciler()
     ex = _FakeExecutor()
-    runner, sleep, _store, _cfg = _make_runner(
+    runner, sleep, _store, cfg = _make_runner(
         tmp_path, times=[_POST_WINDOW_T], reconciler=rec, executor=ex, max_iterations=1
     )
 
@@ -457,7 +457,9 @@ def test_post_window_forces_reconcile_and_sleeps_to_next_pre_open(tmp_path) -> N
 
     assert ex.run_calls == 0
     assert rec.tick_calls >= 1
-    assert sleep.sleeps and sleep.sleeps[-1] > 0  # long sleep to the next pre-open
+    # 2026-07-11 fix: capped by the idle poll (was an uncapped sleep-to-next-pre-open,
+    # which over a weekend blocked request_stop()/kill-switch for ~63h — see CLAUDE.md).
+    assert sleep.sleeps and sleep.sleeps[-1] == cfg.idle_poll_min * 60
 
 
 def test_idle_only_sleeps_no_work(tmp_path) -> None:

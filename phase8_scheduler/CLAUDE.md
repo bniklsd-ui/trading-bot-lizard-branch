@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase8_scheduler_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-06
+updated: 2026-07-11
 ---
 # CLAUDE.md — Phase 8: Scheduler (`phase8_scheduler/`)
 
@@ -108,7 +108,7 @@ immer → Variety + Clamp/Floor + echte Lessons). **Token-Budget by-default scha
 | `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ✅ (Modul 8, 14 Tests) |
 | `scheduler/observability.py` | v1.6 Step 0 — per-Zyklus JSONL-Diagnose-Log (`record_cycle`/`iter_records`), Sicherheitsnetz für Rückfälle | ✅ (v1.6, 9 Tests) |
 | `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ✅ (7 Tests) |
-| `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown + `request_stop()` + optionaler `universe_refresher` (Phase 9/V2, Default `None` = bit-identisch) | ✅ (Modul 10, 24 Tests — 18 + 6 v2) |
+| `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown + `request_stop()` + optionaler `universe_refresher` (Phase 9/V2, Default `None` = bit-identisch); POST_WINDOW-Sleep seit 2026-07-11 gecappt (s. `## Session stopped — 2026-07-11`) | ✅ (Modul 10, 24 Tests — 18 + 6 v2) |
 | `scheduler/run.py` | `python -m scheduler.run` Entry (in-package, lazy `scripts.wiring`, SIGTERM/SIGINT → `request_stop`) | ✅ (Modul 11, 6 Tests) |
 | `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures + `universe_refresher`-Closure (Phase 9/V2) | ✅ (Modul 11, operator-run) |
 | `scripts/run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Operator-Tools (Start-Script · offline Sim-Tag mit Fakes · echter unbeaufsichtigter IG-Demo-Zyklus) | ✅ (Modul 11, operator-run) |
@@ -234,54 +234,110 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 
 ---
 
-## Session stopped — 2026-07-04 (Phase 9 / V2 Step 5 — `universe_refresher`-Naht, additiv)
+## Session stopped — 2026-07-11 (Hotfix: POST_WINDOW-Sleep gecappt — Kill-Switch/SIGINT waren bis zu ~63h wirkungslos)
 
-> **Auslöser:** Phase 9 (V2)-Kickoff-Session, Step 5 des Ausführungsplans
-> (`docs/concepts/phase9_v2_foundation_plan(1).md`) — die P8-Integrationshälfte der
-> DB-Universum-Anbindung. Phase 8 selbst bleibt sonst unverändert.
+> **Auslöser:** kein Phase-8-Arbeitsauftrag — Nebenbefund am Anfang der Phase-10-V3-
+> Weekend-Session. Der Nikinger meldete: `Strg+C` im Scheduler-Terminal + Web-UI-Kill-
+> Switch zeigten nach 10 Minuten keine Wirkung, Vermutung "wartet bis zum nächsten Zyklus,
+> der am Wochenende Tage dauert". Diagnose bestätigte das exakt; Fix + Kill nach
+> Nikinger-Freigabe (AskUserQuestion, 2026-07-11) durchgeführt, außerhalb des
+> Phase-10-Scopes aber **extrem notwendig** (Root-`CLAUDE.md` Working-Style-Regel
+> "b) extremely necessary, nach Check mit dem Nikinger").
 
-### Completed (additiv, Default-Pfad bit-identisch)
-- **`scheduler/config.py`:** neues `universe_refresh_interval_min: int = 240`.
-- **`scheduler/state.py`:** neues Cross-Day-Feld `last_universe_refresh_ts: str | None =
-  None` (wie `last_reconcile_ts` — von `rollover_if_new_day` unberührt, self-healing via
-  den bestehenden Feld-Filter).
-- **`scheduler/runner.py`:** `SchedulerRunner.__init__` bekam einen optionalen
-  keyword-only `universe_refresher: Callable[[], Any] | None = None` (Default `None` =
-  heutiges Verhalten, bit-identisch). Aufgerufen (a) einmalig in `preflight()`
-  (fail-soft, guarded — ein Refresh-Fehler stoppt den Daemon-Start nicht), (b) danach
-  höchstens 1× je `universe_refresh_interval_min` in der WINDOW-Phase (throttled via
-  neuem generischem `_due_after()`, aus dem bestehenden `_due()` extrahiert — **niemals**
-  innerhalb von `research_tick.ensure_candidates`, ein Discover/Promote-Pass ist
-  unabhängig von einem Gate-2-Pick). **+6 neue Tests** in `test_runner.py`
-  (None→nie gerufen, Preflight-Call, Never-run→sofort due, Throttle innerhalb des
-  Intervalls, Re-Run nach Intervall-Ablauf, Fail-soft bei Exception — kein Crash, kein
-  Backoff-Trip). **P8 199 → 205.**
-- **`scripts/wiring.py`:** neue `_build_universe_from_db()` (dupliziert — nicht
-  importiert — aus P4s `scripts.wiring.build_universe_from_db`, gleicher Grund wie
-  `_build_research` direkt aus dem `research`-Paket baut statt P4s Factory zu
-  importieren: die `scripts.wiring`-Namenskollision über die Phasen). `_build_research`
-  nutzt sie jetzt statt hartkodiertem `EXTENDED_UNIVERSE`. Neue `universe_refresher`-
-  Closure in `build_scheduler()` (Discover + `run_promotion_cycle` über den geteilten
-  Broker + `research.market_data`, `is_demo=(config.account=="demo")`), an
-  `SchedulerRunner(...)` durchgereicht.
-- **Manuell end-to-end verifiziert** (kein pytest, `scripts/wiring.py` wird laut
-  Konvention nicht von pytest importiert): eine echte Migration-004-DB mit 1 geseedeten
-  DAX-Record → `build_universe_from_db` liefert `[DAX]`; leere/fehlende DB → Fallback
-  auf `EXTENDED_UNIVERSE` (4 Instrumente), kein Crash, korrekt geloggte Warnung.
+### Was (Befund)
+- **Prozess:** `python -m scheduler.run --daily-loss-cap 1800 --max-trades 5` (PID
+  19860), gestartet Do 2026-07-09 13:28 CEST, lief trotz zweifachem Stop-Versuch
+  (Ctrl+C **und** Dashboard-Kill-Switch) unverändert weiter bis zum manuellen `kill -9`
+  in dieser Session (Sa 2026-07-11 07:44 UTC).
+- **Kill-Switch griff, aber zu spät:** `data/state/KILL` existierte bereits
+  (`{"reason": "manual:dashboard", "ts": "2026-07-11T07:32:03Z"}`), 11 Min. vor der
+  Diagnose — genau die vom Nikinger beobachteten "10 Minuten ohne Wirkung".
+- **Prozesszustand:** `wchan = hrtimer_nanosleep` — echter `time.sleep()`, kein Hang/Bug
+  im Sinne eines Deadlocks. `scheduler_state.json` zeigte den letzten Reconcile Fr
+  2026-07-10 17:29:30 CEST (POST_WINDOW nach Handelsschluss 17:30).
+
+### Wo (Root Cause)
+- `scheduler/runner.py::_run_phase`, **POST_WINDOW**-Zweig (vor dem Fix Zeile 370):
+  `self._clock.sleep(self._clock.seconds_until(Phase.PRE_OPEN, now))` — **ein einziger,
+  ungecappter** `time.sleep()`-Call. Von Freitag-Handelsschluss aus berechnet
+  `seconds_until(PRE_OPEN)` den nächsten **Handelstag** (Montag `pre_open_time` =
+  08:50 CEST, `window_open` 09:00 minus `pre_open_lead_min` 10) → ein Sleep von **~63
+  Stunden am Stück**.
+- `request_stop()` (Ctrl+C/SIGTERM-Handler, :260-269) setzt nur ein **In-Memory-Flag**;
+  der Loop prüft es (wie den Kill-Switch, :292/:295) **ausschließlich am Top jeder
+  Iteration** — also erst, **nachdem** der laufende `clock.sleep()`-Call zurückkehrt.
+  Pythons `time.sleep()` retryt einen durch ein Signal unterbrochenen Syscall automatisch
+  bis zum vollen Rest (PEP 475) — der Handler feuert sofort, aber der Sleep selbst läuft
+  ungestört zu Ende. Für **PRE_OPEN** (:339-341) und **IDLE** (:372) ist das harmlos, weil
+  beide bereits mit `self._idle_poll_s` (Default 5 Min) gecappt sind — **nur der
+  POST_WINDOW-Zweig hatte kein Cap.** Ein Freitagabend-Stop-Versuch traf damit exakt den
+  einzigen ungecappten Pfad, und zwar in seiner längsten Ausprägung (Wochenende statt
+  Übernacht-Lücke).
+- **Kein Scope-Zufall, dass niemand das vorher sah:** der Daemon läuft seit Phase-8-
+  Live-Verifikation (2026-07-03) unbeaufsichtigt durch — ein Stop mitten in POST_WINDOW
+  wurde vorher nie gebraucht/versucht.
+
+### Wie (Fix)
+- `scheduler/runner.py` POST_WINDOW-Zweig auf exakt das PRE_OPEN-Muster umgestellt:
+  ```python
+  self._clock.sleep(
+      min(self._clock.seconds_until(Phase.PRE_OPEN, now), self._idle_poll_s)
+  )
+  ```
+  Reiner Additiv-Cap, keine neue Abstraktion (bereits im gleichen File als Muster
+  vorhanden). `_run_phase`-Docstring ergänzt (Verweis auf diesen Block).
+- `tests/test_runner.py::test_post_window_forces_reconcile_and_sleeps_to_next_pre_open`
+  verschärft: statt der laxen `sleep.sleeps[-1] > 0` jetzt
+  `sleep.sleeps[-1] == cfg.idle_poll_min * 60` — pinnt das Cap-Verhalten, damit eine
+  Regression hier künftig ein rotes Pytest ist, kein stilles Wieder-Aufreißen.
+- **Effekt:** ein zukünftiger Stop (Ctrl+C, SIGTERM, Kill-Switch) während POST_WINDOW
+  greift jetzt binnen **max. 5 Minuten** statt bis zu ~63 Stunden — WINDOW (`cycle_interval_s`,
+  Default 5 Min) und PRE_OPEN/IDLE waren bereits in dieser Größenordnung.
+
+### Warum (Impact/Einordnung)
+- Der Kill-Switch ist laut Root-`CLAUDE.md` Hard Rule 2 ("Never bypass VETOs") /
+  Konzept §4 die letzte Handbremse — genau in der unbeaufsichtigten Wochenend-/
+  Übernacht-Phase am wichtigsten, in der dieser Bug sie am längsten lahmlegte. Kein
+  Trading-Risiko in diesem konkreten Vorfall (Markt zu, `account="demo"` strukturell
+  gesperrt), aber ein struktureller Blind Spot im Shutdown-Pfad, der bei einer echten
+  Not-Aus-Situation (z. B. ein Freitagabend-Fehlverhalten) real ~63h Wirkungslosigkeit
+  bedeutet hätte.
+- **Parallel-Login-Risiko geprüft (Nikinger-Auflage):** `kill -9` überspringt
+  `shutdown()` (finaler Reconcile + `broker.disconnect()`). Laut
+  `phase1_broker_wrapper/lightstreamer_integration_notes.md` ("Parallel-login auth
+  trap") sind IG-Session-Tokens **nur In-Memory** (kein On-Disk-Session-File) — kein
+  Reboot nötig, die Session heilt sich beim nächsten **solo** `connect()` selbst.
+  `ps aux` nach dem Kill bestätigt: **kein** zweiter `scheduler.run`-/IG-Login-Prozess
+  aktiv — kein aktuelles Parallel-Login-Risiko. Ein Restart sollte trotzdem, wie immer,
+  **sequenziell** erfolgen (nicht parallel zu einem laufenden Live-/Diagnose-Skript).
+- **KILL-Datei bewusst NICHT gelöscht** — sie ist der sticky, operator-gesetzte Halt
+  (`manual:dashboard`, 2026-07-11 07:32 UTC) und bleibt bis der Nikinger den Bot bewusst
+  neu startet (`clear_kill` ist ein Operator-Schritt, keiner, den diese Session
+  eigenmächtig zieht).
 
 ### Verifiziert
-- `pytest phase8_scheduler/tests -q` → **205 passed** (199 + 6). Volle Regression
-  unverändert grün: P1 52 · P2 76 · P3 73 · P4 141 (+6, s. `phase4_research/CLAUDE.md`) ·
-  P5 154 · P6 70 · P7 133 · root 64 · P9 67.
-- `py_compile` clean auf allen berührten Dateien.
+- `pytest phase8_scheduler/tests -q` → **217 passed** (unverändert — ein Test verschärft,
+  keiner hinzugefügt/entfernt).
+- Volle Cross-Phase-Regression unverändert grün gegen die Phase-10-Step-1-Baseline: P1 87
+  · P2 76 · P3 100 · P4 148 · P5 154 · P6 70 · P7 133 · P9 72 · meta_m1_harness 28 ·
+  root 77 (Summe unverändert 1162 + P8 217).
+- `ps aux` nach dem Kill: kein `scheduler.run`-Prozess mehr aktiv, keine verwaisten
+  IG-Login-Prozesse.
 
 ### Next
-- Phase 9 (V2) Steps 6–7 (BarProvider-Kette + Lightstreamer, V2b) sind noch offen —
-  siehe `phase9_universe/CLAUDE.md` für den aktuellen Stand des Universe-Pakets selbst.
-- Operator-Live-Runs (Step 8: Autonomie-Beweis + Breaker-Fire) folgen erst nach V2b.
+- **Operator (Nikinger):** Restart des Schedulers ist ein bewusster, separater Schritt
+  (KILL-Datei erst löschen, dann `python -m scheduler.run …`) — nicht Teil dieser
+  Session. Bis dahin steht der Bot (Markt ohnehin am Wochenende zu).
+- Advisor-Tool war diese Session **nicht erreichbar** (ein Aufruf, sofortiger Fehler,
+  keine weiteren Details in der Tool-Antwort) — exakte Fehlermeldung geht an den
+  Nikinger zur eigenen Recherche (s. Chat-Antwort dieser Session), kein Repo-Fix hier.
+- Zurück zu Phase 10 V3 Block A (Migration 005 etc., s. `## Session stopped —
+  2026-07-10` in `../phase10_v3/CLAUDE.md`) — dieser Hotfix war ein Zwischenstopp, keine
+  Änderung am Phase-10-Plan.
 
 ### Offene Punkte / blockers
-- Keine technischen.
+- Keine technischen. Eine Operator-Entscheidung offen: wann der Scheduler wieder
+  gestartet wird (kein Blocker für die Phase-10-Arbeit selbst).
 
 ---
 

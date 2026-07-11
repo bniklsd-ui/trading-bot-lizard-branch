@@ -331,7 +331,10 @@ class SchedulerRunner:
         PRE_OPEN warms the session + reconciles, then sleeps until WINDOW (capped by the idle poll).
         WINDOW warms + reconciles, runs the pre-cycle gate, and on a pass triggers real research +
         a bare ``executor.run()`` (Contract A), recording the outcome. POST_WINDOW does a forced
-        final reconcile then sleeps to the next pre-open. IDLE just sleeps.
+        final reconcile then sleeps to the next pre-open (capped by the idle poll — 2026-07-11
+        fix, see ``phase8_scheduler/CLAUDE.md``: an uncapped sleep here blocked ``request_stop()``
+        and the kill-switch for the whole POST_WINDOW→PRE_OPEN gap, up to a full weekend). IDLE
+        just sleeps.
         """
         if phase is Phase.PRE_OPEN:
             self._warm_session()
@@ -367,7 +370,9 @@ class SchedulerRunner:
         elif phase is Phase.POST_WINDOW:
             self._warm_session()
             self._maybe_reconcile(state, now, force=True)
-            self._clock.sleep(self._clock.seconds_until(Phase.PRE_OPEN, now))
+            self._clock.sleep(
+                min(self._clock.seconds_until(Phase.PRE_OPEN, now), self._idle_poll_s)
+            )
         else:  # Phase.IDLE
             self._clock.sleep(self._idle_poll_s)
 
