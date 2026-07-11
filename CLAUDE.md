@@ -294,6 +294,18 @@ The "AI as little as possible" principle resolves most ambiguity.
   next), spell out terms instead of session-local shorthand, and make the next step specific
   enough to start without re-reading everything.
 
+- **Advisor usage (Claude Code, `/advisor` active).** Consult the Advisor in exactly these
+  cases — no more, no less:
+  1. **[VERIFY] mismatch:** the as-built code deviates from the plan's contract → ask the
+     Advisor *before* reinterpreting it yourself, never adjust silently.
+  2. **A test/gate keeps failing after 2–3 fix attempts** → consult the Advisor with the
+     diff + error output instead of iterating further.
+  3. **Before declaring a weekend block (Block A/B) done** → the Advisor checks against the
+     plan's acceptance criteria + Definition of Done.
+
+  Do NOT consult for: routine edits, locked decisions (they stay locked), or anything the
+  plan already specifies exactly.
+
 ---
 
 ## Phase transitions
