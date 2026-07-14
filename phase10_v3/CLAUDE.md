@@ -1,6 +1,6 @@
 ---
 status: live
-purpose: ACTIVE phase head — V3: Abstain-/No-Trade-Lessons echt auf main + Persistenz-Reform (Regime-Snapshots, Decision-Context) + Paper-Trades; Steps 0–6 (Block A live on main) done, Steps 8–11 (Block B) gated on WE 2
+purpose: ACTIVE phase head — V3: Abstain-/No-Trade-Lessons echt auf main + Persistenz-Reform (Regime-Snapshots, Decision-Context) + Paper-Trades; Block A (Steps 0–7) done + Montag-Restart-Beweis erbracht 2026-07-14, Block B (Steps 8–11) gated on WE 2
 read-when: working in phase10_v3/ — read this head + its newest Session-stopped block first
 detail: L2
 up: ../CLAUDE.md
@@ -9,7 +9,7 @@ down:
   - ../docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md   # kickoff handover from M1 into V3 (L3)
   - ../meta_m1_harness/specs/S1.md   # ... S7.md — Abstain-Lessons Bauplan-Specs (L3, zweifach real durchgebaut)
   - ./SESSIONS_ARCHIVE.md   # full session history (L3)
-updated: 2026-07-11
+updated: 2026-07-14
 ---
 # CLAUDE.md — Phase 10 (V3): Abstain-Lessons + Persistenz-Reform + Paper-Trades (`phase10_v3/`)
 
@@ -320,6 +320,39 @@ Time-Stop-Dauer-Key: `max_hold_minutes` (Default 240), konsumiert in `monitor.py
   Sinn) — das war bereits die S2-Contract-Absicht (G2 → `REASON_NO_CANDIDATES`), aber am
   echten Datenbild (94 % der Abstains sind genau dieser Pfad) lohnt ein Blick, ob die
   12-Reason-Taxonomie an dieser Stelle granular genug bleibt.
+
+### Nachtrag (2026-07-14, Di) — Montag-Restart-Beweis erbracht ✅
+
+Scheduler seit Mo 2026-07-13 durchgehend gelaufen (PID 129102, KILL-Datei vom Nikinger vor
+dem Restart gelöscht), `scheduler_state.json` zeigt `consecutive_failures: 0`, `kill_reason:
+null` — sauberer, unbeaufsichtigter Lauf. Read-only via `mode=ro`-URI gegen die Live-DB
+geprüft (Plan §7.3 Akzeptanzkriterium):
+
+**`abstain_records`** (66 Zeilen, 2026-07-13T07:05:42.541Z … 2026-07-13T14:47:42.545Z, alle
+`epic: null`/`stage: research_empty`/`reason: reason_no_candidates`/`lesson_extracted: 0`).
+Erste 3 Zeilen wortgleich:
+```
+{'record_id': 'fc38dd85-a8f3-47a8-a722-8f4d71ac4748', 'created_utc': '2026-07-13T07:05:42.541Z', 'epic': None, 'stage': 'research_empty', 'reason': 'reason_no_candidates', 'lesson_extracted': 0}
+{'record_id': 'ae4615b6-a371-4908-96ce-f38cef069aff', 'created_utc': '2026-07-13T07:10:52.196Z', 'epic': None, 'stage': 'research_empty', 'reason': 'reason_no_candidates', 'lesson_extracted': 0}
+{'record_id': '7165c61a-a1b1-4fa9-b07e-800536eb881b', 'created_utc': '2026-07-13T07:15:59.476Z', 'epic': None, 'stage': 'research_empty', 'reason': 'reason_no_candidates', 'lesson_extracted': 0}
+```
+
+**`research_health.jsonl`** — 66 `abstain_recorded`-Events, 1:1 deckungsgleich mit den
+DB-Zeilen (gleiche Reason/Stage/Epic, unabhängiger zweiter Kanal). Letzte 3 wortgleich:
+```
+{"event": "abstain_recorded", "reason": "reason_no_candidates", "stage": "research_empty", "epic": null, "ts": "2026-07-13T14:37:20.513400+02:00"}
+{"event": "abstain_recorded", "reason": "reason_no_candidates", "stage": "research_empty", "epic": null, "ts": "2026-07-13T14:42:31.614240+02:00"}
+{"event": "abstain_recorded", "reason": "reason_no_candidates", "stage": "research_empty", "epic": null, "ts": "2026-07-13T14:47:42.546626+02:00"}
+```
+
+**Einordnung:** 66/66 sind `REASON_NO_CANDIDATES` (Research-Stufe) — deckt sich exakt mit der
+Step-2-Baseline (94.3 % dieses Pfads über 8 Tage). `lesson_extracted` 0/66 ist **erwartetes
+Verhalten**, kein Fehler: `reflect_stages` defaultet auf `{AbstainStage.DEBATE}` (V3-D8) —
+Research-Stufe-Abstains reflektieren bewusst nie. Noch kein einziger `REASON_DEBATE_ABSTAIN`
+in diesem Fenster beobachtet → der Reflect-Pfad selbst ist am echten Live-Lauf noch
+unbewiesen (Beobachtungspunkt für die Woche-2-Review, s. o.). **WE-1-Akzeptanzkriterium
+(Plan §7.3) damit vollständig erfüllt** — Block A ist nicht nur code-complete, sondern
+live am echten unbeaufsichtigten Bot bewiesen.
 
 ---
 
