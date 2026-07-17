@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase7_reward_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-06
+updated: 2026-07-17
 ---
 # CLAUDE.md — Phase 7: Reward/Brain (`phase7_reward/`)
 
@@ -64,6 +64,42 @@ P7 baut nur das **Substrat** (`trade_lessons` + `reward_pts`).
 > provenance round-trips through `on_trade_opened`; defaults to `"autonomous"` when not overridden).
 > Detail: `docs/concepts/phase8_v1.6_hotfix_plan.md` §6 + `phase8_scheduler/CLAUDE.md` →
 > `## Session stopped — 2026-07-02 (v1.6-Hotfix: Cause A part 2)`.
+
+> 🔁 **Phase-10 (V3) finding — ✅ FIXED same-day, follow-up session (2026-07-17, Bug A —
+> `pnl_resolver` history-match had no plausibility guard, code = source of truth). Original
+> finding (Block-B forensic session) preserved below; fix summary first:** implemented exactly
+> the suggested guard (reject any `get_trade_history` candidate whose `close_date` predates the
+> trade's own `open_ts`), with one correction caught by advisor review before shipping — a naive
+> lexical/string compare across the two timestamps is unsafe (`open_ts` carries a local offset
+> like `+02:00`, IG's `close_date` is UTC; a legitimate same-day match could sort as "earlier"
+> and be wrongly rejected). The shipped guard parses both as tz-aware instants (`_parse_instant`,
+> new helper in `pnl_resolver.py`) and compares in real UTC, defaulting to *not* reject when
+> either side is unparseable. `_OpenCtx` (`recorder.py`, the cold-reconcile path) gained
+> `open_ts`. +4 tests (`test_pnl_resolver.py`, **133 → 137**), including a golden replay of the
+> row-6 incident below and a dedicated tz-correctness case. **The already-persisted bad row
+> (`id=6`) is not retroactively corrected** — its `status` is `CLOSED` so idempotent reconcile
+> never revisits it; a correction needs a fresh `get_trade_history` read against IG (deal
+> `DIAAAAXZEYXT8BC`, should be settled by now) + a manual `UPDATE`, both live-network/live-DB
+> actions left to the Nikinger. Detail: `phase10_v3/CLAUDE.md` → this session's
+> `## Session stopped` block.
+> live `trade_outcomes` row `id=6` (deal `DIAAAAXZEYXT8BC`, epic `IX.D.DAX.IGN.IP`, BUY, open
+> `25140.06`, closed 2026-07-10) has `close_level=25714.5` / `profit_loss=-651.16` —
+> **byte-identical** to row `id=5` (deal `DIAAAAXXFLTFRAG`, a *different* epic, closed a full
+> week earlier on 2026-07-03). Cross-checked against `data/state/execution_state.json`: row 5's
+> own `stop_level` really is `25714.5` (internally consistent, it stopped out there); row 6's own
+> `stop_level` is `25110.06` — nowhere near `25714.5`. A BUY closing at `25714.5` from an open of
+> `25140.06` would be a +574pt profit, not the recorded loss — row 6's stored numbers are
+> internally contradictory. **Root cause:** row 6 closed `CLOSED_BY_BROKER` (no lag-free
+> close-confirm reaches `ExecutionResult` for that path — Contract 1.2, "CLOSED_BY_BROKER bleibt
+> `None`"), so `pnl_resolver.resolve()` (`reward/pnl_resolver.py:139-188`) fell to its branch-3
+> heuristic: match by size-magnitude + smallest open-level distance among `get_trade_history`
+> rows, tie-broken by recency — **never** rejecting a candidate whose `close_date` predates the
+> trade's own `open_ts`, or whose `open_level` is wildly far from the intended entry. IG demo's
+> settlement lag (documented 2026-06-23) likely meant row 6's own transaction hadn't posted yet,
+> leaving row 5's already-settled transaction (same size `22.3` magnitude — expected, sizing is
+> config-deterministic, not itself a red flag) as the only/best magnitude match despite being 7
+> days old and 600+ points away in `open_level`, and its `close_level`/`profit_loss` got copied
+> onto row 6. (End of original forensic finding — see the fix summary at the top of this block.)
 
 ## Harte Regeln (nicht verhandelbar)
 - **`confidence` ist observe-only und gatet NICHTS** (Decision C). N < `n_min=10` → `INSUFFICIENT`
@@ -127,7 +163,7 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `reward/synthetic.py` | `SyntheticTradeGenerator` + Pfad-Guard + Edge-Selector (harte Synthetik/Echt-Trennung, H) [→ Opus] | ✅ Step 6 |
 | `reward/brain.py` | `Brain.reflect()` + `LessonExtractor`-Protocol: Lesson-Extraktion, EIN Haiku-Call, best-effort, swappbar (E) [→ Opus] | ✅ Step 7 |
 | `reward/recorder.py` | `RewardSink`-Impl: `on_trade_opened` (insert+in-memory-Stash) / `on_trade_closed` (resolve→close→score→reward→best-effort-Lesson), fail-closed pro Schritt, idempotent via Status (A/J) **+ `reconcile_open_trades` (Live-Debug 2026-06-23): idempotenter Retry für noch-OPEN-Trades bei IG-History-Lag** | ✅ Step 8 (·13b) |
-| `reward/pnl_resolver.py` | `resolve()` → (close_level, profit_loss, r_multiple). **Bevorzugt lag-frei den Close-Confirm** (`closed.profit_loss` → direkt; `closed.close_level`+Richtung → aus Levels; Step 13c); **sonst** heuristischer `get_trade_history`-Match (**Size-Betrag**+Level+Recency, **kein** deal_id; Size magnituden-basiert weil IG SELL negativ signt). no-match → `PnLUnavailable` | ✅ Step 9 (·13b·13c) |
+| `reward/pnl_resolver.py` | `resolve()` → (close_level, profit_loss, r_multiple). **Bevorzugt lag-frei den Close-Confirm** (`closed.profit_loss` → direkt; `closed.close_level`+Richtung → aus Levels; Step 13c); **sonst** heuristischer `get_trade_history`-Match (**Size-Betrag**+Level+Recency, **kein** deal_id; Size magnituden-basiert weil IG SELL negativ signt) **+ Plausibilitäts-Guard (Bug-A-Fix 2026-07-17): `close_date` < eigener `open_ts` (tz-aware UTC-Vergleich) → verworfen**. no-match → `PnLUnavailable` | ✅ Step 9 (·13b·13c·Bug-A) |
 | `reward/credentials.py` | dünner Shim → `broker_wrapper.credentials.get_credential("anthropic_api_key")` (verbatim P4/P6-Spiegel, `parents[2]`-Bootstrap) | ✅ Step 13 |
 | `002_phase7_reward.sql` — **liegt in `phase2_persistence/migrations/`** (Code=SoT, s. Step-12-Block), **nicht** `phase7_reward/migrations/` | `ADD COLUMN initial_risk` / `r_multiple` **/ `account`** (Operator 2026-06-18, s. 1.7) + Whitelist-Erweiterung `persistence/db.py` (`_TRADE_COLUMNS`/`_REWARD_COLUMNS`) | ✅ Step 12 |
 | `scripts/wiring.py` (`build_reward_sink`/`build_brain`/`build_executor`, spiegelt P6 — Executor direkt aus `execution`, `reward_sink` injiziert, **keine** P5-Edit) · `backfill_synthetic.py` (guard-first, nie live) · `smoke_test.py` (1× echter Haiku-`reflect`, DRY) · `live_test.py` (voller open→close→reward→lesson **+ reconcile-Retry bei IG-Lag**) · `inspect_history.py` (**read-only** History-Dump, Live-Debug 2026-06-23) | Composition + Operator-Tools | ✅ Step 13 (·13b) |
@@ -137,7 +173,7 @@ diktiert, stehen unten unter *Verifizierte Contracts* 1.2/1.3/1.7.)
 | `tests/test_scorer.py` | Prozess-vs-Outcome-Trennung, Clamping, Symmetrie/Asymmetrie, R-Clip, schwaches Debate-Signal (18 Fälle, Ziel ≥12) ★ | ✅ Step 5 |
 | `tests/test_synthetic.py` | Generator-Determinismus/Labels, Pfad-Guard trifft Live-Pfad nie (+Aliasing), Edge-Selector Synthetik-Ausschluss + Demo-Toggle (11 Fälle, Ziel ≥8) | ✅ Step 6 |
 | `tests/conftest.py` + `tests/test_brain.py` | erster P7-Fake (`FakeLLM`); valide Lesson → `ok=True`-verbatim, Prompt trägt R/Status/Kontext, alle Fehlerpfade → `ok=False`/kein Raise, AI-Grenze, Protocol (12 Fälle, Ziel ≥8) | ✅ Step 7 |
-| `tests/test_pnl_resolver.py` | exakter/mehrdeutiger Match (size+Level+Recency), BUY-Win/SELL-Loss-R-Vorzeichen, `initial_risk==0` defensiv, not-ok/no-match/unbrauchbar → `PnLUnavailable`, ignoriert epic/direction (12 Fälle, Ziel ≥8) | ✅ Step 9 |
+| `tests/test_pnl_resolver.py` | exakter/mehrdeutiger Match (size+Level+Recency), BUY-Win/SELL-Loss-R-Vorzeichen, `initial_risk==0` defensiv, not-ok/no-match/unbrauchbar → `PnLUnavailable`, ignoriert epic/direction **+ 4 Bug-A-Guard-Fälle (stale-Match verworfen, tz-aware-Korrektheit, unparsbar→kein Reject, `open_ts` fehlt→Guard aus)** (16 Fälle) | ✅ Step 9 (·Bug-A) |
 | `tests/test_recorder.py` | open→close schreibt alle 3 Tabellen + Delta-Mapping; PnLUnavailable→critical/kein Reward/Trade bleibt OPEN; Reward-Insert-Fehler→critical/Trade CLOSED; Lesson-Fehler→Reward bleibt; idempotenter Doppel-Close; no-Stash-Reconstruct; confidence_provider best-effort (14 Fälle, Ziel ≥10) | ✅ Step 8 |
 | `tests/test_executor_seam.py` → **verlegt nach** `phase5_execution/tests/test_executor.py` | `reward_sink=None` → P5 bit-identisch; mit Sink → beide Callbacks + gebaute Snapshots; Debate-Flip; TIME_STOP; NO_TRADE feuert nicht; werfender Sink kippt den Zyklus nicht (7 Fälle, Ziel ≥6). **Placement-Reconciliation:** Executor + Fakes leben in P5, cross-test-package-Fake-Reuse ist nicht baubar → getestet, wo die Naht lebt (spiegelt den Debate-Seam-Präzedenzfall) | ✅ Step 10 |
 

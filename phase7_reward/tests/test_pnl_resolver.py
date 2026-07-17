@@ -195,6 +195,71 @@ def test_close_level_without_profit_sell_direction_sign(make_closed, make_opened
     assert r == pytest.approx(1.0)
 
 
+def test_stale_settlement_before_own_open_is_rejected(make_closed, make_opened):
+    """Bug-A guard: a same-size candidate that settled *before* this trade's own
+    open cannot be its close — replays the live incident (row id=6 matched row
+    id=5's 7-days-stale, different-instrument transaction)."""
+    opened = make_opened(
+        open_ts="2026-07-10T12:49:49.648643+02:00",
+        size=22.3, intended_open_level=25140.06, initial_risk=669.0,
+    )
+    broker = FakeBroker([
+        make_tx(size=22.3, open_level=25744.5, close_level=25714.5, profit_loss=-651.16,
+                close_date="2026-07-03T07:31:49"),  # settled a week before this trade opened
+    ])
+    with pytest.raises(PnLUnavailable):
+        resolve(make_closed(), broker, opened, CFG)
+
+
+def test_guard_compares_timezones_correctly_not_lexically(make_closed, make_opened):
+    """The legitimate same-day match must survive: a UTC close ~40 min *after* a
+    ``+02:00`` open sorts *before* it as a naive string, but is later as a real
+    instant — the guard must not reject it (the bug the advisor caught in review)."""
+    opened = make_opened(
+        open_ts="2026-07-10T12:49:49+02:00",  # == 10:49:49 UTC
+        size=1.0, intended_open_level=18000.0, initial_risk=30.0,
+    )
+    broker = FakeBroker([
+        make_tx(open_level=18000.0, close_level=18030.0, profit_loss=30.0,
+                close_date="2026-07-10T11:31:59"),  # UTC, ~42 min after the real open
+    ])
+
+    close_level, profit_loss, _ = resolve(make_closed(), broker, opened, CFG)
+
+    assert close_level == 18030.0
+    assert profit_loss == 30.0
+
+
+def test_guard_does_not_reject_on_unparseable_close_date(make_closed, make_opened):
+    """An unparseable ``close_date`` disables the guard for that row (conservative
+    default — "can't compare" must never mean "reject")."""
+    opened = make_opened(size=1.0, intended_open_level=18000.0, initial_risk=30.0)
+    broker = FakeBroker([
+        make_tx(open_level=18000.0, close_level=18010.0, profit_loss=10.0,
+                close_date="not-a-date"),
+    ])
+
+    _, profit_loss, _ = resolve(make_closed(), broker, opened, CFG)
+
+    assert profit_loss == 10.0
+
+
+def test_guard_disabled_when_open_ts_missing(make_closed, make_opened):
+    """``open_ts=None`` (a duck-typed caller that doesn't carry it) disables the
+    guard entirely rather than rejecting everything."""
+    opened = make_opened(
+        open_ts=None, size=1.0, intended_open_level=18000.0, initial_risk=30.0,
+    )
+    broker = FakeBroker([
+        make_tx(open_level=18000.0, close_level=17990.0, profit_loss=-10.0,
+                close_date="2020-01-01T00:00:00"),  # would be "stale" if the guard ran
+    ])
+
+    _, profit_loss, _ = resolve(make_closed(), broker, opened, CFG)
+
+    assert profit_loss == -10.0
+
+
 def test_signed_history_size_matches_by_magnitude(make_closed, make_opened):
     """IG signs the history ``size`` (``-19.8`` for a SELL); the magnitude match still
     finds it. A signed compare silently rejected every SELL forever (live-debug

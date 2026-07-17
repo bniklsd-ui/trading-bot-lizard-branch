@@ -36,13 +36,29 @@ the only successful path is a real history match, no ``pnl_source`` provenance t
 needed in v1.
 
 The ``opened`` argument is **duck-typed**: only ``.size``, ``.intended_open_level``,
-and ``.initial_risk`` are read, so the recorder may pass either a real ``OpenedTrade``
-or a minimal context rebuilt from the persisted trade row.
+``.initial_risk``, and (for the plausibility guard below) ``.open_ts`` are read, so
+the recorder may pass either a real ``OpenedTrade`` or a minimal context rebuilt from
+the persisted trade row.
+
+**Plausibility guard (Phase-10 V3 Bug-A fix, 2026-07-17 session).** Branch 3's
+magnitude match had no check that a candidate transaction even postdates the trade's
+own open — a live incident (row `id=6`, documented in this session's
+``phase10_v3/CLAUDE.md``) matched a different epic's 7-day-old, already-settled
+transaction onto a same-size same-day trade, copying its wrong ``close_level``
+(``profit_loss`` looked plausible by coincidence — same fixed ``stop_distance_points``
++ size ⇒ structurally similar loss magnitude). Fix: reject any candidate whose
+``close_date`` predates ``opened.open_ts``. The two fields carry **different**
+timezone conventions (IG's ``close_date`` is UTC; ``opened.open_ts`` is local,
+e.g. ``+02:00`` — see ``build_opened``, ``execution/executor.py``), so the guard
+parses both as tz-aware instants and compares in UTC — a naive lexical compare
+would reject same-day legitimate matches too (an 11:31 UTC close sorts before a
+12:49 ``+02:00`` open despite being ~40 min *after* it in real time).
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from reward.models import PnLUnavailable, RewardConfig
@@ -69,6 +85,27 @@ def _normalise_ts(value: Any) -> str:
     if not isinstance(value, str):
         return ""
     return value.rstrip("Z")[:19]
+
+
+def _parse_instant(value: Any) -> datetime | None:
+    """Best-effort parse an IG/``open_ts`` timestamp into a tz-aware UTC instant.
+
+    Returns ``None`` on anything unparseable/missing — callers must treat that as
+    "can't compare", never as a rejection signal (the plausibility guard is
+    deliberately conservative: an unparseable timestamp must not reject an
+    otherwise-usable candidate).
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        # No explicit offset (IG's dateUtc/legacy fields sometimes omit it) — the
+        # field name implies UTC; assume UTC rather than guessing a local zone.
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _r_multiple(profit_loss: float, initial_risk: float) -> float:
@@ -149,6 +186,11 @@ def resolve(closed: Any, broker: Any, opened: Any, cfg: RewardConfig) -> tuple[f
     size = float(opened.size)
     intended_open_level = float(opened.intended_open_level)
 
+    # Plausibility guard (Bug-A fix): a transaction that settled before this trade's
+    # own open cannot be its close. ``None`` (open_ts missing/unparseable) disables
+    # the guard entirely for this call — conservative, never rejects on "don't know".
+    own_open_instant = _parse_instant(getattr(opened, "open_ts", None))
+
     # Hard filter: same size *magnitude* (IG signs the history size — see module
     # docstring) + a usable (non-null) close level and P&L.
     candidates: list[dict[str, Any]] = []
@@ -160,6 +202,10 @@ def resolve(closed: Any, broker: Any, opened: Any, cfg: RewardConfig) -> tuple[f
             continue
         if tx.get("open_level") is None:
             continue
+        if own_open_instant is not None:
+            tx_close_instant = _parse_instant(tx.get("close_date"))
+            if tx_close_instant is not None and tx_close_instant < own_open_instant:
+                continue  # settled before this trade even opened — not its close
         candidates.append(tx)
 
     if not candidates:

@@ -71,12 +71,14 @@ _DEFAULT_RELEVANCE = 1.0
 @dataclass(frozen=True)
 class _OpenCtx:
     """Minimal duck-typed open context the resolver needs (``.size`` / levels / risk /
-    ``.direction`` for the level-based P&L branch)."""
+    ``.direction`` for the level-based P&L branch / ``.open_ts`` for the Bug-A
+    plausibility guard, Phase-10 V3)."""
 
     size: float
     intended_open_level: float
     initial_risk: float
     direction: str | None = None
+    open_ts: str | None = None
 
 
 class RewardSink:
@@ -264,6 +266,7 @@ class RewardSink:
             intended_open_level=float(row.get("open_level") or 0.0),
             initial_risk=float(row.get("initial_risk") or 0.0),
             direction=row.get("direction"),
+            open_ts=row.get("open_ts"),
         )
         try:
             close_level, profit_loss, r_multiple = pnl_resolver.resolve(
