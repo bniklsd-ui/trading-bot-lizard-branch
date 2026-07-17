@@ -14,6 +14,7 @@ from debate.prompts import (
     build_bear_prompt,
     build_bull_prompt,
     build_judge_prompt,
+    build_paper_pick_prompt,
 )
 
 
@@ -149,3 +150,68 @@ def test_none_drift_renders_na() -> None:
     ctx = _ctx(drift_at_pick=None)
     system, _, _ = build_bull_prompt(ctx, [])
     assert "n/a" in system
+
+
+# --------------------------------------------------------------------------- #
+# Council-Paper-Call (§10.3) — build_paper_pick_prompt, additive sibling       #
+# --------------------------------------------------------------------------- #
+
+
+def test_paper_pick_returns_triple() -> None:
+    system, user, schema = build_paper_pick_prompt({"epic": "IX.D.DAX.IFMM.IP"})
+    assert isinstance(system, str) and system
+    assert isinstance(user, str) and user
+    assert isinstance(schema, dict)
+
+
+def test_paper_pick_schema_has_no_abstain_branch() -> None:
+    """Contrast the live Judge schema: direction is required, not nullable, and
+    there is no ``decision``/``conclude`` field at all (forced pick, no ABSTAIN)."""
+    _, _, schema = build_paper_pick_prompt({"epic": "IX.D.DAX.IFMM.IP"})
+    assert schema["type"] == "object"
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["direction"] == {
+        "type": "string", "enum": ["BUY", "SELL"],
+    }
+    assert set(schema["required"]) == {"direction", "confidence", "rationale"}
+    assert "decision" not in schema["properties"]
+    assert "conclude" not in schema["properties"]
+
+
+def test_paper_pick_framing_present() -> None:
+    system, _, _ = build_paper_pick_prompt({"epic": "IX.D.DAX.IFMM.IP"})
+    assert "PAPER-MODUS" in system
+    assert "kein echtes Geld" in system
+    assert "ABSTAIN ist nicht verfügbar" in system
+
+
+def test_paper_pick_renders_epic_and_quote() -> None:
+    system, _, _ = build_paper_pick_prompt(
+        {"epic": "IX.D.DAX.IFMM.IP", "bid": 18000.1, "ask": 18000.6}
+    )
+    assert "IX.D.DAX.IFMM.IP" in system
+    assert "18000.10" in system
+    assert "18000.60" in system
+
+
+def test_paper_pick_missing_quote_still_well_formed() -> None:
+    """A thin digest (no bid/ask) must not raise or render a fake "0"."""
+    system, user, schema = build_paper_pick_prompt({"epic": "IX.D.DAX.IFMM.IP"})
+    assert "IX.D.DAX.IFMM.IP" in system
+    assert isinstance(schema, dict)
+
+
+def test_paper_pick_no_options_vocabulary() -> None:
+    banned = tuple(
+        a + b
+        for a, b in (
+            ("CA", "LL"), ("P", "UT"), ("str", "ike"), ("o", "tm"),
+            ("iss", "uer"), ("FL", "IP"), ("tur", "bo"), ("option", "_check"),
+        )
+    )
+    system, user, _ = build_paper_pick_prompt(
+        {"epic": "IX.D.DAX.IFMM.IP", "bid": 18000.0, "ask": 18001.0}
+    )
+    blob = system + " " + user
+    for token in banned:
+        assert token not in blob, f"banned token {token!r} in prompt"

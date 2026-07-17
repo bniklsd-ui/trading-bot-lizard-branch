@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase6_debate_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-06
+updated: 2026-07-17
 ---
 # CLAUDE.md — Phase 6: Bull/Bear/Judge-Debatte (`phase6_debate/`)
 
@@ -124,7 +124,7 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
 | `debate/models.py` | `DebateConfig`, `DebateContext`, `AgentTurn`, `DebateOutcome`, Exceptions (types only, frozen) | ✅ Modul 1 |
 | `debate/context_builder.py` | CODE: Candidate + 1 frischer Broker-Snapshot → frozen `DebateContext` (die AI-Grenze) | ✅ Modul 2 |
 | `debate/timeutil.py` | ISO-8601-UTC-Stempel (`_utcnow()`-Seam, je Phase dupliziert) → `DebateContext.generated_at` | ✅ Modul 2 |
-| `debate/prompts.py` | Bull/Bear/Judge System+User-Templates + JSON-Schemas (DE) | ✅ Modul 3 |
+| `debate/prompts.py` | Bull/Bear/Judge System+User-Templates + JSON-Schemas (DE) **+ `build_paper_pick_prompt` (§10.3 Council-Paper-Call, additiv, 2026-07-17 — forced-pick Single-Shot, kein ABSTAIN, zero Diff am Live-Judge-Pfad)** | ✅ Modul 3 (·§10.3) |
 | `debate/llm_caching.py` | additiver `cache_control`-Wrapper um `research.LLMClient` + Meter-Erweiterung | ✅ Modul 4 |
 | `debate/budget.py` | Call-/Token-/Wall-Clock-Caps + kumulatives Metering, fail-closed | ✅ Modul 5 |
 | `debate/debate.py` | Orchestrator: Runden-Loop, Early-Stop, Kompression, fail-closed (Kern) | ✅ Modul 6 |
@@ -152,6 +152,18 @@ wie `phase4_research/research/`, `phase5_execution/execution/`). `pyproject.toml
    (`vetos.py:131`).
 4. **Modulnamen-Kollision** `scripts.wiring` (P4/P5/P6) — P6-Wiring darf nicht die
    falsche `wiring` importieren.
+
+> 🔁 **Phase-10 (V3) Council-Paper-Call edit (2026-07-17, §10.3, code = source of truth):**
+> `debate/prompts.py` gained an **additive sibling** to the live Judge: `_PAPER_PICK_SYSTEM` +
+> `_paper_pick_schema()` + `build_paper_pick_prompt(digest)` — a single-shot forced-pick prompt
+> (no ABSTAIN branch, `direction` required not nullable) for `phase10_v3`'s
+> `PaperDebateCaller.request_pick(...)`. `build_judge_prompt`/`_judge_schema`/the live
+> Bull/Bear/Judge orchestrator are **untouched** — zero diff on the real debate path. The
+> caller lives in `phase10_v3/abstain_lessons/paper.py` and never imports `debate` (the
+> prompt builder is injected by `phase8_scheduler/scripts/wiring.py`, the only cross-phase
+> composition point), mirroring how `debate_runner` is duck-typed into `phase5_execution`.
+> **P6 70 → 76** (+6 tests, `test_prompts.py`). Detail: `phase10_v3/CLAUDE.md` → this
+> session's `## Session stopped` block.
 
 ## Done-Kriterien (Phase-6-Gate)
 - `pytest phase6_debate/tests -v` grün, **≥45 Tests** (alle gemockt, kein Netz, KEIN echtes

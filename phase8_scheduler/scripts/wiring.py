@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
@@ -315,7 +315,7 @@ class _AbstainLLMAdapter:
         return result["lesson"]
 
 
-def _build_abstain_sink(config: SchedulerConfig) -> Any:
+def _build_abstain_sink(config: SchedulerConfig, paper_engine: Any = None) -> Any:
     """Build the Phase-10 (V3) :class:`AbstainLessonSink` over its own DB connection.
 
     ``AbstainStore`` opens its **own** ``sqlite3`` connection (the UniverseStore
@@ -325,7 +325,9 @@ def _build_abstain_sink(config: SchedulerConfig) -> Any:
     the reward-sink lesson extraction already uses) is only built when
     ``config.enable_abstain_reflect`` — reflect stays best-effort/capped either way, but
     skipping the client construction when reflect is off avoids touching the keyring
-    for a call that will never fire.
+    for a call that will never fire. ``paper_engine`` (Block B, ``None`` unless
+    ``config.enable_paper_trades``) is threaded straight into the sink's existing
+    ``paper_engine`` seam (``sink.py``, wired dark since Block A).
     """
     from abstain_lessons.sink import AbstainLessonSink
     from abstain_lessons.store import AbstainStore
@@ -352,7 +354,129 @@ def _build_abstain_sink(config: SchedulerConfig) -> Any:
         )
         llm = _AbstainLLMAdapter(client)
 
-    return AbstainLessonSink(store, llm=llm, reflect_daily_cap=config.reflect_daily_cap)
+    return AbstainLessonSink(
+        store, llm=llm, paper_engine=paper_engine, reflect_daily_cap=config.reflect_daily_cap,
+    )
+
+
+def _build_paper_engine(config: SchedulerConfig, broker: Any, exec_cfg: Any) -> Any:
+    """Build the Phase-10 (V3) Block-B :class:`PaperEngine` (Both-Sides-Shadow-Tracking,
+    V3-D5/D6). ``quote_fetch`` wraps ``broker.get_price(epic)`` — one fresh call per
+    debate-abstain trigger (the plan's sanctioned exception to "no extra IG calls",
+    §10.2: a stale entry would corrupt every R-multiple). ``exec_cfg`` supplies the
+    **same fixed** ``stop_distance_points``/``limit_distance_points``/``max_hold_minutes``
+    the real order path sizes against (verified this session — Gate-4 sizing reads them
+    directly, not a per-trade computed value).
+
+    Council-Paper-Call (§10.3, 2026-07-17 session): when ``config.enable_paper_debate``
+    (default ``False`` — stays off this session, the Nikinger flips it later), a
+    :class:`~abstain_lessons.paper.PaperDebateCaller` is built the same way the
+    reflect LLM is below in :func:`_build_abstain_sink` (same credential shim, same
+    ``LLMClient``/``ResearchConfig`` construction) and wired in. Model is the real
+    Judge's (``DebateConfig().model_judge``, Sonnet — not the cheap Haiku reflect
+    model): the point of the feature is "what would the council pick if forced", and
+    the cap (default 3/day) keeps the cost trivial regardless.
+    """
+    from abstain_lessons.paper import PaperEngine
+    from abstain_lessons.paper_store import PaperTradeStore
+
+    store = PaperTradeStore(str(_DB_PATH))
+    store.ensure_schema()
+
+    def quote_fetch(epic: str) -> dict[str, float]:
+        env = broker.get_price(epic)
+        if not env.ok:
+            raise RuntimeError(f"get_price not ok for {epic}")
+        data = env.data or {}
+        return {"bid": data["bid"], "ask": data["ask"]}
+
+    debate_caller = None
+    if config.enable_paper_debate:
+        from abstain_lessons.paper import PaperDebateCaller
+        from debate.models import DebateConfig
+        from debate.prompts import build_paper_pick_prompt
+        from research.llm_client import LLMClient
+        from research.models import ResearchConfig
+        from reward.credentials import get_credential
+
+        dcfg = DebateConfig()
+        client = LLMClient(
+            model=dcfg.model_judge,
+            api_key=get_credential("anthropic_api_key"),
+            max_tokens=dcfg.max_tokens_judge,
+            temperature=dcfg.temperature_judge,
+            timeout_s=dcfg.wall_clock_timeout_s,
+            token_meter_path=str(_USAGE_LOG),
+            config=ResearchConfig(),
+        )
+        debate_caller = PaperDebateCaller(client, build_paper_pick_prompt)
+
+    return PaperEngine(
+        store, quote_fetch, exec_cfg,
+        debate_caller=debate_caller, council_daily_cap=config.paper_debate_daily_cap,
+    )
+
+
+# 1-min bars covering the longest possible hold (v1 max_hold_minutes=240) — well under
+# the IG get_ohlcv 1000-bar cap (phase1_broker_wrapper/adapters/ig_adapter.py:423-441).
+_PAPER_BAR_COUNT = 300
+
+
+def _build_paper_tracker(config: SchedulerConfig, broker: Any) -> Any:
+    """Build the Phase-10 (V3) Block-B :class:`PaperTradeTracker`. ``bar_fetch`` wraps
+    one ``get_ohlcv(epic, "MINUTE_1", _PAPER_BAR_COUNT)`` call per affected epic per
+    tick. ``reflect_cap_check`` reads **both** stores' daily lesson counts against the
+    shared ``reflect_daily_cap`` (V3-D8) — own connections (cheap; mirrors
+    ``_observed_abstain_sink``'s "recompute rather than thread state" choice).
+
+    Deliberately **not** threaded with the scheduler's shared (``config.tz``-local,
+    test-injectable) ``_now`` clock: the tracker's own default (real UTC) is always
+    correct against ``created_utc``/``time_stop_utc`` regardless of ``config.tz``, and
+    this best-effort secondary system doesn't need lock-step determinism with the main
+    executor loop.
+    """
+    from abstain_lessons.paper import PaperTradeTracker
+    from abstain_lessons.paper_store import PaperTradeStore
+    from abstain_lessons.store import AbstainStore
+
+    paper_store = PaperTradeStore(str(_DB_PATH))
+    paper_store.ensure_schema()
+    abstain_store = AbstainStore(str(_DB_PATH))
+    abstain_store.ensure_schema()
+
+    def bar_fetch(epic: str) -> list[dict[str, Any]]:
+        env = broker.get_ohlcv(epic, "MINUTE_1", _PAPER_BAR_COUNT)
+        if not env.ok:
+            raise RuntimeError(f"get_ohlcv not ok for {epic}")
+        return (env.data or {}).get("bars", [])
+
+    llm = None
+    if config.enable_abstain_reflect:
+        from research.llm_client import LLMClient
+        from research.models import ResearchConfig
+        from reward import RewardConfig
+        from reward.credentials import get_credential
+
+        cfg = RewardConfig()
+        client = LLMClient(
+            model=cfg.lesson_model,
+            api_key=get_credential("anthropic_api_key"),
+            max_tokens=cfg.lesson_max_tokens,
+            temperature=cfg.lesson_temperature,
+            timeout_s=cfg.lesson_timeout_s,
+            token_meter_path=str(_USAGE_LOG),
+            config=ResearchConfig(),
+        )
+        llm = _AbstainLLMAdapter(client)
+
+    def reflect_cap_check() -> bool:
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        combined = (
+            abstain_store.count_lessons_today(now_iso) + paper_store.count_lessons_today(now_iso)
+        )
+        return combined < config.reflect_daily_cap
+
+    return PaperTradeTracker(paper_store, bar_fetch, llm=llm, reflect_cap_check=reflect_cap_check)
 
 
 def _observed_abstain_sink(inner: Any, observability_path: str) -> Any:
@@ -379,6 +503,39 @@ def _observed_abstain_sink(inner: Any, observability_path: str) -> Any:
                 })
             except Exception as exc:  # noqa: BLE001 — observability must never break the cycle
                 logger.critical("abstain observability event failed: %s", exc)
+
+    return _Observed()
+
+
+def _build_context_recorder(config: SchedulerConfig) -> Any:
+    """Build the Phase-10 (V3) Block-B :class:`ContextRecorder` over its own DB connection.
+
+    ``MarketContextWriter`` opens its **own** ``sqlite3`` connection (the same
+    UniverseStore/AbstainStore pattern), so it needs no shared broker/db argument.
+    """
+    from market_context.writer import ContextRecorder, MarketContextWriter
+
+    writer = MarketContextWriter(str(_DB_PATH))
+    writer.ensure_schema()
+    return ContextRecorder(writer)
+
+
+def _observed_context_recorder(inner: Any, observability_path: str) -> Any:
+    """Wrap ``inner`` (a :class:`ContextRecorder`) with the ``context_recorded``
+    observability event (outcome, epic) — mirrors ``_observed_abstain_sink``."""
+    from scheduler.observability import record_event
+
+    class _Observed:
+        def on_decision(self, **kwargs: Any) -> None:
+            inner.on_decision(**kwargs)
+            try:
+                record_event(observability_path, {
+                    "event": "context_recorded",
+                    "outcome": kwargs.get("outcome"),
+                    "epic": kwargs.get("epic"),
+                })
+            except Exception as exc:  # noqa: BLE001 — observability must never break the cycle
+                logger.critical("context observability event failed: %s", exc)
 
     return _Observed()
 
@@ -467,10 +624,20 @@ def build_scheduler(
     research = _build_research(broker, db, state, enable_ig_bars=config.enable_ig_bars)
     debate_runner = _make_debate_runner(broker)
     reward_sink = _build_reward_sink(broker, db)
+    paper_engine = None
+    paper_tracker = None
+    if config.enable_paper_trades:
+        paper_engine = _build_paper_engine(config, broker, exec_cfg)
+        paper_tracker = _build_paper_tracker(config, broker)
     abstain_sink = None
     if config.enable_abstain_lessons:
         abstain_sink = _observed_abstain_sink(
-            _build_abstain_sink(config), config.observability_path
+            _build_abstain_sink(config, paper_engine=paper_engine), config.observability_path
+        )
+    context_recorder = None
+    if config.enable_context_persistence:
+        context_recorder = _observed_context_recorder(
+            _build_context_recorder(config), config.observability_path
         )
 
     # --- the scheduler modules ---
@@ -499,6 +666,7 @@ def build_scheduler(
         debate_runner=debate_runner,
         reward_sink=reward_sink,
         abstain_sink=abstain_sink,
+        context_recorder=context_recorder,
         now_fn=_now,                  # shared clock; executor keeps its own real sleep_fn
     )
 
@@ -570,5 +738,6 @@ def build_scheduler(
         broker=broker,
         preflight_fn=preflight_fn,
         universe_refresher=universe_refresher,
+        paper_tracker=paper_tracker,
         max_iterations=max_iterations,
     )

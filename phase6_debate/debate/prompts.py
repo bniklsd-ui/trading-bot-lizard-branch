@@ -29,7 +29,7 @@ prose, not enforced in the schema (Structured Outputs rejects numeric bounds).
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Mapping
 
 from debate.models import AgentTurn, DebateContext
 
@@ -257,3 +257,65 @@ def build_judge_prompt(
         "geforderten Schema (decision, direction, confidence, rationale, conclude)."
     )
     return system, user, _judge_schema()
+
+
+# --------------------------------------------------------------------------- #
+# Council-Paper-Call (Phase-10 V3, §10.3) — additive sibling, zero diff above  #
+# --------------------------------------------------------------------------- #
+#
+# A single-shot forced-pick variant of the Judge, used only by
+# ``abstain_lessons.paper.PaperDebateCaller`` (never on the live order path — that
+# caller has no broker access to build a full ``DebateContext``/run Bull-Bear
+# rounds; it is triggered post-hoc from an already-recorded debate-abstain). The
+# live ``build_judge_prompt``/``_judge_schema`` above are untouched.
+
+_PAPER_PICK_SYSTEM = (
+    "Du bist der RICHTER (Judge) in einer Trading-Entscheidung für einen "
+    "DAX/Index-Intraday-CFD-Bot.\n"
+    "\n"
+    "PAPER-MODUS: kein echtes Geld, keine echte Order — dies ist ein rein "
+    "virtueller Test. ABSTAIN ist nicht verfügbar: wähle BUY oder SELL und "
+    "begründe deine Wahl in einem Satz.\n"
+    "\n"
+    "Regeln:\n"
+    "- Richtung ist ausschließlich \"BUY\" oder \"SELL\" (CFD-Bot, keine Optionen).\n"
+    "- \"confidence\" (0-100, reine Selbsteinschätzung — steuert nichts, rein "
+    "advisory).\n"
+    "- \"rationale\": genau ein Satz."
+)
+
+
+def _paper_pick_schema() -> dict[str, Any]:
+    """Forced-pick Structured-Outputs schema — no ABSTAIN branch (contrast
+    :func:`_judge_schema`, which keeps it): ``direction`` is required, not
+    nullable."""
+    return {
+        "type": "object",
+        "properties": {
+            "direction": {"type": "string", "enum": ["BUY", "SELL"]},
+            "confidence": {"anyOf": [{"type": "number"}, {"type": "null"}]},
+            "rationale": {"type": "string"},
+        },
+        "required": ["direction", "confidence", "rationale"],
+        "additionalProperties": False,
+    }
+
+
+def build_paper_pick_prompt(digest: Mapping[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    """Single-shot forced-pick prompt for the Council-Paper-Call (plan §10.3).
+
+    Takes a thin ``candidate_digest`` (``epic`` + a fresh ``bid``/``ask`` — not a
+    full :class:`~debate.models.DebateContext`: ``PaperEngine`` has no broker
+    context-builder access, only the one quote it's already sanctioned to fetch
+    for the shadow pair) instead of a full debate round. No transcript — one shot.
+    """
+    lines = ["Kontext (read-only):", f"- Instrument (epic): {digest.get('epic')}"]
+    bid, ask = digest.get("bid"), digest.get("ask")
+    if bid is not None or ask is not None:
+        lines.append(f"- Aktueller Kurs: bid={_fmt(bid)} ask={_fmt(ask)}")
+    system = _PAPER_PICK_SYSTEM + "\n\n" + "\n".join(lines)
+    user = (
+        "Triff jetzt deine Wahl im geforderten Schema (direction, confidence, "
+        "rationale)."
+    )
+    return system, user, _paper_pick_schema()
