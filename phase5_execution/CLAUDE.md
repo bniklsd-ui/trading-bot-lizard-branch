@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase5_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-06
+updated: 2026-07-17
 ---
 # CLAUDE.md — Phase 5: Execution (`phase5_execution/`)
 
@@ -164,6 +164,46 @@ Hand-off „Candidate → Gates → Order" so bauen, dass P6 die Richtungs-/Size
 > **Additive, `reward_sink=None` bit-identical** (`build_opened` only runs when a sink is wired). Gate-
 > path/VETOs/sizing untouched; lessons gate nothing (root rule 3). +1 seam test (**153 → 154**). Detail:
 > `docs/concepts/phase8_v1.5_hotfix_plan.md` Step 4.
+
+> 🔁 **Phase-10 (V3) Block-A edit (2026-07-11, retroactive note — code = source of truth,
+> missing from this file until now):** `executor.py` gained a keyword-only `abstain_sink: Any |
+> None = None` (mirrors `reward_sink`'s DI pattern exactly). `_no_trade` moved from a
+> `@staticmethod` to an instance method so it could reach `self.abstain_sink`; a new
+> `_notify_no_trade` fires `abstain_sink.on_no_trade(cycle_outcome)` on **every** NO_TRADE
+> return path (never on a trade path), guarded (`try/except` → `logger.critical`, Decision J).
+> **Additive, `abstain_sink=None` bit-identical** (P5 154 → **161**, +7 seam tests). Detail:
+> `phase10_v3/` + `docs/concepts/phase10_v3_plan.md` §7.2.
+
+> 🔁 **Phase-10 (V3) Block-B edit (2026-07-17, code = source of truth):** `executor.py` gained a
+> keyword-only `context_recorder: Any | None = None` (same DI pattern). Three call sites, not
+> two: `_notify_opened` (TRADE), `_notify_no_trade`'s caller `_no_trade` (NO_TRADE — now returns
+> the real abstain `record_id` for the FK link, see `abstain_lessons/sink.py`'s widened
+> `on_no_trade -> str | None`), and — **a scope extension beyond the original plan, Nikinger-
+> authorized** — the post-`place_order`/monitor `_abort` call site (`ABORT`, e.g. a broker-
+> rejected order after a TRADE debate decision; this is exactly 2026-07-15's flagged incident,
+> "BUY decision, no executed trade"). `_abort` moved from `@staticmethod` to an instance method
+> (same reason `_no_trade` did in Block A) and only records when the caller passes a
+> `candidate` — the earlier session-health/reconcile `_abort` call site (before Gate 1, no
+> candidate exists yet) passes none, so it stays deliberately unrecorded. New shared
+> `_notify_context` helper, guarded like every other seam (Decision J). **Additive,
+> `context_recorder=None` bit-identical** (P5 161 → **167**, +6 seam tests). Detail:
+> `phase10_v3/market_context/` + this session's `phase10_v3/CLAUDE.md` session block.
+
+> 🔁 **Bug-B follow-up (2026-07-17, same-day follow-up session, code = source of truth):**
+> the ABORT visibility landed above still didn't carry *why* it aborted — `_abort()`'s
+> `_notify_context` call hardcoded `veto_results_json=json.dumps({"vetos": "pass"})`, dropping
+> the actual `detail` string (which carries IG's own reject reason, from `order.py`'s
+> `f"order {ref} REJECTED by broker: {reason}"`). Now folded in:
+> `json.dumps({"vetos": "pass", "abort_detail": detail})` — no schema/migration change, reuses
+> the existing `veto_results_json` TEXT column. **This closes the visibility gap for the *next*
+> broker rejection — it does not recover 2026-07-15's actual reason**, which was only ever
+> logged to stderr and is confirmed unrecoverably lost (no log file covers that date). One
+> hypothesis flagged to the Nikinger, unconfirmed: the rejected order was on **AEX**, not DAX —
+> `ExecutionConfig.stop_distance_points`/`limit_distance_points` are fixed constants applied to
+> every epic, and the existing v1.5-hotfix note above already flags non-DAX `point_values` as
+> provisional; the same DAX-calibration risk plausibly extends to stop/limit distances. P5 167
+> unchanged (extended the existing Bug-B seam test rather than adding a new one). Detail:
+> `phase10_v3/CLAUDE.md` → this session's `## Session stopped` block.
 
 ## Datei-/Modul-Übersicht (Soll, Konzept §"Modul-Plan")
 ```

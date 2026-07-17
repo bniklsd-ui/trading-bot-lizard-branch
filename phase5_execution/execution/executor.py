@@ -40,6 +40,7 @@ Phase-isolated: ``execution.*`` + stdlib only; broker / db / state are duck-type
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from datetime import datetime
@@ -79,6 +80,7 @@ class Executor:
         debate_runner: Callable[[dict[str, Any]], Any] | None = None,
         reward_sink: Any | None = None,
         abstain_sink: Any | None = None,
+        context_recorder: Any | None = None,
         now_fn: Callable[[], datetime] = datetime.now,
         sleep_fn: Callable[[float], None] = time.sleep,
     ) -> None:
@@ -118,6 +120,18 @@ class Executor:
                 called once on **every** NO_TRADE return path (never on a trade path)
                 via the shared ``_no_trade`` helper — see :class:`execution.protocols.
                 AbstainSink`. Also passive/guarded (Decision J), no Phase-10 import here.
+                Returns the persisted abstain ``record_id`` (``None`` on failure), which
+                feeds ``context_recorder`` below.
+            context_recorder: optional Phase-10 (V3) Block-B hook (``market_context``),
+                same DI pattern. ``None`` (the default) → the seam is skipped, Phase 5
+                stays bit-identical. When present, ``on_decision(...)`` is called once per
+                cycle on **all three** outcomes — TRADE (``_notify_opened``), NO_TRADE
+                (``_no_trade``), and the post-debate **ABORT** path (a broker-rejected
+                order is exactly this case — Nikinger-authorized scope extension beyond
+                the original TRADE/NO_TRADE-only plan, 2026-07-17). The earlier
+                session-health/reconcile ABORT (before any candidate exists) is
+                deliberately **not** recorded — nothing decided yet to report. Passive/
+                guarded (Decision J), no Phase-10 import here.
             now_fn / sleep_fn: injected clock / sleep for deterministic tests.
         """
         self.broker = broker
@@ -130,6 +144,7 @@ class Executor:
         self.debate_runner = debate_runner
         self.reward_sink = reward_sink
         self.abstain_sink = abstain_sink
+        self.context_recorder = context_recorder
         self.now_fn = now_fn
         self.sleep_fn = sleep_fn
 
@@ -150,29 +165,68 @@ class Executor:
         """A clean no-trade outcome (gate/VETO/abstain) — exit 0, no order placed.
 
         The single funnel every NO_TRADE return path already goes through — also the
-        Phase-10 (V3) abstain-sink seam (:meth:`_notify_no_trade`). The keyword-only
-        params are the S2 classifier contract fields the caller knows about at its
-        point in the cycle; unset ones default to their "nothing to report" value
-        (``None``/``False``) and are harmless when no sink is injected.
+        Phase-10 (V3) abstain-sink seam (:meth:`_notify_no_trade`) and the Block-B
+        context-recorder seam (:meth:`_notify_context`). The keyword-only params are the
+        S2 classifier contract fields the caller knows about at its point in the cycle;
+        unset ones default to their "nothing to report" value (``None``/``False``) and
+        are harmless when no sink/recorder is injected.
         """
         logger.info("no trade: %s — %s", rule, reason)
-        self._notify_no_trade(
+        cycle_outcome = {
+            "outcome": "NO_TRADE",
+            "epic": epic,
+            "failed_gate": failed_gate,
+            "veto": veto,
+            "debate_decision": debate_decision,
+            "research_empty": research_empty,
+            "error": error,
+        }
+        record_id = self._notify_no_trade(cycle_outcome)
+        self._notify_context(
+            outcome="NO_TRADE",
             epic=epic,
-            failed_gate=failed_gate,
-            veto=veto,
-            debate_decision=debate_decision,
-            research_empty=research_empty,
-            error=error,
+            gate_results_json=json.dumps({"failed_gate": failed_gate}) if failed_gate else None,
+            veto_results_json=json.dumps({"veto": veto}) if veto else None,
+            abstain_record_id=record_id,
         )
         return ExecutionResult(
             status="NO_TRADE", deal_id=None, plan=None, detail=f"{rule}: {reason}"
         )
 
-    @staticmethod
-    def _abort(detail: str, *, plan: OrderPlan | None = None,
-               deal_id: str | None = None) -> ExecutionResult:
-        """A fail-closed abort outcome — the CLI exits non-zero, operator attends."""
+    def _abort(
+        self,
+        detail: str,
+        *,
+        plan: OrderPlan | None = None,
+        deal_id: str | None = None,
+        candidate: dict[str, Any] | None = None,
+        debate_outcome: Any = None,
+    ) -> ExecutionResult:
+        """A fail-closed abort outcome — the CLI exits non-zero, operator attends.
+
+        Phase-10 (V3) Block-B context-recorder seam: recorded only when the caller
+        passes a ``candidate`` (the post-``place_order``/monitor abort — a broker
+        rejection is exactly this path, e.g. 2026-07-15's flagged incident). The earlier
+        session-health/reconcile abort (before any candidate exists) never passes one,
+        so it stays unrecorded — deliberate, see the constructor's ``context_recorder``
+        docstring.
+
+        ``detail`` (e.g. IG's own reject reason, ``order.py``'s ``"order {ref} REJECTED
+        by broker: {reason}"``) is folded into ``veto_results_json`` alongside the fixed
+        "vetos pass" note (2026-07-17 Bug-B fix — the ABORT row's visibility from the
+        first Block-B session didn't yet carry *why* it aborted, only *that* it did;
+        this closes that gap for the next occurrence without a schema change).
+        """
         logger.error("abort: %s", detail)
+        if candidate is not None:
+            self._notify_context(
+                outcome="ABORT",
+                epic=candidate.get("epic"),
+                candidate=candidate,
+                debate_outcome=debate_outcome,
+                gate_results_json=json.dumps({"gates": "1,2,3,4,5 pass"}),
+                veto_results_json=json.dumps({"vetos": "pass", "abort_detail": detail}),
+            )
         return ExecutionResult(
             status="ABORT", deal_id=deal_id, plan=plan, detail=detail
         )
@@ -296,7 +350,7 @@ class Executor:
                 return result
             return place_result
         except (ExecutionAbort, ReconcileConflict) as exc:
-            return self._abort(str(exc), plan=plan)
+            return self._abort(str(exc), plan=plan, candidate=candidate, debate_outcome=outcome)
 
     # -- Phase-7 reward seam (Decision A/J) ---------------------------------
 
@@ -309,23 +363,34 @@ class Executor:
         outcome: Any,
         now: datetime,
     ) -> None:
-        """Fire ``reward_sink.on_trade_opened`` with the open decision context.
+        """Fire ``reward_sink.on_trade_opened`` + the Block-B ``context_recorder`` with the
+        open decision context.
 
-        No-op when no sink is injected (Phase 5 bit-identical). Fail-closed: a failure
-        building or delivering the snapshot is logged ``critical`` and never raised — the
-        order/monitor path is unaffected (Decision J).
+        No-op per-seam when that seam has no sink/recorder injected (Phase 5 bit-identical
+        with both ``None``). Fail-closed: a failure building or delivering either snapshot
+        is logged ``critical`` and never raised — the order/monitor path is unaffected
+        (Decision J).
         """
-        if self.reward_sink is None:
-            return
-        try:
-            opened = build_opened(
-                candidate, plan, place_result, price_env, outcome,
-                score_at_open=self.db.get_current_score(), now=now,
-                point_value=self.config.point_value_for(plan.epic),
-            )
-            self.reward_sink.on_trade_opened(opened)
-        except Exception as exc:  # noqa: BLE001 - the sink must never kill the cycle (J)
-            logger.critical("reward_sink.on_trade_opened failed: %s", exc)
+        if self.reward_sink is not None:
+            try:
+                opened = build_opened(
+                    candidate, plan, place_result, price_env, outcome,
+                    score_at_open=self.db.get_current_score(), now=now,
+                    point_value=self.config.point_value_for(plan.epic),
+                )
+                self.reward_sink.on_trade_opened(opened)
+            except Exception as exc:  # noqa: BLE001 - the sink must never kill the cycle (J)
+                logger.critical("reward_sink.on_trade_opened failed: %s", exc)
+
+        self._notify_context(
+            outcome="TRADE",
+            epic=candidate.get("epic"),
+            candidate=candidate,
+            debate_outcome=outcome,
+            gate_results_json=json.dumps({"gates": "1,2,3,4,5 pass"}),
+            veto_results_json=json.dumps({"vetos": "pass"}),
+            deal_id=place_result.deal_id,
+        )
 
     def _notify_closed(self, result: ExecutionResult) -> None:
         """Fire ``reward_sink.on_trade_closed`` after a real close (broker SL/TP or time-stop).
@@ -343,37 +408,63 @@ class Executor:
 
     # -- Phase-10 (V3) abstain-lessons seam (Decision J) ---------------------
 
-    def _notify_no_trade(
-        self,
-        *,
-        epic: str | None,
-        failed_gate: str | None,
-        veto: str | None,
-        debate_decision: str | None,
-        research_empty: bool,
-        error: str | None,
-    ) -> None:
+    def _notify_no_trade(self, cycle_outcome: dict[str, Any]) -> str | None:
         """Fire ``abstain_sink.on_no_trade`` with the S2 classifier cycle-outcome dict.
 
-        No-op when no sink is injected (Phase 5 bit-identical). Fail-closed: a failure
-        building or delivering the dict is logged ``critical`` and never raised — every
-        NO_TRADE path is unaffected (Decision J), mirroring ``_notify_opened``.
+        No-op (returns ``None``) when no sink is injected (Phase 5 bit-identical).
+        Fail-closed: a failure building or delivering the dict is logged ``critical`` and
+        never raised — every NO_TRADE path is unaffected (Decision J), mirroring
+        ``_notify_opened``. Returns the persisted abstain ``record_id`` on success (``None``
+        on failure/no-sink) — Block-B's ``context_recorder`` links it into
+        ``decision_context.abstain_record_id``.
         """
         if self.abstain_sink is None:
-            return
+            return None
         try:
-            cycle_outcome = {
-                "outcome": "NO_TRADE",
-                "epic": epic,
-                "failed_gate": failed_gate,
-                "veto": veto,
-                "debate_decision": debate_decision,
-                "research_empty": research_empty,
-                "error": error,
-            }
-            self.abstain_sink.on_no_trade(cycle_outcome)
+            return self.abstain_sink.on_no_trade(cycle_outcome)
         except Exception as exc:  # noqa: BLE001 - the sink must never kill the cycle (J)
             logger.critical("abstain_sink.on_no_trade failed: %s", exc)
+            return None
+
+    # -- Phase-10 (V3) Block-B market-context seam (Decision J) --------------
+
+    def _notify_context(
+        self,
+        *,
+        outcome: str,
+        epic: str | None,
+        candidate: dict[str, Any] | None = None,
+        debate_outcome: Any = None,
+        gate_results_json: str | None = None,
+        veto_results_json: str | None = None,
+        deal_id: str | None = None,
+        abstain_record_id: str | None = None,
+    ) -> None:
+        """Fire ``context_recorder.on_decision`` — ``outcome`` is one of ``"TRADE"``,
+        ``"NO_TRADE"``, or ``"ABORT"``.
+
+        No-op when no recorder is injected (Phase 5 bit-identical). Fail-closed: a failure
+        is logged ``critical`` and never raised — mirrors ``_notify_opened``/
+        ``_notify_no_trade`` (Decision J), even though ``ContextRecorder.on_decision``
+        already guards itself (defense in depth, same double-guard style as the other
+        seams).
+        """
+        if self.context_recorder is None:
+            return
+        try:
+            self.context_recorder.on_decision(
+                outcome=outcome,
+                epic=epic,
+                candidate=candidate,
+                debate_outcome=debate_outcome,
+                gate_results_json=gate_results_json,
+                veto_results_json=veto_results_json,
+                deal_id=deal_id,
+                abstain_record_id=abstain_record_id,
+                now_utc=self.now_fn(),
+            )
+        except Exception as exc:  # noqa: BLE001 - the recorder must never kill the cycle (J)
+            logger.critical("context_recorder.on_decision failed: %s", exc)
 
     # -- internals ----------------------------------------------------------
 

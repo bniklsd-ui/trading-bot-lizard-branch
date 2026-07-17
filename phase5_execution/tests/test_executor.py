@@ -14,6 +14,7 @@ abort — lives in ``test_order.py``.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -103,6 +104,7 @@ def _build(
     debate_runner: Callable[[dict[str, Any]], Any] | None = None,
     reward_sink: Any | None = None,
     abstain_sink: Any | None = None,
+    context_recorder: Any | None = None,
     now_fn: Callable[[], datetime] | None = None,
     config: ExecutionConfig | None = None,
     db: FakeDB | None = None,
@@ -119,6 +121,7 @@ def _build(
         debate_runner=debate_runner,
         reward_sink=reward_sink,
         abstain_sink=abstain_sink,
+        context_recorder=context_recorder,
         now_fn=now_fn or _in_window(),
         sleep_fn=lambda _s: None,
     )
@@ -710,14 +713,16 @@ def test_build_closed_defaults_none_without_confirm(
 class _RecordingAbstainSink:
     """Duck-typed ``AbstainSink`` stand-in — records the ``cycle_outcome`` dicts it sees."""
 
-    def __init__(self, *, raise_on_call: bool = False) -> None:
+    def __init__(self, *, raise_on_call: bool = False, record_id: str | None = None) -> None:
         self.calls: list[dict[str, Any]] = []
         self._raise_on_call = raise_on_call
+        self._record_id = record_id
 
-    def on_no_trade(self, cycle_outcome: dict[str, Any]) -> None:
+    def on_no_trade(self, cycle_outcome: dict[str, Any]) -> str | None:
         self.calls.append(cycle_outcome)
         if self._raise_on_call:
             raise RuntimeError("abstain_sink.on_no_trade boom")
+        return self._record_id
 
 
 def test_abstain_sink_none_is_bit_identical_passthrough(exec_state: ExecutionState) -> None:
@@ -834,3 +839,137 @@ def test_abstain_sink_raising_does_not_crash_cycle(exec_state: ExecutionState) -
 
     assert result.status == "NO_TRADE"
     assert len(sink.calls) == 1
+
+
+# --- 26–31) Phase-10 (V3) Block-B context-recorder seam (Decision J) -------
+#
+# ``context_recorder=None`` (the default) must leave every existing TRADE/NO_TRADE/ABORT
+# behaviour bit-identical (proven by the full pre-existing suite staying green). Unlike
+# ``abstain_sink``/``reward_sink``, this seam fires on all three cycle outcomes — including
+# the post-debate ABORT path (Nikinger-authorized scope extension, 2026-07-17's Bug B: a
+# debate-approved TRADE whose order the broker then rejects).
+
+
+class _RecordingContextRecorder:
+    """Duck-typed ``ContextRecorder`` stand-in — records every ``on_decision`` call."""
+
+    def __init__(self, *, raise_on_call: bool = False) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._raise_on_call = raise_on_call
+
+    def on_decision(self, **kwargs: Any) -> None:
+        self.calls.append(kwargs)
+        if self._raise_on_call:
+            raise RuntimeError("context_recorder.on_decision boom")
+
+
+def test_context_recorder_none_is_bit_identical_passthrough(exec_state: ExecutionState) -> None:
+    """``context_recorder=None`` (the default) → a NO_TRADE cycle behaves exactly as before."""
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[])
+    executor, _ = _build(broker, state, exec_state)  # no context_recorder
+
+    result = executor.run()
+
+    assert result.status == "NO_TRADE"
+
+
+def test_context_recorder_fires_on_trade_path(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """A full open->closed trade path records exactly one TRADE context, with deal_id."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    recorder = _RecordingContextRecorder()
+    executor, _ = _build(broker, state, exec_state, context_recorder=recorder)
+
+    result = executor.run()
+
+    assert result.status == "CLOSED_BY_BROKER"
+    assert len(recorder.calls) == 1
+    call = recorder.calls[0]
+    assert call["outcome"] == "TRADE"
+    assert call["epic"] == DEFAULT_EPIC
+    assert call["deal_id"] == DEAL_ID
+    assert call["abstain_record_id"] is None
+
+
+def test_context_recorder_fires_on_no_trade_path_with_abstain_record_id(
+    exec_state: ExecutionState,
+) -> None:
+    """A NO_TRADE cycle records outcome=NO_TRADE, linked to the real abstain record_id."""
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[])  # Gate 2 abstain (research_empty)
+    abstain_sink = _RecordingAbstainSink(record_id="abs-42")
+    recorder = _RecordingContextRecorder()
+    executor, _ = _build(
+        broker, state, exec_state, abstain_sink=abstain_sink, context_recorder=recorder,
+    )
+
+    executor.run()
+
+    assert len(recorder.calls) == 1
+    call = recorder.calls[0]
+    assert call["outcome"] == "NO_TRADE"
+    assert call["abstain_record_id"] == "abs-42"
+    assert call["deal_id"] is None
+
+
+def test_context_recorder_fires_on_abort_after_debate_approved_but_broker_rejects(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """Bug B (2026-07-15): TRADE debate decision, then broker REJECTED -> ABORT is recorded."""
+    broker = FakeBroker(
+        account_env=_account(1500.0),
+        positions_env=_positions(),  # Gate 3/5 + VETO 4 all clear
+        open_env=_FakeEnv(ok=True, data={"status": "REJECTED", "reason": "INSUFFICIENT_FUNDS"}),
+    )
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    debate = _DebateRunner(_DebateOutcome("TRADE", "BUY", confidence=57.0))
+    recorder = _RecordingContextRecorder()
+    executor, _ = _build(
+        broker, state, exec_state, debate_runner=debate, context_recorder=recorder,
+    )
+
+    result = executor.run()
+
+    assert result.status == "ABORT"
+    assert len(recorder.calls) == 1
+    call = recorder.calls[0]
+    assert call["outcome"] == "ABORT"
+    assert call["epic"] == DEFAULT_EPIC
+    assert call["deal_id"] is None
+    assert call["debate_outcome"] is debate.outcome
+    # Bug-B follow-up (2026-07-17): the broker's own reject reason must round-trip
+    # into the persisted row — otherwise a future rejection is invisible without
+    # stderr access (exactly what made 2026-07-15's incident undiagnosable).
+    veto_results = json.loads(call["veto_results_json"])
+    assert "INSUFFICIENT_FUNDS" in veto_results["abort_detail"]
+
+
+def test_context_recorder_not_fired_on_early_session_health_abort(
+    exec_state: ExecutionState,
+) -> None:
+    """The pre-Gate-1 session-health ABORT has no candidate yet -> deliberately unrecorded."""
+    broker = FakeBroker(account_env=_FakeEnv(ok=False, data=None))
+    state = FakeState(fresh=True, candidates=[])
+    recorder = _RecordingContextRecorder()
+    executor, _ = _build(broker, state, exec_state, context_recorder=recorder)
+
+    result = executor.run()
+
+    assert result.status == "ABORT"
+    assert recorder.calls == []
+
+
+def test_context_recorder_raising_does_not_crash_cycle(exec_state: ExecutionState) -> None:
+    """A throwing ``on_decision`` is swallowed -> the cycle still returns NO_TRADE (J)."""
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[])
+    recorder = _RecordingContextRecorder(raise_on_call=True)
+    executor, _ = _build(broker, state, exec_state, context_recorder=recorder)
+
+    result = executor.run()
+
+    assert result.status == "NO_TRADE"
+    assert len(recorder.calls) == 1
