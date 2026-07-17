@@ -1,0 +1,209 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" font-family="'SF Mono','Menlo','Consolas',monospace">
+  <!-- background -->
+  <rect width="1080" height="1080" fill="#0d1117"/>
+  <rect x="0" y="0" width="1080" height="6" fill="#58a6ff"/>
+
+  <!-- ===================== HEADER ===================== -->
+  <text x="40" y="62" fill="#c9d1d9" font-size="30" font-weight="700">Phase 9 · V2 — Foundation</text>
+  <text x="40" y="90" fill="#8b949e" font-size="15">Autonome Epic-Research (V2a) + Daten-Input-Zuverlässigkeit (V2b) · trading-bot-lizard-branch</text>
+
+  <!-- badges -->
+  <g>
+    <rect x="40" y="104" width="196" height="26" rx="13" fill="#132a17" stroke="#238636"/>
+    <circle cx="58" cy="117" r="5" fill="#3fb950"/>
+    <text x="70" y="122" fill="#3fb950" font-size="13" font-weight="700">NULL neues AI im Layer</text>
+    <rect x="244" y="104" width="150" height="26" rx="13" fill="#1c2128" stroke="#30363d"/>
+    <text x="256" y="122" fill="#8b949e" font-size="13">Code = deterministisch</text>
+  </g>
+  <text x="1040" y="62" fill="#8b949e" font-size="14" text-anchor="end">Stand 2026-07-07</text>
+  <text x="1040" y="84" fill="#3fb950" font-size="14" text-anchor="end" font-weight="700">V2a live end-to-end bewiesen</text>
+  <text x="1040" y="104" fill="#8b949e" font-size="12" text-anchor="end">so wenig AI wie möglich, so viel wie nötig</text>
+
+  <line x1="40" y1="148" x2="1040" y2="148" stroke="#30363d"/>
+
+  <!-- ===================== V2a COLUMN (left) ===================== -->
+  <rect x="40" y="164" width="490" height="470" rx="10" fill="#161b22" stroke="#30363d"/>
+  <circle cx="64" cy="192" r="6" fill="#58a6ff"/>
+  <text x="80" y="197" fill="#58a6ff" font-size="19" font-weight="700">V2a · Autonome Epic-Research</text>
+  <text x="60" y="222" fill="#8b949e" font-size="12.5">discover → validate → promote als reine Code-Pipeline.</text>
+  <text x="60" y="240" fill="#8b949e" font-size="12.5">Kein manueller Edit mehr, damit ein Instrument live geht.</text>
+
+  <!-- pipeline modules -->
+  <g font-size="12">
+    <rect x="60" y="256" width="130" height="42" rx="6" fill="#1c2128" stroke="#30363d"/>
+    <text x="125" y="274" fill="#c9d1d9" text-anchor="middle" font-weight="700">discovery.py</text>
+    <text x="125" y="290" fill="#8b949e" text-anchor="middle" font-size="10.5">Seed-Sweep + Filter</text>
+
+    <rect x="205" y="256" width="130" height="42" rx="6" fill="#1c2128" stroke="#30363d"/>
+    <text x="270" y="274" fill="#c9d1d9" text-anchor="middle" font-weight="700">pricing.py</text>
+    <text x="270" y="290" fill="#8b949e" text-anchor="middle" font-size="10.5">point_value-Resolver</text>
+
+    <rect x="350" y="256" width="160" height="42" rx="6" fill="#1c2128" stroke="#30363d"/>
+    <text x="430" y="274" fill="#c9d1d9" text-anchor="middle" font-weight="700">promotion.py</text>
+    <text x="430" y="290" fill="#8b949e" text-anchor="middle" font-size="10.5">Statusmaschine + Safety</text>
+  </g>
+  <text x="196" y="281" fill="#484f58" font-size="14">→</text>
+  <text x="341" y="281" fill="#484f58" font-size="14">→</text>
+
+  <!-- state machine -->
+  <text x="60" y="330" fill="#8b949e" font-size="12" font-weight="700">STATUSMASCHINE · instrument_universe.status (DB, Migration 004)</text>
+  <g font-size="11.5">
+    <rect x="60" y="342" width="104" height="34" rx="5" fill="#1c2128" stroke="#30363d"/>
+    <text x="112" y="363" fill="#c9d1d9" text-anchor="middle">discovered</text>
+
+    <rect x="193" y="342" width="104" height="34" rx="5" fill="#1c2128" stroke="#388bfd"/>
+    <text x="245" y="363" fill="#58a6ff" text-anchor="middle">verified</text>
+
+    <rect x="326" y="342" width="104" height="34" rx="5" fill="#132a17" stroke="#3fb950"/>
+    <text x="378" y="363" fill="#3fb950" text-anchor="middle" font-weight="700">active</text>
+
+    <text x="170" y="364" fill="#484f58" font-size="13">→</text>
+    <text x="303" y="364" fill="#484f58" font-size="13">→</text>
+
+    <!-- quarantined -->
+    <rect x="326" y="398" width="104" height="34" rx="5" fill="#2a1416" stroke="#f85149"/>
+    <text x="378" y="419" fill="#f85149" text-anchor="middle">quarantined</text>
+    <text x="384" y="394" fill="#8b949e" font-size="10">IG-fail ×N</text>
+  </g>
+  <text x="60" y="393" fill="#8b949e" font-size="10.5">gate: verify PASS + point_value</text>
+  <text x="60" y="407" fill="#8b949e" font-size="10.5">gelöst (sonst bleibt discovered)</text>
+  <text x="60" y="424" fill="#d29922" font-size="10.5">yF-fail → data_degraded=1</text>
+  <text x="60" y="438" fill="#8b949e" font-size="10.5">(demotiert NIE · Konzept C3)</text>
+
+  <!-- key decisions realized -->
+  <line x1="60" y1="454" x2="510" y2="454" stroke="#30363d"/>
+  <g font-size="12">
+    <circle cx="66" cy="476" r="4" fill="#3fb950"/>
+    <text x="78" y="480" fill="#c9d1d9">point_value 100% deterministisch aufgelöst —</text>
+    <text x="78" y="496" fill="#8b949e" font-size="11">Pfad 1 <tspan fill="#bc8cff">ig_fields</tspan>, freigeschaltet durch P1 Pip-Feld-Passthrough.</text>
+
+    <circle cx="66" cy="516" r="4" fill="#3fb950"/>
+    <text x="78" y="520" fill="#c9d1d9">D6 erfüllt: carried-over point_value stirbt strukturell —</text>
+    <text x="78" y="536" fill="#8b949e" font-size="11">STXE/CAC/IBEX geseedet mit NULL → per Resolver bestätigt.</text>
+
+    <circle cx="66" cy="556" r="4" fill="#3fb950"/>
+    <text x="78" y="560" fill="#c9d1d9">Demo-only, fail-closed hart: is_demo=False → raise.</text>
+
+    <circle cx="66" cy="576" r="4" fill="#3fb950"/>
+    <text x="78" y="580" fill="#c9d1d9">P8-verify wiederverwendet (importlib), kein Copy-Paste.</text>
+
+    <circle cx="66" cy="596" r="4" fill="#3fb950"/>
+    <text x="78" y="600" fill="#c9d1d9">Phasen-Isolation verifiziert: 0 cross-phase Imports</text>
+    <text x="78" y="616" fill="#8b949e" font-size="11">am Modul-Top · Grep-Assert: kein <tspan fill="#bc8cff">import anthropic</tspan> im Paket.</text>
+  </g>
+
+  <!-- ===================== V2b COLUMN (right) ===================== -->
+  <rect x="550" y="164" width="490" height="470" rx="10" fill="#161b22" stroke="#30363d"/>
+  <circle cx="574" cy="192" r="6" fill="#39c5cf"/>
+  <text x="590" y="197" fill="#39c5cf" font-size="19" font-weight="700">V2b · Daten-Zuverlässigkeit</text>
+  <text x="570" y="222" fill="#8b949e" font-size="12.5">Provider-Kette statt yFinance flicken. IG als Primärquelle.</text>
+
+  <!-- provider chain -->
+  <text x="570" y="250" fill="#8b949e" font-size="12" font-weight="700">BarProvider-KETTE (external_data/providers.py)</text>
+  <g font-size="11.5">
+    <rect x="570" y="262" width="150" height="46" rx="6" fill="#132a17" stroke="#3fb950"/>
+    <text x="645" y="281" fill="#3fb950" text-anchor="middle" font-weight="700">IG REST-Bars</text>
+    <text x="645" y="297" fill="#8b949e" text-anchor="middle" font-size="10">primär · real-time</text>
+
+    <text x="726" y="290" fill="#484f58" font-size="14">→</text>
+
+    <rect x="742" y="262" width="150" height="46" rx="6" fill="#1c2128" stroke="#d29922"/>
+    <text x="817" y="281" fill="#d29922" text-anchor="middle" font-weight="700">yFinance</text>
+    <text x="817" y="297" fill="#8b949e" text-anchor="middle" font-size="10">Fallback · gehärtet</text>
+
+    <rect x="905" y="262" width="118" height="46" rx="6" fill="#1c2128" stroke="#30363d"/>
+    <text x="964" y="281" fill="#c9d1d9" text-anchor="middle">Divergenz-</text>
+    <text x="964" y="297" fill="#c9d1d9" text-anchor="middle">Check</text>
+  </g>
+
+  <!-- hardening -->
+  <g font-size="12">
+    <circle cx="576" cy="336" r="4" fill="#3fb950"/>
+    <text x="588" y="340" fill="#c9d1d9">Backoff (3 Versuche) + Circuit-Breaker pro Ticker —</text>
+    <text x="588" y="356" fill="#8b949e" font-size="11">hämmert Yahoo nie mehr in ein härteres Rate-Limit.</text>
+
+    <circle cx="576" cy="376" r="4" fill="#3fb950"/>
+    <text x="588" y="380" fill="#c9d1d9">Default-Pfad bit-identisch — hinter enable_ig_bars-Flag,</text>
+    <text x="588" y="396" fill="#8b949e" font-size="11">Flag default <tspan fill="#d29922">AUS</tspan>. Momentum-VETO unangetastet (P1-Bars).</text>
+  </g>
+
+  <!-- LS 7a negative result -->
+  <rect x="570" y="416" width="453" height="96" rx="8" fill="#1c2128" stroke="#30363d"/>
+  <circle cx="588" cy="440" r="5" fill="#d29922"/>
+  <text x="602" y="445" fill="#d29922" font-size="13" font-weight="700">Step 7a · Lightstreamer Multi-Epic-Diagnose</text>
+  <text x="588" y="468" fill="#c9d1d9" font-size="12">NEGATIVES Ergebnis (live 2026-07-06): <tspan fill="#3fb950" font-weight="700">kein Multi-Epic-Bug.</tspan></text>
+  <text x="588" y="486" fill="#8b949e" font-size="11.5">Alle 4 Epics subscriben in M1+M2, Hypothesen H1–H4 alle False.</text>
+  <text x="588" y="503" fill="#8b949e" font-size="11.5">7b hat kein Fix-Target → re-run erst bei ~10+ aktiven Epics (H2).</text>
+
+  <!-- what V2b is NOT / honest note -->
+  <text x="570" y="540" fill="#8b949e" font-size="11.5" font-weight="700">EHRLICH ABGEGRENZT:</text>
+  <text x="570" y="558" fill="#8b949e" font-size="11">Keine zweite unabhängige Echtzeitquelle (Lock #8 — kein</text>
+  <text x="570" y="574" fill="#8b949e" font-size="11">bezahlter/gekeyter Provider). Redundanz über IG-Transportwege</text>
+  <text x="570" y="590" fill="#8b949e" font-size="11">+ yFinance als delayed Cross-Check mit Divergenz-Alarm.</text>
+  <text x="570" y="614" fill="#484f58" font-size="10.5">Eigenständiger Echtzeit-Stack lohnt nur bei Krypto → eigene Phase, gegatet.</text>
+
+  <!-- ===================== LIVE RESULTS BAND ===================== -->
+  <rect x="40" y="650" width="1000" height="210" rx="10" fill="#0f1620" stroke="#238636"/>
+  <circle cx="64" cy="678" r="6" fill="#3fb950"/>
+  <text x="80" y="683" fill="#3fb950" font-size="18" font-weight="700">Live-Baseline-Lauf · seit 2026-07-06 (läuft weiter)</text>
+  <text x="1016" y="683" fill="#8b949e" font-size="12" text-anchor="end">Belege: scheduler-Log + DB read-only + research_health.jsonl</text>
+
+  <!-- metric tiles -->
+  <g>
+    <rect x="60" y="700" width="150" height="72" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="135" y="732" fill="#3fb950" font-size="26" text-anchor="middle" font-weight="700">8 / 7 / 0</text>
+    <text x="135" y="752" fill="#8b949e" font-size="10.5" text-anchor="middle">active / verified /</text>
+    <text x="135" y="765" fill="#8b949e" font-size="10.5" text-anchor="middle">quarantined</text>
+
+    <rect x="222" y="700" width="150" height="72" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="297" y="732" fill="#bc8cff" font-size="20" text-anchor="middle" font-weight="700">15× ig_fields</text>
+    <text x="297" y="752" fill="#8b949e" font-size="10.5" text-anchor="middle">alle point_value</text>
+    <text x="297" y="765" fill="#8b949e" font-size="10.5" text-anchor="middle">code-bewiesen (Pfad 1)</text>
+
+    <rect x="384" y="700" width="150" height="72" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="459" y="732" fill="#58a6ff" font-size="26" text-anchor="middle" font-weight="700">CAC</text>
+    <text x="459" y="752" fill="#8b949e" font-size="10.5" text-anchor="middle">erster DB-Pick +</text>
+    <text x="459" y="765" fill="#8b949e" font-size="10.5" text-anchor="middle">Bull/Bear/Judge-Debatte</text>
+
+    <rect x="546" y="700" width="150" height="72" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="621" y="732" fill="#3fb950" font-size="22" text-anchor="middle" font-weight="700">Neustart ✓</text>
+    <text x="621" y="752" fill="#8b949e" font-size="10.5" text-anchor="middle">context built: 8 epics,</text>
+    <text x="621" y="765" fill="#8b949e" font-size="10.5" text-anchor="middle">brain 8/8 (11:31)</text>
+
+    <rect x="708" y="700" width="150" height="72" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="783" y="732" fill="#d29922" font-size="26" text-anchor="middle" font-weight="700">0 Trades</text>
+    <text x="783" y="752" fill="#8b949e" font-size="10.5" text-anchor="middle">40 Abstains on-merit</text>
+    <text x="783" y="765" fill="#8b949e" font-size="10.5" text-anchor="middle">+ 1 Pick→Debatte→Abstain</text>
+
+    <rect x="870" y="700" width="150" height="72" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="945" y="732" fill="#3fb950" font-size="26" text-anchor="middle" font-weight="700">0 Errors</text>
+    <text x="945" y="752" fill="#8b949e" font-size="10.5" text-anchor="middle">kein AUTH/RATE/Backoff-</text>
+    <text x="945" y="765" fill="#8b949e" font-size="10.5" text-anchor="middle">Trip · Rollover sauber</text>
+  </g>
+
+  <!-- proven / open line -->
+  <g font-size="12.5">
+    <circle cx="66" cy="800" r="4" fill="#3fb950"/>
+    <text x="78" y="804" fill="#c9d1d9"><tspan fill="#3fb950" font-weight="700">BEWIESEN:</tspan> V2a end-to-end (discover→activate→research-nutzt-es), C3-Fix wirksam (yF hart down, 0 Quarantänen),</text>
+    <text x="78" y="822" fill="#8b949e">V2 verändert Research messbar (vorher DAX-only → jetzt DB-Universum). Pipeline mechanisch stabil.</text>
+    <circle cx="66" cy="840" r="4" fill="#d29922"/>
+    <text x="78" y="844" fill="#c9d1d9"><tspan fill="#d29922" font-weight="700">OFFEN:</tspan> ein echter open→close-Trade unter V2-Universum · Variety-These (Abstain-Quote mit 8 statt 2–4 Epics).</text>
+  </g>
+
+  <!-- ===================== FOOTER: NEXT ===================== -->
+  <rect x="40" y="878" width="1000" height="162" rx="10" fill="#161b22" stroke="#30363d"/>
+  <circle cx="64" cy="906" r="6" fill="#bc8cff"/>
+  <text x="80" y="911" fill="#bc8cff" font-size="17" font-weight="700">Nächste Phase · Meta-Phase (Harness-Unabhängigkeit)</text>
+  <text x="60" y="936" fill="#8b949e" font-size="12">Orthogonal zum funktionalen Strang. Kein Bot-Feature — eine Methoden-Entscheidung: <tspan fill="#c9d1d9">Kann der Bot-Code künftig mit</tspan></text>
+  <text x="60" y="954" fill="#8b949e" font-size="12"><tspan fill="#c9d1d9">einem offenen Harness (Kandidat: opencode) statt Claude Code geschrieben werden — bei fixem Modell, ohne Zuverlässigkeitsverlust?</tspan></text>
+  <g font-size="11.5">
+    <circle cx="66" cy="978" r="4" fill="#d29922"/>
+    <text x="78" y="982" fill="#c9d1d9">Vor JEDEM Experiment zu setzen: <tspan fill="#d29922">Δ (Build-Toleranz)</tspan> und <tspan fill="#d29922">X (Ausfall-Erwartungswert)</tspan> — vorregistriert, nicht nachträglich.</text>
+    <circle cx="66" cy="1000" r="4" fill="#58a6ff"/>
+    <text x="78" y="1004" fill="#c9d1d9">Build-Front zuerst (billig, throwaway-Fork). Laufzeit-Swap (P4/P6) = späterer, eigener Schritt.</text>
+    <circle cx="66" cy="1022" r="4" fill="#3fb950"/>
+    <text x="78" y="1026" fill="#c9d1d9">Sicherungsnetz existiert schon: P4-Validator + candidate_filter machen Modelltausch überhaupt erst gefahrlos.</text>
+  </g>
+
+  <text x="1040" y="1062" fill="#484f58" font-size="11" text-anchor="end">Quelle der Wahrheit = Code + Messung, nicht dieses Bild · Detail: phase9_universe/CLAUDE.md · PHASE9_V2_LIVE_RESULTS_HANDOVER.md</text>
+</svg>

@@ -1,0 +1,122 @@
+<svg width="1080" height="1350" viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans Mono, monospace">
+  <!-- background -->
+  <rect width="1080" height="1350" fill="#0d1117"/>
+
+  <!-- ================= HEADER ================= -->
+  <text x="40" y="52" fill="#58a6ff" font-size="30" font-weight="bold">META-PHASE M1 — Harness-Unabhängigkeit (Build-Front)</text>
+  <text x="40" y="82" fill="#8b949e" font-size="15">Vorregistriertes Bake-off: Claude Code vs. OpenCode · trading-bot-lizard-branch · 08.–09.07.2026</text>
+  <rect x="878" y="30" width="162" height="34" rx="17" fill="#238636"/>
+  <text x="959" y="53" fill="#ffffff" font-size="15" font-weight="bold" text-anchor="middle">✓ ABGESCHLOSSEN</text>
+  <line x1="40" y1="100" x2="1040" y2="100" stroke="#30363d" stroke-width="2"/>
+
+  <!-- ================= ROW 1: MISSION + PREREG ================= -->
+  <rect x="40" y="118" width="490" height="252" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="60" y="148" fill="#bc8cff" font-size="17" font-weight="bold">MISSION &amp; FRAGE</text>
+  <text x="60" y="178" fill="#c9d1d9" font-size="13.5">Kein Bot-Feature — eine Methoden-Messung:</text>
+  <text x="60" y="202" fill="#e6edf3" font-size="13.5">H_Build: Erreicht ein offener Harness</text>
+  <text x="60" y="221" fill="#e6edf3" font-size="13.5">(OpenCode) + festes Modell die Zuverlässig-</text>
+  <text x="60" y="240" fill="#e6edf3" font-size="13.5">keit von Claude Code innerhalb Toleranz Δ?</text>
+  <text x="60" y="270" fill="#8b949e" font-size="13">Plus 2 Feuerlöscher, unabhängig vom Ausgang:</text>
+  <text x="60" y="292" fill="#3fb950" font-size="13">▸ AGENTS.md (Harness-neutraler Einstieg)</text>
+  <text x="60" y="312" fill="#3fb950" font-size="13">▸ Kalter P4/P6-Fallback (OpenRouter)</text>
+  <text x="60" y="344" fill="#d29922" font-size="12.5">Live-Bot &amp; Live-Pfade: zu keinem Zeitpunkt berührt</text>
+
+  <rect x="550" y="118" width="490" height="252" rx="10" fill="#161b22" stroke="#d29922"/>
+  <text x="570" y="148" fill="#d29922" font-size="17" font-weight="bold">VORREGISTRIERUNG (vor der ersten Zahl)</text>
+  <text x="570" y="177" fill="#c9d1d9" font-size="13.5">Δ = 10 pp   P = 35 %   K = 210 €</text>
+  <text x="570" y="199" fill="#c9d1d9" font-size="13.5">E = P×K = 73,50 €    M = 120 €</text>
+  <rect x="570" y="214" width="450" height="52" rx="6" fill="#21262d"/>
+  <text x="588" y="236" fill="#e6edf3" font-size="13.5" font-weight="bold">Migrieren ⇔ Gap ≤ Δ  UND  E ≥ M</text>
+  <text x="588" y="256" fill="#f85149" font-size="13">E &lt; M ⇒ Migration vorab ausgeschlossen</text>
+  <text x="570" y="292" fill="#8b949e" font-size="12.5">Zweck damit reframed: Feuerlöscher-Test des</text>
+  <text x="570" y="311" fill="#8b949e" font-size="12.5">Build-Pfads — belastbare Zahl für den Zwangsfall.</text>
+  <text x="570" y="341" fill="#d29922" font-size="12.5">Anti-Shopping: Δ/P/K/M nach Messung unantastbar</text>
+
+  <!-- ================= ROW 2: EXPERIMENT DESIGN ================= -->
+  <rect x="40" y="390" width="1000" height="186" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="60" y="420" fill="#58a6ff" font-size="17" font-weight="bold">EXPERIMENT — 20 Messtrials, vollständig isoliert</text>
+
+  <!-- pipeline boxes -->
+  <rect x="60" y="440" width="180" height="58" rx="8" fill="#21262d" stroke="#8b949e"/>
+  <text x="150" y="464" fill="#e6edf3" font-size="13" text-anchor="middle">Wegwerf-Fork</text>
+  <text x="150" y="484" fill="#8b949e" font-size="11.5" text-anchor="middle">Keyring neutralisiert</text>
+  <text x="253" y="475" fill="#8b949e" font-size="16">→</text>
+  <rect x="275" y="440" width="200" height="58" rx="8" fill="#21262d" stroke="#8b949e"/>
+  <text x="375" y="464" fill="#e6edf3" font-size="13" text-anchor="middle">Referenz-Build S1–S7</text>
+  <text x="375" y="484" fill="#8b949e" font-size="11.5" text-anchor="middle">git tags base-0…base-7</text>
+  <text x="488" y="475" fill="#8b949e" font-size="16">→</text>
+  <rect x="510" y="440" width="250" height="58" rx="8" fill="#21262d" stroke="#8b949e"/>
+  <text x="635" y="464" fill="#e6edf3" font-size="13" text-anchor="middle">S1–S5 × 2 Repeats × 2 Harnesse</text>
+  <text x="635" y="484" fill="#8b949e" font-size="11.5" text-anchor="middle">je Trial: reset auf base-(k−1)</text>
+  <text x="773" y="475" fill="#8b949e" font-size="16">→</text>
+  <rect x="795" y="440" width="225" height="58" rx="8" fill="#21262d" stroke="#8b949e"/>
+  <text x="907" y="464" fill="#e6edf3" font-size="13" text-anchor="middle">trials.jsonl → analyze.py</text>
+  <text x="907" y="484" fill="#8b949e" font-size="11.5" text-anchor="middle">gate_pass · wall · cost</text>
+
+  <text x="60" y="528" fill="#c9d1d9" font-size="12.5">Testfeld: Abstain-/No-Trade-Lessons-Modul (V3-Item, vorgezogen — Specs dienen doppelt als späterer echter Bauplan)</text>
+  <text x="60" y="550" fill="#8b949e" font-size="12.5">Sonnet 5 @ high in beiden (korrigiert 08.07.) · separater API-Key, keyring-only · Trials außerhalb Handelsfenster · Cap 50 €</text>
+
+  <!-- ================= ROW 3: RESULTS ================= -->
+  <rect x="40" y="596" width="1000" height="312" rx="10" fill="#161b22" stroke="#3fb950"/>
+  <text x="60" y="626" fill="#3fb950" font-size="17" font-weight="bold">ERGEBNIS — 20/20 Trials, kein Budget-Stopp, kein Isolations-Vorfall</text>
+
+  <!-- headline metric table -->
+  <text x="60" y="660" fill="#8b949e" font-size="12.5">Harness            gate_pass    wall_s (μ±σ)      Spend (USD)   edit_failures</text>
+  <line x1="60" y1="670" x2="640" y2="670" stroke="#30363d"/>
+  <text x="60" y="692" fill="#e6edf3" font-size="13">claude_code        90 % (9/10)  118,3 ± 94,3      $6,90         0</text>
+  <text x="60" y="716" fill="#e6edf3" font-size="13">opencode           90 % (9/10)  154,5 ± 101,7     $4,37         0</text>
+
+  <rect x="680" y="644" width="340" height="84" rx="8" fill="#0d1117" stroke="#3fb950" stroke-width="2"/>
+  <text x="850" y="678" fill="#3fb950" font-size="24" font-weight="bold" text-anchor="middle">Gap = 0,00 pp</text>
+  <text x="850" y="704" fill="#8b949e" font-size="12.5" text-anchor="middle">per Rausch-Regel: „nicht unterscheidbar"</text>
+
+  <!-- per-step grid -->
+  <text x="60" y="756" fill="#8b949e" font-size="12.5">Step                       claude_code   opencode</text>
+  <line x1="60" y1="766" x2="530" y2="766" stroke="#30363d"/>
+  <text x="60" y="787" fill="#c9d1d9" font-size="12.5">S1 Modelle+Taxonomie</text><text x="330" y="787" fill="#f85149" font-size="12.5">✗</text><text x="352" y="787" fill="#3fb950" font-size="12.5">✓</text><text x="440" y="787" fill="#3fb950" font-size="12.5">✓</text><text x="462" y="787" fill="#f85149" font-size="12.5">✗</text>
+  <text x="60" y="808" fill="#c9d1d9" font-size="12.5">S2 Klassifizierer</text><text x="330" y="808" fill="#3fb950" font-size="12.5">✓</text><text x="352" y="808" fill="#3fb950" font-size="12.5">✓</text><text x="440" y="808" fill="#3fb950" font-size="12.5">✓</text><text x="462" y="808" fill="#3fb950" font-size="12.5">✓</text>
+  <text x="60" y="829" fill="#c9d1d9" font-size="12.5">S3 Persistenz</text><text x="330" y="829" fill="#3fb950" font-size="12.5">✓</text><text x="352" y="829" fill="#3fb950" font-size="12.5">✓</text><text x="440" y="829" fill="#3fb950" font-size="12.5">✓</text><text x="462" y="829" fill="#3fb950" font-size="12.5">✓</text>
+  <text x="60" y="850" fill="#c9d1d9" font-size="12.5">S4 reflect (AI-Naht)</text><text x="330" y="850" fill="#3fb950" font-size="12.5">✓</text><text x="352" y="850" fill="#3fb950" font-size="12.5">✓</text><text x="440" y="850" fill="#3fb950" font-size="12.5">✓</text><text x="462" y="850" fill="#3fb950" font-size="12.5">✓</text>
+  <text x="60" y="871" fill="#c9d1d9" font-size="12.5">S5 Sink+Wiring (Cross-File)</text><text x="330" y="871" fill="#3fb950" font-size="12.5">✓</text><text x="352" y="871" fill="#3fb950" font-size="12.5">✓</text><text x="440" y="871" fill="#3fb950" font-size="12.5">✓</text><text x="462" y="871" fill="#3fb950" font-size="12.5">✓</text>
+
+  <rect x="560" y="748" width="460" height="132" rx="8" fill="#21262d"/>
+  <text x="578" y="774" fill="#d29922" font-size="13" font-weight="bold">Die 2 Fails: identische Root-Cause, kein Harness-Gap</text>
+  <text x="578" y="798" fill="#c9d1d9" font-size="12">Bare `pytest` im Gate setzt sys.path nicht — ob der</text>
+  <text x="578" y="817" fill="#c9d1d9" font-size="12">Import auflöst, hängt an __init__.py-Markern, die die</text>
+  <text x="578" y="836" fill="#c9d1d9" font-size="12">Spec dem Agenten überlässt. Bewusst als legitimes</text>
+  <text x="578" y="855" fill="#c9d1d9" font-size="12">Signal gewertet, nicht als Instrument-Bug gepatcht.</text>
+  <text x="578" y="874" fill="#8b949e" font-size="11.5">Ab S2: beide Harnesse durchgehend gate-clean.</text>
+
+  <!-- ================= ROW 4: DECISION + DELIVERABLES ================= -->
+  <rect x="40" y="928" width="490" height="200" rx="10" fill="#161b22" stroke="#f85149"/>
+  <text x="60" y="958" fill="#f85149" font-size="17" font-weight="bold">ENTSCHEIDUNG (Regel wörtlich)</text>
+  <text x="60" y="988" fill="#c9d1d9" font-size="13">Gap 0,00 pp ≤ Δ 10 pp        → TRUE</text>
+  <text x="60" y="1010" fill="#c9d1d9" font-size="13">E 73,50 € ≥ M 120 €          → FALSE</text>
+  <line x1="60" y1="1024" x2="510" y2="1024" stroke="#30363d"/>
+  <text x="60" y="1050" fill="#e6edf3" font-size="15" font-weight="bold">Migrate = FALSE → KEINE MIGRATION</text>
+  <text x="60" y="1078" fill="#3fb950" font-size="12.5">Feuerlöscher-Befund: im Zwangsfall ist OpenCode</text>
+  <text x="60" y="1097" fill="#3fb950" font-size="12.5">+ gleiches Modell ein belegter Build-Pfad (0 pp),</text>
+  <text x="60" y="1116" fill="#3fb950" font-size="12.5">Doc-Layers-Navigation portiert nachweislich.</text>
+
+  <rect x="550" y="928" width="490" height="200" rx="10" fill="#161b22" stroke="#3fb950"/>
+  <text x="570" y="958" fill="#3fb950" font-size="17" font-weight="bold">DELIVERABLES (unabhängig vom Ausgang)</text>
+  <text x="570" y="988" fill="#e6edf3" font-size="13">✓ AGENTS.md — Repo-Root, @ref on need-to-know</text>
+  <text x="570" y="1012" fill="#e6edf3" font-size="13">✓ OpenAICompatLLMClient (OpenRouter) — kalt,</text>
+  <text x="588" y="1031" fill="#8b949e" font-size="12">  rein additiv, null Live-Pfad-Diff, mocked Tests</text>
+  <text x="570" y="1055" fill="#e6edf3" font-size="13">✓ Operator-Smoke: PASS (valid abstain) durch den</text>
+  <text x="588" y="1074" fill="#8b949e" font-size="12">  echten P4-Validator; 400-Fail sauber klassifiziert</text>
+  <text x="570" y="1098" fill="#e6edf3" font-size="13">✓ Specs S1–S7 = fertiger Bauplan für echten</text>
+  <text x="588" y="1117" fill="#8b949e" font-size="12">  Abstain-Lessons-Build (V3)</text>
+
+  <!-- ================= ROW 5: LEARNINGS ================= -->
+  <rect x="40" y="1148" width="1000" height="132" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="60" y="1176" fill="#bc8cff" font-size="15" font-weight="bold">VORFÄLLE &amp; LEARNINGS (alle offengelegt, nichts still gepatcht)</text>
+  <text x="60" y="1202" fill="#c9d1d9" font-size="12.5">▸ OpenCode-Trial entkam trotz korrektem cwd in das Live-Repo → --dir + OS-Write-Lock nachgerüstet, hielt über alle 20 Trials</text>
+  <text x="60" y="1224" fill="#c9d1d9" font-size="12.5">▸ Manual-Spend-Prompt crashte non-interaktiv (EOFError) → beide Harnesse parsen jetzt ihre eigene autoritative Cost-JSON</text>
+  <text x="60" y="1246" fill="#c9d1d9" font-size="12.5">▸ Effort-Korrektur: Sonnet 5 defaulted auf high (nicht medium) → M1-D4 datiert korrigiert · Key-Guthaben lag zeitweise unter Cap</text>
+  <text x="60" y="1268" fill="#c9d1d9" font-size="12.5">▸ Spend-Rekonziliation: $9,30 berechnet vs. $9,27 Console (0,3 %) — Messinstrument bestätigt</text>
+
+  <!-- footer -->
+  <text x="40" y="1322" fill="#8b949e" font-size="12">meta_m1_harness/ · META_M1_{PREREGISTRATION,RESULTS,DECISION,CLOSEOUT_HANDOVER}.md · AGENTS.md · phase4_research/research/llm_openai_compat.py</text>
+  <text x="1040" y="1322" fill="#30363d" font-size="12" text-anchor="end">M1 · 2026-07-09</text>
+</svg>
