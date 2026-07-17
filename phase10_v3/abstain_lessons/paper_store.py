@@ -157,6 +157,21 @@ class PaperTradeStore:
             raise PaperTradeError(f"count_today failed: {exc}") from exc
         return row[0]
 
+    def count_lessons_today(self, now_utc: str) -> int:
+        """Count of lessons extracted on the UTC calendar day of ``now_utc`` — mirrors
+        ``AbstainStore.count_lessons_today``; the two combine into the shared daily
+        reflect cap (``AbstainLessonSink``, V3-D8)."""
+        day_prefix = now_utc[:10]
+        try:
+            row = self.conn.execute(
+                "SELECT COUNT(*) FROM paper_trades "
+                "WHERE lesson_extracted = 1 AND created_utc LIKE ?",
+                (f"{day_prefix}%",),
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise PaperTradeError(f"count_lessons_today failed: {exc}") from exc
+        return row[0]
+
     def recent_lessons(self, limit: int = 5) -> list[str]:
         """Lesson strings from the newest resolved trades with a set, non-null lesson."""
         try:

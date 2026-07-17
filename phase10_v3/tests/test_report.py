@@ -92,6 +92,94 @@ def test_report_empty_db(tmp_path):
     assert report == expected
 
 
+_PAPER_CREATE_TABLE = """
+CREATE TABLE paper_trades (
+    paper_id            TEXT PRIMARY KEY,
+    abstain_record_id   TEXT NOT NULL,
+    variant             TEXT NOT NULL,
+    epic                TEXT NOT NULL,
+    direction           TEXT NOT NULL,
+    created_utc         TEXT NOT NULL,
+    entry_level         REAL NOT NULL,
+    stop_distance       REAL NOT NULL,
+    limit_distance      REAL,
+    time_stop_utc       TEXT NOT NULL,
+    status              TEXT NOT NULL DEFAULT 'OPEN',
+    resolved_utc        TEXT,
+    exit_reason         TEXT,
+    exit_level          REAL,
+    pnl_points           REAL,
+    r_multiple          REAL,
+    council_confidence  INTEGER,
+    lesson              TEXT,
+    lesson_extracted    INTEGER NOT NULL DEFAULT 0,
+    context_json        TEXT NOT NULL DEFAULT '{}'
+)
+"""
+
+
+def _seed_paper_trades(path) -> None:
+    conn = sqlite3.connect(str(path))
+    conn.execute(_PAPER_CREATE_TABLE)
+    rows = [
+        # abs-1: both sides resolved, both lost -> abstain validated
+        ("p1", "abs-1", "SHADOW_BUY", "X", "BUY", "2026-07-11T09:00:00.000Z", "RESOLVED", "SL", -30.0),
+        ("p2", "abs-1", "SHADOW_SELL", "X", "SELL", "2026-07-11T09:00:00.000Z", "RESOLVED", "SL", -30.0),
+        # abs-2: both sides resolved, one won -> abstain not validated
+        ("p3", "abs-2", "SHADOW_BUY", "X", "BUY", "2026-07-11T09:10:00.000Z", "RESOLVED", "TP", 45.0),
+        ("p4", "abs-2", "SHADOW_SELL", "X", "SELL", "2026-07-11T09:10:00.000Z", "RESOLVED", "SL", -30.0),
+        # abs-3: still open -> not counted in the resolved-pairs denominator
+        ("p5", "abs-3", "SHADOW_BUY", "X", "BUY", "2026-07-11T09:20:00.000Z", "OPEN", None, None),
+        ("p6", "abs-3", "SHADOW_SELL", "X", "SELL", "2026-07-11T09:20:00.000Z", "OPEN", None, None),
+    ]
+    for paper_id, abstain_id, variant, epic, direction, created, status, exit_reason, pnl in rows:
+        conn.execute(
+            "INSERT INTO paper_trades (paper_id, abstain_record_id, variant, epic, direction, "
+            "created_utc, entry_level, stop_distance, limit_distance, time_stop_utc, status, "
+            "exit_reason, pnl_points) VALUES (?,?,?,?,?,?,18000,30,45,?,?,?,?)",
+            (paper_id, abstain_id, variant, epic, direction, created, created, status,
+             exit_reason, pnl),
+        )
+    conn.commit()
+    conn.close()
+
+
+def test_report_paper_section_golden_output(tmp_path):
+    db_path = tmp_path / "test.sqlite"
+    _seed_db(db_path)
+    _seed_paper_trades(db_path)
+
+    report = build_report(str(db_path), recent_n=10, include_paper=True)
+
+    expected_tail = "\n".join([
+        "",
+        "=== Paper-Trades Report ===",
+        "",
+        "Counts by variant:",
+        "  SHADOW_BUY: 3",
+        "  SHADOW_SELL: 3",
+        "",
+        "Counts by exit (or status if still open):",
+        "  OPEN: 2",
+        "  SL: 3",
+        "  TP: 1",
+        "",
+        "Abstain-Validierungsquote: 1/2 resolved pairs (both shadow sides negative or breakeven)",
+    ])
+    assert report.endswith(expected_tail)
+
+
+def test_report_without_paper_flag_is_bit_identical_to_block_a(tmp_path):
+    """``include_paper=False`` (the default) never touches paper_trades — the table
+    doesn't even need to exist."""
+    db_path = tmp_path / "test.sqlite"
+    _seed_db(db_path)  # no paper_trades table created at all
+
+    report = build_report(str(db_path), recent_n=10)  # default include_paper=False
+
+    assert "Paper-Trades Report" not in report
+
+
 def test_report_respects_recent_n(tmp_path):
     db_path = tmp_path / "test.sqlite"
     _seed_db(db_path)

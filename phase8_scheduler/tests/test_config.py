@@ -53,6 +53,13 @@ def test_defaults_match_locked_concept_values() -> None:
     assert cfg.enable_abstain_reflect is True
     assert cfg.reflect_daily_cap == 10
 
+    # Phase 10 (V3) market_context + paper-trades (Block B) — context persistence + Both-
+    # Sides-Shadow paper trades on by default; Council-Paper-Call (debate) off (deferred)
+    assert cfg.enable_context_persistence is True
+    assert cfg.enable_paper_trades is True
+    assert cfg.enable_paper_debate is False
+    assert cfg.paper_debate_daily_cap == 3
+
     # paths (gitignored data/ tree)
     assert cfg.live_db_path == "data/trading_bot.sqlite"
     assert cfg.state_path == "data/state/scheduler_state.json"

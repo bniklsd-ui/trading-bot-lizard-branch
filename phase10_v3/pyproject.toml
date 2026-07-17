@@ -5,12 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "abstain_lessons"
 version = "0.1.0"
-description = "Phase 10 (V3) — Abstain-/No-Trade-Lessons, own-connection SQLite store, best-effort reflect. Bauprinzip: no new AI beyond reflect_abstain (default off, capped)."
+description = "Phase 10 (V3) — Abstain-/No-Trade-Lessons + market_context (Block B), own-connection SQLite stores, best-effort reflect. Bauprinzip: no new AI beyond reflect_abstain (default off, capped)."
 requires-python = ">=3.11"
 # Packaging metadata only, enabling an editable install (`pip install -e`) so
-# `import abstain_lessons` resolves at runtime without sys.path hacks — mirrors
-# `phase9_universe`'s `universe` package. The sibling `tests`/`scripts` dirs are
-# deliberately excluded from the installed package.
+# `import abstain_lessons` / `import market_context` resolve at runtime without
+# sys.path hacks — mirrors `phase9_universe`'s `universe` package. The sibling
+# `tests`/`scripts` dirs are deliberately excluded from the installed package.
+# One distribution, two top-level packages (Block B's `market_context/` added
+# alongside `abstain_lessons/`, plan §9/§12 — same pattern as this repo already
+# using one `pyproject.toml` per phase directory, not one per importable package).
 
 [tool.setuptools.packages.find]
-include = ["abstain_lessons*"]
+include = ["abstain_lessons*", "market_context*"]

@@ -191,6 +191,12 @@ class SchedulerRunner:
             research tick — a Gate-2 candidate pick and a universe refresh are independent passes).
             Best-effort/fail-soft (a refresh failure is logged ``critical``, never propagated — a
             stale universe is a data-freshness concern, not a safety one).
+        paper_tracker: optional Phase-10 (V3) Block-B ``PaperTradeTracker``-shaped object
+            (``.tick() -> None``). Default ``None`` ⇒ never called, bit-identical. When set,
+            ticked once per WINDOW-phase cycle (after the executor run) — resolving OPEN
+            paper trades past their time-stop needs no market-open check itself (retrospective
+            bar resolution), but tying it to the same cadence as everything else is simplest.
+            Best-effort/fail-soft, same discipline as ``universe_refresher``.
         max_iterations: optional loop bound. ``None`` (default) ⇒ run forever (the real daemon);
             a positive int ⇒ stop after that many iterations (deterministic tests).
     """
@@ -209,6 +215,7 @@ class SchedulerRunner:
         broker: _BrokerLike,
         preflight_fn: Callable[[], None],
         universe_refresher: Callable[[], Any] | None = None,
+        paper_tracker: Any | None = None,
         max_iterations: int | None = None,
     ) -> None:
         self._clock = clock
@@ -222,6 +229,7 @@ class SchedulerRunner:
         self._broker = broker
         self._preflight_fn = preflight_fn
         self._universe_refresher = universe_refresher
+        self._paper_tracker = paper_tracker
         self._max_iterations = max_iterations
         # Non-sticky graceful-stop flag (set by request_stop(), checked at the loop top).
         # Deliberately NOT the kill-switch file: a SIGTERM-driven stop must not persist a
@@ -366,6 +374,7 @@ class SchedulerRunner:
                 state = self._state_store.record_cycle(state, result)
             else:
                 state.last_no_trade_reason = reason
+            self._run_paper_tracker()
             self._clock.sleep(self._cycle_interval_s)
         elif phase is Phase.POST_WINDOW:
             self._warm_session()
@@ -463,6 +472,17 @@ class SchedulerRunner:
             self._universe_refresher()
         except Exception:  # noqa: BLE001 — fail-soft, see docstring
             logger.critical("universe refresher failed", exc_info=True)
+
+    def _run_paper_tracker(self) -> None:
+        """Fire-and-forget ``paper_tracker.tick()`` (fail-soft, same pattern as
+        ``_run_universe_refresher``). No-op when ``None`` (default — bit-identical).
+        """
+        if self._paper_tracker is None:
+            return
+        try:
+            self._paper_tracker.tick()
+        except Exception:  # noqa: BLE001 — fail-soft, see docstring
+            logger.critical("paper tracker tick failed", exc_info=True)
 
     def _maybe_refresh_universe(self, state: SchedulerState, now: datetime) -> None:
         """Run the universe refresher, throttled to ``config.universe_refresh_interval_min``.

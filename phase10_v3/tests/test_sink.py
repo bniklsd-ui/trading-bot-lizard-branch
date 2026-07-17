@@ -37,6 +37,20 @@ def test_on_no_trade_classifies_and_persists(tmp_path):
     assert recent[0].stage is AbstainStage.VETO
 
 
+def test_on_no_trade_returns_the_persisted_record_id(tmp_path):
+    """Block-B's context_recorder needs the real record_id to link decision_context."""
+    store = _store(tmp_path)
+    sink = AbstainLessonSink(store)
+    record_id = sink.on_no_trade({"veto": "spread"})
+    assert record_id is not None
+    assert store.recent(limit=10)[0].record_id == record_id
+
+
+def test_on_no_trade_returns_none_on_failure():
+    sink = AbstainLessonSink(_RaisingStore())  # type: ignore[arg-type]
+    assert sink.on_no_trade({"veto": "spread"}) is None
+
+
 def test_reflect_runs_for_matching_stage_with_llm(tmp_path):
     store = _store(tmp_path)
     llm = _StubLLM(response="Warte auf klareres Momentum.")

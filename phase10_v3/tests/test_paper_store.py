@@ -100,3 +100,16 @@ def test_count_today_all_and_by_variant(store):
 def test_broken_path_raises_paper_trade_error():
     with pytest.raises(PaperTradeError):
         PaperTradeStore("/nonexistent_dir_xyz/test.sqlite")
+
+
+def test_count_lessons_today(store):
+    t1 = _trade()
+    t2 = _trade(variant=PaperVariant.SHADOW_SELL)
+    store.insert(t1)
+    store.insert(t2)
+    today_prefix = t1.created_utc[:10]
+    now = f"{today_prefix}T12:00:00.000Z"
+    assert store.count_lessons_today(now) == 0
+    store.set_lesson(t1.paper_id, "eine Lehre")
+    assert store.count_lessons_today(now) == 1
+    assert store.count_lessons_today("2099-01-01T00:00:00.000Z") == 0

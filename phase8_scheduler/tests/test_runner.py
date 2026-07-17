@@ -228,6 +228,7 @@ def _make_runner(
     broker=None,
     preflight_fn=None,
     universe_refresher=None,
+    paper_tracker=None,
     max_iterations: int | None = 1,
 ):
     cfg = config or _config(tmp_path)
@@ -246,6 +247,7 @@ def _make_runner(
         broker=broker or _FakeBroker(),
         preflight_fn=preflight_fn or (lambda: None),
         universe_refresher=universe_refresher,
+        paper_tracker=paper_tracker,
         max_iterations=max_iterations,
     )
     return runner, sleep, store, cfg
@@ -344,6 +346,54 @@ def test_universe_refresher_failure_is_fail_soft(tmp_path) -> None:
     backoff = _FakeBackoff()
     runner, _, store, _ = _make_runner(
         tmp_path, times=[_WINDOW_T], universe_refresher=_boom, backoff=backoff,
+    )
+    runner.run()  # must not raise
+    assert backoff.failures == 0
+    assert store.load().kill_reason is None
+
+
+# --- paper tracker (Phase 10 (V3) Block B, plan §10.2) ----------------------
+
+
+def test_paper_tracker_none_is_never_called(tmp_path) -> None:
+    """Default (no wiring opt-in) -> today's behaviour, bit-identical: never called."""
+    runner, _, _, _ = _make_runner(tmp_path, times=[_WINDOW_T], paper_tracker=None)
+    runner.run()  # must not raise
+
+
+def test_paper_tracker_ticked_once_per_window_cycle(tmp_path) -> None:
+    calls: list[int] = []
+
+    class _FakeTracker:
+        def tick(self) -> None:
+            calls.append(1)
+
+    runner, _, _, _ = _make_runner(tmp_path, times=[_WINDOW_T], paper_tracker=_FakeTracker())
+    runner.run()
+    assert calls == [1]
+
+
+def test_paper_tracker_not_ticked_outside_window(tmp_path) -> None:
+    calls: list[int] = []
+
+    class _FakeTracker:
+        def tick(self) -> None:
+            calls.append(1)
+
+    runner, _, _, _ = _make_runner(tmp_path, times=[_PRE_OPEN_T], paper_tracker=_FakeTracker())
+    runner.run()
+    assert calls == []
+
+
+def test_paper_tracker_failure_is_fail_soft(tmp_path) -> None:
+    """A tracker exception must never crash the cycle or trip backoff."""
+    class _BoomTracker:
+        def tick(self) -> None:
+            raise RuntimeError("tracker exploded")
+
+    backoff = _FakeBackoff()
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T], paper_tracker=_BoomTracker(), backoff=backoff,
     )
     runner.run()  # must not raise
     assert backoff.failures == 0

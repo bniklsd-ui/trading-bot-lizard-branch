@@ -28,9 +28,14 @@ logger = logging.getLogger("abstain_lessons.sink")
 
 
 class AbstainSink(Protocol):
-    """The seam the executor calls on every NO_TRADE path."""
+    """The seam the executor calls on every NO_TRADE path.
 
-    def on_no_trade(self, cycle_outcome: Mapping[str, Any]) -> None: ...
+    Returns the persisted ``record_id`` on success (Phase-10 Block-B needs it to link
+    ``decision_context.abstain_record_id``) or ``None`` if classification/persistence
+    failed — never raises.
+    """
+
+    def on_no_trade(self, cycle_outcome: Mapping[str, Any]) -> str | None: ...
 
 
 class AbstainLessonSink:
@@ -50,8 +55,10 @@ class AbstainLessonSink:
         self.reflect_stages = reflect_stages
         self.reflect_daily_cap = reflect_daily_cap
 
-    def on_no_trade(self, cycle_outcome: Mapping[str, Any]) -> None:
-        """Best-effort pipeline step. Never raises."""
+    def on_no_trade(self, cycle_outcome: Mapping[str, Any]) -> str | None:
+        """Best-effort pipeline step. Never raises. Returns the persisted ``record_id``
+        (``None`` on failure) — Block-B's ``context_recorder`` links it into
+        ``decision_context.abstain_record_id``."""
         try:
             record = classify_abstain(cycle_outcome)
             self.store.insert(record)
@@ -77,5 +84,7 @@ class AbstainLessonSink:
                 and self.paper_engine is not None
             ):
                 self.paper_engine.on_debate_abstain(cycle_outcome, record)
+            return record.record_id
         except Exception as exc:  # noqa: BLE001 — the sink must never kill the cycle
             logger.critical("AbstainLessonSink.on_no_trade failed: %s", exc)
+            return None

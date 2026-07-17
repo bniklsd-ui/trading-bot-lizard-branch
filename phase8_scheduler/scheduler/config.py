@@ -159,6 +159,19 @@ class SchedulerConfig:
     enable_abstain_reflect: bool = True
     reflect_daily_cap: int = 10
 
+    # --- Phase 10 (V3) market_context + paper-trades (Block B) ---
+    # `enable_context_persistence` wires a `MarketContextWriter` + `ContextRecorder` into the
+    # Executor's `context_recorder` seam (default None ⇒ bit-identical) — regime snapshots
+    # degrade to `data_source="quote_only"` (no extra IG calls; see `market_context/regime.py`).
+    # `enable_paper_trades` builds a `PaperEngine` + `PaperTradeTracker` (Both-Sides-Shadow-
+    # Tracking, triggered only on `REASON_DEBATE_ABSTAIN`) and injects the engine into the
+    # abstain-lessons sink; `enable_paper_debate` (Council-Paper-Call) stays off — deferred
+    # this session, plan §10.3/§14 drop-order #1.
+    enable_context_persistence: bool = True
+    enable_paper_trades: bool = True
+    enable_paper_debate: bool = False
+    paper_debate_daily_cap: int = 3
+
     # --- paths (gitignored data/ tree) ---
     live_db_path: str = "data/trading_bot.sqlite"          # the real P2 DB
     state_path: str = "data/state/scheduler_state.json"
