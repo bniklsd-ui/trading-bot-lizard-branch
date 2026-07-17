@@ -29,8 +29,9 @@ updated: 2026-07-06
 - [DOC_LAYERS_CONVENTION.md](./DOC_LAYERS_CONVENTION.md) — 📗 · generic (project-agnostic) doc-layers spec
 
 ## Active phase (10 — V3: Abstain-Lessons + Persistenz-Reform + Paper-Trades)
-- [phase10_v3/CLAUDE.md](../phase10_v3/CLAUDE.md) — 🔄 phase head; Block A live on main 2026-07-11 + Monday-restart-proof erbracht 2026-07-14 (66 real `abstain_records` rows); Block B (WE 2) open · [archive](../phase10_v3/SESSIONS_ARCHIVE.md)
+- [phase10_v3/CLAUDE.md](../phase10_v3/CLAUDE.md) — 🔄 phase head; Block A ✅ (Monday-restart-proof 2026-07-14) + Block B ✅ (market_context + Paper-Pipeline live 2026-07-17); Council-Paper-Call deferred · [archive](../phase10_v3/SESSIONS_ARCHIVE.md)
 - [phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md](../phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md) — 📕 dated Step-2 data analysis (V2-baseline, abstain reasons, gap-check)
+- [phase10_v3/WEEK1_REVIEW_2026-07-17.md](../phase10_v3/WEEK1_REVIEW_2026-07-17.md) — 📕 Step-8 catch-up review: abstain-record distribution + first live `REASON_DEBATE_ABSTAIN` cluster (reflect path unproven, watch item)
 - [docs/concepts/phase10_v3_plan.md](./concepts/phase10_v3_plan.md) — 📕 execution-ready plan (locked decisions V3-D1…D10, Steps 0–11)
 - [docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md](./concepts/PHASE10_V3_KICKOFF_HANDOVER.md) — 📕 kickoff handover from M1-close into V3
 

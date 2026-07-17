@@ -353,36 +353,54 @@ ehrlich quarantänisiert.
 
 ## Phase 10 — V3: Persistenz-Reform + No-Trade-Lessons + (optionales) UI
 
-> **Status: 🔄 aktiv — Block A (Migration 005 + `abstain_lessons/`) live auf main seit WE 1
-> (2026-07-11), Block B gegatet auf WE 2.** Ausführungsreifer Plan liegt vor:
-> [`docs/concepts/phase10_v3_plan.md`](./docs/concepts/phase10_v3_plan.md) (Decisions
+> **Status: 🔄 aktiv — Block A ✅ live auf main seit WE 1 (2026-07-11, Montag-Restart-Beweis
+> 2026-07-14) + Block B ✅ live auf main seit WE 2 (2026-07-17).** Ausführungsreifer Plan lag
+> vor: [`docs/concepts/phase10_v3_plan.md`](./docs/concepts/phase10_v3_plan.md) (Decisions
 > V3-D1…D10, Steps 0–11); Kickoff-Kontext:
 > [`docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md`](./docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md).
 > Phase head: [`phase10_v3/CLAUDE.md`](./phase10_v3/CLAUDE.md). Block C (UI) ist explizit
 > **nicht** Teil dieses Plans (geparkt, Plan §13) — Abschnitt 10c unten bleibt daher offen.
+> ⚠ **2026-07-17 Doku-Fix (code = source of truth):** die 10a/10b-Bullets unten waren seit der
+> ursprünglichen Phase-9-Formulierung nicht mehr aktualisiert worden — as-built ist stärker
+> (echte `abstain_records`-Taxonomie mit 12 Reasons statt nur der 3 genannten, + eine
+> Both-Sides-Shadow-Paper-Pipeline, die im ursprünglichen Text gar nicht vorkam). Bullets unten
+> auf den echten Baustand geflippt.
 
 **Goal:** die aktuellen SQLite-V2-Erweiterungen bauen + „warum tradet der Bot nicht" zu einem
 lernbaren Signal machen, nicht nur einem verworfenen Reason-Code.
 
 ### 10a — SQLite V2 Extensions
-- [ ] `+ market_regime_snapshots` (volatility, spread, time per trade) — seit Phase 2 leerer Platzhalter
-- [ ] `+ decision_context` (Bull/Bear-Argumente, VETO-Faktoren, Confidence-Kurve) — seit Phase 2 leerer Platzhalter
-- [ ] `+ lesson_embeddings` (vector store, semantic similarity) — optional/später
+- [x] `+ market_regime_snapshots` — Migration 005 (epic-scoped, DROP+CREATE über den
+  FK-inkompatiblen P2-Platzhalter), Writer live seit Block B (`market_context/writer.py`);
+  observe-only `regime_tag`, degradiert auf `data_source="quote_only"` ohne Bars
+- [x] `+ decision_context` — Migration 005, Writer live seit Block B; Bull/Bear-Summary aus
+  `DebateOutcome.transcript`, Outcome ∈ `{TRADE, NO_TRADE, ABORT}`
+- [ ] `+ lesson_embeddings` (vector store, semantic similarity) — optional/später, V4+
 
 ### 10b — No-Trade (Abstain) Lessons
-- [ ] P8 `research_tick.py`s reservierte `REASON_EMPTY_UNIVERSE`/`REASON_VALIDATOR_REJECT`/
-  `REASON_FILTER_FAIL`-Taxonomie tatsächlich befüllen (P4 muss den feineren Grund melden)
-- [ ] `reflect()` (P7) auf ABSTAIN-Zyklen erweitern — die bereits vorhandene, aber ungenutzte
-  Abstain-Prosa (`Research.last_no_pick_reasoning`, `SchedulerState.last_no_trade_detail`)
-  persistieren + reflektieren, Lessons zurück in den Prompt (mirror des Closed-Trade-Loops)
+- [x] Eigene `abstain_records`-Tabelle + 12-Reason-Taxonomie (`AbstainReason`,
+  `classify_abstain`) — geht über die ursprünglich skizzierten 3 P8-`research_tick`-Reasons
+  hinaus (Migration 005, live seit Block A, 318+ reale Zeilen Stand 2026-07-17)
+- [x] `reflect_abstain()` (P10, Haiku, best-effort, Tages-Cap) auf `REASON_DEBATE_ABSTAIN`
+  erweitert (nicht `reward.brain.reflect()` selbst — eigene, schlankere P10-Reflect-Funktion,
+  gleiches Reuse-Muster wie P7); Lessons-Rückspeisung in den P4-Prompt liegt **gebaut, aber
+  dunkel** (S6, `include_abstain_lessons=False`, V3-D3 — Aktivierung ist ein separater
+  Operator-Schritt nach Lesson-Review, nicht Teil von V3)
+- [x] **Zusätzlich (nicht ursprünglich geplant):** Both-Sides-Shadow-Paper-Pipeline
+  (`PaperEngine`/`PaperTradeTracker`) — beantwortet "war der Abstain richtig?" für
+  `REASON_DEBATE_ABSTAIN`-Fälle deterministisch, ohne Order/Broker-Touch. Council-Paper-Call
+  (LLM-Forced-Pick-Variante, `PaperDebateCaller` + additiver Judge-Prompt-Sibling in
+  `phase6_debate/`) **✅ gebaut (2026-07-17, Folge-Session)**, hinter Flag
+  `enable_paper_debate` (default `False`) — Nikinger flippt, wann gewünscht.
 
 ### 10c — UI-Erweiterungen (optional, niedrigere Priorität als 10a/10b)
 - [ ] Aufbauend auf dem v1.6-Observability-Log + dem v1.7-DB-gespeisten Status
 
 **Done when:** Abstain-Zyklen erzeugen genauso Lessons wie geschlossene Trades; `decision_context`/
-`market_regime_snapshots` sind befüllt statt leer.
+`market_regime_snapshots` sind befüllt statt leer. **Erreicht (2026-07-17)** — live Rows folgen
+mit dem nächsten Scheduler-Restart (Nikinger).
 
-**Directory:** *(noch nicht angelegt)*
+**Directory:** [`phase10_v3/`](./phase10_v3/)
 
 ---
 

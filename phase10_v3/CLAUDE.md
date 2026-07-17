@@ -1,6 +1,6 @@
 ---
 status: live
-purpose: ACTIVE phase head — V3: Abstain-/No-Trade-Lessons echt auf main + Persistenz-Reform (Regime-Snapshots, Decision-Context) + Paper-Trades; Block A (Steps 0–7) done + Montag-Restart-Beweis erbracht 2026-07-14, Block B (Steps 8–11) gated on WE 2
+purpose: ACTIVE phase head — V3: Abstain-/No-Trade-Lessons echt auf main + Persistenz-Reform (Regime-Snapshots, Decision-Context) + Paper-Trades; Block A ✅ (Montag-Restart-Beweis 2026-07-14) + Block B ✅ (market_context + Paper-Pipeline live auf main 2026-07-17); Council-Paper-Call (§10.3) ✅ gebaut, aus (enable_paper_debate=False) 2026-07-17; Bug A (pnl_resolver) + Bug B (abort_detail) beide gefixt 2026-07-17
 read-when: working in phase10_v3/ — read this head + its newest Session-stopped block first
 detail: L2
 up: ../CLAUDE.md
@@ -8,8 +8,9 @@ down:
   - ../docs/concepts/phase10_v3_plan.md   # full execution-ready plan (L3, ausführungsreif)
   - ../docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md   # kickoff handover from M1 into V3 (L3)
   - ../meta_m1_harness/specs/S1.md   # ... S7.md — Abstain-Lessons Bauplan-Specs (L3, zweifach real durchgebaut)
+  - ./WEEK1_REVIEW_2026-07-17.md   # Step-8 catch-up review (L3, dated)
   - ./SESSIONS_ARCHIVE.md   # full session history (L3)
-updated: 2026-07-14
+updated: 2026-07-17
 ---
 # CLAUDE.md — Phase 10 (V3): Abstain-Lessons + Persistenz-Reform + Paper-Trades (`phase10_v3/`)
 
@@ -26,9 +27,11 @@ Drei Blöcke, sequenziert (§1 des Plans):
 2. **Block A (Bot-berührend, Wochenende 1, Sa 2026-07-11):** ✅ Abstain-/No-Trade-Lessons echt —
    Migration 005, `AbstainStore`, Classifier, `reflect_abstain`, Sink-Naht am P5-Executor,
    Wiring im P8-Runner. S6 (Prompt-Rückspeisung) bewusst dunkel (default OFF).
-3. **Block B (Bot-berührend, Wochenende 2):** Persistenz-Reform (`market_regime_snapshots` +
-   `decision_context`, observe-only `regime_tag`) + Paper-Trades (Both-Sides-Shadow-Tracking,
-   optionaler Council-Paper-Call hinter Flag).
+3. **Block B (Bot-berührend, Wochenende 2, Sa 2026-07-17):** ✅ Persistenz-Reform
+   (`market_regime_snapshots` + `decision_context`, observe-only `regime_tag`, degradiert
+   immer auf `quote_only` — kein VETO-Code-Touch) + Paper-Trades (Both-Sides-Shadow-Tracking
+   live). **Council-Paper-Call ✅ gebaut** (Folge-Session, selber Tag) — hinter Flag
+   `enable_paper_debate` (default `False`), Nikinger flippt wann gewünscht.
 
 Block C (UI) ist **nicht Teil dieses Plans** — geparkt, siehe Plan §13.
 
@@ -50,21 +53,27 @@ Gates unantastbar, keine AI-Order-Triggerung — siehe Root-`CLAUDE.md` Hard Rul
   Regime-*Nutzung* (Floor/Directions-Modulation), UI (Block C), S6-Aktivierung (eigener
   Operator-Schritt nach Lesson-Review), M2 (geparkt, kein V3-Blocker).
 
-## Modul-Tree (Block A = ✅ gebaut WE 1 2026-07-11; Block B = geplant WE 2)
+## Modul-Tree (Block A ✅ WE 1 2026-07-11; Block B ✅ WE 2 2026-07-17; Bug A/B + Council-Paper-Call ✅ Folge-Session 2026-07-17)
 
 ```
 phase10_v3/
 ├── CLAUDE.md                                  ← dieser Kopf
 ├── SESSIONS_ARCHIVE.md                        ← rotierte Session-Blöcke (L3)
 ├── STEP0_DATA_ANALYSIS_2026-07-10.md          ← Step 2 Output (dated)
-├── pyproject.toml · requirements.txt          ← ✅ Paket „abstain_lessons", editable install
-├── abstain_lessons/                            ✅ (WE 1) models.py, exceptions.py, classifier.py,
-│                                                reflect.py, sink.py, store.py, paper.py
-│                                                (Modelle only — Engine ist WE 2), paper_store.py
-├── market_context/                             (WE 2) models.py, exceptions.py, regime.py,
-│                                                writer.py — noch nicht angelegt
-├── scripts/                                    ✅ (WE 1) abstain_report.py
-└── tests/                                      ✅ (WE 1) 67 Tests — (WE 2 ergänzt Block B)
+├── WEEK1_REVIEW_2026-07-17.md                 ← Step-8-Nachzügler Review (dated)
+├── pyproject.toml · requirements.txt          ← ✅ eine Distribution, zwei Pakete
+│                                                (abstain_lessons* + market_context*), editable
+├── abstain_lessons/                            ✅ models.py, exceptions.py, classifier.py,
+│                                                reflect.py, sink.py, store.py,
+│                                                paper.py (WE 1 Modelle + WE 2 Engine:
+│                                                open_shadow_pair/resolve_paper_trade/
+│                                                PaperEngine/PaperTradeTracker + §10.3
+│                                                PaperDebateCaller, Folge-Session), paper_store.py
+├── market_context/                             ✅ (WE 2) models.py, exceptions.py, regime.py
+│                                                (quote_only-Degrade), writer.py
+│                                                (MarketContextWriter + ContextRecorder)
+├── scripts/                                    ✅ abstain_report.py (+ WE-2 `--paper`-Sektion)
+└── tests/                                      ✅ 125 Tests (67 WE 1 + 46 WE 2 + 12 Bug-Fixes/Council)
 ```
 
 ## Arbeitsteilung (nicht verhandelbar)
@@ -228,131 +237,100 @@ Time-Stop-Dauer-Key: `max_hold_minutes` (Default 240), konsumiert in `monitor.py
 
 **9. Test-Baseline-Korrektur:** siehe Step-1-Abschnitt oben (1162 grün, P4 141→148).
 
-## Session stopped — 2026-07-11 (WE 1: Block A live on main — Migration 005 + abstain_lessons)
+## Session stopped — 2026-07-17 (WE 2 follow-up: Bug A + Bug B fixed, Council-Paper-Call built)
 
-> **Nebenbefund am Sessionstart (nicht Teil dieses Plans):** Phase-8-Scheduler-Kill-Switch
-> war bis zu ~63h wirkungslos (uncapped POST_WINDOW-Sleep) — diagnostiziert, gefixt
-> (Nikinger-Freigabe), Prozess gestoppt (`kill -9`), dokumentiert in
-> `phase8_scheduler/CLAUDE.md` → `## Session stopped — 2026-07-11`. Der Scheduler steht seit
-> dieser Session (KILL-Datei, `manual:dashboard`); Restart ist ein bewusster Operator-Schritt.
+> Same-day follow-up to the Block-B session above (now rotated to `SESSIONS_ARCHIVE.md`).
+> Nikinger's special task: "this session is only actually solving these bugs + papertrade
+> council logic." All three delivered. Advisor consulted twice (once before implementation —
+> caught a real timezone defect in the planned Bug-A fix before it shipped; the Council-
+> Paper-Call reuse-shape question was also resolved there, since the plan's own `[VERIFY aus
+> §5.5]` pointer turned out to reference a section that doesn't exist in the plan doc).
 
 ### Completed
-- **Migration `005_v3_learning.sql`** (`phase2_persistence/migrations/`): `abstain_records` +
-  `paper_trades` (additiv), **DROP+CREATE** von `market_regime_snapshots`/`decision_context`
-  (Nikinger-Freigabe via AskUserQuestion — FK-inkompatibel, 0 Zeilen, keine Live-Referenz;
-  dokumentierte Ausnahme von Phase 2s "additive only"-Regel, s.
-  `phase2_persistence/CLAUDE.md` Don't-Liste). **Backup vor Migration:**
-  `data/trading_bot.sqlite.2026-07-11.bak` (gitignored, `*.bak`-Pattern). Live angewandt via
-  `phase2_persistence/scripts/init_db.py` → Schema-Version 5, verifiziert (3 Bestands-Trades
-  unberührt, alle 4 neuen Tabellen leer + korrektes Schema).
-- **Konsequenz-Fixes derselben Migration** (root-cause, nicht nur Symptom): `Database.
-  insert_regime_snapshot`/`insert_decision_context` (trade_id-basiert, jetzt schema-inkompatibel)
-  entfernt aus `phase2_persistence/persistence/db.py`; `scripts/archive_verification_trades.py`s
-  `_CHILD_TABLES` von den beiden Tabellen bereinigt (hätten sonst auf eine nicht mehr existierende
-  `trade_id`-Spalte gequeryt); betroffene Tests in `phase2_persistence/tests/test_db.py`,
-  `test_migrations.py` (Version 4→5, neuer `test_v3_learning_tables_present`),
-  `tests/test_archive_verification_trades.py` aktualisiert.
-- **`phase10_v3/abstain_lessons/`** (neues Paket, `pyproject.toml` + editable install, in
-  `scripts/dev_install.sh` aufgenommen): `models.py`/`exceptions.py` (S1: `AbstainStage` 5
-  Werte, `AbstainReason` 12 Werte, `AbstainRecord` frozen), `classifier.py` (S2:
-  `classify_abstain`, Prioritätsordnung exakt wie gespecct), `reflect.py` (S4: `AbstainLLM`
-  Protocol, `reflect_abstain` best-effort/nie werfend, `build_paper_lesson_prompt` für WE 2),
-  `store.py` (S3: `AbstainStore`, UniverseStore-Own-Connection-Muster), `paper.py` (nur
-  Modelle — `PaperTrade`/`PaperVariant`/`PaperStatus`/`PaperExitReason`; die "deterministischer
-  Kern"-Engine ist WE 2), `paper_store.py` (`PaperTradeStore`, analog `AbstainStore`),
-  `sink.py` (S5: `AbstainLessonSink`, `paper_engine=None` bis WE 2).
-- **P5-Executor-Naht** (`phase5_execution/execution/executor.py` + `protocols.py`): neuer
-  keyword-only `abstain_sink=None`; `_no_trade` von `@staticmethod` zu Instanzmethode mit
-  Cycle-Outcome-Keywords, neuer `_notify_no_trade`-Helper (Muster wie `_notify_opened`,
-  Decision J). Alle 8 NO_TRADE-Rückgabepfade übergeben jetzt ihre bekannten Felder
-  (Gate-ID-Mapping `time_window→G1, load_candidates→G2(→research_empty statt failed_gate),
-  constraints→G3, sizing→G4, direction_consistency→G5`; Veto-IDs matchten bereits 1:1).
-  **Default `None` ⇒ bit-identisch bewiesen** (154→154 Bestandstests unverändert grün,
-  **+7 neue Naht-Tests → P5 154→161**).
-- **P8-Wiring** (`scheduler/config.py`, `scripts/wiring.py`): `enable_abstain_lessons=True`,
-  `enable_abstain_reflect=True`, `reflect_daily_cap=10` (V3-D8: **an by default**, anders als
-  z. B. `enable_ig_bars` — bewusst, s. Plan). `_build_abstain_sink` (AbstainStore + optionaler
-  `_AbstainLLMAdapter` über die wiederverwendete P4-`LLMClient`/Haiku, `RewardConfig.lesson_*`-
-  Knobs) + `_observed_abstain_sink`-Wrapper (`abstain_recorded`-Event via
-  `observability.record_event`, generischer Call wie im Anker-Annex vorgesehen). In die
-  Executor-Konstruktion verdrahtet. **P8 217 Tests unverändert grün** (Config-Defaults
-  erweitert, kein neuer Test nötig).
-- **S7** `phase10_v3/scripts/abstain_report.py`: deterministisches `--db`-CLI (Counts je
-  Reason, letzte N Records, Lesson-Quote), Golden-Output-Test, manuell gegen die echte
-  (aktuell leere) Live-DB smoke-verifiziert.
-- **S6 dunkel** (`phase4_research/research/prompt.py`): `build_prompt` bekam
-  `include_abstain_lessons`/`abstain_lessons`/`include_paper_lessons`/`paper_lessons`
-  (alle default aus/`None`) — **pure Funktion bleibt pure** (Lessons werden als
-  vorgefertigte String-Listen übergeben, kein eigener DB-Zugriff in `prompt.py`, anders
-  als der Plan-Wortlaut "AbstainStore.recent_lessons als Prompt-Block" wörtlich nahelegt —
-  bewusste Abweichung, um die dokumentierte "Pure function — no I/O"-Invariante des
-  Moduls nicht zu brechen; der Aufrufer holt die Lessons). Default aus ⇒ **P4 148→148
-  Bestandstests unverändert grün, +7 neue Flag-Tests → P4 148→155**. **Aktivierung bleibt
-  ausdrücklich außerhalb V3** (V3-D3) — niemand im Repo setzt die Flags aktuell `True`.
+
+**Bug A — FIXED** (`phase7_reward/reward/pnl_resolver.py`, cross-phase, dated 🔁-note in
+`phase7_reward/CLAUDE.md`): `resolve()` branch 3 now rejects any `get_trade_history`
+candidate whose `close_date` predates the trade's own `open_ts` (new `_parse_instant`
+helper — tz-aware, compares in UTC, conservative/no-reject on parse failure).
+**Advisor-caught defect avoided:** a naive string compare across `open_ts` (local offset,
+e.g. `+02:00`) and IG's `close_date` (UTC) would have rejected legitimate same-day matches
+too. `_OpenCtx` (`recorder.py`'s cold-reconcile path) gained `open_ts`. +4 tests, **P7 133 →
+137**, including a golden replay of the row-6 incident and a dedicated tz-correctness case.
+**Not done:** correcting the already-persisted bad row (`id=6`) — needs a live
+`get_trade_history` read (deal `DIAAAAXZEYXT8BC` should be settled by now) + a manual DB
+`UPDATE`, both left to the Nikinger (network + live-DB write are operator actions per
+project convention).
+
+**Bug B — root cause confirmed correct, visibility gap closed, root reason unrecoverable**
+(`phase5_execution/execution/executor.py`, dated 🔁-note in `phase5_execution/CLAUDE.md`):
+the 2026-07-15 AEX order was a genuine broker `REJECTED` → `ExecutionAbort` — correct
+fail-closed behavior, not a gate/VETO/order-path bug. But `_abort()`'s `_notify_context`
+call hardcoded `veto_results_json={"vetos": "pass"}`, dropping the actual `detail` (IG's
+reject reason) — so even with last session's ABORT-visibility fix, a future rejection would
+still need stderr access to know why. Fixed: `detail` now folds into
+`{"vetos": "pass", "abort_detail": detail}` (no schema change). **The original 2026-07-15
+reason itself is confirmed unrecoverably lost** — checked `logs/` (only covers 2026-07-16+,
+daemon restarted since) and `journalctl` (nothing bot-related for that window). **Flagged
+to the Nikinger, unconfirmed:** the rejected instrument was AEX, not DAX — the fixed
+`stop_distance_points`/`limit_distance_points` (30/45) apply to every epic, and the existing
+v1.5-hotfix note already flags non-DAX `point_values` as provisional; the same DAX-
+calibration risk plausibly extends to stop/limit distances tripping an IG minimum-distance
+rule on the ~1000-level AEX index. Unconfirmed — watch for it on the next rejection, now
+self-diagnosing from the DB.
+
+**Council-Paper-Call (§10.3) — built, off by default** (`enable_paper_debate` stays `False`,
+matches the plan's Drop-Order + the Nikinger's build-then-flip pattern for every other V3
+flag):
+- `phase6_debate/debate/prompts.py` (dated 🔁-note in `phase6_debate/CLAUDE.md`): additive
+  sibling to the live Judge — `build_paper_pick_prompt(digest)` + `_paper_pick_schema()` +
+  `_PAPER_PICK_SYSTEM` (forced BUY/SELL, no ABSTAIN branch, one-sentence rationale). Zero
+  diff to `build_judge_prompt`/the live Bull/Bear/Judge orchestrator. **P6 70 → 76** (+6).
+- `phase10_v3/abstain_lessons/paper.py`: `PaperDebateCaller` (`request_pick(digest) ->
+  tuple[str,int]|None`, injected `llm` + `prompt_builder` — no `debate` import, phase
+  isolation preserved by construction, verified again by `test_separation_guarantees.py`).
+  `PaperEngine` gained `council_daily_cap` (default 3) and `_maybe_council_pick`: after the
+  shadow pair, checks `store.count_today(COUNCIL_PICK, ...)` against the cap, calls
+  `debate_caller.request_pick({"epic","bid","ask"})` (same quote already fetched for the
+  shadow pair — no second IG call), inserts a `COUNCIL_PICK` `PaperTrade` with
+  `council_confidence` set on a valid pick. Digest is deliberately thin (epic + one quote)
+  — `PaperEngine.on_debate_abstain` only ever receives a sparse `cycle_outcome`
+  (confirmed: `AbstainRecord.detail`/`.context_json` are never actually populated by
+  `classify_abstain` today — a separate, pre-existing gap, out of this session's scope, not
+  touched). **P10 113 → 125** (+12: `PaperDebateCaller` validation + `PaperEngine`
+  integration).
+- `phase8_scheduler/scripts/wiring.py`: `_build_paper_engine` now builds a
+  `PaperDebateCaller` when `config.enable_paper_debate` (lazy import, mirrors the existing
+  `enable_abstain_reflect` LLM-construction pattern exactly — same `get_credential`/
+  `LLMClient`/`ResearchConfig`). Model = `DebateConfig().model_judge` (Sonnet, matching the
+  real Judge — deliberately not the cheap Haiku reflect model; the cap keeps cost trivial
+  regardless). `py_compile` clean; not pytest-collected (scripts convention).
 
 ### Verifiziert
-- Volle Cross-Phase-Regression (jede Phase separat, `tests.conftest`-Kollision):
-  P1 87 · P2 **75** (−1: 2 alte Regime/Context-Tests entfernt, 1 neuer Migrations-Test) ·
-  P3 100 · P4 **155** (+7) · P5 **161** (+7) · P6 70 · P7 133 · P8 217 · P9 72 ·
-  **P10 67 (neu)** · meta_m1_harness 28 · root 77. `py_compile` clean auf allen
-  berührten Dateien (inkl. `scripts/wiring.py`, laut Konvention nicht pytest-importiert).
-- Live-Migration gegen die echte `data/trading_bot.sqlite` angewandt + verifiziert
-  (s. o.) — nicht nur gegen `tmp_path`.
-- `phase2_persistence/CLAUDE.md` + `phase8_scheduler/CLAUDE.md`(Nebenbefund) dokumentiert
-  Doku-Drift-Fixes im selben Commit-Satz (Doku-Hygiene-Regel).
+- Volle Cross-Phase-Regression: P1 87 · P2 75 · P3 100 · P4 155 · P5 **167** (unverändert —
+  Bug-B-Fix erweiterte einen Bestandstest statt einen neuen anzulegen) · P6 **76** (+6) ·
+  P7 **137** (+4) · P8 221 (unverändert) · P9 72 · P10 **125** (+12) · meta_m1_harness 28 ·
+  root 77.
+- Kein Live-/Netz-/Smoke-Test diese Session (kein neuer Broker-/Order-Pfad berührt) —
+  Live-Verifikation (inkl. `enable_paper_debate`-Flip, wenn gewünscht) bleibt Operator-Aufgabe.
 
 ### Next
-- **Operator (Nikinger), Montag:** Scheduler-Restart ist ein bewusster Schritt (KILL-Datei
-  erst löschen). Montag-Restart-Beweis (Plan §7.3 Akzeptanzkriterium): erste echte
-  `abstain_records`-Zeilen + `abstain_recorded`-Events im Health-Log — wortgleich hier
-  protokollieren, sobald der Nikinger den Restart macht.
-- **Woche 2 (wochentags, docs-only):** Review-Note nach den ersten realen
-  `abstain_records`-Zeilen (Plan §8) — insbesondere `REASON_DEBATE_ABSTAIN`-Reflect-Cap-
-  Verteilung gegen die 94/6-Analyse aus Step 2 prüfen.
-- **WE 2 (18.–19.07.):** Block B — `market_context/` Paket (Modelle, `regime.py`,
-  `writer.py`, `context_recorder`-Naht am P5-Executor) + Paper-Pipeline (die
-  "deterministischer Kern"-Engine für `paper.py`, `PaperEngine`, Both-Sides-Shadow +
-  optionaler Council-Paper-Call). Plan §9–§11.
+- **Operator (Nikinger):**
+  1. Row-`id=6`-Korrektur (Bug A): optional, network + live-DB write, s. o. — nur falls die
+     historische Zeile es wert ist, korrigiert zu werden.
+  2. AEX-Stop-Distanz-Hypothese (Bug B): unbestätigt, beobachten bei der nächsten
+     ABORT-Zeile (jetzt self-diagnosing via `decision_context.veto_results_json`).
+  3. `enable_paper_debate=True` flippen, wann gewünscht — Council-Paper-Call ist gebaut +
+     getestet, aber bewusst noch nicht live.
+  4. Montag-Restart-Beweis Runde 2 (aus der Vorsession, weiterhin offen): erste echte
+     `market_regime_snapshots`/`decision_context`/`paper_trades`-Zeilen protokollieren.
+- **Reflect-Pfad-Watch-Item** (aus dem Week-1-Review, weiterhin offen): warum
+  `lesson_extracted=0` bei allen realen `REASON_DEBATE_ABSTAIN`-Records — unverändert aus der
+  Vorsession, nicht Teil dieser Session's Scope.
 
 ### Open questions / blockers
-- Keine technischen. Eine Beobachtung für die Woche-2-Review: der `_no_trade`-Seam übergibt
-  `research_empty=True` für JEDE Gate-2-Fehlschlag (nicht nur `research_empty` im engeren
-  Sinn) — das war bereits die S2-Contract-Absicht (G2 → `REASON_NO_CANDIDATES`), aber am
-  echten Datenbild (94 % der Abstains sind genau dieser Pfad) lohnt ein Blick, ob die
-  12-Reason-Taxonomie an dieser Stelle granular genug bleibt.
-
-### Nachtrag (2026-07-14, Di) — Montag-Restart-Beweis erbracht ✅
-
-Scheduler seit Mo 2026-07-13 durchgehend gelaufen (PID 129102, KILL-Datei vom Nikinger vor
-dem Restart gelöscht), `scheduler_state.json` zeigt `consecutive_failures: 0`, `kill_reason:
-null` — sauberer, unbeaufsichtigter Lauf. Read-only via `mode=ro`-URI gegen die Live-DB
-geprüft (Plan §7.3 Akzeptanzkriterium):
-
-**`abstain_records`** (66 Zeilen, 2026-07-13T07:05:42.541Z … 2026-07-13T14:47:42.545Z, alle
-`epic: null`/`stage: research_empty`/`reason: reason_no_candidates`/`lesson_extracted: 0`).
-Erste 3 Zeilen wortgleich:
-```
-{'record_id': 'fc38dd85-a8f3-47a8-a722-8f4d71ac4748', 'created_utc': '2026-07-13T07:05:42.541Z', 'epic': None, 'stage': 'research_empty', 'reason': 'reason_no_candidates', 'lesson_extracted': 0}
-{'record_id': 'ae4615b6-a371-4908-96ce-f38cef069aff', 'created_utc': '2026-07-13T07:10:52.196Z', 'epic': None, 'stage': 'research_empty', 'reason': 'reason_no_candidates', 'lesson_extracted': 0}
-{'record_id': '7165c61a-a1b1-4fa9-b07e-800536eb881b', 'created_utc': '2026-07-13T07:15:59.476Z', 'epic': None, 'stage': 'research_empty', 'reason': 'reason_no_candidates', 'lesson_extracted': 0}
-```
-
-**`research_health.jsonl`** — 66 `abstain_recorded`-Events, 1:1 deckungsgleich mit den
-DB-Zeilen (gleiche Reason/Stage/Epic, unabhängiger zweiter Kanal). Letzte 3 wortgleich:
-```
-{"event": "abstain_recorded", "reason": "reason_no_candidates", "stage": "research_empty", "epic": null, "ts": "2026-07-13T14:37:20.513400+02:00"}
-{"event": "abstain_recorded", "reason": "reason_no_candidates", "stage": "research_empty", "epic": null, "ts": "2026-07-13T14:42:31.614240+02:00"}
-{"event": "abstain_recorded", "reason": "reason_no_candidates", "stage": "research_empty", "epic": null, "ts": "2026-07-13T14:47:42.546626+02:00"}
-```
-
-**Einordnung:** 66/66 sind `REASON_NO_CANDIDATES` (Research-Stufe) — deckt sich exakt mit der
-Step-2-Baseline (94.3 % dieses Pfads über 8 Tage). `lesson_extracted` 0/66 ist **erwartetes
-Verhalten**, kein Fehler: `reflect_stages` defaultet auf `{AbstainStage.DEBATE}` (V3-D8) —
-Research-Stufe-Abstains reflektieren bewusst nie. Noch kein einziger `REASON_DEBATE_ABSTAIN`
-in diesem Fenster beobachtet → der Reflect-Pfad selbst ist am echten Live-Lauf noch
-unbewiesen (Beobachtungspunkt für die Woche-2-Review, s. o.). **WE-1-Akzeptanzkriterium
-(Plan §7.3) damit vollständig erfüllt** — Block A ist nicht nur code-complete, sondern
-live am echten unbeaufsichtigten Bot bewiesen.
+- Keine technischen. Volle Regression grün, keine VETO-/Gate-/Order-Pfad-Änderung diese
+  Session (Bug-B-Fix ist rein additiv an einer bereits Nikinger-autorisierten Beobachtungs-
+  Naht, kein neuer Order-Pfad-Touch).
 
 ---
 
