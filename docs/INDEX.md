@@ -32,6 +32,7 @@ updated: 2026-07-06
 - [phase10_v3/CLAUDE.md](../phase10_v3/CLAUDE.md) — 🔄 phase head; Block A ✅ (Monday-restart-proof 2026-07-14) + Block B ✅ (market_context + Paper-Pipeline live 2026-07-17); Council-Paper-Call deferred · [archive](../phase10_v3/SESSIONS_ARCHIVE.md)
 - [phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md](../phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md) — 📕 dated Step-2 data analysis (V2-baseline, abstain reasons, gap-check)
 - [phase10_v3/WEEK1_REVIEW_2026-07-17.md](../phase10_v3/WEEK1_REVIEW_2026-07-17.md) — 📕 Step-8 catch-up review: abstain-record distribution + first live `REASON_DEBATE_ABSTAIN` cluster (reflect path unproven, watch item)
+- [phase10_v3/TRADE_DATA_DIAGNOSIS_2026-07-19.md](../phase10_v3/TRADE_DATA_DIAGNOSIS_2026-07-19.md) — 📕 pre-V4 Strukturdiagnose: 6 Befunde (BUY-Abstain-Asymmetrie, Sub-Noise-Stop, Budget-Blindfleck …) + falsifizierbare Watch-Items WI-1…WI-6 für die Datenwoche ab 2026-07-20
 - [docs/concepts/phase10_v3_plan.md](./concepts/phase10_v3_plan.md) — 📕 execution-ready plan (locked decisions V3-D1…D10, Steps 0–11)
 - [docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md](./concepts/PHASE10_V3_KICKOFF_HANDOVER.md) — 📕 kickoff handover from M1-close into V3
 

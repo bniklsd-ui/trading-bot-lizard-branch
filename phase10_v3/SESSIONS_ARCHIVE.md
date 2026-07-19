@@ -4,7 +4,7 @@ purpose: Verbatim session-history archive rotated out of `CLAUDE.md`
 read-when: auditing how a past phase-10 (V3) decision came about — never needed at session start
 detail: L3
 up: ./CLAUDE.md
-updated: 2026-07-17
+updated: 2026-07-19
 ---
 
 # phase10_v3 — Session Archive
@@ -13,6 +13,103 @@ updated: 2026-07-17
 > rotation rule ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)). Source order
 > preserved (newest-first). The newest `## Session stopped` block always stays in the source file;
 > at each session end, the previously-newest block rotates here.
+
+---
+
+## Session stopped — 2026-07-17 (WE 2 follow-up: Bug A + Bug B fixed, Council-Paper-Call built)
+
+> Same-day follow-up to the Block-B session above (now rotated to `SESSIONS_ARCHIVE.md`).
+> Nikinger's special task: "this session is only actually solving these bugs + papertrade
+> council logic." All three delivered. Advisor consulted twice (once before implementation —
+> caught a real timezone defect in the planned Bug-A fix before it shipped; the Council-
+> Paper-Call reuse-shape question was also resolved there, since the plan's own `[VERIFY aus
+> §5.5]` pointer turned out to reference a section that doesn't exist in the plan doc).
+
+### Completed
+
+**Bug A — FIXED** (`phase7_reward/reward/pnl_resolver.py`, cross-phase, dated 🔁-note in
+`phase7_reward/CLAUDE.md`): `resolve()` branch 3 now rejects any `get_trade_history`
+candidate whose `close_date` predates the trade's own `open_ts` (new `_parse_instant`
+helper — tz-aware, compares in UTC, conservative/no-reject on parse failure).
+**Advisor-caught defect avoided:** a naive string compare across `open_ts` (local offset,
+e.g. `+02:00`) and IG's `close_date` (UTC) would have rejected legitimate same-day matches
+too. `_OpenCtx` (`recorder.py`'s cold-reconcile path) gained `open_ts`. +4 tests, **P7 133 →
+137**, including a golden replay of the row-6 incident and a dedicated tz-correctness case.
+**Not done:** correcting the already-persisted bad row (`id=6`) — needs a live
+`get_trade_history` read (deal `DIAAAAXZEYXT8BC` should be settled by now) + a manual DB
+`UPDATE`, both left to the Nikinger (network + live-DB write are operator actions per
+project convention).
+
+**Bug B — root cause confirmed correct, visibility gap closed, root reason unrecoverable**
+(`phase5_execution/execution/executor.py`, dated 🔁-note in `phase5_execution/CLAUDE.md`):
+the 2026-07-15 AEX order was a genuine broker `REJECTED` → `ExecutionAbort` — correct
+fail-closed behavior, not a gate/VETO/order-path bug. But `_abort()`'s `_notify_context`
+call hardcoded `veto_results_json={"vetos": "pass"}`, dropping the actual `detail` (IG's
+reject reason) — so even with last session's ABORT-visibility fix, a future rejection would
+still need stderr access to know why. Fixed: `detail` now folds into
+`{"vetos": "pass", "abort_detail": detail}` (no schema change). **The original 2026-07-15
+reason itself is confirmed unrecoverably lost** — checked `logs/` (only covers 2026-07-16+,
+daemon restarted since) and `journalctl` (nothing bot-related for that window). **Flagged
+to the Nikinger, unconfirmed:** the rejected instrument was AEX, not DAX — the fixed
+`stop_distance_points`/`limit_distance_points` (30/45) apply to every epic, and the existing
+v1.5-hotfix note already flags non-DAX `point_values` as provisional; the same DAX-
+calibration risk plausibly extends to stop/limit distances tripping an IG minimum-distance
+rule on the ~1000-level AEX index. Unconfirmed — watch for it on the next rejection, now
+self-diagnosing from the DB.
+
+**Council-Paper-Call (§10.3) — built, off by default** (`enable_paper_debate` stays `False`,
+matches the plan's Drop-Order + the Nikinger's build-then-flip pattern for every other V3
+flag):
+- `phase6_debate/debate/prompts.py` (dated 🔁-note in `phase6_debate/CLAUDE.md`): additive
+  sibling to the live Judge — `build_paper_pick_prompt(digest)` + `_paper_pick_schema()` +
+  `_PAPER_PICK_SYSTEM` (forced BUY/SELL, no ABSTAIN branch, one-sentence rationale). Zero
+  diff to `build_judge_prompt`/the live Bull/Bear/Judge orchestrator. **P6 70 → 76** (+6).
+- `phase10_v3/abstain_lessons/paper.py`: `PaperDebateCaller` (`request_pick(digest) ->
+  tuple[str,int]|None`, injected `llm` + `prompt_builder` — no `debate` import, phase
+  isolation preserved by construction, verified again by `test_separation_guarantees.py`).
+  `PaperEngine` gained `council_daily_cap` (default 3) and `_maybe_council_pick`: after the
+  shadow pair, checks `store.count_today(COUNCIL_PICK, ...)` against the cap, calls
+  `debate_caller.request_pick({"epic","bid","ask"})` (same quote already fetched for the
+  shadow pair — no second IG call), inserts a `COUNCIL_PICK` `PaperTrade` with
+  `council_confidence` set on a valid pick. Digest is deliberately thin (epic + one quote)
+  — `PaperEngine.on_debate_abstain` only ever receives a sparse `cycle_outcome`
+  (confirmed: `AbstainRecord.detail`/`.context_json` are never actually populated by
+  `classify_abstain` today — a separate, pre-existing gap, out of this session's scope, not
+  touched). **P10 113 → 125** (+12: `PaperDebateCaller` validation + `PaperEngine`
+  integration).
+- `phase8_scheduler/scripts/wiring.py`: `_build_paper_engine` now builds a
+  `PaperDebateCaller` when `config.enable_paper_debate` (lazy import, mirrors the existing
+  `enable_abstain_reflect` LLM-construction pattern exactly — same `get_credential`/
+  `LLMClient`/`ResearchConfig`). Model = `DebateConfig().model_judge` (Sonnet, matching the
+  real Judge — deliberately not the cheap Haiku reflect model; the cap keeps cost trivial
+  regardless). `py_compile` clean; not pytest-collected (scripts convention).
+
+### Verifiziert
+- Volle Cross-Phase-Regression: P1 87 · P2 75 · P3 100 · P4 155 · P5 **167** (unverändert —
+  Bug-B-Fix erweiterte einen Bestandstest statt einen neuen anzulegen) · P6 **76** (+6) ·
+  P7 **137** (+4) · P8 221 (unverändert) · P9 72 · P10 **125** (+12) · meta_m1_harness 28 ·
+  root 77.
+- Kein Live-/Netz-/Smoke-Test diese Session (kein neuer Broker-/Order-Pfad berührt) —
+  Live-Verifikation (inkl. `enable_paper_debate`-Flip, wenn gewünscht) bleibt Operator-Aufgabe.
+
+### Next
+- **Operator (Nikinger):**
+  1. Row-`id=6`-Korrektur (Bug A): optional, network + live-DB write, s. o. — nur falls die
+     historische Zeile es wert ist, korrigiert zu werden.
+  2. AEX-Stop-Distanz-Hypothese (Bug B): unbestätigt, beobachten bei der nächsten
+     ABORT-Zeile (jetzt self-diagnosing via `decision_context.veto_results_json`).
+  3. `enable_paper_debate=True` flippen, wann gewünscht — Council-Paper-Call ist gebaut +
+     getestet, aber bewusst noch nicht live.
+  4. Montag-Restart-Beweis Runde 2 (aus der Vorsession, weiterhin offen): erste echte
+     `market_regime_snapshots`/`decision_context`/`paper_trades`-Zeilen protokollieren.
+- **Reflect-Pfad-Watch-Item** (aus dem Week-1-Review, weiterhin offen): warum
+  `lesson_extracted=0` bei allen realen `REASON_DEBATE_ABSTAIN`-Records — unverändert aus der
+  Vorsession, nicht Teil dieser Session's Scope.
+
+### Open questions / blockers
+- Keine technischen. Volle Regression grün, keine VETO-/Gate-/Order-Pfad-Änderung diese
+  Session (Bug-B-Fix ist rein additiv an einer bereits Nikinger-autorisierten Beobachtungs-
+  Naht, kein neuer Order-Pfad-Touch).
 
 ---
 
