@@ -61,6 +61,11 @@ def test_enable_ig_bars_flag_threads_through() -> None:
     assert config_from_args(parse_args(["--enable-ig-bars"])).enable_ig_bars is True
 
 
+def test_enable_paper_debate_flag_threads_through() -> None:
+    assert config_from_args(parse_args([])).enable_paper_debate is False
+    assert config_from_args(parse_args(["--enable-paper-debate"])).enable_paper_debate is True
+
+
 def test_config_from_args_threads_overrides() -> None:
     cfg = config_from_args(
         parse_args(["--daily-loss-cap", "750", "--max-trades", "3", "--cycle-interval-min", "2"])

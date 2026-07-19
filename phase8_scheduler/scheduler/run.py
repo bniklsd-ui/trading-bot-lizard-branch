@@ -93,6 +93,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "Step 6 — yFinance stays the fallback). Default OFF = yFinance-only path, bit-identical. "
         "Flip on only after a live run has confirmed the IG→yFinance chain.",
     )
+    parser.add_argument(
+        "--enable-paper-debate",
+        action="store_true",
+        help="enable the Council-Paper-Call (Phase 10 / V3 §10.3): up to "
+        "paper_debate_daily_cap forced BUY/SELL paper picks per day on debate-abstain "
+        "cycles — output lands only in paper_trades, never an order. Default OFF.",
+    )
     parser.add_argument("--verbose", action="store_true", help="DEBUG logging to stderr.")
     return parser
 
@@ -118,6 +125,7 @@ def config_from_args(args: argparse.Namespace) -> SchedulerConfig:
         cycle_interval_min=args.cycle_interval_min,
         max_consecutive_failures=args.max_consecutive_failures,
         enable_ig_bars=args.enable_ig_bars,
+        enable_paper_debate=args.enable_paper_debate,
     )
 
 

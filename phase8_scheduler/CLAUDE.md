@@ -232,6 +232,12 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 - `broker_wrapper.credentials.get_credential(name)` (`credentials.py:56`,
   `SERVICE_NAME="tradingbot"`, wirft `CredentialNotFoundError`) für den Keyring-Preflight.
 
+> 🔁 **Phase-10 (V3) additive edit (2026-07-19, Nikinger-beauftragt, code = source of truth):**
+> `scheduler/run.py` gained `--enable-paper-debate` (mirrors `--enable-ig-bars` exactly:
+> `store_true`, threads into `SchedulerConfig.enable_paper_debate`, default OFF unverändert) —
+> the CLI arm for the already-built Council-Paper-Call (Phase 10 §10.3; wiring reads the config
+> field since 2026-07-17). +1 test (`test_run.py`, **P8 221 → 222**). No other behaviour change.
+
 ---
 
 ## Session stopped — 2026-07-11 (Hotfix: POST_WINDOW-Sleep gecappt — Kill-Switch/SIGINT waren bis zu ~63h wirkungslos)
