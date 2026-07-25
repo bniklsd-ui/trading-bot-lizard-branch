@@ -305,6 +305,7 @@ class _AbstainLLMAdapter:
         "type": "object",
         "properties": {"lesson": {"type": "string"}},
         "required": ["lesson"],
+        "additionalProperties": False,
     }
 
     def __init__(self, client: Any) -> None:
@@ -424,7 +425,7 @@ _PAPER_BAR_COUNT = 300
 
 def _build_paper_tracker(config: SchedulerConfig, broker: Any) -> Any:
     """Build the Phase-10 (V3) Block-B :class:`PaperTradeTracker`. ``bar_fetch`` wraps
-    one ``get_ohlcv(epic, "MINUTE_1", _PAPER_BAR_COUNT)`` call per affected epic per
+    one ``get_ohlcv(epic, "MINUTE", _PAPER_BAR_COUNT)`` call per affected epic per
     tick. ``reflect_cap_check`` reads **both** stores' daily lesson counts against the
     shared ``reflect_daily_cap`` (V3-D8) — own connections (cheap; mirrors
     ``_observed_abstain_sink``'s "recompute rather than thread state" choice).
@@ -445,7 +446,7 @@ def _build_paper_tracker(config: SchedulerConfig, broker: Any) -> Any:
     abstain_store.ensure_schema()
 
     def bar_fetch(epic: str) -> list[dict[str, Any]]:
-        env = broker.get_ohlcv(epic, "MINUTE_1", _PAPER_BAR_COUNT)
+        env = broker.get_ohlcv(epic, "MINUTE", _PAPER_BAR_COUNT)
         if not env.ok:
             raise RuntimeError(f"get_ohlcv not ok for {epic}")
         return (env.data or {}).get("bars", [])

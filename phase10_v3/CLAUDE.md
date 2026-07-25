@@ -1,6 +1,6 @@
 ---
 status: live
-purpose: ACTIVE phase head — V3: Abstain-/No-Trade-Lessons echt auf main + Persistenz-Reform (Regime-Snapshots, Decision-Context) + Paper-Trades; Block A ✅ (Montag-Restart-Beweis 2026-07-14) + Block B ✅ (market_context + Paper-Pipeline live auf main 2026-07-17); Council-Paper-Call (§10.3) ✅ gebaut, aus (enable_paper_debate=False) 2026-07-17; Bug A (pnl_resolver) + Bug B (abort_detail) beide gefixt 2026-07-17
+purpose: ACTIVE phase head — V3: Abstain-/No-Trade-Lessons + Persistenz-Reform + Paper-Trades, alles live auf main; erste Datenwoche mit enable_paper_debate=True gefahren (2026-07-20/24), ausgewertet 2026-07-25 — 2 weitere Bugs gefunden+gefixt (Paper-Tracker-Resolution, reflect_abstain-Schema, beide seit Rollout tot); N1 (INSUFFICIENT_FUNDS-Reject) per Operator-Check geklärt (Konto gesund, kein Dauerproblem); V4-Scope-Schnitt auf saubere Woche verschoben
 read-when: working in phase10_v3/ — read this head + its newest Session-stopped block first
 detail: L2
 up: ../CLAUDE.md
@@ -10,8 +10,9 @@ down:
   - ../meta_m1_harness/specs/S1.md   # ... S7.md — Abstain-Lessons Bauplan-Specs (L3, zweifach real durchgebaut)
   - ./WEEK1_REVIEW_2026-07-17.md   # Step-8 catch-up review (L3, dated)
   - ./TRADE_DATA_DIAGNOSIS_2026-07-19.md   # pre-V4 Strukturdiagnose W1-W6 + Watch-Items (L3, dated)
+  - ./DATA_WEEK_REVIEW_2026-07-25.md   # WI-1..WI-6 Auswertung + 2 Bugfixes + N1/N2 (L3, dated)
   - ./SESSIONS_ARCHIVE.md   # full session history (L3)
-updated: 2026-07-19
+updated: 2026-07-25
 ---
 # CLAUDE.md — Phase 10 (V3): Abstain-Lessons + Persistenz-Reform + Paper-Trades (`phase10_v3/`)
 
@@ -238,46 +239,61 @@ Time-Stop-Dauer-Key: `max_hold_minutes` (Default 240), konsumiert in `monitor.py
 
 **9. Test-Baseline-Korrektur:** siehe Step-1-Abschnitt oben (1162 grün, P4 141→148).
 
-## Session stopped — 2026-07-19 (Sa — read-only Strukturdiagnose vor der V4-Datenwoche)
+## Session stopped — 2026-07-25 (Sa — erste Datenwoche ausgewertet, 2 Bugs gefunden + gefixt)
 
-> Special-Task-Session (Nikinger): kein Code-Touch, keine DB-Writes (`mode=ro` durchgehend).
-> Auftrag: strukturelle Schwächen hinter „fast nur BUY-Trades, alle per SL gestoppt" finden,
-> mit Daten-/Code-Beweis, plus Watch-Items für die Datenwoche ab Montag 2026-07-20 — damit V4
-> aus echten Befunden geformt wird statt aus Vermutungen.
+> Special-Task-Folgesession (Nikinger): Bot lief Mo–Fr mit `--enable-paper-debate` (s. Session
+> 2026-07-19), Wochenende-Auswertung entlang WI-1…WI-6. Advisor konsultiert vor dem Report
+> (bestätigte die Einordnung + gab die Fix-Priorisierung: MINUTE_1 sofort, reflect_abstain erst
+> nach Mechanismus-Bestätigung).
 
 ### Completed
-- **`TRADE_DATA_DIAGNOSIS_2026-07-19.md`** (neu, 📕 dated, in `docs/INDEX.md` eingetragen):
-  6 belegte Befunde + falsifizierbare Watch-Items WI-1…WI-6. Kurzfassung:
-  - **W1** BUY-Bias = Abstain-Asymmetrie in P4: bei positivem Drift → BUY-Seed (19/20
-    Debatten), bei negativem Drift → Abstain statt SELL (Smoking Gun: 07-17
-    `last_no_trade_detail`, LLM erwägt SELL zweimal und verwirft ihn). Kein Clamp aktiv.
-  - **W2** Fixe 30-pt-Stop-Distanz ist auf DAX (~0.117 %) Sub-Noise — unter der eigenen
-    Momentum-VETO-Schwelle (0.15 %/h); Geometrie 30/45 = EV ≈ 0 vor Kosten; Trades 4/5 in
-    3.6–9.3 min exakt −30 pts gestoppt. Auf AEX wären dieselben 30 pts 2.73 % (Faktor ~23).
-  - **W3** `daily_token_budget=200k` wird JEDEN Handelstag erreicht (5/5 Tage 195k–203k) →
-    Research endet täglich ~14–15 Uhr, Nachmittag blind.
-  - **W4** Paper-Pipeline (das V4-Datenwerkzeug) triggert fast nie: 98.4 % der Abstains sind
-    `REASON_NO_CANDIDATES` (kein Paper-Trigger); `paper_trades` = 0 Zeilen.
-  - **W5** Lesson-Loop dämpft generell statt richtungsspezifisch (3 identische Stop-out-
-    Lessons in jedem Prompt, zitiert als Abstain-Grund auch gegen SELL).
-  - **W6** Gate 1 erlaubt Entries bis 17:30, Square-off ist 17:15 — Spät-Entries haben
-    verkürzte/negative Max-Haltezeit (Trade 4: Entry 16:58).
-  - Explizit NICHT kaputt: Mechanik/Sizing/Fail-closed/VETOs — kein Execution-Bug.
+- **`DATA_WEEK_REVIEW_2026-07-25.md`** (neu, 📕 dated, in `docs/INDEX.md`): WI-2 (Shadow-Pairs,
+  das Schlüssel-Experiment) **tot** — 15 Paper-Trades erzeugt, 0 aufgelöst. WI-1 (roter Tag →
+  SELL-Seed) **untestbar** — Di–Fr 100 % `REASON_NO_CANDIDATES`, kein einziger Zyklus erreichte
+  die Kandidaten-Stufe; Montags einziger Handelstag war durchgehend positiv-driftend. WI-3
+  (Budget-Kappe ~14–15 Uhr) + WI-4 (Paper-Trigger selten) **bestätigt**. Zwei neue Befunde:
+  **N1** zwei Broker-Rejects `INSUFFICIENT_FUNDS` (DAX + AEX, selber Vormittag, ein dritter
+  Trade selben Vormittags erfolgreich) — widerlegt die unbestätigte AEX-Stop-Distanz-Hypothese
+  aus der Bug-B-Session. **Operator-Check nachgeliefert (Nikinger, `broker_wrapper.cli`, selber
+  Tag):** `get-account` → `available == balance` = 26.815,63 € exakt, `get-positions` → `[]` —
+  **kein Dauer-Margin-Problem, Stale-Deal-Hypothese widerlegt.** Montags Reject bleibt
+  unerklärt, aber nachweislich transient (kein Fix, nur Beobachten nächste Woche, s. Review-Doc).
+  **N2** Funnel-Kollaps Di–Fr ist schlechter als die Vorwoche, Ursache
+  (Marktregime vs. strukturell) mit einer Woche nicht unterscheidbar. **Empfehlung: kein
+  V4-Scope aus dieser Woche** — beide Schlüssel-Fragen unbeantwortet wegen kaputter Messwerkzeuge,
+  nicht wegen fehlender Marktbewegung.
+- **Zwei Bugs root-caused + gefixt** (`scripts/wiring.py`, dated 🔁-Note in
+  `phase8_scheduler/CLAUDE.md`): (1) `PaperTradeTracker`s `bar_fetch` rief `get_ohlcv(epic,
+  "MINUTE_1", …)` — ungültige IG-Resolution, 422 Fehlschläge diese Woche, 0/15 Paper-Trades je
+  aufgelöst seit Block B (07-17). Fix: `"MINUTE"`. (2) `_AbstainLLMAdapter._SCHEMA` fehlte
+  `additionalProperties: False` → Anthropic lehnt den Structured-Output-Call ab (HTTP 400,
+  in den Logs bestätigt) → Klartext-Fallback → `json.loads` scheitert immer → `reflect_abstain`
+  hat **seit Rollout (07-15) nie** eine Lesson erzeugt. Fix: Feld ergänzt (Muster aus dem
+  bewährten `brain.py`-Schema). Beide additiv, ein-Wert-Korrekturen in bereits von V3 berührtem
+  Code, am Wochenende bei gestopptem Bot. `scripts/wiring.py` hat laut Projekt-Konvention keine
+  eigene Testdatei ("operator-run, not pytest-collected") — verifiziert via `py_compile` (clean)
+  + volle Regression (**P8 222 · P10 125, beide unverändert** — nur String-/Dict-Literale
+  berührt, kein getestetes Modul).
+- Session-Block 2026-07-19 rotiert nach `SESSIONS_ARCHIVE.md`.
 
 ### Next
-- **Operator (Nikinger), vor/während der Datenwoche ab Mo 2026-07-20:**
-  1. **Empfehlung: `enable_paper_debate=True` flippen** (gebaut + getestet, Cap 3/Tag) —
-     ohne den Flip bleibt WI-2/WI-4 mangels `paper_trades`-Zeilen unbeantwortbar.
-  2. Bot Montag normal starten (Neustart-Pickup + erste `market_regime_snapshots`/
-     `decision_context`-Zeilen sind weiterhin offene Beweis-Punkte aus der Vorsession).
-- **Auswertung am Wochenende 2026-07-25/26** entlang WI-1…WI-6 (Queries stehen in der
-  Diagnose-Datei); daraus den V4-Scope schneiden.
-- Unverändert offen aus Vorsessions: Row-id=6-Korrektur (Bug A), Reflect-Pfad
-  `lesson_extracted=0`, AEX-Reject-Hypothese (jetzt self-diagnosing).
+- **Operator (Nikinger):**
+  1. ✅ **erledigt diese Session:** `get_account`/`get_positions`-Check (N1) — Konto gesund,
+     kein Dauerproblem. Verbleibt nur als **Beobachtungspunkt**: taucht `INSUFFICIENT_FUNDS`
+     nächste Woche wieder auf, direkt danach `get-account` laufen lassen (nicht Tage später),
+     um den zeitlichen Zusammenhang zu fangen.
+  2. Nächste Datenwoche starten (gleicher Command, Fixes sind bereits im Code) — dort WI-1/WI-2
+     erneut prüfen, jetzt mit funktionierender Paper-Pipeline; beobachten, ob N2 (Funnel-Kollaps)
+     sich wiederholt.
+  3. Row-id=6-Korrektur (Bug A) und `enable_paper_debate`-Frage sind erledigt/entschieden;
+     unverändert offen: keine neuen Blocker.
+- V4-Scope-Entscheidung bleibt auf eine saubere Woche verschoben (kein Schnitt diese Session).
 
 ### Open questions / blockers
-- Keine technischen. Reine Lese-Session; einzige Edits: neue Diagnose-Datei, `docs/INDEX.md`
-  (+1 Zeile), dieser Session-Block (Rotation regelkonform).
+- **N1** ist kein Blocker mehr (Konto-Check bestanden) — nur noch ein Beobachtungspunkt bei
+  Wiederauftreten, kein offener Live-Check.
+- Unverändert offen: `used_in_research`/Lesson-Dämpfung (W5) hat diese Woche keine frische
+  Evidenz geliefert, bleibt aus der Vordiagnose unverändert gültig.
 
 ---
 

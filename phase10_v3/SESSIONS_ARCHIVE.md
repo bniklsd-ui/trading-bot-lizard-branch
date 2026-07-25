@@ -4,7 +4,7 @@ purpose: Verbatim session-history archive rotated out of `CLAUDE.md`
 read-when: auditing how a past phase-10 (V3) decision came about — never needed at session start
 detail: L3
 up: ./CLAUDE.md
-updated: 2026-07-19
+updated: 2026-07-25
 ---
 
 # phase10_v3 — Session Archive
@@ -13,6 +13,49 @@ updated: 2026-07-19
 > rotation rule ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)). Source order
 > preserved (newest-first). The newest `## Session stopped` block always stays in the source file;
 > at each session end, the previously-newest block rotates here.
+
+---
+
+## Session stopped — 2026-07-19 (Sa — read-only Strukturdiagnose vor der V4-Datenwoche)
+
+> Special-Task-Session (Nikinger): kein Code-Touch, keine DB-Writes (`mode=ro` durchgehend).
+> Auftrag: strukturelle Schwächen hinter „fast nur BUY-Trades, alle per SL gestoppt" finden,
+> mit Daten-/Code-Beweis, plus Watch-Items für die Datenwoche ab Montag 2026-07-20 — damit V4
+> aus echten Befunden geformt wird statt aus Vermutungen.
+
+### Completed
+- **`TRADE_DATA_DIAGNOSIS_2026-07-19.md`** (neu, 📕 dated, in `docs/INDEX.md` eingetragen):
+  6 belegte Befunde + falsifizierbare Watch-Items WI-1…WI-6. Kurzfassung:
+  - **W1** BUY-Bias = Abstain-Asymmetrie in P4: bei positivem Drift → BUY-Seed (19/20
+    Debatten), bei negativem Drift → Abstain statt SELL (Smoking Gun: 07-17
+    `last_no_trade_detail`, LLM erwägt SELL zweimal und verwirft ihn). Kein Clamp aktiv.
+  - **W2** Fixe 30-pt-Stop-Distanz ist auf DAX (~0.117 %) Sub-Noise — unter der eigenen
+    Momentum-VETO-Schwelle (0.15 %/h); Geometrie 30/45 = EV ≈ 0 vor Kosten; Trades 4/5 in
+    3.6–9.3 min exakt −30 pts gestoppt. Auf AEX wären dieselben 30 pts 2.73 % (Faktor ~23).
+  - **W3** `daily_token_budget=200k` wird JEDEN Handelstag erreicht (5/5 Tage 195k–203k) →
+    Research endet täglich ~14–15 Uhr, Nachmittag blind.
+  - **W4** Paper-Pipeline (das V4-Datenwerkzeug) triggert fast nie: 98.4 % der Abstains sind
+    `REASON_NO_CANDIDATES` (kein Paper-Trigger); `paper_trades` = 0 Zeilen.
+  - **W5** Lesson-Loop dämpft generell statt richtungsspezifisch (3 identische Stop-out-
+    Lessons in jedem Prompt, zitiert als Abstain-Grund auch gegen SELL).
+  - **W6** Gate 1 erlaubt Entries bis 17:30, Square-off ist 17:15 — Spät-Entries haben
+    verkürzte/negative Max-Haltezeit (Trade 4: Entry 16:58).
+  - Explizit NICHT kaputt: Mechanik/Sizing/Fail-closed/VETOs — kein Execution-Bug.
+
+### Next
+- **Operator (Nikinger), vor/während der Datenwoche ab Mo 2026-07-20:**
+  1. **Empfehlung: `enable_paper_debate=True` flippen** (gebaut + getestet, Cap 3/Tag) —
+     ohne den Flip bleibt WI-2/WI-4 mangels `paper_trades`-Zeilen unbeantwortbar.
+  2. Bot Montag normal starten (Neustart-Pickup + erste `market_regime_snapshots`/
+     `decision_context`-Zeilen sind weiterhin offene Beweis-Punkte aus der Vorsession).
+- **Auswertung am Wochenende 2026-07-25/26** entlang WI-1…WI-6 (Queries stehen in der
+  Diagnose-Datei); daraus den V4-Scope schneiden.
+- Unverändert offen aus Vorsessions: Row-id=6-Korrektur (Bug A), Reflect-Pfad
+  `lesson_extracted=0`, AEX-Reject-Hypothese (jetzt self-diagnosing).
+
+### Open questions / blockers
+- Keine technischen. Reine Lese-Session; einzige Edits: neue Diagnose-Datei, `docs/INDEX.md`
+  (+1 Zeile), dieser Session-Block (Rotation regelkonform).
 
 ---
 

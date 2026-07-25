@@ -238,6 +238,38 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 > the CLI arm for the already-built Council-Paper-Call (Phase 10 §10.3; wiring reads the config
 > field since 2026-07-17). +1 test (`test_run.py`, **P8 221 → 222**). No other behaviour change.
 
+> 🔁 **Phase-10 (V3) bugfix (2026-07-25, found during the first `--enable-paper-debate` data-week
+> review, code = source of truth):** two silent 100%-failure-rate bugs in `scripts/wiring.py`,
+> both live since Block B (2026-07-17), both root-caused against the week's logs
+> (`phase10_v3/DATA_WEEK_REVIEW_2026-07-25.md` has the full forensic trail):
+> - **`_build_paper_tracker`'s `bar_fetch`** called `broker.get_ohlcv(epic, "MINUTE_1", …)` —
+>   `"MINUTE_1"` is not a valid IG resolution (`ig_adapter.VALID_RESOLUTIONS` has `"MINUTE"`, not
+>   `"MINUTE_1"`). Every tick since the first paper trade went due (2026-07-20) raised and was
+>   swallowed by the tracker's own best-effort guard (`logger.critical`, never crashes) — **422
+>   consecutive failures over 5 days, 0 of 15 paper trades ever resolved.** Fixed: `"MINUTE"`
+>   (two sites: docstring + the actual call). Confirmed the only occurrence repo-wide (grep). The
+>   15 already-open paper trades from that week are **not** retroactively recoverable — a future
+>   tick only fetches recent bars, not history back to their `created_utc` — the fix works
+>   forward only.
+> - **`_AbstainLLMAdapter._SCHEMA`** (the Haiku lesson-extraction call for `reflect_abstain`)
+>   was missing `"additionalProperties": False` — Anthropic rejects Structured Outputs on an
+>   `object`-type schema without it (HTTP 400, confirmed verbatim in this week's logs), so every
+>   call fell back to a plain (non-JSON-constrained) completion; the prompt itself never asks for
+>   JSON, so the German-prose fallback response failed `json.loads` at char 0 every time — **0
+>   lessons extracted since this reflect path went live (2026-07-15), confirmed dead for its
+>   entire lifetime, not just this week.** Fixed: added `"additionalProperties": False` (matches
+>   the proven-working `phase7_reward/reward/brain.py` schema pattern) — no prompt change needed,
+>   Structured Outputs constrains the output regardless of what the prompt literally says.
+> - **Both fixes are additive, one-value corrections in already-V3-touched code**, applied
+>   weekend/bot-stopped per the root `CLAUDE.md` "small necessary cleanup, note back to the
+>   Nikinger" allowance — no gate/VETO/order-path touched. `scripts/wiring.py` has **no** dedicated
+>   test file (documented "operator-run, not pytest-collected" convention, same as the
+>   Council-Paper-Call session) — verified via `py_compile` (clean) + full regression (**P8 222 ·
+>   P10 125, both unchanged** — the fixes touch only inline string/dict literals, no tested
+>   module). A third finding from the same review — two `INSUFFICIENT_FUNDS` broker rejects this
+>   week (refutes the earlier unconfirmed AEX-stop-distance hypothesis) — is **not** a code bug
+>   and needs an operator `get_account`/`get_open_positions` check; see the review doc.
+
 ---
 
 ## Session stopped — 2026-07-11 (Hotfix: POST_WINDOW-Sleep gecappt — Kill-Switch/SIGINT waren bis zu ~63h wirkungslos)
