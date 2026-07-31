@@ -115,12 +115,18 @@ class ExecutionConfig:
     # v1.5 (Issue C — multi-instrument sizing): per-epic account-currency value of ONE
     # index point, used by Gate-4 sizing (``risk / (stop_pts × point_value)``) and the
     # reconstructed ``initial_risk``. Default ``{}`` → every epic falls back to 1.0
-    # (DAX cash CFD = 1 €/pt) → the DAX/default path is bit-identical. ⚠ Non-DAX values
-    # are PROVISIONAL until the operator confirms them on IG demo via
-    # ``scripts/resolve_epics.py`` (v1.5 Step 2B); keep this map consistent with the
-    # research-side ``InstrumentSpec.point_value`` (the two are separate SoTs because the
-    # frozen Candidate/turbo_candidates.json contract carries no point value and IG's
-    # ``get_market_info`` does not expose one). Re-baseline before live.
+    # (DAX cash CFD = 1 €/pt) → the DAX/default path is bit-identical — this empty-map
+    # default is only hit by callers that don't wire the map at all (most unit tests).
+    # ⚠ Phase-10 B1-fix (2026-07-31): once this map IS populated (the real wiring case,
+    # ``phase8_scheduler/scripts/wiring.py``), an epic missing from it is no longer a
+    # silent 1.0 — ``sizing.compute_size`` fails closed (no trade) instead. This is what
+    # a stale-comment version of this note failed to prevent: a static, incomplete
+    # source for this map caused a real 40x oversizing on AEX (see
+    # ``phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`` §4 B1) — a doc note alone doesn't
+    # stop that, a structural guard does. Keep this map consistent with the research-side
+    # ``InstrumentSpec.point_value`` (the two are separate SoTs because the frozen
+    # Candidate/turbo_candidates.json contract carries no point value and IG's
+    # ``get_market_info`` does not expose one).
     point_values: dict[str, float] = field(default_factory=dict)
 
     # --- SL / TP ---
@@ -146,10 +152,12 @@ class ExecutionConfig:
         """Account-currency value of one index point for ``epic`` (v1.5).
 
         Returns ``point_values[epic]`` when present, else ``1.0`` (DAX cash CFD =
-        1 €/pt, and the safe default for any not-yet-confirmed instrument). ``None``
-        epic → ``1.0`` too. This is the P5 sizing authority for the point value; see
-        the ``point_values`` field note on why it is a separate SoT from the research
-        ``InstrumentSpec.point_value`` and that non-DAX values are provisional.
+        1 €/pt). ``None`` epic → ``1.0`` too. This 1.0 fallback is only the *safe*
+        default when ``point_values`` is empty (the map is unwired); once the map is
+        populated, ``sizing.compute_size`` never reaches this fallback for an
+        unmapped epic — it fails closed first (Phase-10 B1-fix). This is the P5
+        sizing authority for the point value; see the ``point_values`` field note
+        on why it is a separate SoT from the research ``InstrumentSpec.point_value``.
         """
         if epic is None:
             return 1.0

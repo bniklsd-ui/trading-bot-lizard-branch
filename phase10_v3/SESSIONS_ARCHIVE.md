@@ -16,6 +16,97 @@ updated: 2026-07-31
 
 ---
 
+## Session stopped — 2026-07-31 (Fr — zweite Datenwoche ausgewertet, read-only; 3 neue Bugs + Phase-11-Scope)
+
+> Special-Task-Session (Nikinger): „Datenwoche ist rum — sag direkt, wenn etwas schiefgelaufen
+> ist; wenn genug Daten da sind, tiefe Analyse + Hypothesen für Phase 11." Kein Code-Touch,
+> DB nur `mode=ro` (Wochentags-Regel). Advisor vor dem Report konsultiert — sein
+> Diskriminator-Query (Regime-Snapshots auf dem Happy Path) hat B4 von „leer weil Funnel leer"
+> auf „teils Design, teils Verdrahtungslücke" präzisiert; seine Warnung zu B2 (Ein-Zeichen-Fix
+> repariert den Loop nicht) ist im Report als eigene Rechnung belegt.
+
+### Completed
+- **`DATA_WEEK_REVIEW_2026-07-31.md`** (neu, 📕 dated, in `docs/INDEX.md`) — vollständige
+  Auswertung. Kernzahlen der Woche: **366 Research-Zyklen, 1 Kandidat, 1 Debatte, 0 Trades,
+  0 neue Paper-Trades**, 364 Abstain-Records zu 100 % `REASON_NO_CANDIDATES`. Mechanik
+  einwandfrei (0 `consecutive_failures`, kein Kill, 10/10 Tage stabil) — der Funnel selbst
+  ist der Ausfall.
+- **WI-1 + WI-5 sind beantwortet, W1 + W5 bestätigt.** Es gab rote Tage (3 von 4 auswertbaren
+  DAX-Sessions negativ). Am 07-30, bei breiter europäischer Schwäche, erzeugte Research
+  **einen BUY** auf dem einzigen Instrument mit positivem Drift und schrieb die Begründung
+  selbst hin: *„a SELL on DAX/CAC/IBEX [is] tempting, **but** recent trade history shows 4
+  consecutive BUY losses on DAX — avoiding that instrument."* Die Verluste dämpfen die
+  **Instrumentenwahl**, nicht die Richtungswahl. Stand kumulativ: 30 Debatten, 29 BUY-Seeds
+  vs. 1 SELL, **nie ein Richtungs-Flip**, 8× TRADE (alle BUY).
+- **WI-2 zum zweiten Mal tot** — diesmal ohne Bug: der Shadow-Pair-Trigger ist
+  `REASON_DEBATE_ABSTAIN`, und die eine Debatte der Woche sagte TRADE. WI-3 bestätigt (10/10
+  Tage an der 200k-Kappe, Research endet 15:2x). WI-6 ohne neue Evidenz.
+- **Drei neue harte Bugs, alle seit Rollout falsch, alle exakt nachgerechnet** (Details +
+  Fix-Ausdrücke im Review-Doc §4):
+  1. **B1 `point_value`-Drift** (`phase8_scheduler/scripts/wiring.py:616`): `point_values`
+     kommt aus der statischen 4-Epic-`EXTENDED_UNIVERSE`, Research handelt aber die
+     8-Epic-DB-Universe → AEX mit 1,0 statt **40,0 €/Punkt** → **40× Oversizing**
+     (Size 26,8 = 1,18 Mio € Nominale, Risiko am Stop **120 % des Kontos**). Erklärt **alle
+     drei** AEX-Rejects (07-15/07-20/07-30) und löst damit den als „unrettbar verloren"
+     abgelegten Bug-B-Vorfall vom 07-15. **50 % aller 8 TRADE-Entscheidungen der Historie sind
+     an Sizing-Config gestorben, nicht am Markt.**
+  2. **B2 Reward-Score-Inversion** (`phase7_reward/reward/scorer.py:115`): `debate_confidence`
+     wird als [0,1] behandelt, geliefert wird 0–100 → `process_delta` +92,25 statt ~+3 →
+     per-Trade-Delta clamped **immer** auf +5 → Score **55→60→65→70 über vier Totalverluste**
+     → `get_risk_level()` = AGGRESSIV → `risk_pct` 3 % statt 2 %. Die Unit-Tests kodieren die
+     falsche Skala (`debate_confidence=0.9`), deshalb unsichtbar. ⚠ **Der Skalen-Fix allein
+     repariert es nicht** (bliebe +1,2/Verlust, weil ein SL-Treffer den `clean_exit_bonus`
+     kassiert) — das ist eine Phase-11-Designfrage.
+  3. **B5 Paper-Lesson-Prompt** (`abstain_lessons/reflect.py:62-65` vs. `:78`): Prompt sagt
+     „max. zwei Sätze", Validator erzwingt ≤300 Zeichen, die Grenze steht nicht im Prompt →
+     am 07-27 6 Reflect-Calls bezahlt, 2 Lessons persistiert.
+- **Zwei strukturelle Lücken (B3/B4, brauchen Designentscheidung, kein Quickfix):**
+  Leverage-Cap ohne Margin-Headroom (Nominale konstruktionsbedingt auf `available × 20`
+  gepinnt; 22,1 rejected / 22,0 accepted am selben Vormittag) und das **leere Mess-Substrat**
+  (alle 1.036 `abstain_records` mit `detail=''`/`context_json='{}'`; alle 722
+  `market_regime_snapshots` `quote_only`/NULL — Bars sind dokumentierte Degradation,
+  `spread_pct` dagegen eine echte Verdrahtungslücke an den drei `_notify_context`-Call-Sites).
+- **Korrektur am 07-27-Block:** der Bug-2-Fix vom 07-25 **ist** live bewiesen — am 07-27 liefen
+  6 Haiku-Calls über denselben gefixten `_AbstainLLMAdapter._SCHEMA` (Abstain-Sink *und*
+  Paper-Pfad teilen ihn), 2 Lessons persistiert, kein HTTP 400. Der 07-27-Block sagte „kein
+  Call wurde versucht" — das galt nur für den Debatte-Abstain-Pfad, nicht für den Adapter.
+- **Der Kern-Befund** (Review §3): eine geschlossene Rückkopplung — 4 SL-Verluste → 4 Lessons
+  („prüfe die Entry-Qualität", **4.529× in den Prompt gerendert**) + dieselben 4 Verluste als
+  zweiter Kanal via `recent_trades` → Modell abstaint 365/366 und begründet es wörtlich damit
+  → keine Trades → keine neuen Outcomes → die 4 alten Lessons bleiben. Ein **absorbierender
+  Zustand**, aus dem sich der Loop nicht selbst befreien kann.
+- Session-Block 2026-07-27 verbatim nach `SESSIONS_ARCHIVE.md` rotiert.
+
+### Next
+- **Nikinger, Entscheidung:** Phase-11-Scope. Vorschlag im Review §5, Reihenfolge
+  **H2 → H1 → H6**, danach mit echten Daten H7/H4/H3/H5:
+  - **H2** Sizing-Wahrheitskette (B1-Fix + fail-closed statt still 1,0 + Margin-Headroom) —
+    klein, sicherheitskritisch, **vor** jedem Live-Gedanken.
+  - **H1** *(größter Hebel)* Messung vom Funnel entkoppeln: Shadow-Pairs **zeitgesteuert**
+    statt an `REASON_DEBATE_ABSTAIN` gekoppelt. 8 Epics × alle 30 min ≈ **130 Paare/Tag**,
+    risikofrei, null LLM-Kosten, beantwortet **WI-2 an einem Tag**. Nutzt `PaperEngine` +
+    `PaperTradeTracker` unverändert; neu ist nur ein Scheduler-Tick (Muster:
+    `universe_refresher` + `_due_after()`).
+  - **H6** Mess-Substrat füllen (`last_no_pick_reasoning` in die ohnehin geschriebene
+    `abstain_records`-Zeile; `spread_pct` durchreichen) — klein, ~70 Begründungen/Tag statt 1.
+- **B1/B2/B5 sind fixbar, ohne den Phase-11-Scope abzuwarten** (klein, additiv, in bereits von
+  V3 berührtem Code). Bei B2 **zwingend** die Testskala in `test_scorer.py` mitziehen, sonst
+  bleibt der Fix ungeprüft. Alles am Wochenende bei gestopptem Bot.
+- **⚠ S6 bleibt AUS.** Die 5 vorhandenen Paper-Lessons sind tautologisch, auf beiden Seiten
+  desselben Paares wortgleich und aus Backfill-Artefakten abgeleitet.
+
+### Open questions / blockers
+- **W2 (Sub-Noise-Geometrie) ist weiterhin unbeantwortet** und ist die Wurzel: solange nicht
+  klar ist, ob 30/45 Punkte auf DAX überhaupt gewinnbar sind, ist jede Arbeit an der
+  Richtungslogik verfrüht. H1 liefert die Antwort in Tagen.
+- Der Scheduler-Daemon lief bei Analyse-Ende (Fr 21:26 lokal) nicht mehr (letzter Reconcile
+  21:22, kein Prozess). Freitagabend unauffällig — falls das nicht der Nikinger war, startet
+  er Montag aber auch nicht von selbst.
+- N1 (`INSUFFICIENT_FUNDS`) ist **kein** Beobachtungspunkt mehr, sondern durch B1/B3
+  vollständig erklärt.
+
+---
+
 ## Session stopped — 2026-07-27 (Mo — Tag-1-Quick-Check der neuen Datenwoche, read-only)
 
 > Special-Task-Session (Nikinger): Quick-Check, ob die beiden am 2026-07-25 gefixten Bugs

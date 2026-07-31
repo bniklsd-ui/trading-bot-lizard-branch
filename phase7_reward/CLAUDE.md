@@ -101,29 +101,34 @@ P7 baut nur das **Substrat** (`trade_lessons` + `reward_pts`).
 > days old and 600+ points away in `open_level`, and its `close_level`/`profit_loss` got copied
 > onto row 6. (End of original forensic finding — see the fix summary at the top of this block.)
 
-> ⚠ **Phase-10 (V3) FINDING — NOT YET FIXED (2026-07-31, second data-week review, weekday
-> read-only session; full evidence: `phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md` §4 B2):**
-> **der Reward-Score steigt nach jedem Verlust.** `scorer.py:115` rechnet
-> `debate_signal = debate_confidence - 0.5` und nimmt damit eine Confidence in **[0,1]** an
-> (Kommentar: „*Weak, centred, additive*"). Geliefert wird `DebateOutcome.confidence` auf der
-> **0–100-Skala** (`phase5_execution/execution/executor.py:578`, in `reward_pts.debate_confidence`
-> als 57/58/60 persistiert). Nachgerechnet an Trade 7 (Zeile stimmt exakt):
-> `outcome_delta = 2.0 × (−0,975) = −1,95`, `process_delta = 1,5 × (1 + 1 + 59,5) = +92,25` →
-> `clamp(±5)` → **+5,00 bei jedem Trade, unabhängig vom Ergebnis**. Empirisch: `score_after`
-> **55 → 60 → 65 → 70** über vier aufeinanderfolgende Totalverluste.
+> ✅⚠ **Phase-10 (V3) FINDING B2 — SCALE FIXED, residual open for Phase-11 (2026-07-31 review;
+> weekend bugfix session, bot stopped, same day; full evidence:
+> `phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md` §4 B2):** **der Reward-Score stieg nach jedem
+> Verlust.** `scorer.py:115` rechnete `debate_signal = debate_confidence - 0.5` und nahm damit
+> eine Confidence in **[0,1]** an (Kommentar: „*Weak, centred, additive*"). Geliefert wird
+> `DebateOutcome.confidence` auf der **0–100-Skala** (`phase5_execution/execution/executor.py:578`,
+> in `reward_pts.debate_confidence` als 57/58/60 persistiert). Nachgerechnet an Trade 7 (Zeile
+> stimmte exakt): `outcome_delta = 2.0 × (−0,975) = −1,95`, `process_delta = 1,5 × (1 + 1 + 59,5)
+> = +92,25` → `clamp(±5)` → **+5,00 bei jedem Trade, unabhängig vom Ergebnis**. Empirisch:
+> `score_after` **55 → 60 → 65 → 70** über vier aufeinanderfolgende Totalverluste.
 > **Nicht kosmetisch:** Score > 50 ⇒ `Database.get_risk_level()` = `AGGRESSIV` ⇒ P5-Gate-4
-> `risk_pct` **3 % statt 2 %** — der Bot erhöht nach vier Verlusten seinen Einsatz. Derselbe
+> `risk_pct` **3 % statt 2 %** — der Bot erhöhte nach vier Verlusten seinen Einsatz. Derselbe
 > Score steht zudem im Research-Prompt („bot score: 70 · risk level: AGGRESSIV"). Die
 > P7-Doku sagt korrekt „**Confidence** gatet nichts" — der **Score** gatet aber sehr wohl
 > (`sizing.select_risk_pct` → `get_risk_level`); diese Kopplung ist nirgends als solche
 > dokumentiert.
-> **Warum die Suite es nie sah:** `tests/test_scorer.py` übergibt `debate_confidence=0.9/1.0/0.0`
-> — die Tests kodieren die falsche Skala. Ein Fix **muss** die Testskala mitziehen.
-> ⚠ **Der Ein-Zeichen-Fix (`/100`) repariert den Loop NICHT:** derselbe Verlust-Trade ergäbe
-> `−1,95 + 1,5 × (1 + 1 + 0,1) = **+1,2**` — der Score stiege weiter bei jedem Verlust, weil ein
-> SL-Treffer als `CLOSED_BY_BROKER` den `clean_exit_bonus` (+1,0) kassiert und der enge Spread
-> nochmal (+1,0). Ob ein Stop-out ein „sauberer Exit" ist, ist eine **Phase-11-Designfrage**,
-> kein Quickfix. Nicht angewendet: Wochentags-Regel (read-only).
+> **Gefixt:** `debate_signal = 0.0 if debate_confidence is None else (debate_confidence / 100.0 -
+> 0.5)`. `tests/test_scorer.py` übergab `debate_confidence=0.9/1.0/0.0` (die falsche Skala) —
+> auf `90.0/100.0/0.0` umskaliert (5 Fälle) + **1 neuer Regressions-Pin-Test**
+> (`test_debate_confidence_scale_is_0_to_100_not_a_fraction`, repliziert Trade 7 exakt: eine
+> −0,975-R-Verlust-Trade mit `debate_confidence=60.0` darf **nicht** auf den Cap clampen). **P7
+> 137 → 138.**
+> ⚠ **Der Skalen-Fix allein repariert den Loop NICHT — bewusst nicht mitgefixt, offen für
+> Phase-11 (H3):** derselbe Verlust-Trade ergibt jetzt `−1,95 + 1,5 × (1 + 1 + 0,1) = **+1,2**` —
+> der Score steigt weiter bei jedem Verlust, weil ein SL-Treffer als `CLOSED_BY_BROKER` den
+> `clean_exit_bonus` (+1,0) kassiert und der enge Spread nochmal (+1,0). Ob ein Stop-out ein
+> „sauberer Exit" ist, ist eine **Phase-11-Designfrage** (H3), kein Quickfix — `clean_exit_bonus`
+> bewusst unangetastet gelassen.
 
 ## Harte Regeln (nicht verhandelbar)
 - **`confidence` ist observe-only und gatet NICHTS** (Decision C). N < `n_min=10` → `INSUFFICIENT`

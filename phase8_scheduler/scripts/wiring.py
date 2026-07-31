@@ -565,9 +565,11 @@ def build_scheduler(
             its own real sleep (the monitor must actually wait); only ``clock.sleep`` uses this.
         max_iterations: optional loop bound (``None`` ⇒ run forever; ``live_test`` passes a few).
         exec_config: optional Phase-5 ``ExecutionConfig`` (default: ``point_values`` derived from
-            ``research.EXTENDED_UNIVERSE`` — v1.5 Issue C, so Gate-4 sizing uses the confirmed
-            per-epic point value, not the 1.0 fallback, for every non-DAX instrument); ``live_test``
-            passes a short-hold one so a placed demo trade closes quickly.
+            ``_build_universe_from_db()`` — the Phase-9/V2 DB universe research actually trades
+            (Phase-10 B1-fix, 2026-07-31; fail-soft to ``EXTENDED_UNIVERSE``), so Gate-4 sizing
+            uses the confirmed per-epic point value for every active instrument, not the
+            fail-closed default); ``live_test`` passes a short-hold one so a placed demo trade
+            closes quickly.
 
     Returns:
         A wired :class:`SchedulerRunner`.
@@ -604,16 +606,22 @@ def build_scheduler(
     if exec_config is not None:
         exec_cfg = exec_config
     else:
-        # v1.5 Issue C, Step 2B: derive point_values from the SAME confirmed universe
-        # research uses (research.EXTENDED_UNIVERSE), rather than hand-duplicating point
-        # values in a second file — InstrumentSpec.point_value is the single source of
-        # truth; this wiring layer (a legitimate cross-phase composition point) projects
-        # it into P5's ExecutionConfig.point_values shape. DAX (1.0) is the field's own
-        # default for any unmapped epic, so it doesn't need an explicit entry.
-        from research import EXTENDED_UNIVERSE
-
+        # v1.5 Issue C, Step 2B / Phase-10 B1-fix (2026-07-31): derive point_values from
+        # the SAME universe research actually trades — the Phase-9/V2 DB universe, via
+        # the same _build_universe_from_db() helper _build_research() uses below (fail-soft
+        # to EXTENDED_UNIVERSE if the DB is unreachable/empty). The prior version sourced
+        # this map from the static 4-epic EXTENDED_UNIVERSE while research already traded
+        # the 8-epic DB universe — every epic outside those 4 (e.g. AEX, point_value 40.0)
+        # silently fell back to ExecutionConfig.point_value_for()'s 1.0 default, causing a
+        # 40x oversizing on every AEX order (all 3 ever placed were broker-rejected on
+        # INSUFFICIENT_FUNDS; see phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md §4 B1).
+        # InstrumentSpec.point_value remains the single source of truth; this wiring layer
+        # (a legitimate cross-phase composition point) projects it into P5's
+        # ExecutionConfig.point_values shape. sizing.compute_size now fails closed (no
+        # trade) for any epic absent from a populated point_values map (execution/sizing.py)
+        # — an unmapped epic can no longer silently size at 1.0.
         exec_cfg = ExecutionConfig(
-            point_values={spec.epic: spec.point_value for spec in EXTENDED_UNIVERSE}
+            point_values={spec.epic: spec.point_value for spec in _build_universe_from_db()}
         )
 
     # --- the shared, warm trading core ---

@@ -180,6 +180,18 @@ def test_point_value_still_fails_closed_below_min() -> None:
     assert (size, reason) == (0.0, "below_min_deal_size")
 
 
+def test_point_value_unmapped_epic_fails_closed_when_map_populated() -> None:
+    # Phase-10 B1(b)-fix (2026-07-31): once point_values is wired at all (non-empty),
+    # an epic absent from it is a real data gap, not a safe 1.0 default — no trade.
+    # This is the guard that would have caught the AEX 40x-oversizing incident.
+    config = replace(ExecutionConfig(), point_values={"IX.D.STXE.IFMM.IP": 5.0})
+    size, reason = compute_size(
+        _account(1500), _price(18_000), _market_info(0.1),
+        config.risk_pct_conservative, config, epic="IX.D.AEX.IFM.IP",
+    )
+    assert (size, reason) == (0.0, "point_value_unmapped")
+
+
 # --- compute_size: available read path & zero balance ---------------------
 
 

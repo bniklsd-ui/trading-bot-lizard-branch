@@ -104,7 +104,12 @@ def compute_size(
 
     Fail-safe: any envelope that is not ``ok`` is a no-trade (we cannot verify the
     size). A rounded size below the instrument's ``min_deal_size`` is a no-trade
-    too — we never clamp upward.
+    too — we never clamp upward. **Phase-10 B1(b)-fix (2026-07-31):** once
+    ``config.point_values`` is populated (the real wiring case — see
+    ``phase8_scheduler/scripts/wiring.py``), an epic absent from that map is *also*
+    a no-trade — it no longer silently sizes at the 1.0 default. An **empty**
+    ``point_values`` map (the untouched-feature/most-tests case) is unaffected and
+    still resolves every epic to 1.0 via :meth:`ExecutionConfig.point_value_for`.
     """
     if not account_env.ok:
         return 0.0, "account_snapshot_unavailable"
@@ -121,6 +126,14 @@ def compute_size(
     # epic is resolved from the arg, falling back to the market_info envelope's echoed
     # ``epic`` — so a caller that omits it (existing tests) still gets the 1.0 default.
     epic_for_pv = epic if epic is not None else (market_info_env.data or {}).get("epic")
+
+    # Phase-10 B1(b)-fix: a POPULATED map is authoritative — an epic missing from it is
+    # a real data gap (e.g. a newly promoted V2 epic the wiring layer hasn't caught up
+    # to yet), not a safe default. Fail closed rather than silently sizing at 1.0 (the
+    # root cause of the 2026-07 AEX 40x-oversizing incident, see wiring.py's B1 note).
+    if config.point_values and epic_for_pv not in config.point_values:
+        return 0.0, "point_value_unmapped"
+
     point_value = config.point_value_for(epic_for_pv)
 
     # Config risk_pct is a PERCENT (2.0 → 2.0%); the helper takes a fraction.

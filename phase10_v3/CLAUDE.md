@@ -1,6 +1,6 @@
 ---
 status: live
-purpose: ACTIVE phase head — V3: Abstain-/No-Trade-Lessons + Persistenz-Reform + Paper-Trades, alles live auf main; zwei Datenwochen gefahren (07-20/24 + 07-27/31). Woche 2 ausgewertet 2026-07-31: Funnel kollabiert (366 Zyklen → 1 Kandidat → 0 Trades), WI-1/WI-5 beantwortet (W1+W5 bestätigt), WI-2 zum zweiten Mal tot; drei neue Bugs seit Rollout (B1 point_value-Drift = 40x-Oversizing auf AEX, B2 Reward-Score steigt nach jedem Verlust, B5 Paper-Lesson-Prompt) + zwei strukturelle Lücken (Margin-Headroom, leeres Mess-Substrat); Phase-11-Scope-Vorschlag mit 7 Hypothesen liegt vor (H2→H1→H6), Entscheidung beim Nikinger
+purpose: ACTIVE phase head — V3: Abstain-/No-Trade-Lessons + Persistenz-Reform + Paper-Trades, alles live auf main; zwei Datenwochen gefahren (07-20/24 + 07-27/31). Woche 2 ausgewertet 2026-07-31: Funnel kollabiert (366 Zyklen → 1 Kandidat → 0 Trades), WI-1/WI-5 beantwortet (W1+W5 bestätigt), WI-2 zum zweiten Mal tot; drei neue Bugs seit Rollout gefunden UND gefixt (B1 point_value-Drift/40x-Oversizing, B2 Reward-Score-Skala, B5 Paper-Lesson-Prompt — B2s clean_exit_bonus-Residuum bewusst offen für H3), zwei strukturelle Lücken bleiben offen (B3 Margin-Headroom, B4 leeres Mess-Substrat); Phase-11-Scope-Vorschlag mit 7 Hypothesen liegt vor (H2→H1→H6), Entscheidung beim Nikinger
 read-when: working in phase10_v3/ — read this head + its newest Session-stopped block first
 detail: L2
 up: ../CLAUDE.md
@@ -240,94 +240,75 @@ Time-Stop-Dauer-Key: `max_hold_minutes` (Default 240), konsumiert in `monitor.py
 
 **9. Test-Baseline-Korrektur:** siehe Step-1-Abschnitt oben (1162 grün, P4 141→148).
 
-## Session stopped — 2026-07-31 (Fr — zweite Datenwoche ausgewertet, read-only; 3 neue Bugs + Phase-11-Scope)
+## Session stopped — 2026-07-31 (bugfix follow-up session, bot stopped — B1/B2/B5 fixed)
 
-> Special-Task-Session (Nikinger): „Datenwoche ist rum — sag direkt, wenn etwas schiefgelaufen
-> ist; wenn genug Daten da sind, tiefe Analyse + Hypothesen für Phase 11." Kein Code-Touch,
-> DB nur `mode=ro` (Wochentags-Regel). Advisor vor dem Report konsultiert — sein
-> Diskriminator-Query (Regime-Snapshots auf dem Happy Path) hat B4 von „leer weil Funnel leer"
-> auf „teils Design, teils Verdrahtungslücke" präzisiert; seine Warnung zu B2 (Ein-Zeichen-Fix
-> repariert den Loop nicht) ist im Report als eigene Rechnung belegt.
+> Special-Task-Session (Nikinger): „Weekend blocks went through, there's an analysis file with
+> tasks for Phase 11 — this is a bug-fixing phase." Scope confirmed via `AskUserQuestion` before
+> any edit: fix exactly B1+B2+B5 (the three the review flagged as fixable without waiting on the
+> Phase-11/H1-H7 scope call); B3/B4 stay open for a design decision; B1(b)'s fail-closed guard
+> only fires when `point_values` is populated (keeps 14 existing P5 tests untouched — verified by
+> grep before choosing the shape, on advisor's flag). Bot/scheduler confirmed not running, no
+> `KILL` file, before touching any code.
 
 ### Completed
-- **`DATA_WEEK_REVIEW_2026-07-31.md`** (neu, 📕 dated, in `docs/INDEX.md`) — vollständige
-  Auswertung. Kernzahlen der Woche: **366 Research-Zyklen, 1 Kandidat, 1 Debatte, 0 Trades,
-  0 neue Paper-Trades**, 364 Abstain-Records zu 100 % `REASON_NO_CANDIDATES`. Mechanik
-  einwandfrei (0 `consecutive_failures`, kein Kill, 10/10 Tage stabil) — der Funnel selbst
-  ist der Ausfall.
-- **WI-1 + WI-5 sind beantwortet, W1 + W5 bestätigt.** Es gab rote Tage (3 von 4 auswertbaren
-  DAX-Sessions negativ). Am 07-30, bei breiter europäischer Schwäche, erzeugte Research
-  **einen BUY** auf dem einzigen Instrument mit positivem Drift und schrieb die Begründung
-  selbst hin: *„a SELL on DAX/CAC/IBEX [is] tempting, **but** recent trade history shows 4
-  consecutive BUY losses on DAX — avoiding that instrument."* Die Verluste dämpfen die
-  **Instrumentenwahl**, nicht die Richtungswahl. Stand kumulativ: 30 Debatten, 29 BUY-Seeds
-  vs. 1 SELL, **nie ein Richtungs-Flip**, 8× TRADE (alle BUY).
-- **WI-2 zum zweiten Mal tot** — diesmal ohne Bug: der Shadow-Pair-Trigger ist
-  `REASON_DEBATE_ABSTAIN`, und die eine Debatte der Woche sagte TRADE. WI-3 bestätigt (10/10
-  Tage an der 200k-Kappe, Research endet 15:2x). WI-6 ohne neue Evidenz.
-- **Drei neue harte Bugs, alle seit Rollout falsch, alle exakt nachgerechnet** (Details +
-  Fix-Ausdrücke im Review-Doc §4):
-  1. **B1 `point_value`-Drift** (`phase8_scheduler/scripts/wiring.py:616`): `point_values`
-     kommt aus der statischen 4-Epic-`EXTENDED_UNIVERSE`, Research handelt aber die
-     8-Epic-DB-Universe → AEX mit 1,0 statt **40,0 €/Punkt** → **40× Oversizing**
-     (Size 26,8 = 1,18 Mio € Nominale, Risiko am Stop **120 % des Kontos**). Erklärt **alle
-     drei** AEX-Rejects (07-15/07-20/07-30) und löst damit den als „unrettbar verloren"
-     abgelegten Bug-B-Vorfall vom 07-15. **50 % aller 8 TRADE-Entscheidungen der Historie sind
-     an Sizing-Config gestorben, nicht am Markt.**
-  2. **B2 Reward-Score-Inversion** (`phase7_reward/reward/scorer.py:115`): `debate_confidence`
-     wird als [0,1] behandelt, geliefert wird 0–100 → `process_delta` +92,25 statt ~+3 →
-     per-Trade-Delta clamped **immer** auf +5 → Score **55→60→65→70 über vier Totalverluste**
-     → `get_risk_level()` = AGGRESSIV → `risk_pct` 3 % statt 2 %. Die Unit-Tests kodieren die
-     falsche Skala (`debate_confidence=0.9`), deshalb unsichtbar. ⚠ **Der Skalen-Fix allein
-     repariert es nicht** (bliebe +1,2/Verlust, weil ein SL-Treffer den `clean_exit_bonus`
-     kassiert) — das ist eine Phase-11-Designfrage.
-  3. **B5 Paper-Lesson-Prompt** (`abstain_lessons/reflect.py:62-65` vs. `:78`): Prompt sagt
-     „max. zwei Sätze", Validator erzwingt ≤300 Zeichen, die Grenze steht nicht im Prompt →
-     am 07-27 6 Reflect-Calls bezahlt, 2 Lessons persistiert.
-- **Zwei strukturelle Lücken (B3/B4, brauchen Designentscheidung, kein Quickfix):**
-  Leverage-Cap ohne Margin-Headroom (Nominale konstruktionsbedingt auf `available × 20`
-  gepinnt; 22,1 rejected / 22,0 accepted am selben Vormittag) und das **leere Mess-Substrat**
-  (alle 1.036 `abstain_records` mit `detail=''`/`context_json='{}'`; alle 722
-  `market_regime_snapshots` `quote_only`/NULL — Bars sind dokumentierte Degradation,
-  `spread_pct` dagegen eine echte Verdrahtungslücke an den drei `_notify_context`-Call-Sites).
-- **Korrektur am 07-27-Block:** der Bug-2-Fix vom 07-25 **ist** live bewiesen — am 07-27 liefen
-  6 Haiku-Calls über denselben gefixten `_AbstainLLMAdapter._SCHEMA` (Abstain-Sink *und*
-  Paper-Pfad teilen ihn), 2 Lessons persistiert, kein HTTP 400. Der 07-27-Block sagte „kein
-  Call wurde versucht" — das galt nur für den Debatte-Abstain-Pfad, nicht für den Adapter.
-- **Der Kern-Befund** (Review §3): eine geschlossene Rückkopplung — 4 SL-Verluste → 4 Lessons
-  („prüfe die Entry-Qualität", **4.529× in den Prompt gerendert**) + dieselben 4 Verluste als
-  zweiter Kanal via `recent_trades` → Modell abstaint 365/366 und begründet es wörtlich damit
-  → keine Trades → keine neuen Outcomes → die 4 alten Lessons bleiben. Ein **absorbierender
-  Zustand**, aus dem sich der Loop nicht selbst befreien kann.
-- Session-Block 2026-07-27 verbatim nach `SESSIONS_ARCHIVE.md` rotiert.
+- **B1 fixed, two parts** (`phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md` §4 B1): (a)
+  `phase8_scheduler/scripts/wiring.py` now sources `ExecutionConfig.point_values` from
+  `_build_universe_from_db()` (already existed in the same file, fail-soft to
+  `EXTENDED_UNIVERSE`) instead of the static 4-epic list; (b)
+  `phase5_execution/execution/sizing.py::compute_size` fails closed
+  (`(0.0, "point_value_unmapped")`) for an epic missing from a **populated** `point_values` map,
+  instead of silently sizing at the 1.0 default — `point_value_for()` itself is unchanged
+  (its 1.0 default now only fires on an empty/unwired map), so `executor.py:379`'s
+  `build_opened(point_value=...)` call stays bit-identical. +1 test
+  (`test_point_value_unmapped_epic_fails_closed_when_map_populated`). **P5 167 → 168.**
+- **B2 scale fixed, residual explicitly NOT fixed** (`...` §4 B2):
+  `phase7_reward/reward/scorer.py:115` now divides `debate_confidence` by 100 before centering
+  (`DebateOutcome.confidence` is 0-100, the formula assumed [0,1]). Rescaled 5 existing
+  `debate_confidence` values in `test_scorer.py` to the real scale + added 1 new regression-pin
+  test replicating the review's Trade-7 numbers (confidence=60, a near-total loss must not clamp
+  to the cap). **Deliberately left open, per the review's own warning:** the score still drifts
+  ~+1.2 per consecutive loss after this fix (`clean_exit_bonus` still pays out on a
+  `CLOSED_BY_BROKER` stop-out) — whether a stop-out counts as a "clean exit" is Phase-11 H3, not
+  addressed here. **P7 137 → 138.**
+- **B5 fixed** (`...` §4 B5): both `build_abstain_prompt` and `build_paper_lesson_prompt`
+  (`abstain_lessons/reflect.py`) now state the `_MAX_LESSON_CHARS` limit in the prompt text
+  itself (sourced from the constant, not a hardcoded "300") — previously only
+  `validate_abstain_lesson` enforced it, so the LLM was never told, causing paid-for/rejected
+  calls (6 on 2026-07-27, 4 too long). Also fixed the sibling `build_abstain_prompt`, which had
+  the identical drift and would have hit it the first time a lesson ran long. **P10 125
+  unchanged** (no test pins exact prompt wording; behavior covered by existing
+  `validate_abstain_lesson` tests).
+- **Not touched, by design:** B3 (margin headroom — needs a Nikinger design call), B4 (empty
+  measurement substrate — that's H6, part of the still-open Phase-11 scope decision), all of
+  H1-H7, S6 (stays OFF).
+- Full cross-phase regression run before AND after all edits (shared venv
+  `phase1_broker_wrapper/.venv`): **P1 87 · P2 75 · P3 100 · P4 155 · P5 168 (was 167) · P6 76 ·
+  P7 138 (was 137) · P8 222 (unaffected, no dedicated `wiring.py` test file — verified via
+  `py_compile`) · P9 72 · P10 125 (unaffected) · meta_m1_harness 28 · root 77** — every other
+  phase's count is bit-identical to the fresh pre-edit baseline captured at session start.
+- Docs committed in two atomic commits: (1) the prior read-only session's 6 modified
+  `CLAUDE.md`/`INDEX.md` files + the new `DATA_WEEK_REVIEW_2026-07-31.md`, unchanged from that
+  session; (2) this session's code fixes + the three phase `CLAUDE.md` "NOT YET FIXED" → fixed
+  flips (P5/P7/P8, each in the same commit as its fix, per the commit⇒note-update rule).
+- Session-Block 2026-07-31 (the data-week review) verbatim nach `SESSIONS_ARCHIVE.md` rotiert.
 
 ### Next
-- **Nikinger, Entscheidung:** Phase-11-Scope. Vorschlag im Review §5, Reihenfolge
-  **H2 → H1 → H6**, danach mit echten Daten H7/H4/H3/H5:
-  - **H2** Sizing-Wahrheitskette (B1-Fix + fail-closed statt still 1,0 + Margin-Headroom) —
-    klein, sicherheitskritisch, **vor** jedem Live-Gedanken.
-  - **H1** *(größter Hebel)* Messung vom Funnel entkoppeln: Shadow-Pairs **zeitgesteuert**
-    statt an `REASON_DEBATE_ABSTAIN` gekoppelt. 8 Epics × alle 30 min ≈ **130 Paare/Tag**,
-    risikofrei, null LLM-Kosten, beantwortet **WI-2 an einem Tag**. Nutzt `PaperEngine` +
-    `PaperTradeTracker` unverändert; neu ist nur ein Scheduler-Tick (Muster:
-    `universe_refresher` + `_due_after()`).
-  - **H6** Mess-Substrat füllen (`last_no_pick_reasoning` in die ohnehin geschriebene
-    `abstain_records`-Zeile; `spread_pct` durchreichen) — klein, ~70 Begründungen/Tag statt 1.
-- **B1/B2/B5 sind fixbar, ohne den Phase-11-Scope abzuwarten** (klein, additiv, in bereits von
-  V3 berührtem Code). Bei B2 **zwingend** die Testskala in `test_scorer.py` mitziehen, sonst
-  bleibt der Fix ungeprüft. Alles am Wochenende bei gestopptem Bot.
-- **⚠ S6 bleibt AUS.** Die 5 vorhandenen Paper-Lessons sind tautologisch, auf beiden Seiten
-  desselben Paares wortgleich und aus Backfill-Artefakten abgeleitet.
+- **Nikinger, Entscheidung (unverändert offen, s. Review §5/§8):** Phase-11-Scope, Reihenfolge
+  **H2 → H1 → H6**, danach mit echten Daten H7/H4/H3/H5. H2's B1-Anteil ist jetzt erledigt; H2's
+  verbleibender Anteil ist **B3** (Margin-Headroom).
+- **Naming-Kollision zu flaggen:** `ROADMAP.md` definiert „Phase 11" bereits als das deferred
+  „V4: Sophisticated/Optional" (Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC,
+  `phase11_v4/` noch nicht angelegt) — das ist **nicht** dasselbe wie diese Bugfix-Session oder
+  die H1-H7-Hypothesen aus dem Datenwoche-Review. Keine `phase11_v4/`-Struktur in dieser Session
+  angelegt; die Nikinger-Entscheidung zur H-Reihenfolge sollte auch klären, ob/wie die
+  ROADMAP-Nummerierung angepasst wird.
+- B3/B4/H1-H7 bleiben wie vom Review vorgeschlagen — kein Code dafür in dieser Session.
 
 ### Open questions / blockers
-- **W2 (Sub-Noise-Geometrie) ist weiterhin unbeantwortet** und ist die Wurzel: solange nicht
-  klar ist, ob 30/45 Punkte auf DAX überhaupt gewinnbar sind, ist jede Arbeit an der
-  Richtungslogik verfrüht. H1 liefert die Antwort in Tagen.
-- Der Scheduler-Daemon lief bei Analyse-Ende (Fr 21:26 lokal) nicht mehr (letzter Reconcile
-  21:22, kein Prozess). Freitagabend unauffällig — falls das nicht der Nikinger war, startet
-  er Montag aber auch nicht von selbst.
-- N1 (`INSUFFICIENT_FUNDS`) ist **kein** Beobachtungspunkt mehr, sondern durch B1/B3
-  vollständig erklärt.
+- **W2 (Sub-Noise-Geometrie) weiterhin unbeantwortet** — unverändert die Wurzel, H1 liefert die
+  Antwort in Tagen (unverändert aus dem 07-31-Review).
+- Scheduler-Daemon weiterhin nicht gestartet (bewusst — Restart ist ein Operator-Schritt, kein
+  Teil dieser Bugfix-Session).
 
 ---
 

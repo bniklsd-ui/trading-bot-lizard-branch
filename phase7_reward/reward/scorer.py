@@ -33,9 +33,20 @@ dedicated knob for, documented here as deliberate:
 
 * the **clean-entry** bonus reuses ``clean_exit_bonus`` as the unit process signal
   (there is no separate entry-magnitude field in concept §5);
-* the **debate** signal is ``(debate_confidence - 0.5)`` — at most ``±0.5`` of a
-  unit, intrinsically weaker than the ``±1``-unit exit/entry signals, which is
-  exactly the "weak process signal, not a multiplier" the concept asks for.
+* the **debate** signal is ``(debate_confidence / 100 - 0.5)`` — ``debate_confidence``
+  is the real ``DebateOutcome.confidence`` scale, **0-100**, not ``[0, 1]``
+  (Phase-10 B2-fix, 2026-07-31: the pre-fix code treated it as already ``[0, 1]``,
+  so a confidence of e.g. 60 produced ``+59.5`` instead of ``+0.1`` — a ~120x
+  overshoot that clamped ``total_delta`` to ``+max_delta_per_trade`` on every single
+  trade regardless of outcome, see
+  ``phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`` §4 B2). Normalized, this signal is
+  at most ``±0.5`` of a unit, intrinsically weaker than the ``±1``-unit exit/entry
+  signals, which is exactly the "weak process signal, not a multiplier" the concept
+  asks for. ⚠ The scale fix alone does **not** make the reward loop outcome-neutral
+  on a losing streak: a ``CLOSED_BY_BROKER`` stop-out still earns the full
+  ``clean_exit_bonus`` (it hit the planned SL), so the score still drifts upward
+  (~+1.2 per consecutive loss) after this fix — whether a stop-out should count as a
+  "clean exit" is an open design question, not addressed here (Phase-11 H3).
 
 Conventions mirror :mod:`reward.confidence`: stdlib only, reads every tunable from
 the passed :class:`~reward.models.RewardConfig`.
@@ -83,8 +94,9 @@ class Scorer:
                 as a neutral exit (no exit signal).
             spread_at_entry_pct: the entry spread as a fraction; ``<= tight_spread_pct``
                 earns the clean-entry process bonus.
-            debate_confidence: the in-memory debate confidence at open time, or
-                ``None`` when no debate ran. A **weak, additive** process nudge only.
+            debate_confidence: the in-memory debate confidence at open time, on its
+                real **0-100** scale (``DebateOutcome.confidence``), or ``None`` when
+                no debate ran. A **weak, additive** process nudge only.
             score_before: the score read before this trade (``get_current_score``).
 
         Returns:
@@ -112,7 +124,11 @@ class Scorer:
         )
 
         # Weak, centred, additive — never a multiplier (concept §6 Step 5).
-        debate_signal = 0.0 if debate_confidence is None else (debate_confidence - 0.5)
+        # debate_confidence is 0-100 (DebateOutcome.confidence), not [0, 1] — divide
+        # before centering (Phase-10 B2-fix, 2026-07-31; see module docstring).
+        debate_signal = (
+            0.0 if debate_confidence is None else (debate_confidence / 100.0 - 0.5)
+        )
 
         process_delta = cfg.process_weight * (exit_signal + entry_signal + debate_signal)
 

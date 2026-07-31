@@ -80,7 +80,7 @@ def test_clamp_high_caps_delta_and_score() -> None:
     s = _scorer()
     r = s.score(
         r_multiple=100.0, status="CLOSED_BY_BROKER", spread_at_entry_pct=0.01,
-        debate_confidence=0.9, score_before=50.0,
+        debate_confidence=90.0, score_before=50.0,
     )
     # The applied delta (score not at a bound here) cannot exceed the cap.
     cfg = RewardConfig()
@@ -96,7 +96,7 @@ def test_clamp_score_floor_and_ceiling_hold() -> None:
     )
     capped = s.score(
         r_multiple=100.0, status="CLOSED_BY_BROKER", spread_at_entry_pct=0.01,
-        debate_confidence=1.0, score_before=99.0,
+        debate_confidence=100.0, score_before=99.0,
     )
     assert floored.score_after >= 0.0          # never negative
     assert capped.score_after <= 100.0         # never above 100
@@ -224,7 +224,7 @@ def test_debate_confidence_is_weak_and_not_a_multiplier() -> None:
     )
     high = s.score(
         r_multiple=1.0, status="CLOSED_BY_BROKER", spread_at_entry_pct=0.02,
-        debate_confidence=0.9, score_before=50.0,
+        debate_confidence=90.0, score_before=50.0,
     )
     # Not a multiplier: the outcome component is untouched by debate confidence.
     assert high.outcome_delta == pytest.approx(none.outcome_delta)
@@ -234,15 +234,16 @@ def test_debate_confidence_is_weak_and_not_a_multiplier() -> None:
 
 
 def test_debate_confidence_extremes_are_centred_at_half() -> None:
-    # 1.0 nudges up, 0.0 nudges down, by symmetric amounts around the None baseline.
+    # debate_confidence is 0-100 (DebateOutcome.confidence scale, Phase-10 B2-fix):
+    # 100 nudges up, 0 nudges down, by symmetric amounts around the 50 (centred) baseline.
     s = _scorer()
     base = s.score(
         r_multiple=1.0, status="CLOSED_BY_BROKER", spread_at_entry_pct=0.02,
-        debate_confidence=0.5, score_before=50.0,
+        debate_confidence=50.0, score_before=50.0,
     )
     up = s.score(
         r_multiple=1.0, status="CLOSED_BY_BROKER", spread_at_entry_pct=0.02,
-        debate_confidence=1.0, score_before=50.0,
+        debate_confidence=100.0, score_before=50.0,
     )
     down = s.score(
         r_multiple=1.0, status="CLOSED_BY_BROKER", spread_at_entry_pct=0.02,
@@ -252,6 +253,24 @@ def test_debate_confidence_extremes_are_centred_at_half() -> None:
     assert (up.process_delta - base.process_delta) == pytest.approx(
         base.process_delta - down.process_delta
     )
+
+
+def test_debate_confidence_scale_is_0_to_100_not_a_fraction() -> None:
+    # Phase-10 B2-fix regression pin (2026-07-31): the live bug fed the real 0-100
+    # DebateOutcome.confidence straight into a formula written for [0, 1], turning a
+    # confidence of 60 into a process_delta of +59.5 (clamped to +5.0 total, on EVERY
+    # trade regardless of outcome — a total_delta hardcoded well below the cap proves
+    # the scale bug is fixed). Trade shape mirrors the review's Trade-7 regression:
+    # a near-total loss with debate_confidence=60.0 must NOT clamp to the cap.
+    cfg = RewardConfig()
+    s = Scorer(cfg)
+    r = s.score(
+        r_multiple=-0.975, status="CLOSED_BY_BROKER", spread_at_entry_pct=0.02,
+        debate_confidence=60.0, score_before=65.0,
+    )
+    applied_delta = r.score_after - r.score_before
+    assert applied_delta < cfg.max_delta_per_trade - 1.0  # not clamped to the cap
+    assert r.score_after < 68.0  # a near-total loss must not push the score up ~5
 
 
 # --------------------------------------------------------------------------- #

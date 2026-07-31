@@ -19,6 +19,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("abstain_lessons.reflect")
 
+# Phase-10 B5-fix (2026-07-31): both prompts below now state this limit explicitly
+# (they used to only say "max two sentences", drifting from what validate_abstain_lesson
+# actually enforces — 6 Haiku calls paid for, 4 rejected as too long on 2026-07-27).
 _MAX_LESSON_CHARS = 300
 
 
@@ -35,8 +38,9 @@ def build_abstain_prompt(record: AbstainRecord) -> str:
         f"Stufe: {record.stage.value}\n"
         f"Grund: {record.reason.value}\n"
         f"Detail: {record.detail or '(keine weiteren Details)'}\n\n"
-        "Formuliere GENAU EINE Lehre aus diesem Abstain, in maximal zwei Sätzen, "
-        "auf Deutsch. Antworte nur mit der Lehre, ohne Einleitung."
+        "Formuliere GENAU EINE Lehre aus diesem Abstain, in maximal zwei Sätzen "
+        f"und maximal {_MAX_LESSON_CHARS} Zeichen, auf Deutsch. Antworte nur mit "
+        "der Lehre, ohne Einleitung."
     )
 
 
@@ -61,7 +65,8 @@ def build_paper_lesson_prompt(trade: "PaperTrade", sibling: "PaperTrade | None")
         )
     lines.append(
         "\nFormuliere GENAU EINE Lehre aus diesem simulierten Ergebnis, in maximal "
-        "zwei Sätzen, auf Deutsch. Antworte nur mit der Lehre, ohne Einleitung."
+        f"zwei Sätzen und maximal {_MAX_LESSON_CHARS} Zeichen, auf Deutsch. "
+        "Antworte nur mit der Lehre, ohne Einleitung."
     )
     return "\n".join(lines)
 
