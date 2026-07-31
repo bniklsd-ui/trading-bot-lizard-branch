@@ -205,6 +205,32 @@ Hand-off „Candidate → Gates → Order" so bauen, dass P6 die Richtungs-/Size
 > unchanged (extended the existing Bug-B seam test rather than adding a new one). Detail:
 > `phase10_v3/CLAUDE.md` → this session's `## Session stopped` block.
 
+> ✅⚠ **Bug-B AUFGELÖST + zwei Sizing-Befunde (2026-07-31, Phase-10-Datenwoche-2-Review,
+> weekday read-only — volle Beweise: `phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md` §4 B1/B3):**
+> - **Der 2026-07-15-AEX-Reject ist erklärt** — die Hypothese im Block direkt darüber zeigte auf
+>   das richtige Instrument, aber die falsche Konstante: **nicht** die Stop-Distanz, sondern
+>   `point_value`. `phase8_scheduler/scripts/wiring.py:616` baut `point_values` aus der statischen
+>   4-Epic-`EXTENDED_UNIVERSE`, während Research die 8-Epic-DB-Universe (V2) handelt → AEX fällt
+>   auf `point_value_for()`s Default **1.0** zurück statt der live-aufgelösten **40.0**
+>   (`instrument_universe.point_value_source='ig_fields'`, „Niederlande 25 Kassa (40€)") →
+>   **40× Oversizing**. **Alle drei** je platzierten AEX-Orders (07-15, 07-20, 07-30) wurden mit
+>   `INSUFFICIENT_FUNDS` abgelehnt; die 07-30-Order hätte am 30-Punkte-Stop **120 % des Kontos**
+>   riskiert. **Fix-Teil hier in P5:** `ExecutionConfig.point_value_for()` (`execution/config.py:156`)
+>   darf für ein unbekanntes Epic **nicht still `1.0`** liefern, sondern muss fail-closed sein —
+>   sonst ist das nächste von V2 promotete Epic wieder still auf 1.0. (Der Map-Quellen-Fix liegt in
+>   P8.) **Merkposten:** genau dieses Risiko stand seit v1.5 als Doku-Notiz in diesem File
+>   („non-DAX point_values provisional, re-baseline before live") — eine Doku-Notiz hat es nicht
+>   verhindert.
+> - **`max_leverage = 20.0` lässt null Margin-Headroom** (`execution/config.py:114`,
+>   `sizing.py:65`): `cap_size` pinnt die Nominale konstruktionsbedingt auf **exakt**
+>   `available × 20`, und auf DAX ist dieser Cap bei **jedem** Trade bindend (das Risikomodell
+>   verlangt bei 30-Punkte-Stop und 3 % Risiko rechnerisch ~25× Hebel). Der Bot fragt die
+>   tatsächliche Margin-Anforderung nie ab. Empirisch am 2026-07-20, selbes Epic, selber Vormittag:
+>   Size **22,1 → REJECTED**, Size **22,0 → ACCEPTED**. Nebenwirkung: eine zweite parallele
+>   Position (`max_parallel`) ist so nie finanzierbar. Braucht eine Designentscheidung
+>   (Headroom im Cap **oder** echte Margin-Abfrage vor der Order) → Phase-11-Scope.
+> Nichts davon angewendet: Wochentags-Regel (read-only), und P5 ist nicht die aktive Phase.
+
 ## Datei-/Modul-Übersicht (Soll, Konzept §"Modul-Plan")
 ```
 phase5_execution/

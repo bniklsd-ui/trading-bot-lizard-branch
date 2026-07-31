@@ -270,6 +270,26 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 >   week (refutes the earlier unconfirmed AEX-stop-distance hypothesis) — is **not** a code bug
 >   and needs an operator `get_account`/`get_open_positions` check; see the review doc.
 
+> ⚠ **Phase-10 (V3) FINDING — NOT YET FIXED (2026-07-31, second data-week review, weekday
+> read-only session; full evidence: `phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md` §4 B1):**
+> `scripts/wiring.py:616` builds `ExecutionConfig.point_values` from the **static** 4-epic
+> `research.EXTENDED_UNIVERSE`, while research trades the **DB universe** (Phase 9 / V2, 8 active
+> epics). Every epic outside those 4 silently falls back to
+> `ExecutionConfig.point_value_for()`'s `1.0` default — for `IX.D.AEX.IFM.IP` the DB's own
+> live-resolved value (`point_value_source='ig_fields'`) is **40.0** ("Niederlande 25 Kassa
+> (40€)"). Result: **40× oversizing** — the 2026-07-30 order was sized 26.8 (intended risk 804 €,
+> real risk at the 30-pt stop **32.160 € = 120 % of the account**, notional 1.18 M€); IG rejected
+> it with `INSUFFICIENT_FUNDS`, as it did **all three** AEX orders ever placed (07-15, 07-20,
+> 07-30). This also retroactively explains the 2026-07-15 reject filed as "unrecoverably lost"
+> in `phase5_execution/CLAUDE.md` — that note's AEX hypothesis pointed at the right instrument
+> but the wrong constant (not stop distance, `point_value`).
+> **Fix has two parts** — the symptom fix alone leaves the next V2-promoted epic silently at 1.0:
+> (a) source the map from the DB — `_build_universe_from_db()` already exists **in this same
+> file** (`wiring.py:105-129`, fail-soft fallback to `EXTENDED_UNIVERSE` included), so
+> `point_values={spec.epic: spec.point_value for spec in _build_universe_from_db()}`; and
+> (b) make `point_value_for()` fail-closed (no trade) on an unmapped epic instead of returning
+> `1.0`. Not applied here: weekday rule (read-only), and (b) is a Phase-5 file.
+
 ---
 
 ## Session stopped — 2026-07-11 (Hotfix: POST_WINDOW-Sleep gecappt — Kill-Switch/SIGINT waren bis zu ~63h wirkungslos)

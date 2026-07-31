@@ -4,7 +4,7 @@ purpose: Verbatim session-history archive rotated out of `CLAUDE.md`
 read-when: auditing how a past phase-10 (V3) decision came about — never needed at session start
 detail: L3
 up: ./CLAUDE.md
-updated: 2026-07-25
+updated: 2026-07-31
 ---
 
 # phase10_v3 — Session Archive
@@ -13,6 +13,120 @@ updated: 2026-07-25
 > rotation rule ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)). Source order
 > preserved (newest-first). The newest `## Session stopped` block always stays in the source file;
 > at each session end, the previously-newest block rotates here.
+
+---
+
+## Session stopped — 2026-07-27 (Mo — Tag-1-Quick-Check der neuen Datenwoche, read-only)
+
+> Special-Task-Session (Nikinger): Quick-Check, ob die beiden am 2026-07-25 gefixten Bugs
+> wirklich tot sind und Tag 1 der neuen Datenwoche wie erwartet lief. Kein Code-Touch,
+> DB nur `mode=ro` (Wochentags-Regel).
+
+### Completed
+- **Bug 1 (Paper-Tracker `MINUTE_1`→`MINUTE`) ✅ live-bestätigt:** erster Tracker-Tick heute
+  07:05:40Z löste alle 15 hängenden Paper-Trades der Vorwoche auf; heute **null** 422/`MINUTE_1`
+  in `research_health.jsonl` (die 7 Grep-Treffer im Log sind Vorwoche bzw. Timestamp-Zufall).
+  **⚠ Daten-Caveat zu den 15 Backfill-Auflösungen:** `resolve_paper_trade` ist first-touch über
+  die *gelieferten* Bars — für die 7 Tage alten Trades lagen nur die heutigen MINUTE-Bars vor
+  (max. 1000 Bars ≈ 16h zurück), der echte Pfad 07-20→07-27 wurde nie gescannt. Ergebnis-Muster
+  (alle BUY→TP +45, alle SELL→SL −30, identisches `resolved_utc`) spiegelt nur "Markt steht
+  heute über den Entries von 07-20". Für WI-2-Auswertung **nicht als echte R-Multiples werten**
+  — Mechanik bewiesen, Zahlen sind Backfill-Artefakte. Frische Pairs dieser Woche werden korrekt
+  aufgelöst (Time-Stop 240 min, Bars reichen dann).
+- **Bug 2 (`reflect_abstain`-Schema) ⚪ heute nicht testbar, aber kein Fehler:** Sink reflektiert
+  per Default nur `stage=DEBATE` (`sink.py:49`), heute waren alle 72 Abstains
+  `research_empty/reason_no_candidates` → 0 Lessons ist **korrektes** Verhalten, kein
+  HTTP-400/Fehl-Event in den Logs (es wurde schlicht nie ein Call versucht). Live-Bestätigung
+  des Fixes kommt erst mit dem ersten Debatte-Abstain der Woche.
+- **Tag-1-Gesundheitsbild:** Mechanik sauber — 72 Zyklen, 72× `abstain_recorded` +
+  72× `context_recorded` (1:1), `consecutive_failures: 0`, kein Kill, Reconcile tickt bis in
+  den Abend. yFinance-Circuit früh offen (09:00–09:31 lokal, `^GDAXI` 0 rows), danach voll
+  erholt — bekanntes Degrade-Verhalten. Budget-Kappe beendete Research ~15:26 lokal
+  (WI-3-Muster, unverändert). 0 echte Trades, 0 neue Paper-Trades (kein Zyklus erreichte
+  Kandidaten-/Debatte-Stufe).
+- **N2 (Funnel-Kollaps) wiederholt sich + frische W5-Evidenz:** 72/72
+  `REASON_NO_CANDIDATES`, Ursache heute belegbar LLM-seitig (`picked: false`,
+  `LLM_ABSTAIN`, "validator abstain (no pick)"). Die Abstain-Begründung in
+  `scheduler_state.json` zitiert **explizit die aktiven Lessons** ("Four consecutive losing
+  BUY trades … active lessons explicitly warn about poor entry quality") — die 4 historischen
+  SL-Stops in `trade_outcomes` dämpfen via P7-Lessons den Research-Pick. Das ist die erste
+  frische Evidenz für W5 (Lesson-Dämpfung) seit der Vordiagnose: der Funnel-Kollaps ist
+  mindestens teilweise **strukturell** (Lesson-Feedback-Schleife), nicht nur Marktregime.
+
+### Next
+- **Operator (Nikinger):** Woche weiterlaufen lassen (kein Eingriff nötig). Beobachten:
+  1. erster Debatte-Abstain → prüfen, ob `reflect_abstain` jetzt eine Lesson schreibt
+     (Bug-2-Live-Bestätigung) und ob Shadow-Pairs frisch erzeugt + binnen ~4h aufgelöst werden.
+  2. `INSUFFICIENT_FUNDS`-Beobachtungspunkt aus 07-25 unverändert (heute nicht aufgetreten —
+     es gab keine Order).
+- Bei der Wochen-Auswertung die 15 Backfill-Rows (alle `resolved_utc` = `2026-07-27T07:05:40Z`)
+  aus der WI-2-Statistik ausschließen oder separat ausweisen.
+- W5-Frage für die V4-Scope-Diskussion mitnehmen: Lesson-Dämpfung drosselt aktuell den
+  gesamten Funnel — gewollt konservativ oder Überkorrektur? (Entscheidung Nikinger, nicht
+  diese Woche.)
+
+### Open questions / blockers
+- Keine neuen Blocker. Bug 2 formal noch ohne Live-Positiv-Beweis (mangels Debatte-Abstain) —
+  Code-Fix steht, Logs zeigen keinen Fehlversuch.
+- N1 bleibt reiner Beobachtungspunkt (heute keine Order, daher keine neue Evidenz).
+
+---
+
+## Session stopped — 2026-07-25 (Sa — erste Datenwoche ausgewertet, 2 Bugs gefunden + gefixt)
+
+> Special-Task-Folgesession (Nikinger): Bot lief Mo–Fr mit `--enable-paper-debate` (s. Session
+> 2026-07-19), Wochenende-Auswertung entlang WI-1…WI-6. Advisor konsultiert vor dem Report
+> (bestätigte die Einordnung + gab die Fix-Priorisierung: MINUTE_1 sofort, reflect_abstain erst
+> nach Mechanismus-Bestätigung).
+
+### Completed
+- **`DATA_WEEK_REVIEW_2026-07-25.md`** (neu, 📕 dated, in `docs/INDEX.md`): WI-2 (Shadow-Pairs,
+  das Schlüssel-Experiment) **tot** — 15 Paper-Trades erzeugt, 0 aufgelöst. WI-1 (roter Tag →
+  SELL-Seed) **untestbar** — Di–Fr 100 % `REASON_NO_CANDIDATES`, kein einziger Zyklus erreichte
+  die Kandidaten-Stufe; Montags einziger Handelstag war durchgehend positiv-driftend. WI-3
+  (Budget-Kappe ~14–15 Uhr) + WI-4 (Paper-Trigger selten) **bestätigt**. Zwei neue Befunde:
+  **N1** zwei Broker-Rejects `INSUFFICIENT_FUNDS` (DAX + AEX, selber Vormittag, ein dritter
+  Trade selben Vormittags erfolgreich) — widerlegt die unbestätigte AEX-Stop-Distanz-Hypothese
+  aus der Bug-B-Session. **Operator-Check nachgeliefert (Nikinger, `broker_wrapper.cli`, selber
+  Tag):** `get-account` → `available == balance` = 26.815,63 € exakt, `get-positions` → `[]` —
+  **kein Dauer-Margin-Problem, Stale-Deal-Hypothese widerlegt.** Montags Reject bleibt
+  unerklärt, aber nachweislich transient (kein Fix, nur Beobachten nächste Woche, s. Review-Doc).
+  **N2** Funnel-Kollaps Di–Fr ist schlechter als die Vorwoche, Ursache
+  (Marktregime vs. strukturell) mit einer Woche nicht unterscheidbar. **Empfehlung: kein
+  V4-Scope aus dieser Woche** — beide Schlüssel-Fragen unbeantwortet wegen kaputter Messwerkzeuge,
+  nicht wegen fehlender Marktbewegung.
+- **Zwei Bugs root-caused + gefixt** (`scripts/wiring.py`, dated 🔁-Note in
+  `phase8_scheduler/CLAUDE.md`): (1) `PaperTradeTracker`s `bar_fetch` rief `get_ohlcv(epic,
+  "MINUTE_1", …)` — ungültige IG-Resolution, 422 Fehlschläge diese Woche, 0/15 Paper-Trades je
+  aufgelöst seit Block B (07-17). Fix: `"MINUTE"`. (2) `_AbstainLLMAdapter._SCHEMA` fehlte
+  `additionalProperties: False` → Anthropic lehnt den Structured-Output-Call ab (HTTP 400,
+  in den Logs bestätigt) → Klartext-Fallback → `json.loads` scheitert immer → `reflect_abstain`
+  hat **seit Rollout (07-15) nie** eine Lesson erzeugt. Fix: Feld ergänzt (Muster aus dem
+  bewährten `brain.py`-Schema). Beide additiv, ein-Wert-Korrekturen in bereits von V3 berührtem
+  Code, am Wochenende bei gestopptem Bot. `scripts/wiring.py` hat laut Projekt-Konvention keine
+  eigene Testdatei ("operator-run, not pytest-collected") — verifiziert via `py_compile` (clean)
+  + volle Regression (**P8 222 · P10 125, beide unverändert** — nur String-/Dict-Literale
+  berührt, kein getestetes Modul).
+- Session-Block 2026-07-19 rotiert nach `SESSIONS_ARCHIVE.md`.
+
+### Next
+- **Operator (Nikinger):**
+  1. ✅ **erledigt diese Session:** `get_account`/`get_positions`-Check (N1) — Konto gesund,
+     kein Dauerproblem. Verbleibt nur als **Beobachtungspunkt**: taucht `INSUFFICIENT_FUNDS`
+     nächste Woche wieder auf, direkt danach `get-account` laufen lassen (nicht Tage später),
+     um den zeitlichen Zusammenhang zu fangen.
+  2. Nächste Datenwoche starten (gleicher Command, Fixes sind bereits im Code) — dort WI-1/WI-2
+     erneut prüfen, jetzt mit funktionierender Paper-Pipeline; beobachten, ob N2 (Funnel-Kollaps)
+     sich wiederholt.
+  3. Row-id=6-Korrektur (Bug A) und `enable_paper_debate`-Frage sind erledigt/entschieden;
+     unverändert offen: keine neuen Blocker.
+- V4-Scope-Entscheidung bleibt auf eine saubere Woche verschoben (kein Schnitt diese Session).
+
+### Open questions / blockers
+- **N1** ist kein Blocker mehr (Konto-Check bestanden) — nur noch ein Beobachtungspunkt bei
+  Wiederauftreten, kein offener Live-Check.
+- Unverändert offen: `used_in_research`/Lesson-Dämpfung (W5) hat diese Woche keine frische
+  Evidenz geliefert, bleibt aus der Vordiagnose unverändert gültig.
 
 ---
 
