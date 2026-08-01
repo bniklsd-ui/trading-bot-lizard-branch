@@ -311,8 +311,10 @@ class PaperDebateCaller:
 
 
 class PaperEngine:
-    """Debate-abstain trigger (V3-D5: ``REASON_DEBATE_ABSTAIN`` only) -> Both-Sides-Shadow
-    (+ optional Council-Paper-Call, §10.3).
+    """Two entry points, both -> Both-Sides-Shadow: the event-triggered
+    ``on_debate_abstain`` (V3-D5: ``REASON_DEBATE_ABSTAIN`` only, + optional
+    Council-Paper-Call, §10.3) and the time-scheduled ``open_scheduled_pairs`` (Phase 11
+    H1, decoupled from the research/debate funnel entirely).
 
     Best-effort, never raises (Decision J, mirrors ``AbstainLessonSink``). ``quote_fetch``
     is duck-typed (``Callable[[str], Mapping[str, float]]``, one fresh call per trigger —
@@ -386,6 +388,49 @@ class PaperEngine:
     def count_lessons_today(self, now_utc: str) -> int:
         """Delegates to the store — used by ``AbstainLessonSink``'s shared reflect cap."""
         return self.store.count_lessons_today(now_utc)
+
+    def open_scheduled_pairs(
+        self, epics: Sequence[str], deadline: datetime | None = None
+    ) -> None:
+        """Phase 11 (H1): open a Both-Sides-Shadow pair per epic on a timer, fully
+        decoupled from ``REASON_DEBATE_ABSTAIN`` (two data-weeks of measurement died on
+        that coupling — see ``phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`` §5 H1).
+
+        ``deadline`` (optional, tz-aware — the wiring passes today's daemon
+        ``window_close``): if this tick's prospective time-stop (``now +
+        config.max_hold_minutes``) would land after it, the **whole tick** is skipped
+        (same ``now``/``max_hold_minutes`` for every epic, so either all of them would
+        overrun or none would). Without this guard, a pair opened late in the window
+        sits unresolved overnight (``PaperTradeTracker`` only ticks during WINDOW) and
+        a next-morning gap bar can then register as a "touch" in ``resolve_paper_trade``
+        hours after the intended hold ended — a fabricated fill, not a real one. Kept
+        as a same-day guard here rather than changing ``resolve_paper_trade`` itself
+        (shared with the debate-triggered path — a behaviour change there is its own,
+        separately-flagged decision, not folded in silently).
+
+        One shared ``now`` for the whole tick (every epic's pair gets the same
+        creation/time-stop timestamp). Each epic is isolated in its own try/except —
+        one epic's quote-fetch failure must not skip the rest (mirrors
+        ``PaperTradeTracker.tick``'s per-epic ``bar_fetch`` isolation). Uses a synthetic
+        ``sched:<uuid>`` ``abstain_record_id`` (no real ``AbstainRecord`` exists for a
+        timer tick; the column has no FK, schema-verified) — the ``sched:`` prefix keeps
+        these trivially distinguishable from debate-triggered pairs (bare UUIDs) in
+        analysis. Deliberately no Council-Paper-Call here — that call is conceptually
+        tied to an actual debate-abstain, not a bare timer tick.
+        """
+        now = self.now_fn()
+        if deadline is not None:
+            prospective_stop = now + timedelta(minutes=self.config.max_hold_minutes)
+            if prospective_stop > deadline:
+                return
+        for epic in epics:
+            try:
+                quote = self.quote_fetch(epic)
+                pair = open_shadow_pair(f"sched:{uuid4()}", epic, quote, self.config, now)
+                for trade in pair:
+                    self.store.insert(trade)
+            except Exception as exc:  # noqa: BLE001 — isolate one epic's failure (J)
+                logger.critical("PaperEngine.open_scheduled_pairs failed for %s: %s", epic, exc)
 
 
 class PaperTradeTracker:

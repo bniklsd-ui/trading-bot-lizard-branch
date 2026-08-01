@@ -229,6 +229,7 @@ def _make_runner(
     preflight_fn=None,
     universe_refresher=None,
     paper_tracker=None,
+    shadow_pair_scheduler=None,
     max_iterations: int | None = 1,
 ):
     cfg = config or _config(tmp_path)
@@ -248,6 +249,7 @@ def _make_runner(
         preflight_fn=preflight_fn or (lambda: None),
         universe_refresher=universe_refresher,
         paper_tracker=paper_tracker,
+        shadow_pair_scheduler=shadow_pair_scheduler,
         max_iterations=max_iterations,
     )
     return runner, sleep, store, cfg
@@ -346,6 +348,74 @@ def test_universe_refresher_failure_is_fail_soft(tmp_path) -> None:
     backoff = _FakeBackoff()
     runner, _, store, _ = _make_runner(
         tmp_path, times=[_WINDOW_T], universe_refresher=_boom, backoff=backoff,
+    )
+    runner.run()  # must not raise
+    assert backoff.failures == 0
+    assert store.load().kill_reason is None
+
+
+# --- shadow-pair scheduler (Phase 11 / H1) ----------------------------------
+
+
+def test_shadow_pair_scheduler_none_is_never_called(tmp_path) -> None:
+    """Default (no wiring opt-in) -> today's behaviour, bit-identical: never called, no field set."""
+    runner, _, store, _ = _make_runner(tmp_path, times=[_WINDOW_T], shadow_pair_scheduler=None)
+    runner.run()
+    assert store.load().last_shadow_pairs_ts is None
+
+
+def test_shadow_pair_scheduler_runs_in_window_when_never_run_before(tmp_path) -> None:
+    calls: list[int] = []
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T], shadow_pair_scheduler=lambda: calls.append(1)
+    )
+    runner.run()
+    # No preflight firing (unlike universe_refresher) — only the WINDOW-phase call.
+    assert calls == [1]
+    assert store.load().last_shadow_pairs_ts is not None
+
+
+def test_shadow_pair_scheduler_throttled_within_interval(tmp_path) -> None:
+    calls: list[int] = []
+    cfg = _config(tmp_path, shadow_schedule_interval_min=240)
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T, _WINDOW_T + timedelta(minutes=5)],
+        config=cfg, shadow_pair_scheduler=lambda: calls.append(1), max_iterations=2,
+    )
+    runner.run()
+    # first WINDOW iteration (never-run -> due, 1); second iteration only 5 minutes
+    # later, well under the 240-minute interval -> not due again.
+    assert calls == [1]
+
+
+def test_shadow_pair_scheduler_runs_again_after_interval_elapses(tmp_path) -> None:
+    calls: list[int] = []
+    cfg = _config(tmp_path, shadow_schedule_interval_min=1)  # 1 minute — trivially elapses
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T, _WINDOW_T + timedelta(minutes=5)],
+        config=cfg, shadow_pair_scheduler=lambda: calls.append(1), max_iterations=2,
+    )
+    runner.run()
+    assert calls == [1, 1]  # both WINDOW iterations (5 min > 1 min interval)
+
+
+def test_shadow_pair_scheduler_not_run_outside_window(tmp_path) -> None:
+    calls: list[int] = []
+    runner, _, _, _ = _make_runner(
+        tmp_path, times=[_PRE_OPEN_T], shadow_pair_scheduler=lambda: calls.append(1)
+    )
+    runner.run()
+    assert calls == []
+
+
+def test_shadow_pair_scheduler_failure_is_fail_soft(tmp_path) -> None:
+    """A scheduler exception must never crash the cycle or trip backoff."""
+    def _boom() -> None:
+        raise RuntimeError("quote fetch exploded")
+
+    backoff = _FakeBackoff()
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T], shadow_pair_scheduler=_boom, backoff=backoff,
     )
     runner.run()  # must not raise
     assert backoff.failures == 0

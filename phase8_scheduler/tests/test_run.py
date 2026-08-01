@@ -66,6 +66,13 @@ def test_enable_paper_debate_flag_threads_through() -> None:
     assert config_from_args(parse_args(["--enable-paper-debate"])).enable_paper_debate is True
 
 
+def test_enable_shadow_schedule_flag_threads_through() -> None:
+    assert config_from_args(parse_args([])).enable_shadow_schedule is False
+    assert (
+        config_from_args(parse_args(["--enable-shadow-schedule"])).enable_shadow_schedule is True
+    )
+
+
 def test_config_from_args_threads_overrides() -> None:
     cfg = config_from_args(
         parse_args(["--daily-loss-cap", "750", "--max-trades", "3", "--cycle-interval-min", "2"])

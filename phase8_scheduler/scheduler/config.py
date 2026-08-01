@@ -172,6 +172,17 @@ class SchedulerConfig:
     enable_paper_debate: bool = False
     paper_debate_daily_cap: int = 3
 
+    # --- Phase 11 (H1, 2026-08-01+): time-scheduled shadow pairs -----------------
+    # Decouples paper-trade measurement from the collapsed research funnel
+    # (phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md §5 H1 — two data-weeks died on the same
+    # "everything hangs off REASON_DEBATE_ABSTAIN" coupling: 1 debate-abstain in 366
+    # cycles). Default OFF: real IG-allowance cost (~130-136 extra quote-calls/day at the
+    # 8-epic/30-min default), the Nikinger arms it consciously (mirrors
+    # enable_paper_debate's "default off" discipline). Requires enable_paper_trades — the
+    # wiring only builds the scheduler closure when both are True.
+    enable_shadow_schedule: bool = False
+    shadow_schedule_interval_min: int = 30
+
     # --- paths (gitignored data/ tree) ---
     live_db_path: str = "data/trading_bot.sqlite"          # the real P2 DB
     state_path: str = "data/state/scheduler_state.json"

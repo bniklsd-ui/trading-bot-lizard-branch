@@ -197,6 +197,13 @@ class SchedulerRunner:
             paper trades past their time-stop needs no market-open check itself (retrospective
             bar resolution), but tying it to the same cadence as everything else is simplest.
             Best-effort/fail-soft, same discipline as ``universe_refresher``.
+        shadow_pair_scheduler: optional zero-arg callable (Phase 11 / H1) the wiring backs
+            with a time-scheduled Both-Sides-Shadow-pair pass over the active DB universe,
+            fully decoupled from ``REASON_DEBATE_ABSTAIN``. Default ``None`` -> never
+            called, bit-identical. When set, runs at most once per
+            ``config.shadow_schedule_interval_min`` inside the WINDOW phase (same
+            throttled pattern as ``universe_refresher``, but **not** also fired in
+            :meth:`preflight` -- a timer tick needs no warm-up call). Best-effort/fail-soft.
         max_iterations: optional loop bound. ``None`` (default) ⇒ run forever (the real daemon);
             a positive int ⇒ stop after that many iterations (deterministic tests).
     """
@@ -216,6 +223,7 @@ class SchedulerRunner:
         preflight_fn: Callable[[], None],
         universe_refresher: Callable[[], Any] | None = None,
         paper_tracker: Any | None = None,
+        shadow_pair_scheduler: Callable[[], Any] | None = None,
         max_iterations: int | None = None,
     ) -> None:
         self._clock = clock
@@ -230,6 +238,7 @@ class SchedulerRunner:
         self._preflight_fn = preflight_fn
         self._universe_refresher = universe_refresher
         self._paper_tracker = paper_tracker
+        self._shadow_pair_scheduler = shadow_pair_scheduler
         self._max_iterations = max_iterations
         # Non-sticky graceful-stop flag (set by request_stop(), checked at the loop top).
         # Deliberately NOT the kill-switch file: a SIGTERM-driven stop must not persist a
@@ -241,6 +250,7 @@ class SchedulerRunner:
         self._cycle_interval_s = config.cycle_interval_min * 60
         self._idle_poll_s = config.idle_poll_min * 60
         self._reconcile_interval_s = config.reconcile_interval_min * 60
+        self._shadow_schedule_interval_s = config.shadow_schedule_interval_min * 60
 
     # --- preflight ---------------------------------------------------------
 
@@ -354,6 +364,7 @@ class SchedulerRunner:
             self._warm_session()
             self._maybe_reconcile(state, now)
             self._maybe_refresh_universe(state, now)
+            self._maybe_run_shadow_pairs(state, now)
             ok, reason = self._auto_confirm.can_open(state)
             if ok:
                 research_result = self._research_tick.ensure_candidates(state)
@@ -498,6 +509,33 @@ class SchedulerRunner:
             return
         self._run_universe_refresher()
         state.last_universe_refresh_ts = now.isoformat()
+
+    def _run_shadow_pair_scheduler(self) -> None:
+        """Fire-and-forget call of the injected ``shadow_pair_scheduler`` (fail-soft),
+        same pattern as ``_run_universe_refresher``. No-op when ``None`` (default —
+        bit-identical, Phase 11 / H1 opt-in).
+        """
+        if self._shadow_pair_scheduler is None:
+            return
+        try:
+            self._shadow_pair_scheduler()
+        except Exception:  # noqa: BLE001 — fail-soft, see docstring
+            logger.critical("shadow pair scheduler failed", exc_info=True)
+
+    def _maybe_run_shadow_pairs(self, state: SchedulerState, now: datetime) -> None:
+        """Run the shadow-pair scheduler, throttled to
+        ``config.shadow_schedule_interval_min`` (Phase 11 / H1).
+
+        Called from the WINDOW phase only, independent of the auto-confirm gate and the
+        research tick — paper trades never touch the real trade caps, and this tick is
+        fully decoupled from ``REASON_DEBATE_ABSTAIN`` by design (that's the point of H1).
+        """
+        if self._shadow_pair_scheduler is None:
+            return
+        if not self._due_after(state.last_shadow_pairs_ts, now, self._shadow_schedule_interval_s):
+            return
+        self._run_shadow_pair_scheduler()
+        state.last_shadow_pairs_ts = now.isoformat()
 
     def _startup_reconcile(self, state: SchedulerState) -> None:
         """One forced reconcile before the loop (Decision 11 "Startup"). Fail-soft; saves state.

@@ -99,6 +99,9 @@ class SchedulerState:
         last_universe_refresh_ts: ISO timestamp of the last Phase-9 (V2) universe
             discover/promotion refresh (``None`` until the wiring injects a
             ``universe_refresher`` — default behaviour untouched otherwise).
+        last_shadow_pairs_ts: ISO timestamp of the last Phase-11 (H1) time-scheduled
+            shadow-pair tick (``None`` until the wiring injects a
+            ``shadow_pair_scheduler`` — default behaviour untouched otherwise).
     """
 
     date: str = ""
@@ -107,6 +110,7 @@ class SchedulerState:
     last_research_ts: str | None = None
     last_reconcile_ts: str | None = None
     last_universe_refresh_ts: str | None = None
+    last_shadow_pairs_ts: str | None = None
     consecutive_failures: int = 0
     kill_reason: str | None = None
     last_no_trade_reason: str | None = None

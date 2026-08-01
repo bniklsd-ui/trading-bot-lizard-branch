@@ -60,6 +60,10 @@ def test_defaults_match_locked_concept_values() -> None:
     assert cfg.enable_paper_debate is False
     assert cfg.paper_debate_daily_cap == 3
 
+    # Phase 11 (H1) time-scheduled shadow pairs — off by default (real IG-allowance cost)
+    assert cfg.enable_shadow_schedule is False
+    assert cfg.shadow_schedule_interval_min == 30
+
     # paths (gitignored data/ tree)
     assert cfg.live_db_path == "data/trading_bot.sqlite"
     assert cfg.state_path == "data/state/scheduler_state.json"

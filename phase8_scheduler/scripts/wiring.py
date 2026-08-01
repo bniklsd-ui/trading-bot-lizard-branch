@@ -667,6 +667,31 @@ def build_scheduler(
     if config.enable_paper_trades:
         paper_engine = _build_paper_engine(config, broker, exec_cfg)
         paper_tracker = _build_paper_tracker(config, broker)
+    shadow_pair_scheduler = None
+    if config.enable_paper_trades and config.enable_shadow_schedule:
+        def shadow_pair_scheduler() -> None:
+            """H1 (Phase 11): time-scheduled Both-Sides-Shadow pairs, decoupled from
+            ``REASON_DEBATE_ABSTAIN`` (``phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`` §5
+            H1 — two data-weeks of measurement died on that same coupling). Reuses the
+            ``paper_engine`` built above + the active DB universe (the identical
+            ``UniverseStore`` query the ``universe_refresher`` closure below uses).
+
+            Passes today's daemon ``window_close`` as the engine's same-session
+            ``deadline`` — a pair whose time-stop would land past market close would
+            otherwise sit unresolved overnight and risk a next-morning gap bar
+            mis-resolving it (see ``PaperEngine.open_scheduled_pairs`` docstring).
+            """
+            from universe import UniverseStore  # noqa: PLC0415 — lazy, phase isolation
+
+            store = UniverseStore(_DB_PATH)
+            try:
+                epics = [rec.epic for rec in store.active_universe()]
+            finally:
+                store.close()
+            now = _now()
+            close_hour, close_minute = (int(p) for p in config.window_close.split(":"))
+            deadline = now.replace(hour=close_hour, minute=close_minute, second=0, microsecond=0)
+            paper_engine.open_scheduled_pairs(epics, deadline=deadline)
     abstain_sink = None
     if config.enable_abstain_lessons:
         abstain_sink = _observed_abstain_sink(
@@ -780,5 +805,6 @@ def build_scheduler(
         preflight_fn=preflight_fn,
         universe_refresher=universe_refresher,
         paper_tracker=paper_tracker,
+        shadow_pair_scheduler=shadow_pair_scheduler,
         max_iterations=max_iterations,
     )

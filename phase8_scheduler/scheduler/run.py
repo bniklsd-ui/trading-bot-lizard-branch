@@ -100,6 +100,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "paper_debate_daily_cap forced BUY/SELL paper picks per day on debate-abstain "
         "cycles — output lands only in paper_trades, never an order. Default OFF.",
     )
+    parser.add_argument(
+        "--enable-shadow-schedule",
+        action="store_true",
+        help="enable Phase 11 (H1) time-scheduled Both-Sides-Shadow pairs: a paper pair "
+        "per active epic every shadow_schedule_interval_min (default 30), fully decoupled "
+        "from REASON_DEBATE_ABSTAIN — output lands only in paper_trades, never an order. "
+        "Requires paper trades to be enabled (on by default). Real IG-allowance cost "
+        "(~130-136 extra quote-calls/day at the default interval/universe size). "
+        "Default OFF.",
+    )
     parser.add_argument("--verbose", action="store_true", help="DEBUG logging to stderr.")
     return parser
 
@@ -126,6 +136,7 @@ def config_from_args(args: argparse.Namespace) -> SchedulerConfig:
         max_consecutive_failures=args.max_consecutive_failures,
         enable_ig_bars=args.enable_ig_bars,
         enable_paper_debate=args.enable_paper_debate,
+        enable_shadow_schedule=args.enable_shadow_schedule,
     )
 
 

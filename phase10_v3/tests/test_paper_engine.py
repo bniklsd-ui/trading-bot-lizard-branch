@@ -187,6 +187,83 @@ def test_paper_engine_count_lessons_today_delegates_to_store():
     assert engine.count_lessons_today("2026-07-17T00:00:00.000Z") == 0
 
 
+# --- open_scheduled_pairs (Phase 11 H1) ---------------------------------------
+
+
+def test_open_scheduled_pairs_opens_pair_per_epic():
+    store = _RecordingStore()
+    engine = PaperEngine(
+        store, lambda epic: {"bid": 17999.0, "ask": 18000.0}, _Config(),
+        now_fn=lambda: datetime(2026, 8, 1, 9, 0, tzinfo=timezone.utc),
+    )
+    engine.open_scheduled_pairs(["EPIC.A", "EPIC.B"])
+
+    assert len(store.inserted) == 4
+    by_epic = {}
+    for t in store.inserted:
+        by_epic.setdefault(t.epic, []).append(t)
+    assert set(by_epic) == {"EPIC.A", "EPIC.B"}
+    for epic, trades in by_epic.items():
+        assert {t.variant for t in trades} == {PaperVariant.SHADOW_BUY, PaperVariant.SHADOW_SELL}
+        assert all(t.abstain_record_id.startswith("sched:") for t in trades)
+    # each epic's pair gets its own synthetic id, not shared across epics
+    assert by_epic["EPIC.A"][0].abstain_record_id != by_epic["EPIC.B"][0].abstain_record_id
+
+
+def test_open_scheduled_pairs_isolates_per_epic_failure():
+    store = _RecordingStore()
+
+    def _quote_fetch(epic):
+        if epic == "BAD":
+            raise RuntimeError("boom")
+        return {"bid": 1.0, "ask": 2.0}
+
+    engine = PaperEngine(store, _quote_fetch, _Config())
+    engine.open_scheduled_pairs(["BAD", "GOOD"])  # must not raise
+
+    assert len(store.inserted) == 2
+    assert all(t.epic == "GOOD" for t in store.inserted)
+
+
+def test_open_scheduled_pairs_empty_epics_is_noop():
+    store = _RecordingStore()
+    engine = PaperEngine(store, lambda epic: {"bid": 1.0, "ask": 2.0}, _Config())
+    engine.open_scheduled_pairs([])
+    assert store.inserted == []
+
+
+def test_open_scheduled_pairs_skips_whole_tick_when_deadline_would_be_exceeded():
+    store = _RecordingStore()
+    engine = PaperEngine(
+        store, lambda epic: {"bid": 1.0, "ask": 2.0}, _Config(),
+        now_fn=lambda: datetime(2026, 8, 1, 14, 0, tzinfo=timezone.utc),
+    )
+    # _Config().max_hold_minutes == 240 -> prospective stop 18:00, past a 17:30 deadline.
+    deadline = datetime(2026, 8, 1, 17, 30, tzinfo=timezone.utc)
+    engine.open_scheduled_pairs(["EPIC.A", "EPIC.B"], deadline=deadline)
+    assert store.inserted == []
+
+
+def test_open_scheduled_pairs_proceeds_when_within_deadline():
+    store = _RecordingStore()
+    engine = PaperEngine(
+        store, lambda epic: {"bid": 1.0, "ask": 2.0}, _Config(),
+        now_fn=lambda: datetime(2026, 8, 1, 13, 0, tzinfo=timezone.utc),
+    )
+    # prospective stop 17:00, at/before the deadline -> proceeds.
+    deadline = datetime(2026, 8, 1, 17, 30, tzinfo=timezone.utc)
+    engine.open_scheduled_pairs(["EPIC.A"], deadline=deadline)
+    assert len(store.inserted) == 2
+
+
+def test_open_scheduled_pairs_no_deadline_is_unrestricted():
+    """Default (``deadline=None``) stays exactly the earlier behaviour."""
+    store = _RecordingStore()
+    engine = PaperEngine(store, lambda epic: {"bid": 1.0, "ask": 2.0}, _Config())
+    engine.open_scheduled_pairs(["EPIC.A"])
+    assert len(store.inserted) == 2
+
+
 # --- PaperDebateCaller (§10.3) --------------------------------------------------
 
 
