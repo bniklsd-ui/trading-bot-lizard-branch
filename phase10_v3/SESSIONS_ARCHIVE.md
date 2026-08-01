@@ -16,6 +16,78 @@ updated: 2026-07-31
 
 ---
 
+## Session stopped — 2026-07-31 (bugfix follow-up session, bot stopped — B1/B2/B5 fixed)
+
+> Special-Task-Session (Nikinger): „Weekend blocks went through, there's an analysis file with
+> tasks for Phase 11 — this is a bug-fixing phase." Scope confirmed via `AskUserQuestion` before
+> any edit: fix exactly B1+B2+B5 (the three the review flagged as fixable without waiting on the
+> Phase-11/H1-H7 scope call); B3/B4 stay open for a design decision; B1(b)'s fail-closed guard
+> only fires when `point_values` is populated (keeps 14 existing P5 tests untouched — verified by
+> grep before choosing the shape, on advisor's flag). Bot/scheduler confirmed not running, no
+> `KILL` file, before touching any code.
+
+### Completed
+- **B1 fixed, two parts** (`phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md` §4 B1): (a)
+  `phase8_scheduler/scripts/wiring.py` now sources `ExecutionConfig.point_values` from
+  `_build_universe_from_db()` (already existed in the same file, fail-soft to
+  `EXTENDED_UNIVERSE`) instead of the static 4-epic list; (b)
+  `phase5_execution/execution/sizing.py::compute_size` fails closed
+  (`(0.0, "point_value_unmapped")`) for an epic missing from a **populated** `point_values` map,
+  instead of silently sizing at the 1.0 default — `point_value_for()` itself is unchanged
+  (its 1.0 default now only fires on an empty/unwired map), so `executor.py:379`'s
+  `build_opened(point_value=...)` call stays bit-identical. +1 test
+  (`test_point_value_unmapped_epic_fails_closed_when_map_populated`). **P5 167 → 168.**
+- **B2 scale fixed, residual explicitly NOT fixed** (`...` §4 B2):
+  `phase7_reward/reward/scorer.py:115` now divides `debate_confidence` by 100 before centering
+  (`DebateOutcome.confidence` is 0-100, the formula assumed [0,1]). Rescaled 5 existing
+  `debate_confidence` values in `test_scorer.py` to the real scale + added 1 new regression-pin
+  test replicating the review's Trade-7 numbers (confidence=60, a near-total loss must not clamp
+  to the cap). **Deliberately left open, per the review's own warning:** the score still drifts
+  ~+1.2 per consecutive loss after this fix (`clean_exit_bonus` still pays out on a
+  `CLOSED_BY_BROKER` stop-out) — whether a stop-out counts as a "clean exit" is Phase-11 H3, not
+  addressed here. **P7 137 → 138.**
+- **B5 fixed** (`...` §4 B5): both `build_abstain_prompt` and `build_paper_lesson_prompt`
+  (`abstain_lessons/reflect.py`) now state the `_MAX_LESSON_CHARS` limit in the prompt text
+  itself (sourced from the constant, not a hardcoded "300") — previously only
+  `validate_abstain_lesson` enforced it, so the LLM was never told, causing paid-for/rejected
+  calls (6 on 2026-07-27, 4 too long). Also fixed the sibling `build_abstain_prompt`, which had
+  the identical drift and would have hit it the first time a lesson ran long. **P10 125
+  unchanged** (no test pins exact prompt wording; behavior covered by existing
+  `validate_abstain_lesson` tests).
+- **Not touched, by design:** B3 (margin headroom — needs a Nikinger design call), B4 (empty
+  measurement substrate — that's H6, part of the still-open Phase-11 scope decision), all of
+  H1-H7, S6 (stays OFF).
+- Full cross-phase regression run before AND after all edits (shared venv
+  `phase1_broker_wrapper/.venv`): **P1 87 · P2 75 · P3 100 · P4 155 · P5 168 (was 167) · P6 76 ·
+  P7 138 (was 137) · P8 222 (unaffected, no dedicated `wiring.py` test file — verified via
+  `py_compile`) · P9 72 · P10 125 (unaffected) · meta_m1_harness 28 · root 77** — every other
+  phase's count is bit-identical to the fresh pre-edit baseline captured at session start.
+- Docs committed in two atomic commits: (1) the prior read-only session's 6 modified
+  `CLAUDE.md`/`INDEX.md` files + the new `DATA_WEEK_REVIEW_2026-07-31.md`, unchanged from that
+  session; (2) this session's code fixes + the three phase `CLAUDE.md` "NOT YET FIXED" → fixed
+  flips (P5/P7/P8, each in the same commit as its fix, per the commit⇒note-update rule).
+- Session-Block 2026-07-31 (the data-week review) verbatim nach `SESSIONS_ARCHIVE.md` rotiert.
+
+### Next
+- **Nikinger, Entscheidung (unverändert offen, s. Review §5/§8):** Phase-11-Scope, Reihenfolge
+  **H2 → H1 → H6**, danach mit echten Daten H7/H4/H3/H5. H2's B1-Anteil ist jetzt erledigt; H2's
+  verbleibender Anteil ist **B3** (Margin-Headroom).
+- **Naming-Kollision zu flaggen:** `ROADMAP.md` definiert „Phase 11" bereits als das deferred
+  „V4: Sophisticated/Optional" (Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC,
+  `phase11_v4/` noch nicht angelegt) — das ist **nicht** dasselbe wie diese Bugfix-Session oder
+  die H1-H7-Hypothesen aus dem Datenwoche-Review. Keine `phase11_v4/`-Struktur in dieser Session
+  angelegt; die Nikinger-Entscheidung zur H-Reihenfolge sollte auch klären, ob/wie die
+  ROADMAP-Nummerierung angepasst wird.
+- B3/B4/H1-H7 bleiben wie vom Review vorgeschlagen — kein Code dafür in dieser Session.
+
+### Open questions / blockers
+- **W2 (Sub-Noise-Geometrie) weiterhin unbeantwortet** — unverändert die Wurzel, H1 liefert die
+  Antwort in Tagen (unverändert aus dem 07-31-Review).
+- Scheduler-Daemon weiterhin nicht gestartet (bewusst — Restart ist ein Operator-Schritt, kein
+  Teil dieser Bugfix-Session).
+
+---
+
 ## Session stopped — 2026-07-31 (Fr — zweite Datenwoche ausgewertet, read-only; 3 neue Bugs + Phase-11-Scope)
 
 > Special-Task-Session (Nikinger): „Datenwoche ist rum — sag direkt, wenn etwas schiefgelaufen

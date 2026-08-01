@@ -1,6 +1,6 @@
 ---
 status: live
-purpose: ACTIVE phase head — V3: Abstain-/No-Trade-Lessons + Persistenz-Reform + Paper-Trades, alles live auf main; zwei Datenwochen gefahren (07-20/24 + 07-27/31). Woche 2 ausgewertet 2026-07-31: Funnel kollabiert (366 Zyklen → 1 Kandidat → 0 Trades), WI-1/WI-5 beantwortet (W1+W5 bestätigt), WI-2 zum zweiten Mal tot; drei neue Bugs seit Rollout gefunden UND gefixt (B1 point_value-Drift/40x-Oversizing, B2 Reward-Score-Skala, B5 Paper-Lesson-Prompt — B2s clean_exit_bonus-Residuum bewusst offen für H3), zwei strukturelle Lücken bleiben offen (B3 Margin-Headroom, B4 leeres Mess-Substrat); Phase-11-Scope-Vorschlag mit 7 Hypothesen liegt vor (H2→H1→H6), Entscheidung beim Nikinger
+purpose: ACTIVE phase head — covers Phase 10 (V3: Abstain-/No-Trade-Lessons + Persistenz-Reform + Paper-Trades, alles live auf main) UND Phase 11 (V3-Fortsetzung: Funnel-/Mess-Fixes aus der Datenwoche-2-Review, claimed 2026-08-01 — ROADMAP's alte "Phase 11 = V4" ist jetzt Phase 12). Zwei Datenwochen gefahren (07-20/24 + 07-27/31), Woche 2 zeigte Funnel-Kollaps (366 Zyklen → 1 Kandidat → 0 Trades). Fünf Befunde B1-B5: B1 (point_value-Drift/40x-Oversizing), B2 (Reward-Score-Skala, clean_exit_bonus-Residuum offen für H3), B5 (Paper-Lesson-Prompt), B4/H6 (leeres Mess-Substrat) — alle vier gefixt (07-31/08-01); B3 (Margin-Headroom) design-dokumentiert, bewusst auf eine eigene größere Session verschoben. H1 (zeitgesteuerte Shadow-Pairs, größter Hebel) ist der nächste inhaltliche Schritt, ebenfalls eigene Session; H3/H4/H5/H7 offen.
 read-when: working in phase10_v3/ — read this head + its newest Session-stopped block first
 detail: L2
 up: ../CLAUDE.md
@@ -12,8 +12,9 @@ down:
   - ./TRADE_DATA_DIAGNOSIS_2026-07-19.md   # pre-V4 Strukturdiagnose W1-W6 + Watch-Items (L3, dated)
   - ./DATA_WEEK_REVIEW_2026-07-25.md   # WI-1..WI-6 Auswertung + 2 Bugfixes + N1/N2 (L3, dated)
   - ./DATA_WEEK_REVIEW_2026-07-31.md   # Datenwoche 2: W1/W5 bestätigt, 3 neue Bugs, Phase-11-Hypothesen H1-H7 (L3, dated)
+  - ../ROADMAP.md   # Phase 11 (this work) + Phase 12 (V4, renumbered 2026-08-01) sections
   - ./SESSIONS_ARCHIVE.md   # full session history (L3)
-updated: 2026-07-31
+updated: 2026-08-01
 ---
 # CLAUDE.md — Phase 10 (V3): Abstain-Lessons + Persistenz-Reform + Paper-Trades (`phase10_v3/`)
 
@@ -240,75 +241,78 @@ Time-Stop-Dauer-Key: `max_hold_minutes` (Default 240), konsumiert in `monitor.py
 
 **9. Test-Baseline-Korrektur:** siehe Step-1-Abschnitt oben (1162 grün, P4 141→148).
 
-## Session stopped — 2026-07-31 (bugfix follow-up session, bot stopped — B1/B2/B5 fixed)
+## Session stopped — 2026-08-01 (Phase 11 claimed + B4/H6 fixed + B3 designed-and-deferred)
 
-> Special-Task-Session (Nikinger): „Weekend blocks went through, there's an analysis file with
-> tasks for Phase 11 — this is a bug-fixing phase." Scope confirmed via `AskUserQuestion` before
-> any edit: fix exactly B1+B2+B5 (the three the review flagged as fixable without waiting on the
-> Phase-11/H1-H7 scope call); B3/B4 stay open for a design decision; B1(b)'s fail-closed guard
-> only fires when `point_values` is populated (keeps 14 existing P5 tests untouched — verified by
-> grep before choosing the shape, on advisor's flag). Bot/scheduler confirmed not running, no
-> `KILL` file, before touching any code.
+> Follow-up in the same working thread as the 2026-07-31 bugfix session. Four design questions
+> from that session's summary were put back to the Nikinger via `AskUserQuestion` instead of
+> being decided unilaterally: (1) B3 approach → **"do it correctly, defer with documentation"**
+> (rejected the quick `max_leverage` buffer hack); (2) B4/H6 → **"do the full scope now"**;
+> (3) H1 → **confirmed separate session** (no build here); (4) the Phase-11/V4 naming collision →
+> **"claim Phase 11 for the H1-H7 work, renumber V4 to Phase 12."** All four executed as answered.
 
 ### Completed
-- **B1 fixed, two parts** (`phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md` §4 B1): (a)
-  `phase8_scheduler/scripts/wiring.py` now sources `ExecutionConfig.point_values` from
-  `_build_universe_from_db()` (already existed in the same file, fail-soft to
-  `EXTENDED_UNIVERSE`) instead of the static 4-epic list; (b)
-  `phase5_execution/execution/sizing.py::compute_size` fails closed
-  (`(0.0, "point_value_unmapped")`) for an epic missing from a **populated** `point_values` map,
-  instead of silently sizing at the 1.0 default — `point_value_for()` itself is unchanged
-  (its 1.0 default now only fires on an empty/unwired map), so `executor.py:379`'s
-  `build_opened(point_value=...)` call stays bit-identical. +1 test
-  (`test_point_value_unmapped_epic_fails_closed_when_map_populated`). **P5 167 → 168.**
-- **B2 scale fixed, residual explicitly NOT fixed** (`...` §4 B2):
-  `phase7_reward/reward/scorer.py:115` now divides `debate_confidence` by 100 before centering
-  (`DebateOutcome.confidence` is 0-100, the formula assumed [0,1]). Rescaled 5 existing
-  `debate_confidence` values in `test_scorer.py` to the real scale + added 1 new regression-pin
-  test replicating the review's Trade-7 numbers (confidence=60, a near-total loss must not clamp
-  to the cap). **Deliberately left open, per the review's own warning:** the score still drifts
-  ~+1.2 per consecutive loss after this fix (`clean_exit_bonus` still pays out on a
-  `CLOSED_BY_BROKER` stop-out) — whether a stop-out counts as a "clean exit" is Phase-11 H3, not
-  addressed here. **P7 137 → 138.**
-- **B5 fixed** (`...` §4 B5): both `build_abstain_prompt` and `build_paper_lesson_prompt`
-  (`abstain_lessons/reflect.py`) now state the `_MAX_LESSON_CHARS` limit in the prompt text
-  itself (sourced from the constant, not a hardcoded "300") — previously only
-  `validate_abstain_lesson` enforced it, so the LLM was never told, causing paid-for/rejected
-  calls (6 on 2026-07-27, 4 too long). Also fixed the sibling `build_abstain_prompt`, which had
-  the identical drift and would have hit it the first time a lesson ran long. **P10 125
-  unchanged** (no test pins exact prompt wording; behavior covered by existing
-  `validate_abstain_lesson` tests).
-- **Not touched, by design:** B3 (margin headroom — needs a Nikinger design call), B4 (empty
-  measurement substrate — that's H6, part of the still-open Phase-11 scope decision), all of
-  H1-H7, S6 (stays OFF).
-- Full cross-phase regression run before AND after all edits (shared venv
-  `phase1_broker_wrapper/.venv`): **P1 87 · P2 75 · P3 100 · P4 155 · P5 168 (was 167) · P6 76 ·
-  P7 138 (was 137) · P8 222 (unaffected, no dedicated `wiring.py` test file — verified via
-  `py_compile`) · P9 72 · P10 125 (unaffected) · meta_m1_harness 28 · root 77** — every other
-  phase's count is bit-identical to the fresh pre-edit baseline captured at session start.
-- Docs committed in two atomic commits: (1) the prior read-only session's 6 modified
-  `CLAUDE.md`/`INDEX.md` files + the new `DATA_WEEK_REVIEW_2026-07-31.md`, unchanged from that
-  session; (2) this session's code fixes + the three phase `CLAUDE.md` "NOT YET FIXED" → fixed
-  flips (P5/P7/P8, each in the same commit as its fix, per the commit⇒note-update rule).
-- Session-Block 2026-07-31 (the data-week review) verbatim nach `SESSIONS_ARCHIVE.md` rotiert.
+- **B4/H6 fixed, full scope** (`phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md` §4 B4): the empty
+  measurement substrate now gets filled on every NO_TRADE/ABORT/TRADE cycle:
+  - `phase5_execution/execution/executor.py::_no_trade` now threads its own `reason` string
+    into `cycle_outcome["detail"]` (was computed for the `ExecutionResult` but never handed to
+    the classifier — every branch's `AbstainRecord.detail` landed at the model default `""`).
+    `phase10_v3/abstain_lessons/classifier.py::classify_abstain` reads it on all 5 branches.
+  - `spread_pct` now reaches `ContextRecorder.on_decision` at all three call sites
+    (`_no_trade` when a Gate-4 price snapshot is already in scope, i.e. sizing/VETO failures;
+    `_abort`'s post-`place_order` call site; `_notify_opened`'s TRADE path) — the recorder
+    already accepted the param, the gap was purely that no call site passed it. Early gates
+    (1/2/3/5, debate) still pass `None` — no price snapshot exists yet at that point, so `None`
+    is correct, not a regression.
+  - **The dominant `research_empty` case** (364/366 records in the review week) needed a
+    cross-phase bridge: Gate 2's own `detail` is a fixed generic string, never the LLM's actual
+    abstain prose (`Research.last_no_pick_reasoning`, held on the `Research` object `research_tick`
+    already drove that same cycle). New `phase8_scheduler/scripts/wiring.py::_enrich_abstain_detail`
+    wraps the abstain sink (same pattern as the existing `_observed_abstain_sink`) and backfills
+    `cycle_outcome["detail"]` with the model's real reasoning when present, only for
+    `research_empty` cycles — a preflight/exception abstain (no LLM call happened) keeps Gate 2's
+    generic detail.
+  - +5 tests in `phase5_execution/tests/test_executor.py` (detail-carries-rationale for debate
+    and VETO paths, spread_pct present/absent across NO_TRADE/ABORT/TRADE), +7 tests in
+    `phase10_v3/tests/test_classifier.py` (detail threaded on every branch, defaults to `""`,
+    coerces `None` safely). **P5 168 → 173, P10 125 → 132.** `wiring.py` unaffected test count
+    (222, no dedicated test file, verified `py_compile`).
+- **B3 designed, deliberately NOT fixed** — the Nikinger rejected the quick `max_leverage`
+  buffer (a static guess, doesn't scale per-instrument, same failure pattern as B1's stale
+  doc-note). `phase5_execution/CLAUDE.md`'s B3 block now carries the full why (margin cap has
+  zero headroom, empirically 22.0 accepted / 22.1 rejected) + what (P1 needs a live `/markets/
+  {epic}` inspection to confirm IG's actual margin field names — a live/network call, Nikinger's
+  job per repo convention — then a new `MarketInfo` field + a margin-based `compute_size` cap,
+  cross-phase P1+P5, with the fail-closed-vs-fallback question left as an explicit open design
+  call for that session) — enough for a cold start next time, no re-derivation needed.
+- **Phase-11/V4 naming collision resolved.** `ROADMAP.md`'s "Phase 11" (the old deferred V4:
+  Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC) is now **Phase 12**, content
+  unchanged (`11a-e` → `12a-e`, `phase11_v4/` → `phase12_v4/`). **Phase 11** is now claimed for
+  this data-week-review-driven funnel/measurement work (H1-H7 + B1-B5) — living in `phase10_v3/`
+  for now, **no physical directory move** (a separate, larger decision, not made here). Updated:
+  `ROADMAP.md` (new Phase 11 section + renumbered Phase 12), root `CLAUDE.md` (phase table),
+  `ARCHITECTURE.md` (3 refs + a dated correction note), `README.md`, `phase9_universe/CLAUDE.md`,
+  `docs/INDEX.md`. Left untouched (dated snapshots, never edited):
+  `phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`, `docs/concepts/phase9_v2_foundation_plan(1).md`.
+- Full cross-phase regression before AND after all edits: **P1 87 · P2 75 · P3 100 · P4 155 ·
+  P5 173 (was 168) · P6 76 · P7 138 · P8 222 (unaffected) · P9 72 · P10 132 (was 125) ·
+  meta_m1_harness 28 · root 77.**
+- Session-Block 2026-07-31 (B1/B2/B5 bugfix session) verbatim nach `SESSIONS_ARCHIVE.md` rotiert.
 
 ### Next
-- **Nikinger, Entscheidung (unverändert offen, s. Review §5/§8):** Phase-11-Scope, Reihenfolge
-  **H2 → H1 → H6**, danach mit echten Daten H7/H4/H3/H5. H2's B1-Anteil ist jetzt erledigt; H2's
-  verbleibender Anteil ist **B3** (Margin-Headroom).
-- **Naming-Kollision zu flaggen:** `ROADMAP.md` definiert „Phase 11" bereits als das deferred
-  „V4: Sophisticated/Optional" (Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC,
-  `phase11_v4/` noch nicht angelegt) — das ist **nicht** dasselbe wie diese Bugfix-Session oder
-  die H1-H7-Hypothesen aus dem Datenwoche-Review. Keine `phase11_v4/`-Struktur in dieser Session
-  angelegt; die Nikinger-Entscheidung zur H-Reihenfolge sollte auch klären, ob/wie die
-  ROADMAP-Nummerierung angepasst wird.
-- B3/B4/H1-H7 bleiben wie vom Review vorgeschlagen — kein Code dafür in dieser Session.
+- **H1 (next, separate session, per the Nikinger's confirmation):** time-scheduled shadow pairs
+  — decouples paper-trade measurement from the collapsed research funnel, the review's
+  highest-leverage item. Needs a new scheduler tick + a leaner `PaperEngine` entry point (today's
+  `on_debate_abstain` expects a real `AbstainRecord`; the time-scheduled path needs the ~10-line
+  variant the review sketched) + an IG-allowance budget for ~136 extra quote-calls/day. Not
+  scoped in detail this session (the Nikinger chose to let the next session do that fresh).
+- **B3 (its own session, whenever the Nikinger picks it up):** start with the live `/markets/
+  {epic}` inspection — see `phase5_execution/CLAUDE.md`'s B3 block for the exact plan.
+- **H3/H4/H5/H7** remain fully open, data-gated on H1's results per the review's own ordering.
+- Scheduler daemon still not started — unchanged, an operator decision outside this session.
 
 ### Open questions / blockers
-- **W2 (Sub-Noise-Geometrie) weiterhin unbeantwortet** — unverändert die Wurzel, H1 liefert die
-  Antwort in Tagen (unverändert aus dem 07-31-Review).
-- Scheduler-Daemon weiterhin nicht gestartet (bewusst — Restart ist ein Operator-Schritt, kein
-  Teil dieser Bugfix-Session).
+- **W2 (Sub-Noise geometry) still unanswered** — still the root question; H1 answers it in days.
+- None new from this session's own work (all edits additive, full regression green).
 
 ---
 

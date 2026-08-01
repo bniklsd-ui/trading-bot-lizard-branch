@@ -79,3 +79,33 @@ def test_epic_passed_through():
 def test_epic_none_when_absent():
     record = classify_abstain({"veto": "spread"})
     assert record.epic is None
+
+
+# --------------------------------------------------------------------------- #
+# Phase-10 B4-fix (2026-07-31): detail is threaded through, not always ""     #
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "cycle_outcome",
+    [
+        {"error": "boom", "detail": "account snapshot unavailable"},
+        {"research_empty": True, "detail": "no fresh candidate (research abstained or empty)"},
+        {"failed_gate": "G3", "detail": "max_parallel_positions reached"},
+        {"debate_decision": "ABSTAIN", "detail": "4 consecutive BUY losses on DAX"},
+        {"veto": "spread", "detail": "spread 0.6% > max 0.5%"},
+    ],
+)
+def test_detail_is_threaded_through_on_every_branch(cycle_outcome):
+    record = classify_abstain(cycle_outcome)
+    assert record.detail == cycle_outcome["detail"]
+
+
+def test_detail_defaults_to_empty_string_when_absent():
+    record = classify_abstain({"veto": "spread"})
+    assert record.detail == ""
+
+
+def test_detail_coerced_to_string_when_none():
+    # The executor always sets a "detail" key (Phase-10 B4-fix), but a defensive
+    # caller passing an explicit None must not crash the classifier.
+    record = classify_abstain({"veto": "spread", "detail": None})
+    assert record.detail == ""

@@ -42,7 +42,7 @@ LLM-Vorschlag (das wäre V4).
   Fix → `LiveQuoteCache` in den Research-Kontext.
 - **DRAUSSEN (carried to V3/V4):** DB-Reform jenseits Migration 004, No-Trade-Lessons, UI-
   Arbeit (alles V3/Phase 10); Council, Debate-Handover, Reward-Reform, Force-Trigger-Guard,
-  Instinct-ECC (V4/Phase 11); eine echte zweite unabhängige Echtzeitquelle (Lock #8 — kein
+  Instinct-ECC (V4/Phase 12, umnummeriert 2026-08-01, war vorher "Phase 11"); eine echte zweite unabhängige Echtzeitquelle (Lock #8 — kein
   neuer bezahlter/gekeyter Provider); Momentum-VETO-Datenquelle (bleibt P1-IG-Bars, unangetastet).
 
 ## Build-Reihenfolge (verbindlich, aus dem Plan §1)

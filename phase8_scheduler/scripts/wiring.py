@@ -480,6 +480,35 @@ def _build_paper_tracker(config: SchedulerConfig, broker: Any) -> Any:
     return PaperTradeTracker(paper_store, bar_fetch, llm=llm, reflect_cap_check=reflect_cap_check)
 
 
+def _enrich_abstain_detail(inner: Any, research: Any) -> Any:
+    """Wrap ``inner`` (an :class:`AbstainSink`) to backfill ``cycle_outcome["detail"]`` with
+    the Phase-4 ``Research``'s own ``last_no_pick_reasoning`` on a ``research_empty`` (Gate 2)
+    abstain (Phase-10 B4/H6-fix, 2026-07-31).
+
+    Gate 2's own ``detail`` (threaded through by the executor's B4-fix) is a fixed generic
+    string ("no fresh candidate (research abstained or empty)") — it never carries the
+    model's actual abstain prose. ``research_empty`` is the dominant NO_TRADE case (364/366
+    cycles in the 2026-07-31 data-week review), so this is the one that matters most: the
+    same warm ``Research`` instance ``research_tick`` just drove still holds
+    ``last_no_pick_reasoning`` from that same cycle's LLM call (reset to ``None`` on every
+    ``run()``, so it only ever carries the current cycle's own reasoning or nothing —
+    never a stale value from a prior cycle). Only overwrites when the model actually
+    produced prose (a genuine LLM abstain); a preflight/exception abstain leaves Gate 2's
+    generic detail in place, still better than empty. See
+    ``phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`` §4 B4.
+    """
+
+    class _Enriched:
+        def on_no_trade(self, cycle_outcome: Any) -> Any:
+            if cycle_outcome.get("research_empty") is True:
+                reasoning = getattr(research, "last_no_pick_reasoning", None)
+                if reasoning:
+                    cycle_outcome = {**cycle_outcome, "detail": reasoning}
+            return inner.on_no_trade(cycle_outcome)
+
+    return _Enriched()
+
+
 def _observed_abstain_sink(inner: Any, observability_path: str) -> Any:
     """Wrap ``inner`` (an :class:`AbstainSink`) with the ``abstain_recorded`` observability
     event (reason, stage, epic) — the generic ``record_event`` call, not ``record_cycle``'s
@@ -641,7 +670,10 @@ def build_scheduler(
     abstain_sink = None
     if config.enable_abstain_lessons:
         abstain_sink = _observed_abstain_sink(
-            _build_abstain_sink(config, paper_engine=paper_engine), config.observability_path
+            _enrich_abstain_detail(
+                _build_abstain_sink(config, paper_engine=paper_engine), research
+            ),
+            config.observability_path,
         )
     context_recorder = None
     if config.enable_context_persistence:

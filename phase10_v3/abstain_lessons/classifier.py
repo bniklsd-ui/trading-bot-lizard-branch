@@ -46,33 +46,44 @@ def classify_abstain(cycle_outcome: Mapping[str, Any]) -> AbstainRecord:
     ``debate_decision`` -> ``veto`` -> ``REASON_UNCLASSIFIED``. An unmapped
     ``failed_gate``/``veto`` id, or an empty/unrecognized input, falls through to
     ``REASON_UNCLASSIFIED`` (fail-closed, not raised).
+
+    ``detail`` (Phase-10 B4-fix, 2026-07-31): the executor's ``reason`` string — a
+    gate/VETO message, or the debate stage's own Judge rationale — is threaded
+    through onto every branch. Previously never read here, so every
+    ``AbstainRecord.detail`` landed at the model default ``""``
+    (phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md §4 B4).
     """
     epic = cycle_outcome.get("epic")
+    detail = str(cycle_outcome.get("detail") or "")
 
     if cycle_outcome.get("error"):
         return AbstainRecord.new(
-            epic=epic, stage=AbstainStage.ERROR, reason=AbstainReason.REASON_ERROR_FAILCLOSED
+            epic=epic, stage=AbstainStage.ERROR, reason=AbstainReason.REASON_ERROR_FAILCLOSED,
+            detail=detail,
         )
     if cycle_outcome.get("research_empty") is True:
         return AbstainRecord.new(
             epic=epic, stage=AbstainStage.RESEARCH_EMPTY,
-            reason=AbstainReason.REASON_NO_CANDIDATES,
+            reason=AbstainReason.REASON_NO_CANDIDATES, detail=detail,
         )
     failed_gate = cycle_outcome.get("failed_gate")
     if failed_gate:
         return AbstainRecord.new(
-            epic=epic, stage=AbstainStage.GATE, reason=_reason_from_gate(failed_gate)
+            epic=epic, stage=AbstainStage.GATE, reason=_reason_from_gate(failed_gate),
+            detail=detail,
         )
     if cycle_outcome.get("debate_decision") == "ABSTAIN":
         return AbstainRecord.new(
-            epic=epic, stage=AbstainStage.DEBATE, reason=AbstainReason.REASON_DEBATE_ABSTAIN
+            epic=epic, stage=AbstainStage.DEBATE, reason=AbstainReason.REASON_DEBATE_ABSTAIN,
+            detail=detail,
         )
     veto = cycle_outcome.get("veto")
     if veto:
         return AbstainRecord.new(
-            epic=epic, stage=AbstainStage.VETO, reason=_reason_from_veto(veto)
+            epic=epic, stage=AbstainStage.VETO, reason=_reason_from_veto(veto), detail=detail,
         )
     # No signal matched (or an empty mapping) — fail-closed, never raise.
     return AbstainRecord.new(
-        epic=epic, stage=AbstainStage.ERROR, reason=AbstainReason.REASON_UNCLASSIFIED
+        epic=epic, stage=AbstainStage.ERROR, reason=AbstainReason.REASON_UNCLASSIFIED,
+        detail=detail,
     )

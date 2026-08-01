@@ -161,6 +161,7 @@ class Executor:
         debate_decision: str | None = None,
         research_empty: bool = False,
         error: str | None = None,
+        price_env: Any = None,
     ) -> ExecutionResult:
         """A clean no-trade outcome (gate/VETO/abstain) — exit 0, no order placed.
 
@@ -169,7 +170,9 @@ class Executor:
         context-recorder seam (:meth:`_notify_context`). The keyword-only params are the
         S2 classifier contract fields the caller knows about at its point in the cycle;
         unset ones default to their "nothing to report" value (``None``/``False``) and
-        are harmless when no sink/recorder is injected.
+        are harmless when no sink/recorder is injected. ``price_env`` (Phase-10 B4-fix,
+        2026-07-31) is only in scope at the Gate-4/VETO call sites (fetched for sizing) —
+        earlier gates pass ``None``, which is harmless (no spread to report yet).
         """
         logger.info("no trade: %s — %s", rule, reason)
         cycle_outcome = {
@@ -180,11 +183,19 @@ class Executor:
             "debate_decision": debate_decision,
             "research_empty": research_empty,
             "error": error,
+            # Phase-10 B4-fix (2026-07-31): `reason` is the richest text available at
+            # every call site (a gate's message, a VETO's message, or — for the DEBATE
+            # stage — the Judge's own abstain rationale). Previously computed and logged
+            # but never handed to the classifier, so every AbstainRecord.detail landed
+            # at the model default "" (see phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md §4 B4).
+            "detail": reason,
         }
         record_id = self._notify_no_trade(cycle_outcome)
+        spread_pct = (price_env.data or {}).get("spread_pct") if price_env is not None else None
         self._notify_context(
             outcome="NO_TRADE",
             epic=epic,
+            spread_pct=spread_pct,
             gate_results_json=json.dumps({"failed_gate": failed_gate}) if failed_gate else None,
             veto_results_json=json.dumps({"veto": veto}) if veto else None,
             abstain_record_id=record_id,
@@ -201,6 +212,7 @@ class Executor:
         deal_id: str | None = None,
         candidate: dict[str, Any] | None = None,
         debate_outcome: Any = None,
+        price_env: Any = None,
     ) -> ExecutionResult:
         """A fail-closed abort outcome — the CLI exits non-zero, operator attends.
 
@@ -209,7 +221,9 @@ class Executor:
         rejection is exactly this path, e.g. 2026-07-15's flagged incident). The earlier
         session-health/reconcile abort (before any candidate exists) never passes one,
         so it stays unrecorded — deliberate, see the constructor's ``context_recorder``
-        docstring.
+        docstring. ``price_env`` (Phase-10 B4-fix, 2026-07-31) is only ever passed by the
+        post-``place_order``/monitor call site, which by then has a fresh Gate-4 price
+        snapshot in scope.
 
         ``detail`` (e.g. IG's own reject reason, ``order.py``'s ``"order {ref} REJECTED
         by broker: {reason}"``) is folded into ``veto_results_json`` alongside the fixed
@@ -219,11 +233,15 @@ class Executor:
         """
         logger.error("abort: %s", detail)
         if candidate is not None:
+            spread_pct = (
+                (price_env.data or {}).get("spread_pct") if price_env is not None else None
+            )
             self._notify_context(
                 outcome="ABORT",
                 epic=candidate.get("epic"),
                 candidate=candidate,
                 debate_outcome=debate_outcome,
+                spread_pct=spread_pct,
                 gate_results_json=json.dumps({"gates": "1,2,3,4,5 pass"}),
                 veto_results_json=json.dumps({"vetos": "pass", "abort_detail": detail}),
             )
@@ -306,12 +324,16 @@ class Executor:
             account_env, price_env, market_info_env, risk_pct, self.config, epic=epic
         )
         if size_reason is not None:
-            return self._no_trade("sizing", size_reason, epic=epic, failed_gate="G4")
+            return self._no_trade(
+                "sizing", size_reason, epic=epic, failed_gate="G4", price_env=price_env
+            )
 
         # 7) The four HARD VETOs on a fresh snapshot, immediately before the order.
         veto = pre_trade_check(self.broker, candidate, now, self.config)
         if not veto.ok:
-            return self._no_trade(veto.veto, veto.reason, epic=epic, veto=veto.veto)
+            return self._no_trade(
+                veto.veto, veto.reason, epic=epic, veto=veto.veto, price_env=price_env
+            )
 
         # 8) Build the resolved order plan (reuse the Gate-4 fresh price + market info).
         plan = build_order_plan(candidate, size, price_env, market_info_env, self.config)
@@ -350,7 +372,10 @@ class Executor:
                 return result
             return place_result
         except (ExecutionAbort, ReconcileConflict) as exc:
-            return self._abort(str(exc), plan=plan, candidate=candidate, debate_outcome=outcome)
+            return self._abort(
+                str(exc), plan=plan, candidate=candidate, debate_outcome=outcome,
+                price_env=price_env,
+            )
 
     # -- Phase-7 reward seam (Decision A/J) ---------------------------------
 
@@ -387,6 +412,7 @@ class Executor:
             epic=candidate.get("epic"),
             candidate=candidate,
             debate_outcome=outcome,
+            spread_pct=(price_env.data or {}).get("spread_pct"),
             gate_results_json=json.dumps({"gates": "1,2,3,4,5 pass"}),
             veto_results_json=json.dumps({"vetos": "pass"}),
             deal_id=place_result.deal_id,
@@ -435,6 +461,7 @@ class Executor:
         epic: str | None,
         candidate: dict[str, Any] | None = None,
         debate_outcome: Any = None,
+        spread_pct: float | None = None,
         gate_results_json: str | None = None,
         veto_results_json: str | None = None,
         deal_id: str | None = None,
@@ -447,7 +474,10 @@ class Executor:
         is logged ``critical`` and never raised — mirrors ``_notify_opened``/
         ``_notify_no_trade`` (Decision J), even though ``ContextRecorder.on_decision``
         already guards itself (defense in depth, same double-guard style as the other
-        seams).
+        seams). ``spread_pct`` (Phase-10 B4-fix, 2026-07-31) is the caller's freshest
+        ``price_env``-derived spread, or ``None`` when no price snapshot was in scope yet
+        (``ContextRecorder`` already accepted this param — the gap was every call site
+        never passing it, see phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md §4 B4).
         """
         if self.context_recorder is None:
             return
@@ -457,6 +487,7 @@ class Executor:
                 epic=epic,
                 candidate=candidate,
                 debate_outcome=debate_outcome,
+                spread_pct=spread_pct,
                 gate_results_json=gate_results_json,
                 veto_results_json=veto_results_json,
                 deal_id=deal_id,

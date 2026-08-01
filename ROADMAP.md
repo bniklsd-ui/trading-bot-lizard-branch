@@ -404,32 +404,83 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 
 ---
 
-## Phase 11 — V4: Sophisticated / Optional *(die alte Phase 9, deferred)*
+## Phase 11 — V3-Fortsetzung: Funnel-/Mess-Fixes *(aus der zweiten Datenwoche-Review)*
 
-> **Status: deferred, gegatet auf Phase 9+10 UND reale Outcomes** (unverändert aus der
+> **Status: 🔄 in Arbeit (seit 2026-08-01).** Numbering claimed 2026-08-01 (Nikinger-Entscheidung)
+> — vorher stand hier "Phase 11 = V4"; V4 ist jetzt **Phase 12** (unten), unverändert im Inhalt.
+> Diese Phase ist **keine** neue AI-Sophistication-Arbeit, sondern das Fix-/Diagnostik-Ergebnis
+> der zweiten V3-Datenwoche: [`phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`](./phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md)
+> §4 (Befunde B1-B5) + §5 (Hypothesen H1-H7). **Directory:** lebt vorerst weiter in
+> [`phase10_v3/`](./phase10_v3/) (`abstain_lessons/`, `market_context/`) — keine physische
+> Verzeichnis-Verschiebung in dieser Session, das ist eine eigene, größere Entscheidung.
+
+**Goal:** die Research-Funnel-/Mess-Probleme beheben, die die zweite V3-Datenwoche aufgedeckt hat
+(366 Zyklen → 1 Kandidat → 0 Trades), bevor an der Richtungslogik selbst weitergearbeitet wird.
+
+### 11a — Bugs aus der Datenwoche-2-Review
+- [x] **B1** `point_value`-Drift (40× Oversizing auf AEX) — P8-Sizing-Quelle + P5-Fail-closed-Guard
+  gefixt (2026-08-01)
+- [x] **B2** Reward-Score-Skala (`debate_confidence` 0-100 statt [0,1]) — Skala gefixt
+  (2026-08-01); Residuum (**H3**, `clean_exit_bonus` auf Stop-outs) bewusst offen gelassen
+- [x] **B5** Paper-/Abstain-Lesson-Prompt/Validator-Zeichengrenzen-Drift — gefixt (2026-08-01)
+- [x] **B4 / H6** leeres Mess-Substrat (`abstain_records.detail`/`spread_pct` nie befüllt) —
+  gefixt (2026-08-01): `detail` wird jetzt aus dem Executor durchgereicht (+ die
+  `Research.last_no_pick_reasoning`-Anreicherung für den dominanten `research_empty`-Fall in der
+  P8-Wiring), `spread_pct` an allen drei `_notify_context`-Call-Sites verdrahtet
+- [ ] **B3** Leverage-Cap ohne Margin-Headroom — **NICHT gefixt, Design + Prep dokumentiert**
+  für eine eigene, größere Session (P1-Adapter-Feld + P5-Gate-4-Änderung, cross-phase; braucht
+  zuerst einen Live-Demo-Call gegen `/markets/{epic}`, um IGs echte Margin-Felder zu bestätigen).
+  Details: `phase5_execution/CLAUDE.md` B3-Block.
+
+### 11b — H1-H7 (offene Hypothesen, Reihenfolge H2→H1→H6, danach datengetrieben H7/H4/H3/H5)
+- [x] **H2** (B1-Anteil) — gefixt, s. 11a. B3-Anteil bleibt offen.
+- [x] **H6** — gefixt, s. 11a (B4).
+- [ ] **H1** *(größter Hebel, nächste eigene Session)* — Shadow-Pairs zeitgesteuert statt an
+  `REASON_DEBATE_ABSTAIN` gekoppelt (neuer Scheduler-Tick + schlanker `PaperEngine`-Einstieg,
+  ~130 Paare/Tag, IG-Allowance-Budget einplanen). Beantwortet WI-2 (Sub-Noise-Geometrie-Frage,
+  **H7**) an einem Tag statt in Wochen.
+- [ ] **H3** — Reward-Loop-Residuum (`clean_exit_bonus` auf Stop-outs) — Designfrage, nach B2.
+- [ ] **H4** — Lesson-Sackgasse aufbrechen (Relevanz-Decay, Doppelzählung Lessons/`recent_trades`
+  beenden, Lessons skopieren).
+- [ ] **H5** — Nachmittag zurückkaufen (Prompt-Caching für Research, `LLMClient(cache_system=True)`
+  existiert bereits, wird von Research nicht genutzt).
+- [ ] **H7** — Geometrie-Rahmenfrage (30/45-Punkte-DAX-Stops gewinnbar?) — datengetrieben, wartet
+  auf H1s Ergebnis.
+
+**Done when:** B1-B5 entschieden (gefixt oder bewusst dokumentiert-deferred, ✅ erreicht
+2026-08-01) UND mindestens H1 gebaut + WI-2 beantwortet.
+
+**Directory:** [`phase10_v3/`](./phase10_v3/) *(vorerst — kein Verzeichnis-Split in dieser Session)*
+
+---
+
+## Phase 12 — V4: Sophisticated / Optional *(die alte Phase 9, deferred; vormals "Phase 11" —
+umnummeriert 2026-08-01, s. Phase 11 oben)*
+
+> **Status: deferred, gegatet auf Phase 9+11 UND reale Outcomes** (unverändert aus der
 > ursprünglichen Phase-9-Formulierung — nur numerisch verschoben, kein Inhalt geändert).
 
 **Goal:** Implement the V2 improvements identified in the Council analysis.
 
-### 11a — Council Skill Integration *(vormals 9a)*
+### 12a — Council Skill Integration *(vormals 9a / 11a)*
 - [ ] Integrate `verbesserungsvorschlaege` as structured input to pipeline
 - [ ] Trigger detection for ad-hoc strategy evaluation
 
-### 11b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b)*
+### 12b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b / 11b)*
 - [ ] Context-window monitoring during debate (~60–70 %)
 - [ ] Compression of Bull/Bear/Judge state into summary
 - [ ] New session continuation
 
-### 11c — Reward/Punishment Reform *(vormals 9d)*
+### 12c — Reward/Punishment Reform *(vormals 9d / 11c)*
 - [ ] `+ process_quality_score` (VETOs, confidence, debate quality, gate path)
 - [ ] Anti-emotionality: separate process score from outcome score
 
-### 11d — Force Trigger Safeguard *(vormals 9e)*
+### 12d — Force Trigger Safeguard *(vormals 9e / 11d)*
 - [ ] Lock force trigger when daily PNL < 0 — das P2-Schema-Feld `force_trigger_locked` existiert
   bereits seit Phase 2, wird aber von keiner Funktion durchgesetzt (kein Force-Trigger existiert
   bisher überhaupt)
 
-### 11e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f, aus Phase 7 hierher verschoben)*
+### 12e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f / 11e, aus Phase 7 hierher verschoben)*
 - [ ] AI extrahiert strukturierte Instincts (`trigger` / `domain` / `confidence` / `evidence_trade_ids`) aus P7 `trade_lessons` + `reward_pts`
 - [ ] Code **validiert** Instincts gegen reale Outcomes; bewährte werden zu **deterministischen Regeln promotet** (`longterm_pre_trade_check()` VETO), mit Prune→Archiv der widerlegten
 - [ ] **Harte Leitplanke:** Promotion in die VETO-Schicht **nur** über einen deterministischen / menschlich gegateten Schritt — eine promotete Regel wird deterministischer Code, die AI sitzt nie in der VETO-Auswertung. Gegatet auf reale Outcomes (≫ `n_min`)
@@ -437,7 +488,7 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 **Done when:** All V4 changes operational, bot demonstrates improved learning signal (process-score
 divergence from outcome-score on bad-market days).
 
-**Directory:** `phase11_v4/` *(to be created)*
+**Directory:** `phase12_v4/` *(to be created)*
 
 ---
 

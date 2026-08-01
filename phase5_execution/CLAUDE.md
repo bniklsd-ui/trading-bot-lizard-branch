@@ -228,15 +228,48 @@ Hand-off „Candidate → Gates → Order" so bauen, dass P6 die Richtungs-/Size
 >   `test_point_value_unmapped_epic_fails_closed_when_map_populated`).** Der frühere „Doku-Notiz
 >   verhindert das nicht"-Befund bleibt als Lehre stehen: die Guard ist jetzt strukturell, nicht
 >   dokumentarisch.
-> - **B3 — `max_leverage = 20.0` lässt weiterhin null Margin-Headroom, NICHT gefixt** —
->   braucht eine Designentscheidung (Nikinger), kein Quickfix (`execution/config.py:114`,
->   `sizing.py:65`): `cap_size` pinnt die Nominale konstruktionsbedingt auf **exakt**
->   `available × 20`, und auf DAX ist dieser Cap bei **jedem** Trade bindend (das Risikomodell
->   verlangt bei 30-Punkte-Stop und 3 % Risiko rechnerisch ~25× Hebel). Der Bot fragt die
->   tatsächliche Margin-Anforderung nie ab. Empirisch am 2026-07-20, selbes Epic, selber Vormittag:
->   Size **22,1 → REJECTED**, Size **22,0 → ACCEPTED**. Nebenwirkung: eine zweite parallele
->   Position (`max_parallel`) ist so nie finanzierbar. Braucht eine Designentscheidung
->   (Headroom im Cap **oder** echte Margin-Abfrage vor der Order) → Phase-11-Scope, ungelockt.
+> - **B3 — `max_leverage = 20.0` lässt null Margin-Headroom, NICHT gefixt — Design + Prep für
+>   eine eigene (größere) Session, Nikinger-Entscheidung 2026-08-01: „richtig lösen, nicht der
+>   Quick-Hack, mit Dokumentation warum und was":**
+>   - **Problem (unverändert):** `cap_size` (`execution/config.py:114` `max_leverage=20.0`,
+>     `sizing.py:65`) pinnt die Nominale konstruktionsbedingt auf **exakt** `available × 20`, und
+>     auf DAX ist dieser Cap bei **jedem** Trade bindend (das Risikomodell verlangt bei
+>     30-Punkte-Stop und 3 % Risiko rechnerisch ~25× Hebel). Der Bot fragt die tatsächliche
+>     Margin-Anforderung nie ab. Empirisch am 2026-07-20, selbes Epic, selber Vormittag: Size
+>     **22,1 → REJECTED**, Size **22,0 → ACCEPTED**. Nebenwirkung: eine zweite parallele Position
+>     (`max_parallel`) ist so nie finanzierbar.
+>   - **Warum kein Quick-Fix** (z. B. `max_leverage` auf 12,0 senken): das ist ein statischer
+>     Puffer ohne Bezug zur echten Margin-Anforderung des Brokers — er müsste pro Instrument
+>     unterschiedlich kalibriert sein (Margin-Faktoren variieren zwischen Indizes/FX/Rohstoffen,
+>     genau die Art Konstante, die schon bei `point_value` als „provisional, non-DAX" gepflegt
+>     werden musste und trotzdem zu B1 führte), verschenkt an margin-entspannten Tagen Size ohne
+>     Not, und löst an margin-engen Tagen das Problem nicht zuverlässig. Eine Doku-Notiz oder ein
+>     geschätzter Puffer ist genau das Muster, das B1 schon einmal nicht verhindert hat.
+>   - **Was (der korrekte Fix, cross-phase P1+P5, für die nächste Session):**
+>     1. **Live-Recherche zuerst (Nikinger-Job, live/network-Test):** IG's `/markets/{epic}`-
+>        Response (`dealingRules`/`instrument`) trägt vermutlich ein Margin-Feld (Kandidaten:
+>        `dealingRules.marginFactor`/`marginFactorUnit`, ggf. `instrument.marginDepositBands`) —
+>        **nicht verifiziert**, `get_market_info`
+>        (`phase1_broker_wrapper/broker_wrapper/adapters/ig_adapter.py:479-513`) extrahiert
+>        aktuell **kein** Margin-Feld in `MarketInfo` (`broker_wrapper/models.py`). Erster Schritt:
+>        ein Live-Demo-Call gegen `/markets/{epic}` für 2-3 Epics (DAX + ein Non-DAX-Epic mit
+>        abweichendem Margin-Faktor, falls erkennbar), rohe Response inspizieren, echte Feldnamen
+>        + die von IG tatsächlich verwendete Margin-Formel bestätigen.
+>     2. `MarketInfo` bekommt ein neues Feld (Name/Typ hängt vom bestätigten IG-Feld ab, z. B.
+>        `margin_factor_pct: float | None`), `get_market_info` extrahiert es.
+>     3. P5 `sizing.compute_size`s `cap_size`-Formel bekommt eine zweite, margin-basierte Grenze
+>        (`available_balance / (price × point_value × margin_factor)` oder die tatsächliche
+>        IG-Formel, sobald bestätigt). `max_leverage` bleibt als sekundäre, konservative
+>        Rückfallgrenze, wenn IG keinen Margin-Faktor liefert — **offene Designfrage für die
+>        nächste Session:** fail-closed (kein Trade) vs. Rückfall auf den bestehenden
+>        Leverage-Cap, wenn der Margin-Faktor fehlt.
+>     4. Tests: neuer P1-Test fürs neue `MarketInfo`-Feld, neue P5-Tests für die margin-basierte
+>        Cap-Formel — inkl. des 22,0/22,1-Grenzfalls aus der Datenwoche als konkreter
+>        Regressionsfall.
+>     5. Danach `smoke_test.py`/`live_test.py` (Nikinger-Job, live/network).
+>   - Bleibt Teil von **H2** (Sizing-Wahrheitskette) im Phase-11-Scope (s.
+>     `phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md` §4 B3, §5 H2) — B1 (dieser Session) war der
+>     kleine, sofort fixbare Teil; B3 ist der größere, cross-phase Teil.
 
 ## Datei-/Modul-Übersicht (Soll, Konzept §"Modul-Plan")
 ```

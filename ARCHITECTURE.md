@@ -37,6 +37,13 @@ updated: 2026-07-06
 > optional items, unchanged content, renumbered). Execution plan:
 > [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md).
 > New package skeleton: [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md).
+>
+> **Correction (2026-08-01):** V3's second data-week review surfaced its own funnel/measurement
+> bugs and open hypotheses (H1-H7) needing a dedicated phase — the Nikinger claimed **Phase 11**
+> for that work (living in `phase10_v3/` for now) and renumbered V4 to **Phase 12** (content
+> unchanged). Every "Phase 11 (V4)" reference below now means Phase 12. Details:
+> [`phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`](./phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md),
+> `ROADMAP.md`'s Phase 11/12 sections.
 
 ---
 
@@ -147,7 +154,7 @@ updated: 2026-07-06
   free-text lesson (language only — no number/score/decision); failures never break the close path
 - **Confidence** (Wilson lower-bound / expectancy-R / N-min) is **observe-only** — it does not
   gate `risk_pct` or anything else in v1. Promotion to an actual VETO ("Instinct→VETO ECC") is
-  deferred to **Phase 11e (V4)**, gated on real outcomes **and** on Phase 9/10 (V2/V3) landing first
+  deferred to **Phase 12e (V4)**, gated on real outcomes **and** on Phase 9/10 (V2/V3) landing first
 - **No VETO touch.** Reward/lessons sit entirely downstream of order execution
 
 ### Scheduler (Phase 8 — ✅ live-verified 2026-07-03, v1.5+v1.6+v1.7 merged)
@@ -206,7 +213,7 @@ updated: 2026-07-06
    on losing days. Recommendation: lock when daily PNL < 0 (root `CLAUDE.md`
    Hard Rule 5). The P2 schema already carries a `force_trigger_locked` flag
    (`persistence/defaults.py`), but no Force Trigger feature exists yet to
-   enforce it against — tracked as Phase 11d (V4), whenever manual override is built.
+   enforce it against — tracked as Phase 12d (V4), whenever manual override is built.
 2. **Score-as-emotion** — addressed by Phase 7: `reward_pts` measures process
    quality (clean exit vs. time-stop, spread tightness, debate signal)
    independently from the outcome component, instead of punishing unlucky
@@ -234,4 +241,5 @@ Per-phase concept + implementation:
 - Phase 8 — [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md) · [`phase8_scheduler/`](./phase8_scheduler/) · hotfix history: [`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md) · [`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.6_HANDOVER.md) · closeout + V2/V3/V4 proposal: [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md) · session journal: [`phase8_scheduler/CLAUDE.md`](./phase8_scheduler/CLAUDE.md)
 - Phase 9 (V2 — Foundation, in Arbeit) — [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md) · [`phase9_universe/`](./phase9_universe/)
 - Phase 10 (V3 — Persistence Reform + No-Trade Lessons + UI, geplant) — no concept doc yet
-- Phase 11 (V4 — Sophisticated/Optional, deferred) — no concept doc yet
+- Phase 11 (V3-Fortsetzung — Funnel-/Mess-Fixes aus Datenwoche-2-Review, in Arbeit) — no concept doc, lives in `phase10_v3/`; see [`phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`](./phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md)
+- Phase 12 (V4 — Sophisticated/Optional, deferred) — no concept doc yet

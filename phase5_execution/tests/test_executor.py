@@ -813,6 +813,96 @@ def test_abstain_sink_fires_on_debate_abstain(
     assert outcome["epic"] == DEFAULT_EPIC
 
 
+def test_abstain_sink_carries_detail_for_debate_abstain(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """Phase-10 B4-fix (2026-07-31): the Judge's own rationale reaches cycle_outcome["detail"]
+    — previously computed for the ExecutionResult but never handed to the classifier, so every
+    AbstainRecord.detail landed at "" (see phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md §4 B4)."""
+    debate = _DebateRunner(
+        _DebateOutcome("ABSTAIN", None, confidence=0.4, rationale="4 consecutive BUY losses")
+    )
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    sink = _RecordingAbstainSink()
+    executor, _ = _build(broker, state, exec_state, debate_runner=debate, abstain_sink=sink)
+
+    executor.run()
+
+    assert sink.calls[0]["detail"] == "4 consecutive BUY losses"
+
+
+def test_abstain_sink_carries_detail_for_veto(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """Same B4-fix, VETO path: cycle_outcome["detail"] carries the VETO's own reason text."""
+    from tests.conftest import make_bars
+
+    broker = FakeBroker(
+        account_env=_account(1500.0),
+        ohlcv_env=_FakeEnv(ok=True, data={"bars": make_bars([18000.0, 17900.0])}),
+    )
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    sink = _RecordingAbstainSink()
+    executor, _ = _build(broker, state, exec_state, abstain_sink=sink)
+
+    executor.run()
+
+    assert sink.calls[0]["detail"]  # non-empty — the VETO's own reason string
+    assert sink.calls[0]["detail"] != ""
+
+
+def test_context_recorder_receives_spread_pct_on_veto_no_trade(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """Phase-10 B4-fix (2026-07-31): a VETO NO_TRADE has a fresh Gate-4 price snapshot in
+    scope (fetched just before the VETOs) — spread_pct now reaches decision_context instead
+    of always NULL (see phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md §4 B4)."""
+    from tests.conftest import make_bars
+
+    broker = FakeBroker(
+        account_env=_account(1500.0),
+        ohlcv_env=_FakeEnv(ok=True, data={"bars": make_bars([18000.0, 17900.0])}),
+    )
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    recorder = _RecordingContextRecorder()
+    executor, _ = _build(broker, state, exec_state, context_recorder=recorder)
+
+    executor.run()
+
+    assert recorder.calls[0]["spread_pct"] == pytest.approx(0.03)  # FakeBroker's default price
+
+
+def test_context_recorder_spread_pct_none_before_gate4(
+    exec_state: ExecutionState,
+) -> None:
+    """A Gate-2 abstain (no candidate) has no price snapshot yet — spread_pct stays None,
+    not a fabricated value."""
+    broker = FakeBroker(account_env=_account(1500.0))
+    state = FakeState(fresh=True, candidates=[])
+    recorder = _RecordingContextRecorder()
+    executor, _ = _build(broker, state, exec_state, context_recorder=recorder)
+
+    executor.run()
+
+    assert recorder.calls[0]["spread_pct"] is None
+
+
+def test_context_recorder_receives_spread_pct_on_trade(
+    exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """Phase-10 B4-fix: the TRADE path also carries spread_pct (it already had price_env in
+    scope, just never passed it to the recorder)."""
+    broker = _full_path_broker()
+    state = FakeState(fresh=True, candidates=[make_candidate(direction="BUY")])
+    recorder = _RecordingContextRecorder()
+    executor, _ = _build(broker, state, exec_state, context_recorder=recorder)
+
+    executor.run()
+
+    assert recorder.calls[0]["spread_pct"] == pytest.approx(0.03)
+
+
 def test_abstain_sink_not_fired_on_trade_path(
     exec_state: ExecutionState, make_candidate: Callable[..., dict[str, Any]]
 ) -> None:

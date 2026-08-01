@@ -28,8 +28,8 @@ updated: 2026-07-06
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — 📗 18KB · system layers, components, risks
 - [DOC_LAYERS_CONVENTION.md](./DOC_LAYERS_CONVENTION.md) — 📗 · generic (project-agnostic) doc-layers spec
 
-## Active phase (10 — V3: Abstain-Lessons + Persistenz-Reform + Paper-Trades)
-- [phase10_v3/CLAUDE.md](../phase10_v3/CLAUDE.md) — 🔄 phase head; Block A ✅ (Monday-restart-proof 2026-07-14) + Block B ✅ (market_context + Paper-Pipeline live 2026-07-17); Council-Paper-Call deferred · [archive](../phase10_v3/SESSIONS_ARCHIVE.md)
+## Active phases (10 — V3: Abstain-Lessons + Persistenz-Reform + Paper-Trades; 11 — V3-Fortsetzung: Funnel-/Mess-Fixes, lives in the same directory)
+- [phase10_v3/CLAUDE.md](../phase10_v3/CLAUDE.md) — 🔄 phase head (covers both Phase 10 and Phase 11 work); Block A ✅ (Monday-restart-proof 2026-07-14) + Block B ✅ (market_context + Paper-Pipeline live 2026-07-17); Council-Paper-Call deferred; Phase 11 (2026-08-01, claimed from the deferred "V4" numbering — V4 is now Phase 12) — B1/B2/B5/B4(H6) fixed, B3 deferred, H1 next session · [archive](../phase10_v3/SESSIONS_ARCHIVE.md)
 - [phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md](../phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md) — 📕 dated Step-2 data analysis (V2-baseline, abstain reasons, gap-check)
 - [phase10_v3/WEEK1_REVIEW_2026-07-17.md](../phase10_v3/WEEK1_REVIEW_2026-07-17.md) — 📕 Step-8 catch-up review: abstain-record distribution + first live `REASON_DEBATE_ABSTAIN` cluster (reflect path unproven, watch item)
 - [phase10_v3/TRADE_DATA_DIAGNOSIS_2026-07-19.md](../phase10_v3/TRADE_DATA_DIAGNOSIS_2026-07-19.md) — 📕 pre-V4 Strukturdiagnose: 6 Befunde (BUY-Abstain-Asymmetrie, Sub-Noise-Stop, Budget-Blindfleck …) + falsifizierbare Watch-Items WI-1…WI-6 für die Datenwoche ab 2026-07-20

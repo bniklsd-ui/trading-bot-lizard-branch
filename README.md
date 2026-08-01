@@ -121,9 +121,12 @@ Circuit-Breaker, Lightstreamer-Multi-Epic-Diagnose → `LiveQuoteCache` in den R
 Step 7b ohne Fix-Target — die LS-Diagnose fand keinen Bug; Live-Baseline-Lauf läuft, Tag-1-Ergebnisse:
 [`phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md`](./phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md).)*
 `ROADMAP.md`s alte Phase 9 (Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC) ist jetzt
-**Phase 11 (V4)** — unverändert im Inhalt, nur numerisch verschoben und gegatet auf Phase 9+10 und
-reale Outcomes; die dazwischenliegende **Phase 10 (V3)** bündelt Persistenz-Reform + No-Trade-
-Lessons + optionales UI. Plan: [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md).
+**Phase 12 (V4)** *(umnummeriert 2026-08-01, war vorher "Phase 11" — Phase 11 ist jetzt die
+V3-Fortsetzung, s. u.)* — unverändert im Inhalt, nur numerisch verschoben und gegatet auf Phase
+9+11 und reale Outcomes; die dazwischenliegende **Phase 10 (V3)** bündelt Persistenz-Reform +
+No-Trade-Lessons + optionales UI, gefolgt von **Phase 11** (V3-Fortsetzung: Funnel-/Mess-Fixes
+aus der zweiten Datenwoche-Review, `phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`).
+Plan: [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md).
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
 Architektur-Diagramm: [`docs/architecture/tradingbot_v2_architecture.svg`](./docs/architecture/tradingbot_v2_architecture.svg)
