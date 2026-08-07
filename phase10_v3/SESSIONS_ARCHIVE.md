@@ -4,7 +4,7 @@ purpose: Verbatim session-history archive rotated out of `CLAUDE.md`
 read-when: auditing how a past phase-10 (V3) decision came about — never needed at session start
 detail: L3
 up: ./CLAUDE.md
-updated: 2026-07-31
+updated: 2026-08-07
 ---
 
 # phase10_v3 — Session Archive
@@ -13,6 +13,111 @@ updated: 2026-07-31
 > rotation rule ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)). Source order
 > preserved (newest-first). The newest `## Session stopped` block always stays in the source file;
 > at each session end, the previously-newest block rotates here.
+
+## Session stopped — 2026-08-01 (H1 built: time-scheduled shadow pairs, default OFF)
+
+> Building session on the same working thread as the earlier 2026-08-01 (Phase 11 claim +
+> B4/H6 + B3-deferred) session — that block rotated verbatim to `SESSIONS_ARCHIVE.md`. Per the
+> Nikinger's confirmed ordering, H1 (time-scheduled shadow pairs) was the next content step: it
+> decouples paper-trade measurement from the collapsed research funnel entirely and answers W2,
+> the root open question everything else is gated on. Planned in Claude-Code plan mode first
+> (anchors verified against live code before writing any line), approved, then built atomically.
+
+### Completed
+- **`PaperEngine.open_scheduled_pairs(epics, deadline=None)`** (`phase10_v3/abstain_lessons/
+  paper.py`) — a new, lean entry point alongside the existing event-triggered
+  `on_debate_abstain`: one shared `now` per tick, opens a Both-Sides-Shadow pair per epic via
+  the existing (unmodified) `open_shadow_pair`, each epic isolated in its own try/except
+  (mirrors `PaperTradeTracker.tick`'s per-epic isolation) so one epic's quote-fetch failure
+  never blocks the rest. Synthetic `abstain_record_id = f"sched:{uuid4()}"` (schema-verified:
+  the column has no FK) — the `sched:` prefix keeps these trivially distinguishable from
+  debate-triggered pairs (bare UUIDs) in later analysis, per the review's own recommendation.
+  Deliberately **no** Council-Paper-Call from this path — that call is conceptually tied to an
+  actual debate-abstain, not a bare timer tick. +6 tests in `phase10_v3/tests/test_paper_engine.py`.
+- **`deadline` guard, added after an Advisor pass caught a real correctness gap in the first
+  cut:** `PaperTradeTracker` only ticks during the WINDOW phase, so a pair opened late enough
+  that `now + max_hold_minutes` lands after `window_close` would sit unresolved overnight; worse,
+  `resolve_paper_trade` checks SL/TP touch on **every** bar with no cut-off at `time_stop_utc`,
+  so a next-morning gap bar can register as a "touch" hours after the intended hold ended — a
+  fabricated fill, not a real one. Fixed by skipping the **whole tick** (same `now`/
+  `max_hold_minutes` for every epic, so either all would overrun the deadline or none would)
+  when the prospective time-stop would exceed a passed-in `deadline`. `wiring.py`'s
+  `shadow_pair_scheduler()` computes that deadline as today's `config.window_close` in the
+  daemon's tz and passes it through — `resolve_paper_trade` itself is **untouched** (it's shared
+  with the debate-triggered path; a behaviour change there is its own decision, not folded in
+  here). +3 more tests in `test_paper_engine.py` (skips whole tick past deadline / proceeds
+  within it / `deadline=None` stays unrestricted).
+- **Scheduler wiring** — the exact structural precedent as the Phase-9 `universe_refresher`
+  (injected closure + fail-soft fire-and-forget wrapper + throttled caller via the shared
+  `_due_after` helper), with one deliberate difference: **no preflight firing** (a timer tick
+  needs no daemon-start warm-up, unlike a universe refresh):
+  - `phase8_scheduler/scheduler/config.py`: `enable_shadow_schedule: bool = False`,
+    `shadow_schedule_interval_min: int = 30`. **Corrected sizing (post deadline-guard, do not
+    use the review's ~130-136 figure):** with `window_close=17:30` and `max_hold_minutes=240`,
+    the last productive tick is 13:30, so at the 8-epic active universe this is **10 ticks ×
+    8 epics ≈ 80 pairs/day**, not 130 — the guard trades some volume for a same-day-clean
+    sample. Still answers WI-2 in ~1-2 sessions instead of two dead weeks. Two tuning levers if
+    more volume is wanted: shrink `shadow_schedule_interval_min` (20 min → ~14 productive ticks
+    ≈ 112 pairs/day) or shorten the scheduled pairs' own hold (would need a separate
+    `max_hold_minutes` for this path — not built, `open_scheduled_pairs` reuses the shared
+    `ExecutionConfig.max_hold_minutes` today). No new CLI flag on the interval (mirrors
+    `universe_refresh_interval_min`/`reflect_daily_cap` — config-only default).
+  - `phase8_scheduler/scheduler/state.py`: `last_shadow_pairs_ts: str | None = None` — cross-day,
+    kept across `rollover_if_new_day` (same category as `last_universe_refresh_ts`).
+  - `phase8_scheduler/scheduler/runner.py`: `shadow_pair_scheduler` ctor param,
+    `_run_shadow_pair_scheduler()` (fail-soft) + `_maybe_run_shadow_pairs()` (throttled), called
+    from the WINDOW phase right after `_maybe_refresh_universe` — independent of the auto-confirm
+    gate, since paper trades never touch real trade caps.
+  - `phase8_scheduler/scripts/wiring.py`: a `shadow_pair_scheduler()` closure inside
+    `build_scheduler()`, gated on `enable_paper_trades AND enable_shadow_schedule` both true,
+    queries `UniverseStore.active_universe()` (identical pattern the `universe_refresher` closure
+    already uses) for the active epic list, computes today's `window_close` deadline, and calls
+    `paper_engine.open_scheduled_pairs(epics, deadline=deadline)`. No dedicated test file for
+    `wiring.py` (documented "operator-run, not pytest-collected" convention) — verified via
+    `py_compile`.
+  - **`phase8_scheduler/scheduler/run.py`: `--enable-shadow-schedule` CLI flag** (mirrors
+    `--enable-ig-bars`/`--enable-paper-debate` exactly — `store_true`, threaded into
+    `config_from_args`). Caught by the same Advisor pass: without this, `enable_shadow_schedule`
+    had no path to `True` via the documented `python -m scheduler.run` entry at all.
+  - +9 tests in `phase8_scheduler/tests/test_runner.py` (none/runs-once/throttled/re-fires-after-
+    interval/not-in-non-WINDOW-phases/fail-soft, mirroring the `universe_refresher` test block),
+    +2 default assertions in `test_config.py`, +2 field roundtrip assertions in `test_state.py`,
+    +1 CLI-flag-threads-through test in `test_run.py`.
+- **Ships default OFF** (`enable_shadow_schedule=False`) — bit-identical to today's behaviour
+  until the Nikinger consciously arms it (mirrors `enable_paper_debate`'s discipline), given the
+  real IG-allowance cost. No live/network run this session (repo convention: live runs are the
+  Nikinger's job) — that's the natural next step once armed.
+- Full cross-phase regression before AND after all edits, everything green: **P1 87 · P2 75 ·
+  P3 100 · P4 155 · P5 173 · P6 76 · P7 138 · P8 229 (was 222, +7) · P9 72 · P10 138 (was 132,
+  +6) · meta_m1_harness 28 · root 77.**
+- Earlier 2026-08-01 session-block (Phase-11-claim + B4/H6 + B3-deferred) verbatim nach
+  `SESSIONS_ARCHIVE.md` rotiert.
+
+### Next
+- **Operator (Nikinger):** flip `--enable-shadow-schedule` on a live demo run once ready (paper
+  trades already default on), and watch the IG-allowance budget — the interval is the tuning
+  knob if it's too hot. This is what actually answers W2 (do the paper pairs' SL/TP/time-stop
+  resolution rates look like the review's W2 hypothesis predicts). **Open verification item for
+  that live run:** confirm whether IG's `get_ohlcv(epic, "MINUTE", 300)` returns only
+  trading-hours bars or includes out-of-hours — this determines how much slack the deadline
+  guard actually needs; not verifiable from the repo, only from a live call.
+- **B3 (its own session, whenever the Nikinger picks it up):** start with the live `/markets/
+  {epic}` inspection — see `phase5_execution/CLAUDE.md`'s B3 block for the exact plan.
+- **`resolve_paper_trade`'s no-cutoff-at-`time_stop_utc` behaviour** (flagged, not fixed — see
+  the deadline-guard note above): if a future session wants belt-and-braces protection on the
+  debate-triggered path too (not just H1's scheduled pairs), that means changing shared Block-B
+  code — a decision for the Nikinger, not a silent fold-in.
+- **H3/H4/H5/H7** remain fully open, data-gated on H1's live results per the review's own
+  ordering — read the resolved scheduled pairs before touching any of them.
+- Scheduler daemon still not started — unchanged, an operator decision outside this session.
+
+### Open questions / blockers
+- **W2 (Sub-Noise geometry) still unanswered** — the whole point of shipping H1 is to answer it;
+  needs a live run with the flag armed, not more code.
+- None new from this session's own work (all edits additive, full regression green) beyond the
+  two items above, both already actioned (deadline guard + CLI flag) or explicitly deferred.
+
+---
 
 ## Session stopped — 2026-08-01 (Phase 11 claimed + B4/H6 fixed + B3 designed-and-deferred)
 
