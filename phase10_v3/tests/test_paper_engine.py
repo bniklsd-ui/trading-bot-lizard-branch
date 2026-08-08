@@ -581,3 +581,78 @@ def test_tracker_bar_fetch_failure_isolated_per_epic(paper_store):
     tracker.tick(now_utc="2026-07-17T10:05:00.000Z")  # must not raise
 
     assert len(paper_store.open_trades()) == 1  # left OPEN, untouched
+
+
+# --- 2026-08-08: staleness + budget guards (DATA_WEEK_REVIEW_2026-08-07 addendum) -----
+
+
+def _stale_trade(epic="X"):
+    """A trade created two days before the tick — resolve_paper_trade would happily
+    match it against unrelated fresh bars, because it filters on `>= created_utc` only."""
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic=epic,
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-15T14:00:00.000Z",
+    )
+    return dataclasses.replace(trade, created_utc="2026-07-15T10:00:00.000Z")
+
+
+def test_tracker_expires_stale_trade_without_fetching(paper_store):
+    paper_store.insert(_stale_trade())
+
+    calls = []
+    # bars that WOULD produce a (fabricated) SL touch if they were ever consulted
+    bars = [_bar("2026-07-17T09:05:00.000Z", 18000, 18010, 17900, 17950)]
+    tracker = PaperTradeTracker(
+        paper_store,
+        bar_fetch=lambda epic: calls.append(epic) or bars,
+        stale_after_minutes=300,
+    )
+    tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    assert calls == []  # the whole point: zero API cost for an unresolvable trade
+    row = paper_store.conn.execute("SELECT status, exit_reason FROM paper_trades").fetchone()
+    assert row[0] == "EXPIRED_UNRESOLVED"
+    assert row[1] is None  # never fabricated an exit
+
+
+def test_tracker_still_resolves_fresh_trade_with_staleness_enabled(paper_store):
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+
+    bars = [_bar("2026-07-17T09:05:00.000Z", 18000, 18050, 17990, 18040)]  # TP touch
+    tracker = PaperTradeTracker(
+        paper_store, bar_fetch=lambda epic: bars, stale_after_minutes=300
+    )
+    tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    row = paper_store.conn.execute("SELECT status, exit_reason FROM paper_trades").fetchone()
+    assert (row[0], row[1]) == ("RESOLVED", "TP")
+
+
+def test_tracker_skips_whole_tick_when_budget_exhausted(paper_store):
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+
+    calls = []
+    tracker = PaperTradeTracker(
+        paper_store,
+        bar_fetch=lambda epic: calls.append(epic) or [],
+        budget_ok=lambda: False,
+    )
+    tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    assert calls == []
+    # left OPEN, not expired: a budget stand-down must not destroy a still-resolvable
+    # trade the way the staleness cut deliberately does.
+    assert len(paper_store.open_trades()) == 1

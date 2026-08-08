@@ -46,6 +46,12 @@ def _utc_iso_now() -> str:
     return _utc_iso(datetime.now(timezone.utc))
 
 
+def _parse_utc(ts: str) -> datetime:
+    """Inverse of :func:`_utc_iso` — every timestamp this module compares is written by
+    it, so the format is fixed and no tolerant parser is warranted."""
+    return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+
+
 class PaperVariant(str, Enum):
     """Which paper-trade mechanism produced this row (V3-D6)."""
 
@@ -440,7 +446,8 @@ class PaperTradeTracker:
     affected epic per tick) — the wiring layer supplies the real ``get_ohlcv`` call
     (resolution/count decided there, phase-isolation kept: no ``broker_wrapper`` import
     here). ``llm``/``reflect_cap_check`` mirror ``AbstainLessonSink``'s shared-cap reflect
-    pattern — one lesson call per **resolved pair**, not per trade.
+    pattern — one lesson call per **resolved pair**, not per trade. ``budget_ok`` is the
+    same shape as ``reflect_cap_check`` deliberately (see ``tick``).
     """
 
     def __init__(
@@ -450,22 +457,66 @@ class PaperTradeTracker:
         llm: Any | None = None,
         reflect_cap_check: Callable[[], bool] | None = None,
         now_fn: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+        stale_after_minutes: int | None = None,
+        budget_ok: Callable[[], bool] | None = None,
     ) -> None:
         self.store = store
         self.bar_fetch = bar_fetch
         self.llm = llm
         self.reflect_cap_check = reflect_cap_check or (lambda: True)
         self.now_fn = now_fn
+        self.stale_after_minutes = stale_after_minutes
+        self.budget_ok = budget_ok or (lambda: True)
 
     def tick(self, now_utc: str | None = None) -> None:
         """Resolve every OPEN trade whose ``time_stop_utc`` has passed. Idempotent —
         a trade already moved to RESOLVED/EXPIRED_UNRESOLVED by a prior tick is no
-        longer in ``open_trades()``, so a repeat tick is a no-op for it."""
+        longer in ``open_trades()``, so a repeat tick is a no-op for it.
+
+        Two guards, both added 2026-08-08 after the first H1 live week exhausted IG's
+        account historical-data allowance (`DATA_WEEK_REVIEW_2026-08-07.md` +
+        its addendum):
+
+        * ``budget_ok`` — checked **once**, before any fetch, so a tripped budget costs
+          zero calls for the whole tick rather than one per epic. Same callable shape as
+          ``reflect_cap_check`` on purpose: the wiring layer owns the policy, this module
+          stays deterministic and broker-agnostic.
+        * ``stale_after_minutes`` — a trade older than this is expired **without** a
+          fetch. This is a correctness guard first and a budget guard second:
+          ``resolve_paper_trade`` filters bars by ``timestamp >= created_utc`` only, and
+          checks the SL touch unconditionally *before* the time-stop bail-out. A
+          days-old trade therefore matches against unrelated fresh bars and resolves
+          with a fabricated exit — silently poisoning the very substrate WI-2 reads.
+          The cut is **wall-clock**, not ``bar_count × bar_minutes``: IG returns the last
+          N *existing* bars, which reach back across the overnight gap. Same hazard
+          ``PaperEngine.open_scheduled_pairs``' deadline guard already exists to prevent.
+        """
+        if not self.budget_ok():
+            logger.warning("PaperTradeTracker tick skipped: fetch budget exhausted")
+            return
+
         now = now_utc or _utc_iso(self.now_fn())
+        stale_before = (
+            _utc_iso(_parse_utc(now) - timedelta(minutes=self.stale_after_minutes))
+            if self.stale_after_minutes is not None
+            else None
+        )
+
         due_by_epic: dict[str, list[PaperTrade]] = {}
+        stale = 0
         for trade in self.store.open_trades():
-            if trade.time_stop_utc <= now:
-                due_by_epic.setdefault(trade.epic, []).append(trade)
+            if trade.time_stop_utc > now:
+                continue
+            if stale_before is not None and trade.created_utc < stale_before:
+                self.store.mark_expired(trade.paper_id, now)
+                stale += 1
+                continue
+            due_by_epic.setdefault(trade.epic, []).append(trade)
+        if stale:
+            logger.warning(
+                "PaperTradeTracker expired %d unresolvable trade(s) older than %s "
+                "(no bar fetch attempted)", stale, stale_before
+            )
 
         for epic, trades in due_by_epic.items():
             try:

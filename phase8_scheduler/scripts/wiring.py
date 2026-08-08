@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
@@ -420,10 +420,34 @@ def _build_paper_engine(config: SchedulerConfig, broker: Any, exec_cfg: Any) -> 
 
 # 1-min bars covering the longest possible hold (v1 max_hold_minutes=240) — well under
 # the IG get_ohlcv 1000-bar cap (phase1_broker_wrapper/adapters/ig_adapter.py:423-441).
+#
+# ⚠ COST: IG bills /prices in **data points, not requests** — this constant is the price
+# of every single tracker fetch. The first H1 live week (2026-08-03/07) exhausted the
+# account's historical-data allowance in about one day at this rate (≥66 successful
+# fetches ≈ 19.800 points) and cascaded 18 of 22 instrument_universe epics into
+# quarantine. Do not raise it without a budget calculation.
 _PAPER_BAR_COUNT = 300
 
+# How long the tracker stands down after IG reports the allowance exhausted. While
+# tripped it makes **zero** calls (budget_ok is checked once per tick), so the worst case
+# is one probe per cooldown instead of one per epic per 5-minute cycle.
+_PAPER_BUDGET_COOLDOWN_MIN = 60
 
-def _build_paper_tracker(config: SchedulerConfig, broker: Any) -> Any:
+# ponytail: leave a reserve rather than running to zero, so the Phase-9 promotion probe
+# (verify_instrument.check_ig_side, ~3 points/epic/round) keeps working and does not read
+# our own budget exhaustion as instrument unsuitability — that is exactly the cascade of
+# 2026-08-04. The number is a placeholder until a successful call reports the real
+# `totalAllowance`; it is logged on the first success (see bar_fetch) so it can be tuned
+# against an observed value instead of a guess.
+#
+# ⚠ FAILURE MODE, not just imprecision: if the real totalAllowance turns out to be at or
+# below this floor, budget_ok() is false essentially always and the tracker silently
+# resolves nothing — the only signal is a CRITICAL log line. Check the logged allowance
+# object after the first successful fetch and lower this if needed.
+_PAPER_ALLOWANCE_FLOOR = 2000
+
+
+def _build_paper_tracker(config: SchedulerConfig, broker: Any, exec_cfg: Any) -> Any:
     """Build the Phase-10 (V3) Block-B :class:`PaperTradeTracker`. ``bar_fetch`` wraps
     one ``get_ohlcv(epic, "MINUTE", _PAPER_BAR_COUNT)`` call per affected epic per
     tick. ``reflect_cap_check`` reads **both** stores' daily lesson counts against the
@@ -435,6 +459,11 @@ def _build_paper_tracker(config: SchedulerConfig, broker: Any) -> Any:
     correct against ``created_utc``/``time_stop_utc`` regardless of ``config.tz``, and
     this best-effort secondary system doesn't need lock-step determinism with the main
     executor loop.
+
+    ``exec_cfg`` is threaded in (2026-08-08) only to derive the staleness cut from the
+    **same** ``max_hold_minutes`` the engine sizes the trade with — a second hardcoded
+    copy of that number is precisely the drift class that caused finding B1
+    (``point_values`` diverging from the DB universe).
     """
     from abstain_lessons.paper import PaperTradeTracker
     from abstain_lessons.paper_store import PaperTradeStore
@@ -445,11 +474,48 @@ def _build_paper_tracker(config: SchedulerConfig, broker: Any) -> Any:
     abstain_store = AbstainStore(str(_DB_PATH))
     abstain_store.ensure_schema()
 
+    blocked_until: datetime | None = None
+    allowance_logged = False
+
     def bar_fetch(epic: str) -> list[dict[str, Any]]:
+        nonlocal blocked_until, allowance_logged
         env = broker.get_ohlcv(epic, "MINUTE", _PAPER_BAR_COUNT)
         if not env.ok:
-            raise RuntimeError(f"get_ohlcv not ok for {epic}")
-        return (env.data or {}).get("bars", [])
+            err = env.error or {}
+            code = err.get("code") if isinstance(err, dict) else getattr(err, "code", None)
+            if code == "RATE_LIMIT":
+                # IG reports allowance exhaustion as 403 exceeded-*-allowance, mapped to
+                # RATE_LIMIT by the adapter. Retrying costs calls we do not have.
+                blocked_until = datetime.now(timezone.utc) + timedelta(
+                    minutes=_PAPER_BUDGET_COOLDOWN_MIN
+                )
+                logger.critical(
+                    "PaperTradeTracker fetch budget tripped until %s: %s", blocked_until, err
+                )
+            # env.error carried the only copy of IG's real error code and was dropped
+            # here until 2026-08-08 — 4232 CRITICAL lines that quarter named no cause.
+            raise RuntimeError(f"get_ohlcv not ok for {epic}: {err}")
+        data = env.data or {}
+        allowance = data.get("allowance") or {}
+        if not allowance_logged and allowance:
+            allowance_logged = True
+            # totalAllowance sizes the budget, allowanceExpiry dates its reset — both are
+            # the open questions from DATA_WEEK_REVIEW_2026-08-07 and both arrive free in
+            # this envelope. Log once per process, not per fetch.
+            logger.info("IG historical-data allowance: %s", allowance)
+        remaining = allowance.get("remainingAllowance")
+        if isinstance(remaining, (int, float)) and remaining < _PAPER_ALLOWANCE_FLOOR:
+            blocked_until = datetime.now(timezone.utc) + timedelta(
+                minutes=_PAPER_BUDGET_COOLDOWN_MIN
+            )
+            logger.critical(
+                "PaperTradeTracker fetch budget floor reached (remaining=%s < %s), "
+                "standing down until %s", remaining, _PAPER_ALLOWANCE_FLOOR, blocked_until
+            )
+        return data.get("bars", [])
+
+    def budget_ok() -> bool:
+        return blocked_until is None or datetime.now(timezone.utc) >= blocked_until
 
     llm = None
     if config.enable_abstain_reflect:
@@ -477,7 +543,14 @@ def _build_paper_tracker(config: SchedulerConfig, broker: Any) -> Any:
         )
         return combined < config.reflect_daily_cap
 
-    return PaperTradeTracker(paper_store, bar_fetch, llm=llm, reflect_cap_check=reflect_cap_check)
+    return PaperTradeTracker(
+        paper_store, bar_fetch, llm=llm, reflect_cap_check=reflect_cap_check,
+        # +60 min of slack over the hold itself: past that we cannot assume the fetched
+        # bar window is still same-session, and resolve_paper_trade has no session-gap
+        # awareness (it filters on `timestamp >= created_utc` only).
+        stale_after_minutes=exec_cfg.max_hold_minutes + 60,
+        budget_ok=budget_ok,
+    )
 
 
 def _enrich_abstain_detail(inner: Any, research: Any) -> Any:
@@ -666,7 +739,7 @@ def build_scheduler(
     paper_tracker = None
     if config.enable_paper_trades:
         paper_engine = _build_paper_engine(config, broker, exec_cfg)
-        paper_tracker = _build_paper_tracker(config, broker)
+        paper_tracker = _build_paper_tracker(config, broker, exec_cfg)
     shadow_pair_scheduler = None
     if config.enable_paper_trades and config.enable_shadow_schedule:
         def shadow_pair_scheduler() -> None:
