@@ -248,6 +248,7 @@ class FakeDB:
         min_hold_min: float | None = None,
         quarantine_before: str | None = None,
         exclude_provenance: tuple[str, ...] = (),
+        max_age_days: int | None = None,
     ) -> list[dict[str, Any]]:
         # v1.5 (Step 4 A): the provenance-filtered prompt getter context_builder now calls.
         # Records the request (n → lesson_n so the limit assertion still holds; the filter
@@ -260,6 +261,7 @@ class FakeDB:
                 "min_hold_min": min_hold_min,
                 "quarantine_before": quarantine_before,
                 "exclude_provenance": exclude_provenance,
+                "max_age_days": max_age_days,
             }
         )
         return list(self._for_prompt_lessons)

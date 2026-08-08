@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -298,6 +299,7 @@ class Database:
         min_hold_min: float | None = None,
         quarantine_before: str | None = None,
         exclude_provenance: tuple[str, ...] = (),
+        max_age_days: int | None = None,
     ) -> list[dict[str, Any]]:
         """The ``n`` newest lessons **after** dropping verification-trade noise (v1.5 Step 4 A).
 
@@ -322,6 +324,18 @@ class Database:
           ``hold_duration_min IS NULL → keep`` = fail-open toward keeping real lessons.
         - ``quarantine_before`` (**reversible reset**): drops lessons with ``extracted_at`` before
           this ISO timestamp — a one-time hard reset the operator can enable; ``None`` = off.
+        - ``max_age_days`` (**rolling decay**, H4-a, 2026-08-08): drops lessons older than this
+          many days. Deliberately a *separate* knob from ``quarantine_before`` even though both
+          end up as an ``extracted_at >=`` bound: one is a one-off operator reset with a fixed
+          date, the other is a standing policy with a moving one. Overloading a single parameter
+          with both would save a line here and cost an hour the next time either is debugged.
+
+          **Why it exists:** by 2026-08-08 the four lessons on record (from the only four trades
+          the bot ever made, all BUY, all losses) had been rendered into the research prompt
+          5.973 times, the oldest of them 36 days running. Four data points cannot be allowed to
+          own 100 % of every decision indefinitely. The cutoff is computed here rather than in
+          SQL because SQLite's ``datetime('now')`` emits ``"YYYY-MM-DD HH:MM:SS"``, which does
+          **not** string-compare correctly against this project's ``...T...mmmZ`` timestamps.
 
         Provenance/quality here only shapes the **prompt**; it never touches the reward/score math.
         """
@@ -341,6 +355,12 @@ class Database:
         if quarantine_before is not None:
             clauses.append("extracted_at >= ?")
             params.append(quarantine_before)
+        if max_age_days is not None:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+            clauses.append("extracted_at >= ?")
+            params.append(
+                cutoff.strftime("%Y-%m-%dT%H:%M:%S.") + f"{cutoff.microsecond // 1000:03d}Z"
+            )
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
         params.append(n)
         cur = self.conn.execute(

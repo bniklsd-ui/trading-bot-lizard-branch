@@ -275,6 +275,28 @@ def test_for_prompt_quarantine_before(db, base_trade):
     assert "new" in texts
 
 
+def test_for_prompt_max_age_days_drops_stale_lessons(db, base_trade):
+    """H4-a: four lessons had owned every research prompt for weeks (5.973 renderings,
+    the oldest 36 days running). The age cap is relative to now, unlike the fixed-date
+    ``quarantine_before`` — hence the computed timestamps here."""
+    from datetime import datetime, timedelta, timezone
+
+    def _iso(days_ago: int) -> str:
+        ts = datetime.now(timezone.utc) - timedelta(days=days_ago)
+        return ts.strftime("%Y-%m-%dT%H:%M:%S.") + f"{ts.microsecond // 1000:03d}Z"
+
+    tid = db.insert_trade(base_trade)
+    db.insert_lesson(tid, {"lesson_text": "ancient", "extracted_at": _iso(40)})
+    db.insert_lesson(tid, {"lesson_text": "stale", "extracted_at": _iso(31)})
+    db.insert_lesson(tid, {"lesson_text": "fresh", "extracted_at": _iso(3)})
+
+    texts = [l["lesson_text"] for l in db.get_recent_lessons_for_prompt(5, max_age_days=30)]
+    assert texts == ["fresh"]
+
+    # off by default — the pre-H4-a behaviour stays reachable for a controlled A/B
+    assert len(db.get_recent_lessons_for_prompt(5)) == 3
+
+
 def test_for_prompt_combined_returns_newest_n_survivors(db, base_trade):
     tid = db.insert_trade(base_trade)  # never closed → NULL hold (not dropped by hold rule)
     db.insert_lesson(tid, {"lesson_text": "drop-verif", "market_context_json": {"provenance": "verification"}})

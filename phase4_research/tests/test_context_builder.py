@@ -237,6 +237,9 @@ def test_lesson_prompt_filter_uses_config_values(
             "min_hold_min": 3.0,
             "quarantine_before": "2026-07-01T00:00:00.000Z",
             "exclude_provenance": ("verification",),
+            # H4-a (2026-08-08): the rolling age cap rides along with the three quality
+            # filters. 30 is ResearchConfig's default, not something this test sets.
+            "max_age_days": 30,
         }
     ]
 

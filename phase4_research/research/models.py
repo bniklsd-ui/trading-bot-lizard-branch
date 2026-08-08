@@ -646,6 +646,19 @@ class ResearchConfig:
     lesson_min_hold_min: float = 2.0
     lesson_quarantine_before: str | None = None
 
+    # --- H4-a: rolling lesson age cap (Phase 11, 2026-08-08, Nikinger-set at 30) ---
+    # Why: the three knobs above filter for *quality*; none of them bounds *age*. By
+    # 2026-08-08 the four lessons on record — distilled from the only four trades the bot
+    # ever made, all BUY, all losses — had been rendered into the prompt 5.973 times, the
+    # oldest of them for 36 days straight, while the same prompt separately carried those
+    # same four trades in its `recent_trades` block. Four data points owning 100 % of every
+    # decision is the feedback loop DATA_WEEK_REVIEW_2026-07-31 §5 named as H4.
+    # At 30 days three of the four current lessons drop out; at 14 all four would. 30 is the
+    # deliberate smaller step (Nikinger, 2026-08-08) — if the funnel still produces zero
+    # candidates with one lesson left, the lessons were not the cause and H4 is cleanly
+    # falsified. `None` = off (pre-H4-a behaviour, kept for a controlled A/B).
+    lesson_max_age_days: int | None = 30
+
     # --- trade-history provenance filter (v1.6 Phase-8 hotfix, Cause A part 2, 2026-07-02) ---
     # Why: v1.5 above cleaned the *lessons* channel only. ``build_context`` also reads
     # ``db.get_recent_trades`` — the raw trade-history table rendered into the same prompt as a

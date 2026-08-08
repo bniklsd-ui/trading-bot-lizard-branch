@@ -264,6 +264,10 @@ def build_context(
         min_hold_min=config.lesson_min_hold_min,
         quarantine_before=config.lesson_quarantine_before,
         exclude_provenance=config.lesson_exclude_provenance,
+        # H4-a (2026-08-08): rolling age cap on top of the three quality filters — see
+        # ResearchConfig.lesson_max_age_days for why four lessons must stop owning every
+        # decision. `_render_lessons` already handles the empty list ("none on record").
+        max_age_days=config.lesson_max_age_days,
     )
     bot_score = db.get_current_score()
     risk_level = db.get_risk_level()
