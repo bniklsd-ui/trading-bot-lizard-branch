@@ -459,6 +459,7 @@ class PaperTradeTracker:
         now_fn: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
         stale_after_minutes: int | None = None,
         budget_ok: Callable[[], bool] | None = None,
+        max_fetch_attempts: int | None = None,
     ) -> None:
         self.store = store
         self.bar_fetch = bar_fetch
@@ -467,6 +468,11 @@ class PaperTradeTracker:
         self.now_fn = now_fn
         self.stale_after_minutes = stale_after_minutes
         self.budget_ok = budget_ok or (lambda: True)
+        self.max_fetch_attempts = max_fetch_attempts
+        # In-memory on purpose: the daemon runs for days at a time, so this is durable
+        # enough for its job, and `stale_after_minutes` is the backstop across a restart.
+        # A column would cost a migration to bound something already bounded.
+        self._fetch_attempts: dict[str, int] = {}
 
     def tick(self, now_utc: str | None = None) -> None:
         """Resolve every OPEN trade whose ``time_stop_utc`` has passed. Idempotent —
@@ -523,8 +529,38 @@ class PaperTradeTracker:
                 bars = self.bar_fetch(epic)
             except Exception as exc:  # noqa: BLE001 — isolate one epic's fetch failure
                 logger.critical("PaperTradeTracker bar fetch failed for %s: %s", epic, exc)
+                self._charge_failed_attempt(trades, now)
                 continue
             self._resolve_group(trades, bars, now)
+
+    def _charge_failed_attempt(self, trades: list[PaperTrade], now: str) -> None:
+        """Count one failed fetch against each trade in the group; expire at the cap.
+
+        A trade needs exactly **one** successful fetch: a successful `_resolve_group`
+        always terminates it, either RESOLVED or EXPIRED_UNRESOLVED. So a failed fetch is
+        the only way a trade survives a tick, and capping those failures caps the retries.
+
+        Without this, a due trade is re-fetched every cycle until `stale_after_minutes`
+        expires it — up to 60 attempts at a 5-minute cadence, all of them against an
+        endpoint that just refused the previous one. The cap makes the worst case a
+        function of how many trades are due, not of how long the failure lasts.
+
+        Deliberately **not** charged when `budget_ok` stands the tick down: no call was
+        made, so no attempt was spent.
+        """
+        if self.max_fetch_attempts is None:
+            return
+        for trade in trades:
+            attempts = self._fetch_attempts.get(trade.paper_id, 0) + 1
+            if attempts >= self.max_fetch_attempts:
+                self.store.mark_expired(trade.paper_id, now)
+                self._fetch_attempts.pop(trade.paper_id, None)
+                logger.warning(
+                    "PaperTradeTracker gave up on %s after %d failed fetches",
+                    trade.paper_id, attempts,
+                )
+            else:
+                self._fetch_attempts[trade.paper_id] = attempts
 
     def _resolve_group(
         self, trades: list[PaperTrade], bars: Sequence[Mapping[str, Any]], now: str

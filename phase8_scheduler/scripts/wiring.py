@@ -433,6 +433,12 @@ _PAPER_BAR_COUNT = 300
 # is one probe per cooldown instead of one per epic per 5-minute cycle.
 _PAPER_BUDGET_COOLDOWN_MIN = 60
 
+# A due trade needs exactly one successful fetch. After this many failed ones it is
+# written off as unresolvable rather than retried until the staleness cut catches it
+# (which at a 5-minute cadence would be ~60 attempts against an endpoint that just
+# refused the last one). Bounds retries by trades due, not by outage length.
+_PAPER_MAX_FETCH_ATTEMPTS = 3
+
 # ponytail: leave a reserve rather than running to zero, so the Phase-9 promotion probe
 # (verify_instrument.check_ig_side, ~3 points/epic/round) keeps working and does not read
 # our own budget exhaustion as instrument unsuitability — that is exactly the cascade of
@@ -550,6 +556,7 @@ def _build_paper_tracker(config: SchedulerConfig, broker: Any, exec_cfg: Any) ->
         # awareness (it filters on `timestamp >= created_utc` only).
         stale_after_minutes=exec_cfg.max_hold_minutes + 60,
         budget_ok=budget_ok,
+        max_fetch_attempts=_PAPER_MAX_FETCH_ATTEMPTS,
     )
 
 

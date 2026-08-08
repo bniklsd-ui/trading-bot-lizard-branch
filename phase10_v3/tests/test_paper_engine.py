@@ -656,3 +656,58 @@ def test_tracker_skips_whole_tick_when_budget_exhausted(paper_store):
     # left OPEN, not expired: a budget stand-down must not destroy a still-resolvable
     # trade the way the staleness cut deliberately does.
     assert len(paper_store.open_trades()) == 1
+
+
+def test_tracker_gives_up_on_a_trade_after_max_fetch_attempts(paper_store):
+    """A due trade must not be re-fetched forever: one successful fetch always
+    terminates it, so a bounded number of *failed* fetches bounds the retries."""
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+
+    calls = []
+
+    def _raising_fetch(epic):
+        calls.append(epic)
+        raise RuntimeError("get_ohlcv not ok")
+
+    tracker = PaperTradeTracker(
+        paper_store, bar_fetch=_raising_fetch, max_fetch_attempts=3
+    )
+    for _ in range(10):  # ten ticks, but only three may reach the broker
+        tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    assert len(calls) == 3
+    row = paper_store.conn.execute("SELECT status FROM paper_trades").fetchone()
+    assert row[0] == "EXPIRED_UNRESOLVED"
+
+
+def test_budget_standdown_does_not_consume_fetch_attempts(paper_store):
+    """No call was made, so no attempt was spent — otherwise a long outage would burn
+    every trade's budget without ever asking the broker."""
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+
+    allowed = False
+    bars = [_bar("2026-07-17T09:05:00.000Z", 18000, 18050, 17990, 18040)]  # TP touch
+    tracker = PaperTradeTracker(
+        paper_store, bar_fetch=lambda epic: bars,
+        budget_ok=lambda: allowed, max_fetch_attempts=3,
+    )
+    for _ in range(5):
+        tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+    assert len(paper_store.open_trades()) == 1  # survived the stand-down intact
+
+    allowed = True
+    tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+    row = paper_store.conn.execute("SELECT status, exit_reason FROM paper_trades").fetchone()
+    assert (row[0], row[1]) == ("RESOLVED", "TP")
