@@ -75,16 +75,23 @@ def _discovered(epic: str, **overrides) -> UniverseRecord:
 class _FakeBroker:
     """``get_market_info`` + ``get_ohlcv``, both fully controllable per epic."""
 
-    def __init__(self, market_infos: dict, ohlcv_ok: dict | None = None):
+    def __init__(self, market_infos: dict, ohlcv_ok: dict | None = None,
+                 ohlcv_error_code: str | None = None):
         self.market_infos = market_infos
         self.ohlcv_ok = ohlcv_ok or {}
+        self.ohlcv_error_code = ohlcv_error_code
 
     def get_market_info(self, epic: str):
         return self.market_infos.get(epic, _env(False))
 
     def get_ohlcv(self, epic: str, resolution: str, count: int):
         ok = self.ohlcv_ok.get(epic, True)
-        return _env(ok, {"bars": [1, 2, 3]} if ok else {})
+        if ok:
+            return _env(True, {"bars": [1, 2, 3]})
+        env = _env(False, {})
+        if self.ohlcv_error_code:
+            env.error = {"message": "boom", "code": self.ohlcv_error_code}
+        return env
 
 
 class _FakeFetcher:
@@ -302,6 +309,72 @@ def test_demotion_after_ig_fails(store: UniverseStore):
 
     # Cycle 3: fail_count 2->3 >= demote_after_fails -> quarantined
     report = run_promotion_cycle(broker, fetcher, store, is_demo=True, demote_after_fails=3, sleep_fn=_no_sleep)
+    assert store.get(epic).status == STATUS_QUARANTINED
+    assert epic in report.demoted
+
+
+# -- Indeterminate IG verdicts (2026-08-08) ------------------------------------
+# Live finding 2026-08-04: the paper tracker exhausted the ACCOUNT's historical-data
+# allowance, so every get_ohlcv returned RATE_LIMIT and check_ig_side reported
+# ig_ohlcv_available=false for EVERY epic in the same round. 18 of 22 were quarantined,
+# including the DAX/CAC/IBEX/AEX/STXE core Phase 9 had spent weeks verifying. A budget
+# ceiling is a fact about our API quota, not about the instrument.
+
+
+def test_rate_limited_ohlcv_never_demotes_an_active_epic(store: UniverseStore):
+    epic = "IX.D.DAX.IFMM.IP"
+    store.upsert_discovered(_discovered(
+        epic, status=STATUS_ACTIVE, point_value=1.0, point_value_source="ig_fields",
+    ))
+    # market_info healthy (as it really was), only the /prices probe rate-limited
+    broker = _FakeBroker(
+        {epic: _passing_market_info()}, ohlcv_ok={epic: False}, ohlcv_error_code="RATE_LIMIT",
+    )
+    fetcher = _FakeFetcher()
+
+    for _ in range(5):  # five rounds: without the guard this quarantines after three
+        report = run_promotion_cycle(
+            broker, fetcher, store, is_demo=True, demote_after_fails=3, sleep_fn=_no_sleep,
+        )
+
+    rec = store.get(epic)
+    assert rec.status == STATUS_ACTIVE
+    assert rec.fail_count == 0        # no strike...
+    assert report.demoted == []
+    assert report.quarantined == []
+
+
+def test_rate_limited_ohlcv_does_not_quarantine_a_discovered_candidate(store: UniverseStore):
+    epic = "IX.D.CAC.IFE.IP"
+    store.upsert_discovered(_discovered(epic))
+    broker = _FakeBroker(
+        {epic: _passing_market_info()}, ohlcv_ok={epic: False}, ohlcv_error_code="RATE_LIMIT",
+    )
+    fetcher = _FakeFetcher()
+
+    report = run_promotion_cycle(broker, fetcher, store, is_demo=True, sleep_fn=_no_sleep)
+
+    rec = store.get(epic)
+    assert rec.status == STATUS_DISCOVERED
+    assert rec.fail_count == 0
+    assert report.quarantined == []
+
+
+def test_a_genuine_ohlcv_failure_still_demotes(store: UniverseStore):
+    """The guard must be narrow: an epic whose bars are unavailable for its own reason
+    (no RATE_LIMIT code) keeps demoting exactly as before."""
+    epic = "IX.D.DAX.IFMM.IP"
+    store.upsert_discovered(_discovered(
+        epic, status=STATUS_ACTIVE, point_value=1.0, point_value_source="ig_fields",
+    ))
+    broker = _FakeBroker({epic: _passing_market_info()}, ohlcv_ok={epic: False})
+    fetcher = _FakeFetcher()
+
+    for _ in range(3):
+        report = run_promotion_cycle(
+            broker, fetcher, store, is_demo=True, demote_after_fails=3, sleep_fn=_no_sleep,
+        )
+
     assert store.get(epic).status == STATUS_QUARANTINED
     assert epic in report.demoted
 

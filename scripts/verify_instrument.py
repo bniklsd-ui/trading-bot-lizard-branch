@@ -103,6 +103,15 @@ def _error_message(env: Any) -> str | None:
     return str(err)
 
 
+def _error_code(env: Any) -> str | None:
+    """The Envelope error's machine-readable ``code`` (e.g. ``"RATE_LIMIT"``), if any."""
+    err = getattr(env, "error", None)
+    if isinstance(err, dict):
+        code = err.get("code")
+        return str(code) if code else None
+    return getattr(err, "code", None) if err is not None else None
+
+
 # -- IG side --------------------------------------------------------------------------------
 
 def check_ig_side(
@@ -127,9 +136,12 @@ def check_ig_side(
     min_deal_size_ok = info_ok and isinstance(min_deal_size, (int, float)) and min_deal_size > 0
 
     ohlcv_available = False
+    ohlcv_error_code: str | None = None
     try:
         ohlcv_env = broker.get_ohlcv(epic, _OHLCV_RESOLUTION, _OHLCV_COUNT)
         ohlcv_available = _ok(ohlcv_env) and bool(_data(ohlcv_env).get("bars"))
+        if not ohlcv_available:
+            ohlcv_error_code = _error_code(ohlcv_env)
     except Exception:  # noqa: BLE001 — a probe must never crash the run
         ohlcv_available = False
     finally:
@@ -143,6 +155,9 @@ def check_ig_side(
         "min_deal_size": min_deal_size,
         "min_deal_size_ok": min_deal_size_ok,
         "ig_ohlcv_available": ohlcv_available,
+        # 2026-08-08: *why* the probe failed, so a caller can tell an unsuitable
+        # instrument apart from an account-wide condition. See `verdict_for`.
+        "ig_ohlcv_error_code": ohlcv_error_code,
     }
 
 
@@ -211,6 +226,10 @@ def verdict_for(epic: str, ig_checks: dict[str, Any], yf_checks: dict[str, Any])
         "checks": checks,
         "verdict": "FAIL" if failed_checks else "PASS",
         "failed_checks": failed_checks,
+        # Top-level, deliberately **outside** ``checks``: it must not reach
+        # ``failed_checks`` or Phase-9's ``_ig_side_failed``/``_yf_side_failed``, which
+        # both scan ``checks`` for boolean False. Callers that care read it explicitly.
+        "ig_ohlcv_error_code": ig_checks.get("ig_ohlcv_error_code"),
     }
 
 

@@ -51,6 +51,7 @@ class _FakeBroker:
         info_error: dict[str, Any] | None = None,
         ohlcv_ok: bool = True,
         ohlcv_bars: bool = True,
+        ohlcv_error: dict[str, Any] | None = None,
         connect_ok: bool = True,
     ) -> None:
         self._info_ok = info_ok
@@ -59,6 +60,7 @@ class _FakeBroker:
         self._info_error = info_error
         self._ohlcv_ok = ohlcv_ok
         self._ohlcv_bars = ohlcv_bars
+        self._ohlcv_error = ohlcv_error
         self._connect_ok = connect_ok
         self.calls: list[str] = []
 
@@ -74,7 +76,7 @@ class _FakeBroker:
     def get_ohlcv(self, epic: str, resolution: str, count: int) -> _Env:
         self.calls.append(f"ohlcv:{epic}")
         if not self._ohlcv_ok:
-            return _Env(ok=False)
+            return _Env(ok=False, error=self._ohlcv_error)
         return _Env(ok=True, data={"bars": [{"close": 1.0}] if self._ohlcv_bars else []})
 
 
@@ -149,6 +151,33 @@ def test_check_ig_side_no_ohlcv_bars_fails() -> None:
     broker = _FakeBroker(ohlcv_bars=False)
     result = verify_instrument_mod.check_ig_side(broker, EPIC, sleep_fn=_no_sleep)
     assert result["ig_ohlcv_available"] is False
+
+
+def test_check_ig_side_reports_the_ohlcv_error_code() -> None:
+    """The probe must say *why* it failed, so a caller can tell an unsuitable instrument
+    apart from an account-wide condition (live finding 2026-08-04: an exhausted
+    historical-data allowance made every epic look unsuitable at once)."""
+    broker = _FakeBroker(ohlcv_ok=False, ohlcv_error={"code": "RATE_LIMIT", "message": "403"})
+    result = verify_instrument_mod.check_ig_side(broker, EPIC, sleep_fn=_no_sleep)
+    assert result["ig_ohlcv_available"] is False
+    assert result["ig_ohlcv_error_code"] == "RATE_LIMIT"
+
+
+def test_ohlcv_error_code_rides_on_the_verdict_but_never_in_checks() -> None:
+    """It must stay out of ``checks``: both ``failed_checks`` and Phase-9's
+    ``_ig_side_failed``/``_yf_side_failed`` scan that dict for boolean False."""
+    broker = _FakeBroker(ohlcv_ok=False, ohlcv_error={"code": "RATE_LIMIT"})
+    verdict = verify_instrument_mod.verify_instrument(
+        broker, _FakeFetcher(), EPIC, sleep_fn=_no_sleep
+    )
+    assert verdict["ig_ohlcv_error_code"] == "RATE_LIMIT"
+    assert "ig_ohlcv_error_code" not in verdict["checks"]
+    assert "ig_ohlcv_error_code" not in verdict["failed_checks"]
+
+
+def test_check_ig_side_error_code_is_none_when_the_probe_succeeds() -> None:
+    result = verify_instrument_mod.check_ig_side(_FakeBroker(), EPIC, sleep_fn=_no_sleep)
+    assert result["ig_ohlcv_error_code"] is None
 
 
 def test_check_ig_side_market_info_not_ok_degrades_without_crash() -> None:

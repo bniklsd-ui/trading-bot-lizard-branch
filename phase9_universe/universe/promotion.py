@@ -99,6 +99,30 @@ def _ig_side_failed(verdict: dict[str, Any]) -> bool:
     return any(checks.get(name) is False for name in _IG_SIDE_CHECKS)
 
 
+# Error codes that say "this account cannot ask right now", not "this instrument is
+# unsuitable". A verdict carrying one of these is INDETERMINATE, not a failure.
+_INDETERMINATE_IG_ERRORS = frozenset({"RATE_LIMIT"})
+
+
+def _ig_side_indeterminate(verdict: dict[str, Any]) -> bool:
+    """True when the IG probe failed for an account-wide reason, so the verdict says
+    nothing about the instrument.
+
+    **Live finding 2026-08-04/08:** the paper tracker exhausted the account's historical-
+    data allowance. Every ``get_ohlcv`` then returned ``RATE_LIMIT``, so ``check_ig_side``
+    reported ``ig_ohlcv_available: false`` for **every** epic in the same verify round —
+    and the demotion path below read that as 22 simultaneously unsuitable instruments.
+    18 of 22 were quarantined, including the DAX/CAC/IBEX/AEX/STXE core that Phase 9 had
+    spent weeks verifying to ``point_value_source='ig_fields'``.
+
+    The distinction that was missing: ``currency_eur``/``min_deal_size_ok`` come from
+    ``get_market_info``, which stayed healthy the whole time. One endpoint being
+    rate-limited is a fact about our API budget, not about the instrument — and the right
+    response to "we learned nothing" is to change nothing, not to count a strike.
+    """
+    return verdict.get("ig_ohlcv_error_code") in _INDETERMINATE_IG_ERRORS
+
+
 def _yf_side_failed(verdict: dict[str, Any]) -> bool:
     checks = verdict.get("checks", {})
     return any(
@@ -169,6 +193,15 @@ def run_promotion_cycle(
         # finding: one flaky-yf afternoon quarantined 7 IG-green instruments
         # at discovery, and the 2**fail_count backoff then froze the whole
         # universe for hours — an activation obstacle C3 explicitly forbids).
+        if _ig_side_indeterminate(verdict):
+            # No DB write at all — not the status, not the fail_count, not checks_json.
+            # The round told us nothing about this instrument (see _ig_side_indeterminate).
+            report.unchanged += 1
+            _emit(health_sink, {
+                "event": "universe_verify_indeterminate", "epic": rec.epic,
+                "reason": verdict.get("ig_ohlcv_error_code"), "verdict": verdict,
+            })
+            continue
         if _ig_side_failed(verdict):
             store.set_status(
                 rec.epic, STATUS_QUARANTINED, checks=verdict, fail_increment=True
@@ -231,6 +264,15 @@ def run_promotion_cycle(
             broker, fetcher, rec.epic, volume_proxy=rec.volume_proxy,
             sleep_fn=sleep_fn, pace_s=pace_s,
         )
+        if _ig_side_indeterminate(verdict):
+            # Neither a strike nor a reset: the round is discarded. This is the path that
+            # would have saved the DAX/CAC/IBEX/AEX/STXE core on 2026-08-04.
+            report.unchanged += 1
+            _emit(health_sink, {
+                "event": "universe_verify_indeterminate", "epic": rec.epic,
+                "reason": verdict.get("ig_ohlcv_error_code"), "verdict": verdict,
+            })
+            continue
         ig_failed = _ig_side_failed(verdict)
         yf_failed = _yf_side_failed(verdict)
 
