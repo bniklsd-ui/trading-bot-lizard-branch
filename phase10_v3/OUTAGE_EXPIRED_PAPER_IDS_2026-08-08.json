@@ -1,0 +1,3127 @@
+{
+ "captured_utc": "2026-08-08",
+ "why": "Snapshot der OPEN-Zeilen VOR dem ersten Tracker-Tick nach dem Fix von 2026-08-08. Diese Zeilen kippen alle auf EXPIRED_UNRESOLVED, weil der IG-Allowance-Ausfall (08-04..08-07) die noetigen Bars nie geliefert hat \u2014 NICHT weil die Geometrie das Zeitfenster nicht erreicht haette. Ohne diese Liste sind sie spaeter nicht mehr von echten Geometrie-Expiries zu unterscheiden; ein reiner Datumsfilter faengt auch legitime Expiries mit ein. Siehe ALLOWANCE_INCIDENT_2026-08-08.md \u00a77.",
+ "count": 390,
+ "trades": [
+  {
+   "paper_id": "30d79bbf-3ec0-41a2-9649-3244216db4dc",
+   "epic": "IX.D.DAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:16:41.474Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "6b8ef4ef-e777-4f20-92fa-1f5da88882d7",
+   "epic": "IX.D.DAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:16:41.474Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "9bd36e75-fcb4-4888-9a3d-ef29c8d62bc3",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:16:41.628Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "e8b1e182-5da7-4e5c-ab0e-5ba0f9077359",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:16:41.628Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "7989f19c-b5f0-4c08-98ed-4f960dcae0bf",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:16:41.756Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "8960ba46-b71a-409a-a07f-b12e7fd60fa1",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:16:41.756Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "d4760420-ca4d-49a2-bf38-cfeb6633e4b8",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:16:41.868Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "1c39424a-6863-4c33-ba51-3db5a3c9ba49",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:16:41.868Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "d99d7a2c-5889-4b21-8eb6-44fbeec135bf",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:16:41.971Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "d89c0ab5-4b1c-4455-8b4f-3056ba096dcb",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:16:41.971Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "8de0e200-4749-4d55-a9ab-1a8ccfcde36b",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:16:42.086Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "ed463600-c4da-4890-9277-5a43f2986d8c",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:16:42.086Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "909381ea-c0c1-4dc7-ad94-b65a394fd63c",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:16:42.206Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "3887ee09-6359-42d5-81c3-88fa96014883",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:16:42.206Z",
+   "time_stop_utc": "2026-08-04T13:16:41.215Z"
+  },
+  {
+   "paper_id": "6f8b4c19-d253-479f-913f-24e9095c005d",
+   "epic": "IX.D.DAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:50:37.819Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "2a0697e0-847b-4a36-9765-c38058ea965f",
+   "epic": "IX.D.DAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:50:37.819Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "a529e1c0-fe7e-447f-9a7b-2a539321a8e0",
+   "epic": "IX.D.DAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:50:38.002Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "d05d375b-da7e-41e8-bc9e-b178dc37c83b",
+   "epic": "IX.D.DAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:50:38.002Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "24ba91da-7d13-4888-b13a-3111579b96ea",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:50:38.140Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "665de9d6-1fe9-4af0-9bb5-3d1b1423e3bf",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:50:38.140Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "c2683498-14ac-480c-9e45-bc58532c36e8",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:50:38.302Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "8c165653-adb3-4654-b502-89686a51b8b3",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:50:38.302Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "b4ebe764-d4fe-4c07-950f-baa3c0674d72",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:50:38.429Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "844a16c1-9979-46be-a46f-be12faf34338",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:50:38.429Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "25f7dcb7-52bb-42c0-ba28-37218c0a5f2f",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:50:38.580Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "b0be6baf-e4bf-4c46-af96-a637b47cba53",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:50:38.580Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "cc68a980-95c3-4713-bf3a-c7112117a59b",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:50:38.710Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "36be61cf-5b08-4ae5-9d16-ba96f1c3a216",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:50:38.710Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "e74dfec7-85cc-45dc-9dbe-a2c9247a0f65",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T09:50:38.876Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "17c4ddec-c5c5-4a8b-b7e0-f7a65d537bac",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T09:50:38.876Z",
+   "time_stop_utc": "2026-08-04T13:50:37.602Z"
+  },
+  {
+   "paper_id": "89520116-24da-4217-b954-9545aecb7804",
+   "epic": "IX.D.DAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:24:44.379Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "b33083ee-e91c-452b-a073-3ad18fb8d889",
+   "epic": "IX.D.DAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:24:44.379Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "b7856e8c-2919-475a-969f-c00c20ae3f49",
+   "epic": "IX.D.DAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:24:44.490Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "a27026d7-18b3-42fa-b787-a0f59fc6da1c",
+   "epic": "IX.D.DAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:24:44.490Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "60a9bfc9-c9a1-4302-9248-7cfe564107a8",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:24:44.619Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "7bb232ec-17f6-4a72-946c-a1b69cb4e87f",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:24:44.619Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "ee24ee1f-238c-455d-bedd-1770ac4c31ba",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:24:44.755Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "73a45da4-f5c8-4125-b41c-7a6a6f9fc135",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:24:44.755Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "edc77456-d91d-4ac4-89b7-66b34c66c9ed",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:24:44.919Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "e6ceee91-5dab-44ed-929b-961e7266c2cc",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:24:44.919Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "09c02b9b-0091-4ae2-bff0-4fcb7c8c6109",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:24:45.062Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "71c98ba4-92fe-47e2-91b7-49cc1401ec33",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:24:45.062Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "50f5f0ef-fc10-41c4-9105-0fd5eda6d6cb",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:24:45.203Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "98034e0e-04fb-4e1f-921b-4d18478262f3",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:24:45.203Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "47e7473d-fb85-43b4-81c3-5982513cd52f",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:24:45.323Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "fb7eb09b-b007-431f-af97-30dda4dd9875",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:24:45.323Z",
+   "time_stop_utc": "2026-08-04T14:24:44.228Z"
+  },
+  {
+   "paper_id": "d7507231-e7d6-4212-aabe-4cb8c9dce148",
+   "epic": "IX.D.DAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:58:55.448Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "62ad89ba-89f6-4457-a200-b377762fcbe9",
+   "epic": "IX.D.DAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:58:55.448Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "a393ae73-7e82-4528-bd6a-1cc2ab909c08",
+   "epic": "IX.D.DAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:58:55.574Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "53371d03-add9-492a-8e59-3f4746340714",
+   "epic": "IX.D.DAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:58:55.575Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "f97550f5-8bea-4694-b588-887934a1eb4d",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:58:55.750Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "ea8abe3a-ff61-4c3a-b92f-81d74794625d",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:58:55.750Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "17e5cefb-365e-415c-be4f-16bf16149155",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:58:55.898Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "e52c9990-85d7-4f11-9424-86fa2ef40f5c",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:58:55.898Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "9840bbdd-854f-4a3b-b3a9-d110bca2948e",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:58:56.024Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "b7761293-afcc-4013-ae5d-f3c810bc5b5e",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:58:56.024Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "8ad519a1-53e1-425c-9cd8-0b23adf34c97",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:58:56.150Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "58ce3568-cd79-41ff-b1bf-f68ed3eb719f",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:58:56.150Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "7ae329ca-b82f-48c5-91a1-d98dfeecf341",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:58:56.282Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "64e08e6e-134c-4c52-b9e7-f41e831aace3",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:58:56.282Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "57de207b-3f28-44b9-8ec9-8ebed26baf34",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-04T10:58:56.400Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "35681894-334d-4be2-966a-10cde22de109",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-04T10:58:56.400Z",
+   "time_stop_utc": "2026-08-04T14:58:55.232Z"
+  },
+  {
+   "paper_id": "6012190a-848b-4715-a492-6c7b9ec237d4",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:05:44.252Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "97a6b40b-4b0e-49cf-b73f-461fd14b649f",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:05:44.252Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "0047206a-106d-4ec5-a113-eaa67666e415",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:05:44.371Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "3a87313c-2fec-48fd-8092-d1edb6169218",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:05:44.371Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "e8d0d9c6-b6d4-4178-9fdb-2fb676909d2e",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:05:44.482Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "1127f000-84cc-4e77-8230-2e75ae90e9a1",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:05:44.482Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "2db73bc2-b38d-4041-bb2e-406be22d882d",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:05:44.583Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "4f24a12b-6333-455b-9842-b7b03f6baf8f",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:05:44.583Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "394157b8-8714-44b5-886d-49a004c9e161",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:05:44.723Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "acada050-7614-411b-ab0e-44ac9902a300",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:05:44.723Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "c9c930fd-3d3c-4fe7-aa03-990c99534579",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:05:44.823Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "7555bca7-a8f5-48ef-9e55-486c3437ca7f",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:05:44.823Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "6397f488-6dce-4411-ac8a-7440f325198d",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:05:44.947Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "67ee6ff0-adb4-4be9-83a8-33e57f221526",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:05:44.947Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "6013e73c-8635-4d86-b5d2-31e85b7b469a",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:05:45.057Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "5bca623f-b4b0-4328-933c-7a2a758cddda",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:05:45.057Z",
+   "time_stop_utc": "2026-08-05T11:05:44.142Z"
+  },
+  {
+   "paper_id": "20724dec-bf4b-48c6-a052-71675a4b68e8",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:34:56.218Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "031cbf6e-19a4-4943-a6c0-83c13b338b6a",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:34:56.218Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "d25bfaa2-62da-4c33-b9da-fb9e90639f0c",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:34:56.327Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "b41965e6-afe2-4527-bcca-7aabea230d64",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:34:56.327Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "ecce5ba9-14a8-4e2b-9e43-fd3226271a60",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:34:56.461Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "79220f61-6680-4394-bf54-395484459bde",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:34:56.461Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "f002b9a2-cae8-42b9-b606-eca02b4a9f9b",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:34:56.601Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "2610e2d8-4312-4c16-8bf1-5045a4e1dce7",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:34:56.601Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "dd15b2f3-ea58-48ab-b5ba-3d06a51768d1",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:34:56.729Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "a911ff0f-e431-4392-864c-da6da0df96e9",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:34:56.729Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "9035c97f-95dc-4db4-87e6-ce18c46f9d60",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:34:56.853Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "5b9a470a-e581-4901-af60-43ea66220ba3",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:34:56.853Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "61b02b81-2fca-451a-966b-95eea1d2fc5b",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:34:56.972Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "d9942335-a66b-4656-953f-78d584b5a238",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:34:56.972Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "3c546061-01b7-431b-a4f9-115c8b377001",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T07:34:57.097Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "a8ec4f47-ea53-4a96-ae68-42502faaa6f1",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T07:34:57.097Z",
+   "time_stop_utc": "2026-08-05T11:34:56.078Z"
+  },
+  {
+   "paper_id": "cfe97e11-eb24-473f-88f7-4ad8b1f99f0c",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:09:06.646Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "546a44fb-c62d-4dcf-859b-773b7811684d",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:09:06.646Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "91ddd7d5-fab5-4004-aa3c-26fa920c8be6",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:09:06.772Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "fcffc9a7-2a1b-4dd9-bd4c-51424a8cbb5d",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:09:06.772Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "207dddcb-0361-42ed-8e5b-5f32ac916f86",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:09:06.916Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "5cb45449-3a0e-4fc0-8a64-ce66ec886370",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:09:06.916Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "c7843c51-9084-4072-a6f7-2ebec453e1d7",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:09:07.046Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "e7a9c64e-71ef-414a-a934-c6c37c1d0765",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:09:07.046Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "73d76936-f3e9-4d99-ae8b-1a7c04889984",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:09:07.164Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "b65503b6-d58e-47d4-91a9-93ba03db8861",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:09:07.165Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "221d2bb9-cb20-4b68-ab3d-b9767b54acdd",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:09:07.297Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "2e99af37-cc77-45bb-a6ac-e50b51dbf8e1",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:09:07.297Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "6b4f387f-4573-4592-b451-a0d52c3b3a0b",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:09:07.438Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "a0632fb6-cf59-4c3a-8565-964d08a52f06",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:09:07.438Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "60476d6d-7aaa-4697-ae05-290262631b77",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:09:07.559Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "149e5b66-61a2-48a0-99ad-f6ca1fe1c3bd",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:09:07.559Z",
+   "time_stop_utc": "2026-08-05T12:09:06.511Z"
+  },
+  {
+   "paper_id": "de8d20ed-5e34-4af0-aa05-5e137038811b",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:43:11.700Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "bc57320a-468c-4323-ae58-50b6a6509922",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:43:11.700Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "72d38f73-b34b-4455-b46c-7fc8d831df8b",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:43:11.815Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "ea7b92ed-ab0b-463a-955c-537af459af4c",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:43:11.815Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "1ae64a15-e4d2-41c9-bd71-ec9ce9e6bb07",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:43:11.948Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "9d5d2174-3b33-4165-b53e-24be259c9586",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:43:11.948Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "7d6d7e60-7667-4b53-83bb-d9a4d67c3766",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:43:12.066Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "4c8a4a45-f8e5-4b6b-be1d-fbcc848b5793",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:43:12.066Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "f6b176b8-2400-442c-87a1-8ab9ab9f5d6e",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:43:12.234Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "bc37da0a-9613-4017-b014-48ec671546c4",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:43:12.234Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "9d50f92c-01bf-40ea-b612-4ea03219cf1d",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:43:12.388Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "0b4f8d49-26f0-458c-af3b-9a74b0630dba",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:43:12.388Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "9f0add5b-5c3b-44da-b971-df72044bb77d",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:43:12.538Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "b5d802d4-9566-4f12-bd1e-d071f0983980",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:43:12.538Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "98bdd189-624e-4e73-ac9a-7f6f47e0a7a4",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T08:43:12.678Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "8b825007-0967-4deb-88fc-e7cc4a228ebf",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T08:43:12.678Z",
+   "time_stop_utc": "2026-08-05T12:43:11.526Z"
+  },
+  {
+   "paper_id": "5d8129b3-e5b3-4842-8709-6b86359cf710",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:17:09.048Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "7fb39056-f3b7-4b53-b735-498f393efed1",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:17:09.048Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "c663bb6c-0549-4cb1-a65e-6c64da737614",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:17:09.173Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "9de36d8b-a7b1-4362-924b-d38e9e136e3c",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:17:09.173Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "cf9e16cd-1132-4bac-9b2d-6ec20927dfa9",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:17:09.287Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "5cdecd26-eb90-417f-a223-76c4c2d8a27f",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:17:09.287Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "f373c3f6-c841-48bf-b354-9b8e50dfa12b",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:17:09.432Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "abc2ac1b-c189-4773-8081-777e2be77e99",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:17:09.432Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "97b4c173-ac36-462d-a06d-204fd29ceaf7",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:17:09.551Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "bee02a18-4ccb-41dc-ba47-76b7e341b9db",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:17:09.551Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "19ebc731-e81f-47e1-9760-bfeb2b50a7dd",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:17:09.704Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "89802c76-f466-4e0e-89bb-84e0f44948ec",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:17:09.704Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "0cfc891d-7cfe-40e3-a9a7-9eb550f07552",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:17:09.858Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "2ade27ca-c962-4042-b1f1-6b710f6b5b0d",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:17:09.858Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "3b96116c-3072-4aee-bd6b-bfc50407a1d3",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:17:09.970Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "589582d4-d55f-4460-8eef-1ab95c06dbdf",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:17:09.970Z",
+   "time_stop_utc": "2026-08-05T13:17:08.916Z"
+  },
+  {
+   "paper_id": "e313cdf5-2a8a-49c0-aeee-fff7178fdb66",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:51:13.379Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "e6197576-f8d8-4476-902d-d66bc948c089",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:51:13.379Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "affd51fa-a2b6-4f9c-a758-da8425cb2f1d",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:51:13.485Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "75197d4c-f5e3-49ad-aaa6-772a3fc6ddaf",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:51:13.485Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "386879a4-dbda-44ef-ac43-43209233a414",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:51:13.597Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "c0abfdfa-a726-4711-8a5c-6f1217e065e2",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:51:13.597Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "de3e5f15-d0fe-4c8c-983e-b10f4d174bf5",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:51:13.711Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "df91e1e9-9fc5-4bea-a370-3c5c967d1e54",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:51:13.711Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "0e059add-c5d5-4be1-aa74-0a35ef7b03f4",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:51:13.816Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "4814e4ef-9fa0-4d83-bd4c-66e70cad6584",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:51:13.816Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "2b83e94b-9ef5-42a4-9baa-5308ac1caeac",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:51:13.935Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "a3f2d7aa-6fe4-4d0c-81a2-25c022f72a01",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:51:13.935Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "5750b232-ed83-4691-87fc-bc5d7975d523",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:51:14.050Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "300b4ccd-803b-4660-bdec-bbb9daac6d36",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:51:14.050Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "77ce9a65-62ae-4e4f-a964-8b38a9a26f63",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T09:51:14.158Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "383603f4-2180-49a7-b772-b93f75e0481f",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T09:51:14.158Z",
+   "time_stop_utc": "2026-08-05T13:51:13.234Z"
+  },
+  {
+   "paper_id": "22367b38-618f-4d0c-aad5-31af8dff50fd",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:25:23.836Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "85ffff3d-68b0-4e1b-bd0b-3ea750b4b6da",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:25:23.836Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "d0a8ad9c-aafc-4c09-b1f4-067cb66c6e4f",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:25:23.956Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "9e0a9b7e-89de-4795-82b3-66f903e0ab73",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:25:23.956Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "c0813bba-eabe-44f9-9cb6-9c00fde3aae9",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:25:24.064Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "510d9d49-d6f8-4cb2-8fe9-dd2f10f650f0",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:25:24.064Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "3ef58612-24c2-4013-87c4-b18094f8e961",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:25:24.174Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "c25c12cd-f8ba-4255-a3b5-8c17de820d2e",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:25:24.174Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "5c7f5c98-6a5d-485f-9f6a-118333c25881",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:25:24.294Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "ecb06f61-dee3-4191-a7e7-c3d88718cc75",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:25:24.294Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "6d96c7df-2e48-4b73-9801-bacf7dc86f47",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:25:24.426Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "5029651e-f612-48d0-aac5-f693be3bde41",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:25:24.426Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "60c7bccc-5524-485f-b686-08e86f3a4f31",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:25:24.542Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "1393e76a-ffc4-4f5e-a3db-b3a2d71d6019",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:25:24.542Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "ca8bae64-306c-4331-8814-58af8313c80d",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:25:24.684Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "f1575ffa-f729-41e6-ba57-4e4370b7daa1",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:25:24.684Z",
+   "time_stop_utc": "2026-08-05T14:25:23.684Z"
+  },
+  {
+   "paper_id": "3f4ea85b-e18f-40ef-a2ae-281475d425de",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:59:21.449Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "ea19f9c1-5f15-48d7-a03c-e62c91580ae9",
+   "epic": "IX.D.CAC.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:59:21.449Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "359181c0-ffef-4a19-b270-9b742f5b4f0c",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:59:21.578Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "4d5b9713-17f9-4514-9e18-dbabe9199006",
+   "epic": "IX.D.IBEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:59:21.578Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "68373f69-4fad-4f05-91d9-a3fa21cf24e5",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:59:21.713Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "09eb782c-e9a1-4542-87da-59cff0a3e3a0",
+   "epic": "IX.D.IBEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:59:21.713Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "d7553358-2f82-47a9-9cc7-1481ddf9585e",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:59:21.842Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "0d68624d-2a86-418e-abb8-e7251d2828b6",
+   "epic": "IX.D.AEX.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:59:21.842Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "51e955d8-a911-43b6-ad6a-1853fe4e071e",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:59:22.012Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "6db5d7d9-cd24-4b04-b322-9c6aa52bbd07",
+   "epic": "IX.D.AEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:59:22.012Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "53785e4e-2026-4744-8507-1ddee37ef958",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:59:22.146Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "b4a6bfa5-d469-4522-88fe-4b46cb2dcf8c",
+   "epic": "IX.D.MIB.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:59:22.146Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "36858d42-692f-4f4f-9a68-243bef3ea4fd",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:59:22.276Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "eb841f86-57e6-40c3-9d59-09205ca75a41",
+   "epic": "IX.D.IBEX.IFD.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:59:22.276Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "7b82705e-c07a-49f0-96f5-eb79bedb2c52",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-05T10:59:22.396Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "989c32f7-6897-4287-8b15-f7e3020a4a8d",
+   "epic": "IX.D.STXE.IFM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-05T10:59:22.396Z",
+   "time_stop_utc": "2026-08-05T14:59:21.280Z"
+  },
+  {
+   "paper_id": "959561f0-a358-4cc0-b94d-7d3fae51c87c",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:06:36.346Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "eb5dadcd-c089-47ba-ae25-2a7991f98ad4",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:06:36.346Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "ba3ccf51-70b0-49f6-8e58-bfbe1b761713",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:06:36.467Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "28ccda03-25d6-4e65-9506-51177191afcc",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:06:36.467Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "d1e1dcfd-203b-4328-8078-416b6a95d1b8",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:06:36.583Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "6f26d274-4647-451e-abb2-0cbf7f6b28fe",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:06:36.583Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "c6bba629-5f2f-4ff2-b875-35970f3f1751",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:06:36.700Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "08bf4544-430e-439b-a200-bef4c3518e3f",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:06:36.700Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "d58d144a-c4ad-412b-ae0a-992fa10b64be",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:06:36.810Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "ece8f2cf-39c4-4b28-b20a-0f9527d34620",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:06:36.810Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "a24be9ff-6d6f-41f3-a551-afe80951e4ee",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:06:36.943Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "867fec75-0fde-4f4d-83ab-eed5a4dd05b4",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:06:36.943Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "95a7a750-09f4-45d0-a731-1046205a2816",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:06:37.061Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "1eb060ba-0138-4833-bdf0-e7d0e807b230",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:06:37.061Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "3bb8984b-8a26-4786-95cc-bd7f508e040d",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:06:37.175Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "ea82694b-abf0-4d66-951c-d0893423dcd7",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:06:37.175Z",
+   "time_stop_utc": "2026-08-06T11:06:36.247Z"
+  },
+  {
+   "paper_id": "c13950ee-1d96-4fba-b742-8b67f632cf2a",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:30:28.376Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "0eb82fd8-3707-48f2-905f-1099e97266ad",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:30:28.376Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "50285ec4-4967-4e70-9a3f-e727ad41e3b2",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:30:28.497Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "64860363-17f3-4028-8dff-4c41e13866aa",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:30:28.497Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "41a9efbd-f4f9-4d27-9900-11ab9aade002",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:30:28.618Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "cd2a2f02-8ad4-4743-b135-66a2bb378f0c",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:30:28.618Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "ddfdd944-6cf5-41d3-a2d0-8b84ec238123",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:30:28.747Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "16191327-63f8-42cf-ab34-1b74bebb7e55",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:30:28.747Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "3d8ddfe5-5cfe-4eec-9ec8-83cfddd23729",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:30:28.854Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "2e667d89-875c-4d1c-a1cf-3f9baeaee202",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:30:28.854Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "288895de-c42c-431e-8c6b-c58d2e31d7b7",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:30:29.013Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "fb57e9fb-4bb8-4bd9-9402-21e2cd0930da",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:30:29.013Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "5bf5a9d5-5a38-4c8a-96e6-6c744a1c95bc",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:30:29.164Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "0ac5da53-c218-418d-b044-322a13626141",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:30:29.164Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "7269e174-5bf9-4181-b7c6-14799ee64ff8",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T07:30:29.289Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "267b6386-4dd3-4de6-87cd-b7741170943e",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T07:30:29.289Z",
+   "time_stop_utc": "2026-08-06T11:30:28.231Z"
+  },
+  {
+   "paper_id": "9c00c25d-9768-4659-8c4f-598137a1b1a5",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:05:05.770Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "183d07b8-1446-4af2-8930-c79810e11c48",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:05:05.770Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "6513924b-f825-4e36-bd38-95d814d3a02d",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:05:05.904Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "3543094f-0152-484e-80b0-462bc63cda2f",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:05:05.904Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "552aa245-f8ea-48b2-a8e2-44643d496c3a",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:05:06.018Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "5537fddf-81f1-4739-ae83-964fd4a750b9",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:05:06.018Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "500da063-f42a-4300-97d7-5cdd256f2475",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:05:06.130Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "be389cb0-e9c1-43c0-a22f-6010592dd2db",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:05:06.130Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "46c5702e-90e2-4079-9f25-02fa301376a8",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:05:06.258Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "759d6e11-6c6f-4917-8e19-4d66a5262c66",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:05:06.258Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "3b978ac3-bd95-4358-a278-d7005e613aea",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:05:06.390Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "cff68986-9e13-49de-a3bc-553c1bb5db09",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:05:06.390Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "820477b8-abd6-44b8-a12e-684315b9129f",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:05:06.530Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "5c09ef42-7079-49ad-b815-2c77893454fd",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:05:06.530Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "51dd8b88-f150-41c0-ac05-c310bfc15785",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:05:06.677Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "af0cf1dc-2fdb-41f1-b490-6c3131a0b73e",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:05:06.677Z",
+   "time_stop_utc": "2026-08-06T12:05:05.637Z"
+  },
+  {
+   "paper_id": "01bcddea-489c-4018-8899-956751cd6b0a",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:39:53.765Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "f7834491-963e-4e2a-ad6f-937f0dc9d1ac",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:39:53.765Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "dd0e003c-dbf8-4fc5-ba41-8fe049ade39b",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:39:53.910Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "4b8ec41d-d37e-43c5-b1fd-7ecaa3054da5",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:39:53.910Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "316ac065-0fdb-4291-8699-bee16400e23c",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:39:54.019Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "beda678d-39b2-4b3c-99a9-e380db2ff60d",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:39:54.019Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "1ec19210-cff4-41f4-bf59-962547645462",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:39:54.142Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "9395b2cd-4064-4b75-9e13-8fd22ea27dd9",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:39:54.142Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "66ab5ea1-aa77-43f2-95fa-d378c8871896",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:39:54.266Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "62de4eb2-af66-41b0-a1a2-7d3ffc7daf26",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:39:54.266Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "0cabf76f-0ee0-4689-b7e0-fc77c3250f5a",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:39:54.396Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "20f3fb73-6de9-4548-8346-4b89f3961be3",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:39:54.396Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "004c2bcd-efa4-418e-9f9e-08f68fd4243d",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:39:54.511Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "0bb71a24-e1ad-4567-8110-40c82a8024de",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:39:54.511Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "3352b7fd-5f4b-4e04-afea-b0d992866e66",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T08:39:54.628Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "4e4420c1-e5ce-4c9a-9d71-e374afe40018",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T08:39:54.628Z",
+   "time_stop_utc": "2026-08-06T12:39:53.632Z"
+  },
+  {
+   "paper_id": "87c8a32b-e0d2-457c-af23-80af84476e27",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:14:39.178Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "71ebc556-3d42-4a94-acb3-672bb1bd3561",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:14:39.178Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "a22b2934-15b7-4cdb-ab30-f6d2664d6b38",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:14:39.292Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "123d7282-e63f-490a-83dc-3747cbf38e3d",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:14:39.292Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "7077963c-6a5c-409b-94d3-99a21611d1e5",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:14:39.417Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "e57698dd-052b-47fd-bbbe-d38e9c752bc3",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:14:39.417Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "bf204f0a-4acb-40e2-9015-b4dad25035e0",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:14:39.550Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "51ac900b-c09e-41f7-b769-4f53c2e36b63",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:14:39.550Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "549632fa-8aec-45de-9b1a-126cf427eda3",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:14:39.665Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "9aca41c7-efda-41f1-b73b-5cb9c1df26a1",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:14:39.665Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "52639b51-f0c6-4103-8e14-82767e4ec0ad",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:14:39.779Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "5e842fe4-c27d-4911-976b-e5d52944da8c",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:14:39.779Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "2314d09f-580b-465c-98bf-f518053c328c",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:14:39.913Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "1c47363c-c68a-4d99-9868-6946316e582f",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:14:39.913Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "084c5b89-62f2-4b87-b37e-a7d0a599c0b4",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:14:40.039Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "c3314622-a419-4c5c-958e-945ebdd80026",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:14:40.039Z",
+   "time_stop_utc": "2026-08-06T13:14:39.025Z"
+  },
+  {
+   "paper_id": "57e95d11-0af5-4bbb-be15-5466e2803013",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:49:25.167Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "f8ad218e-ef8f-4bdb-bc48-8646ec365cae",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:49:25.167Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "e03f9961-1628-4143-bd1b-d7ab396b9c24",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:49:25.305Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "da420f23-556f-47b8-a1c5-bd2969774a32",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:49:25.305Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "63bafa48-6751-4eb7-b61f-a9e609b28416",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:49:25.427Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "1a49ca0a-bc4a-48e3-b64f-6bd649991dbc",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:49:25.427Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "35bd55af-228c-480c-a912-9c88b146a620",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:49:25.569Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "9dc142f6-0ac3-4545-8a78-820c424a92ba",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:49:25.569Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "7085e52b-d5d8-49ba-b249-ce076a2a0b07",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:49:25.685Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "9696ff43-1332-43a7-82af-a0a7d809b8b1",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:49:25.685Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "84a89c0a-302f-4720-b03c-c0d25de16dd4",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:49:25.813Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "c19b7234-5d2e-429a-bfbe-70e3d7e5842d",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:49:25.813Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "977047a3-570d-4a81-a913-7928a2d1324b",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:49:25.949Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "f010df42-b5c8-4644-b9f4-8e71fefb53c2",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:49:25.949Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "04c9d72f-565b-4595-b072-d75f01478c5c",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T09:49:26.061Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "c5fd2db7-f6e3-4382-b98b-ff9ae53ad5d9",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T09:49:26.061Z",
+   "time_stop_utc": "2026-08-06T13:49:25.038Z"
+  },
+  {
+   "paper_id": "bf6c797b-8037-47fd-972e-c1dd4baaff25",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:24:15.031Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "935a491a-72fc-4016-a7c9-d120369d7b19",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:24:15.031Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "3e0b0e49-a051-4e57-8a62-938a8cccd43a",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:24:15.153Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "c2c37a3a-a9a1-4afb-9386-646daadba6ca",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:24:15.153Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "19f97b2f-fbcf-44b8-af1f-3c94e05ede0a",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:24:15.287Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "f8a75591-8f49-4e75-b567-e26ee4f97b4f",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:24:15.287Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "8cc88e2d-68e6-4430-a64c-6cf7e29efe51",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:24:15.395Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "5507e48f-b025-4124-9366-4e2931c6714b",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:24:15.395Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "0eca9c4d-25a4-44a1-8e02-58e00ca5df5d",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:24:15.507Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "22a130d4-f625-4b98-9a09-b6e19b54c98c",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:24:15.507Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "1187ab55-8d0b-4ac3-98d1-6889be20f188",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:24:15.641Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "6e608166-af92-4c5f-8c11-3a6dca984047",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:24:15.641Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "5bcdd3c1-fe63-463a-a3c5-ab08dc9e0dce",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:24:15.794Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "1c99ac61-d8ca-4e31-bc30-76ada2cd6499",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:24:15.794Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "13760912-274d-421f-8460-9e36736f695f",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:24:15.921Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "15519371-efdf-4a91-8d77-2e5d6d70186a",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:24:15.921Z",
+   "time_stop_utc": "2026-08-06T14:24:14.873Z"
+  },
+  {
+   "paper_id": "2bae1902-7411-4269-9eaf-585fda8b8720",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:59:13.364Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "d3748fc0-12d3-464d-afb7-f6d4b7650bf6",
+   "epic": "IX.D.MIB.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:59:13.364Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "5795b8a2-5223-4cf7-8b2d-5cea5078bd75",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:59:13.560Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "ffbc9845-c152-491d-85dc-f29f592607dc",
+   "epic": "IX.D.SPTRD.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:59:13.560Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "ca0bf0f4-45f2-4b4b-a2cb-f02a02747592",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:59:13.716Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "92320060-0afc-40a7-8b47-3b17542e25b4",
+   "epic": "IX.D.NASDAQ.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:59:13.716Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "db0f02ce-3ef4-44d6-bf7b-b0d653f81e48",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:59:13.910Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "6e0bf692-959a-40b6-819c-915836651c0b",
+   "epic": "IX.D.DOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:59:13.910Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "739ceee7-5aad-4e1e-836b-35089b7e5c24",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:59:14.069Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "dc8caa96-e541-4c99-9d2d-3fe0412205d0",
+   "epic": "IX.D.FTSE.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:59:14.069Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "e2c91eab-63a3-4c53-b512-bd305741adee",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:59:14.237Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "44274419-b11f-4d77-9898-201057600b71",
+   "epic": "IX.D.IBEX.FWM1.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:59:14.237Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "f6fd1d9f-f455-485f-a9e0-7524ab14d0f7",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:59:14.403Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "fbde6630-2201-46ea-9993-ea0a82bd2cb1",
+   "epic": "IX.D.AEX.FWM2.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:59:14.403Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "d96ce417-82da-4043-b660-e598c9d04515",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-06T10:59:14.570Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "75a2c04c-b7ce-4e71-ba49-29f788ad3621",
+   "epic": "IX.D.SUNDAX.IFMM.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-06T10:59:14.570Z",
+   "time_stop_utc": "2026-08-06T14:59:13.167Z"
+  },
+  {
+   "paper_id": "8ed5e65c-0c0f-4bf7-bc2d-5c0314bf8f3a",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T07:06:30.027Z",
+   "time_stop_utc": "2026-08-07T11:06:29.920Z"
+  },
+  {
+   "paper_id": "8991b93d-0b9a-465e-b82e-82a76d00824e",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T07:06:30.027Z",
+   "time_stop_utc": "2026-08-07T11:06:29.920Z"
+  },
+  {
+   "paper_id": "6ff03093-21fe-4422-b30d-353383283b11",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T07:06:30.150Z",
+   "time_stop_utc": "2026-08-07T11:06:29.920Z"
+  },
+  {
+   "paper_id": "5f7a060c-dd8d-4425-93d0-7d00ce243859",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T07:06:30.150Z",
+   "time_stop_utc": "2026-08-07T11:06:29.920Z"
+  },
+  {
+   "paper_id": "be7ab7cf-6d29-48e0-92b7-7f73c05f3085",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T07:06:30.326Z",
+   "time_stop_utc": "2026-08-07T11:06:29.920Z"
+  },
+  {
+   "paper_id": "605eecda-1315-4fca-96c1-ebeaefbc8530",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T07:06:30.326Z",
+   "time_stop_utc": "2026-08-07T11:06:29.920Z"
+  },
+  {
+   "paper_id": "aabebd5b-cb06-4427-8d78-49ede519c0d5",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T07:06:30.434Z",
+   "time_stop_utc": "2026-08-07T11:06:29.920Z"
+  },
+  {
+   "paper_id": "df3e4bdb-5381-494a-92c2-21bfea840327",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T07:06:30.434Z",
+   "time_stop_utc": "2026-08-07T11:06:29.920Z"
+  },
+  {
+   "paper_id": "2d751bd7-e349-49e4-a23f-16d06a0a1cc4",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T07:32:08.306Z",
+   "time_stop_utc": "2026-08-07T11:32:08.150Z"
+  },
+  {
+   "paper_id": "11b8cfef-eabb-41ed-857b-3fb7cdb5102b",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T07:32:08.306Z",
+   "time_stop_utc": "2026-08-07T11:32:08.150Z"
+  },
+  {
+   "paper_id": "c25f900d-5fae-44cd-8340-9dad8b8f0f39",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T07:32:08.428Z",
+   "time_stop_utc": "2026-08-07T11:32:08.150Z"
+  },
+  {
+   "paper_id": "275a17a5-51ef-42b2-9b2c-ffbd45afdf64",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T07:32:08.428Z",
+   "time_stop_utc": "2026-08-07T11:32:08.150Z"
+  },
+  {
+   "paper_id": "8883ba29-ec7b-4b0c-8b12-e0b54a14580e",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T07:32:08.562Z",
+   "time_stop_utc": "2026-08-07T11:32:08.150Z"
+  },
+  {
+   "paper_id": "c2d91701-6ade-4bdb-8e11-f7578829d96b",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T07:32:08.562Z",
+   "time_stop_utc": "2026-08-07T11:32:08.150Z"
+  },
+  {
+   "paper_id": "9ac825da-8eae-423d-acb0-5ed647ede677",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T07:32:08.694Z",
+   "time_stop_utc": "2026-08-07T11:32:08.150Z"
+  },
+  {
+   "paper_id": "bf8d3320-ae22-4f9c-86f0-51ae0918163c",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T07:32:08.694Z",
+   "time_stop_utc": "2026-08-07T11:32:08.150Z"
+  },
+  {
+   "paper_id": "ad87427e-9355-441a-8ca9-7416de34f159",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T08:03:18.957Z",
+   "time_stop_utc": "2026-08-07T12:03:18.806Z"
+  },
+  {
+   "paper_id": "f71af425-6800-4c19-8706-56e81b4812a9",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T08:03:18.957Z",
+   "time_stop_utc": "2026-08-07T12:03:18.806Z"
+  },
+  {
+   "paper_id": "5330859d-c908-4b99-b0e6-5bf7a1416c33",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T08:03:19.093Z",
+   "time_stop_utc": "2026-08-07T12:03:18.806Z"
+  },
+  {
+   "paper_id": "09b377a1-d32f-4e78-b8b6-1c16f0073215",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T08:03:19.093Z",
+   "time_stop_utc": "2026-08-07T12:03:18.806Z"
+  },
+  {
+   "paper_id": "dae25395-e87f-4116-a3a6-2767b3f05eee",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T08:03:19.240Z",
+   "time_stop_utc": "2026-08-07T12:03:18.806Z"
+  },
+  {
+   "paper_id": "6450877a-c46b-43b6-bb5a-8689f85c878e",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T08:03:19.240Z",
+   "time_stop_utc": "2026-08-07T12:03:18.806Z"
+  },
+  {
+   "paper_id": "77a9aabb-3a08-4c66-926f-73f9b49a2cfe",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T08:03:19.365Z",
+   "time_stop_utc": "2026-08-07T12:03:18.806Z"
+  },
+  {
+   "paper_id": "d6f43a0c-4dc3-4533-8ab8-add08dce25ec",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T08:03:19.365Z",
+   "time_stop_utc": "2026-08-07T12:03:18.806Z"
+  },
+  {
+   "paper_id": "74ae5494-7973-448f-b492-4143aee5de6c",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T08:34:23.306Z",
+   "time_stop_utc": "2026-08-07T12:34:23.168Z"
+  },
+  {
+   "paper_id": "1ae31c89-53a2-4614-bfac-5795a9bf84c9",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T08:34:23.306Z",
+   "time_stop_utc": "2026-08-07T12:34:23.168Z"
+  },
+  {
+   "paper_id": "695c4360-374a-44a0-9360-572adafc1aab",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T08:34:23.437Z",
+   "time_stop_utc": "2026-08-07T12:34:23.168Z"
+  },
+  {
+   "paper_id": "c1c30c5b-5973-43f7-9a05-aeee0f858967",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T08:34:23.437Z",
+   "time_stop_utc": "2026-08-07T12:34:23.168Z"
+  },
+  {
+   "paper_id": "bbdfc2cf-b54a-426e-b677-43b03122a8e1",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T08:34:23.559Z",
+   "time_stop_utc": "2026-08-07T12:34:23.168Z"
+  },
+  {
+   "paper_id": "23936cdd-af38-4319-ba60-559db5f51d5e",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T08:34:23.559Z",
+   "time_stop_utc": "2026-08-07T12:34:23.168Z"
+  },
+  {
+   "paper_id": "19411de4-775b-4d7f-98b6-5ab3364b7965",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T08:34:23.714Z",
+   "time_stop_utc": "2026-08-07T12:34:23.168Z"
+  },
+  {
+   "paper_id": "0012932d-cb08-4d0c-be14-551023a581a8",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T08:34:23.714Z",
+   "time_stop_utc": "2026-08-07T12:34:23.168Z"
+  },
+  {
+   "paper_id": "8b212659-c9e9-4703-a41c-0ea0f6a8c17b",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T09:05:38.114Z",
+   "time_stop_utc": "2026-08-07T13:05:37.957Z"
+  },
+  {
+   "paper_id": "0b2bb983-8012-4947-b6c5-ff37d535a4a6",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T09:05:38.114Z",
+   "time_stop_utc": "2026-08-07T13:05:37.957Z"
+  },
+  {
+   "paper_id": "70da1376-7d02-4a48-88cd-f573fab16257",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T09:05:38.269Z",
+   "time_stop_utc": "2026-08-07T13:05:37.957Z"
+  },
+  {
+   "paper_id": "5c491ce3-84dc-4ce9-ac98-b53167521350",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T09:05:38.269Z",
+   "time_stop_utc": "2026-08-07T13:05:37.957Z"
+  },
+  {
+   "paper_id": "a51005b0-37b2-426f-8598-b78685e10604",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T09:05:38.414Z",
+   "time_stop_utc": "2026-08-07T13:05:37.957Z"
+  },
+  {
+   "paper_id": "24d9e3b0-98ec-4f85-863c-ed17a581fc62",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T09:05:38.414Z",
+   "time_stop_utc": "2026-08-07T13:05:37.957Z"
+  },
+  {
+   "paper_id": "be744594-f013-412d-835d-6da8913a4ddb",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T09:05:38.566Z",
+   "time_stop_utc": "2026-08-07T13:05:37.957Z"
+  },
+  {
+   "paper_id": "16c4b5d6-60ae-4a89-8be1-7fea54c7c13f",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T09:05:38.566Z",
+   "time_stop_utc": "2026-08-07T13:05:37.957Z"
+  },
+  {
+   "paper_id": "0cdfae85-e0fa-4016-9409-962b5f53d2af",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T09:36:41.272Z",
+   "time_stop_utc": "2026-08-07T13:36:41.122Z"
+  },
+  {
+   "paper_id": "68e74e61-561d-4118-bd04-9831619b3b26",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T09:36:41.272Z",
+   "time_stop_utc": "2026-08-07T13:36:41.122Z"
+  },
+  {
+   "paper_id": "e9dfc6ce-fecc-432c-9cc6-df4bdc7fb410",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T09:36:41.420Z",
+   "time_stop_utc": "2026-08-07T13:36:41.122Z"
+  },
+  {
+   "paper_id": "ff14197a-6004-44a0-b39b-ea96a653c06f",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T09:36:41.420Z",
+   "time_stop_utc": "2026-08-07T13:36:41.122Z"
+  },
+  {
+   "paper_id": "ed06d5fb-5ed0-4c1e-8308-f8c165b22849",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T09:36:41.570Z",
+   "time_stop_utc": "2026-08-07T13:36:41.122Z"
+  },
+  {
+   "paper_id": "dcc6ea34-817b-4f7a-b894-af2db6beac13",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T09:36:41.570Z",
+   "time_stop_utc": "2026-08-07T13:36:41.122Z"
+  },
+  {
+   "paper_id": "d438b74c-2c47-475b-ab07-3d6d38e556ea",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T09:36:41.732Z",
+   "time_stop_utc": "2026-08-07T13:36:41.122Z"
+  },
+  {
+   "paper_id": "9998495f-7333-48bf-83b8-c364cb45dbf4",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T09:36:41.732Z",
+   "time_stop_utc": "2026-08-07T13:36:41.122Z"
+  },
+  {
+   "paper_id": "d3dde9f5-00f3-4b24-a019-22a3c0547301",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T10:07:57.330Z",
+   "time_stop_utc": "2026-08-07T14:07:57.132Z"
+  },
+  {
+   "paper_id": "a4ad35a0-50b6-44a5-a467-96276f5c6591",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T10:07:57.330Z",
+   "time_stop_utc": "2026-08-07T14:07:57.132Z"
+  },
+  {
+   "paper_id": "56c388cb-1f22-4f3a-9dea-f36f300d6d41",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T10:07:57.498Z",
+   "time_stop_utc": "2026-08-07T14:07:57.132Z"
+  },
+  {
+   "paper_id": "0b67e0fe-f125-4516-bdd5-6f5c07d34e44",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T10:07:57.498Z",
+   "time_stop_utc": "2026-08-07T14:07:57.132Z"
+  },
+  {
+   "paper_id": "68144078-7555-455e-a9ac-aaac6323dd51",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T10:07:57.666Z",
+   "time_stop_utc": "2026-08-07T14:07:57.132Z"
+  },
+  {
+   "paper_id": "2038ebcf-5baa-4d50-8540-6705c99855cc",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T10:07:57.667Z",
+   "time_stop_utc": "2026-08-07T14:07:57.132Z"
+  },
+  {
+   "paper_id": "2ea20fe2-74d9-4b03-9186-0c1b8a53484f",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T10:07:57.902Z",
+   "time_stop_utc": "2026-08-07T14:07:57.132Z"
+  },
+  {
+   "paper_id": "518c693b-1943-484d-bbd8-2a2753afea7d",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T10:07:57.902Z",
+   "time_stop_utc": "2026-08-07T14:07:57.132Z"
+  },
+  {
+   "paper_id": "44f36c00-2e1d-4e13-91aa-06bf164fb03e",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T10:39:21.254Z",
+   "time_stop_utc": "2026-08-07T14:39:21.088Z"
+  },
+  {
+   "paper_id": "e701337a-38e0-4653-9995-fd0701841f97",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T10:39:21.254Z",
+   "time_stop_utc": "2026-08-07T14:39:21.088Z"
+  },
+  {
+   "paper_id": "996680ba-1b72-4dfc-92c5-c67b2fd6139f",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T10:39:21.441Z",
+   "time_stop_utc": "2026-08-07T14:39:21.088Z"
+  },
+  {
+   "paper_id": "65c4f9af-149e-4ed3-b19b-d0bb26c1c625",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T10:39:21.441Z",
+   "time_stop_utc": "2026-08-07T14:39:21.088Z"
+  },
+  {
+   "paper_id": "8c6ae50e-0011-4ad4-873e-decb9435b869",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T10:39:21.636Z",
+   "time_stop_utc": "2026-08-07T14:39:21.088Z"
+  },
+  {
+   "paper_id": "9e084ed1-92d9-444d-be8e-70eb9ef5fcd2",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T10:39:21.636Z",
+   "time_stop_utc": "2026-08-07T14:39:21.088Z"
+  },
+  {
+   "paper_id": "3c9861e7-7d58-46b2-a6f5-ec913f1d34fa",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T10:39:21.804Z",
+   "time_stop_utc": "2026-08-07T14:39:21.088Z"
+  },
+  {
+   "paper_id": "50719ca4-812c-4485-b179-45c32ab04f59",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T10:39:21.804Z",
+   "time_stop_utc": "2026-08-07T14:39:21.088Z"
+  },
+  {
+   "paper_id": "18cbb580-306f-45a9-94c1-d977c54c60bc",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T11:15:25.750Z",
+   "time_stop_utc": "2026-08-07T15:15:25.536Z"
+  },
+  {
+   "paper_id": "2dfded79-2ad5-4328-aceb-a86925c5b054",
+   "epic": "IX.D.SUNNAS.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T11:15:25.750Z",
+   "time_stop_utc": "2026-08-07T15:15:25.536Z"
+  },
+  {
+   "paper_id": "d6e0985b-e1a4-4485-91bd-4cb4af203b31",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T11:15:25.931Z",
+   "time_stop_utc": "2026-08-07T15:15:25.536Z"
+  },
+  {
+   "paper_id": "c5195b7a-753b-4c11-bceb-2dbddd9a39db",
+   "epic": "IX.D.SUNDOW.IAE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T11:15:25.931Z",
+   "time_stop_utc": "2026-08-07T15:15:25.536Z"
+  },
+  {
+   "paper_id": "064e84a4-f6a4-4927-8543-a90fb3cf9169",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T11:15:26.118Z",
+   "time_stop_utc": "2026-08-07T15:15:25.536Z"
+  },
+  {
+   "paper_id": "bcd46ad1-5968-451c-9eb1-891a9b524697",
+   "epic": "IX.D.SUNFUN.IFE.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T11:15:26.118Z",
+   "time_stop_utc": "2026-08-07T15:15:25.536Z"
+  },
+  {
+   "paper_id": "be4882be-7b16-4d8a-a8f5-53d9c3780229",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_BUY",
+   "direction": "BUY",
+   "created_utc": "2026-08-07T11:15:26.345Z",
+   "time_stop_utc": "2026-08-07T15:15:25.536Z"
+  },
+  {
+   "paper_id": "e7d496ae-e36e-4ff7-a38f-e0aa428c1f34",
+   "epic": "IX.D.SUNDAX.IGN.IP",
+   "variant": "SHADOW_SELL",
+   "direction": "SELL",
+   "created_utc": "2026-08-07T11:15:26.345Z",
+   "time_stop_utc": "2026-08-07T15:15:25.536Z"
+  }
+ ]
+}
