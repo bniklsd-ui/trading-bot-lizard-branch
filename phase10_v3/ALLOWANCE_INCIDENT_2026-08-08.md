@@ -9,6 +9,16 @@ updated: 2026-08-08
 
 # Allowance-Incident — Korrektur zu Datenwoche-Review 3 (2026-08-08, Sa)
 
+> **⚠ Nachtrag gleicher Tag (dated snapshot — Body unverändert, nur dieser Kopf):** zwei in §7
+> als offen geführte Punkte wurden **noch am selben Tag gefixt** — die **B5-Restfehlerrate**
+> (Satzgrenzen-Trimmung, Commit `c57daf0`) und der **Phase-9-`check_ig_side`-Designfehler**
+> (ein kontoweiter `RATE_LIMIT` demotiert kein Instrument mehr, Commit `5c2efa3`,
+> Nikinger-freigegeben). Dazu ein Fetch-Attempt-Cap pro Paper-Trade (`cf863de`). **Nicht
+> erledigt und weiterhin bindend: das Restart-Gate in §6** — Universe-Reset und
+> H1-Scharfschaltung bleiben gesperrt, bis ein `remainingAllowance` beobachtet ist. Alle Fixes
+> sind **offline** bewiesen; keiner lief je gegen echte IG-Daten. Details im Session-Block von
+> [`CLAUDE.md`](./CLAUDE.md).
+
 > **BLUF:** `DATA_WEEK_REVIEW_2026-08-07.md` §3.1/§3.2 nannte einen **endpoint-spezifischen
 > IG-Ausfall** als Ursache. Das ist falsch. Der Live-Check des Nikinger (2026-08-08 06:44 UTC)
 > liefert `error.public-api.exceeded-account-historical-data-allowance` — **unser eigenes

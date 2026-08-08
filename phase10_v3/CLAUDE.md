@@ -320,7 +320,7 @@ Time-Stop-Dauer-Key: `max_hold_minutes` (Default 240), konsumiert in `monitor.py
 Aus der Liste offener Punkte oben wurden vier abgearbeitet. Alles am Wochenende, Bot steht.
 
 1. **Fetch-Versuche pro Paper-Trade gedeckelt** (`paper.py` + `wiring.py`,
-   `_PAPER_MAX_FETCH_ATTEMPTS = 3`). Ein fälliger Trade braucht genau **einen** erfolgreichen
+   `_PAPER_MAX_FETCH_ATTEMPTS = 12`). Ein fälliger Trade braucht genau **einen** erfolgreichen
    Fetch — `_resolve_group` terminiert ihn immer, RESOLVED oder EXPIRED. Ein *fehlgeschlagener*
    Fetch ist also der einzige Weg, wie ein Trade einen Tick überlebt. Bisher wurde er jeden
    Zyklus neu geholt, bis `stale_after_minutes` griff: bis zu 60 Versuche bei 5-Minuten-Kadenz.
@@ -328,6 +328,13 @@ Aus der Liste offener Punkte oben wurden vier abgearbeitet. Alles am Wochenende,
    in-memory (Daemon läuft tagelang; `stale_after_minutes` ist der Backstop über Neustarts —
    eine Spalte wäre eine Migration, um etwas zu begrenzen, das schon begrenzt ist). Wird
    **nicht** belastet, wenn `budget_ok` den Tick abbricht: kein Call, kein Versuch.
+   **Kein reiner Gewinn — bewusster Tausch** (Advisor-Befund, Zahl daraufhin von 3 auf 12
+   angehoben): der Cap verkürzt auch die Toleranz gegenüber *transienten* Fehlern (500,
+   405-market-offline, Netz-Blip), und was dabei stirbt, ist eine WI-2-Messzeile — genau das
+   Produkt dieser Phase. Bei 3 Versuchen wären das 15 Minuten Toleranz statt vorher 300; bei
+   12 ist es ~1 Stunde, und der unbegrenzte Fall ist immer noch 5× gekappt. Für den
+   Allowance-Fall ist der Cap ohnehin nicht die wirksame Bremse — dort trippt `budget_ok`
+   schon beim ersten `RATE_LIMIT`.
 2. **Phase-9 `check_ig_side` gefixt** (cross-phase, Nikinger-Go): `verdict` trägt jetzt
    `ig_ohlcv_error_code` — **top-level, bewusst außerhalb von `checks`**, weil sowohl
    `failed_checks` als auch `_ig_side_failed`/`_yf_side_failed` dort nach Boolean-`False`
@@ -345,6 +352,13 @@ Aus der Liste offener Punkte oben wurden vier abgearbeitet. Alles am Wochenende,
    schlecht" → „…war nicht"), und was übrig bleibt muss substanziell sein (≥150 Zeichen).
    Sonst gilt weiter die alte Ablehnung. Text innerhalb der Grenze kommt **byte-identisch**
    zurück (die 58 von 68 gesunden Fälle sind unberührt, per Test gepinnt).
+   **Grenze der Zusage, ehrlich benannt** (Advisor-Befund): getrimmt wird vom Ende, also
+   bleibt der **Kopf** stehen. Eine Lesson, deren handlungsrelevanter Teil hinten steht,
+   verliert ihn — und liest sich trotzdem als vollständiger Satz. Genau diese Form haben alle
+   vier vorhandenen Lessons („…, was auf sauberes Risikomanagement hindeutet — überprüfe …").
+   **Nicht messbar:** die 10 zu langen Texte wurden nie gespeichert, nur ihre Ablehnung. Wer
+   die ersten getrimmten Lessons reviewt, prüft gezielt auf eine fehlende Schlussfolgerung.
+   Die Zusage lautet „besser als nichts", **nicht** „Qualität erhalten".
 4. **H4-a gebaut** (`lesson_max_age_days = 30`): rollender Alters-Cap auf die Prompt-Lessons.
    Eigener Knopf, **nicht** `quarantine_before` zweckentfremdet (einmaliger Operator-Reset mit
    festem Datum vs. stehende Policy mit wanderndem). Cutoff wird in **Python** berechnet, nicht
@@ -389,8 +403,13 @@ und zwei Hebel gleichzeitig zu ziehen hat bei H1 schon Messwochen gekostet.
    `atr_points IS NULL`). Ersatz: budgetierter Live-Test nach dem Reset — je ein
    `get_ohlcv(MINUTE,300)` und `get_ohlcv(MINUTE_5,60)` auf demselben Epic, 360 Punkte einmalig.
 4. ~~H4-a bauen~~ ✅ **gebaut** (s. Nachtrag Punkt 4, `lesson_max_age_days = 30`). Der
-   **Effekt** ist noch nicht gemessen — das braucht eine Woche mit laufendem Daemon, also
-   hängt er an Punkt 1–2. Erwartung, gegen die zu prüfen ist: 3 von 4 Lessons fallen raus.
+   **Effekt** ist ungemessen — das braucht eine Woche mit laufendem Daemon, hängt also an
+   Punkt 1–2. **Die Erwartung ist datumsabhängig, nicht fix** (Korrektur eines Rechenfehlers
+   in der Erstfassung, Advisor-Befund): Lessons vom 07-20/07-10/07-03/07-03 gegen einen
+   rollenden 30-Tage-Cap ⇒ **2 Überlebende bei Neustart am 08-09, 1 ab 08-12, 0 ab 08-20**.
+   Ab dann rendert der Block dauerhaft „none on record", solange keine neuen Trades entstehen
+   — Dämpfer vollständig entfernt, erreicht durch Nichtstun, **kein Bug**. Wer den Effekt
+   auswertet, muss zuerst das Neustart-Datum notieren, sonst prüft er gegen die falsche Zahl.
 5. **H4-b (Doppelzählung) erst nach dieser Messung entscheiden** — der Alters-Cap kann sie
    gegenstandslos machen (s. Scope-Doc §3/§4).
 6. **B3** (Margin-Headroom) unverändert parkiert, eigene Session.

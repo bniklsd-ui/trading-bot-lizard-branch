@@ -9,6 +9,21 @@ updated: 2026-08-08
 
 # H4 — Lesson-Feedback-Loop: Scoping (2026-08-08, Sa, docs-only)
 
+> **⚠ Zwei Korrekturen, gleicher Tag, nach Advisor-Pass** (dated snapshot — Body unverändert,
+> Korrektur hier oben, per Konvention):
+> 1. **H4-a wurde noch am selben Tag gebaut**, nicht nur gescopet — `lesson_max_age_days = 30`,
+>    Commit `a06dfa8`. Der Satz „Diese Session ändert keinen Code" unten gilt für den
+>    Scoping-Teil, nicht für die Session. Nicht gebaut: H4-b, H4-c, S6 (alle unverändert offen).
+> 2. **§3 H4-a rechnet falsch:** dort steht „mit einem 30-Tage-Cap fallen **drei der vier**
+>    Lessons sofort weg". Richtig ist **zwei von vier** — die Lessons stammen vom 07-20, 07-10,
+>    07-03, 07-03; der Cutoff am 08-09 liegt auf dem 07-10. Und der Cap **rollt**, die Antwort
+>    hängt also am Neustart-Datum: **2 Überlebende am 08-09, 1 ab 08-12, 0 ab 08-20** — dann
+>    rendert `_render_lessons` dauerhaft „none on record", solange keine neuen Trades entstehen.
+>    Das ist der Dämpfer vollständig entfernt und wird durch **Nichtstun** erreicht — kein Bug.
+>    Die Falsifikations-Erwartung („wenn der Funnel mit einer verbleibenden Lesson weiterhin 0
+>    Kandidaten liefert…") muss entsprechend am Neustart-Datum festgemacht werden, nicht an
+>    einer festen Zahl.
+
 > **BLUF:** Die Erfahrungsbasis des Modells besteht aus **vier** Trades. Alle vier sind
 > `BUY` auf DAX, alle vier Verluste (−585 € bis −651 €). Aus genau diesen vier Trades wurden
 > genau vier Lessons destilliert. Beide Blöcke — `recent_trades` **und** `Active lessons` —

@@ -119,6 +119,15 @@ def _ig_side_indeterminate(verdict: dict[str, Any]) -> bool:
     ``get_market_info``, which stayed healthy the whole time. One endpoint being
     rate-limited is a fact about our API budget, not about the instrument — and the right
     response to "we learned nothing" is to change nothing, not to count a strike.
+
+    **Accepted side effect:** writing nothing also means ``last_verified_at`` does not
+    advance, so ``_backoff_eligible``'s ``2**fail_count`` staircase stops throttling
+    re-probes of discovered/quarantined candidates while the condition lasts. At 3 data
+    points per probe (``_OHLCV_COUNT``) that cost is negligible against the 300 the paper
+    tracker spends per fetch, so it is accepted rather than fixed — but note the direction
+    is opposite to the "a repeated failure must not raise call volume" property this
+    session otherwise enforces. Revisit if a future indeterminate cause is expensive to
+    probe.
     """
     return verdict.get("ig_ohlcv_error_code") in _INDETERMINATE_IG_ERRORS
 

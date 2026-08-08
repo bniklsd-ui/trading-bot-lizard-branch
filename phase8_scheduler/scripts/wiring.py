@@ -437,7 +437,15 @@ _PAPER_BUDGET_COOLDOWN_MIN = 60
 # written off as unresolvable rather than retried until the staleness cut catches it
 # (which at a 5-minute cadence would be ~60 attempts against an endpoint that just
 # refused the last one). Bounds retries by trades due, not by outage length.
-_PAPER_MAX_FETCH_ATTEMPTS = 3
+#
+# ⚠ TRADE-OFF, not a pure win: this cap also shortens how long a trade tolerates a
+# *transient* failure (a 500, a 405 market-offline, a network blip) before being written
+# off — and what gets destroyed is a WI-2 measurement row, the output this phase exists to
+# produce. 12 attempts x the 5-minute cadence ~ one hour of tolerance, while still cutting
+# the unbounded case 5x. It is deliberately NOT tuned for the allowance case: there,
+# `budget_ok` trips on the first RATE_LIMIT and stands the tick down for an hour, and no
+# attempt is charged while stood down, so the breaker does that bounding already.
+_PAPER_MAX_FETCH_ATTEMPTS = 12
 
 # ponytail: leave a reserve rather than running to zero, so the Phase-9 promotion probe
 # (verify_instrument.check_ig_side, ~3 points/epic/round) keeps working and does not read

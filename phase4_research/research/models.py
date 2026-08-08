@@ -653,10 +653,13 @@ class ResearchConfig:
     # oldest of them for 36 days straight, while the same prompt separately carried those
     # same four trades in its `recent_trades` block. Four data points owning 100 % of every
     # decision is the feedback loop DATA_WEEK_REVIEW_2026-07-31 §5 named as H4.
-    # At 30 days three of the four current lessons drop out; at 14 all four would. 30 is the
-    # deliberate smaller step (Nikinger, 2026-08-08) — if the funnel still produces zero
-    # candidates with one lesson left, the lessons were not the cause and H4 is cleanly
-    # falsified. `None` = off (pre-H4-a behaviour, kept for a controlled A/B).
+    # 30 is the deliberate smaller step (Nikinger, 2026-08-08); 14 would drop all four at once.
+    # The cap ROLLS, so how many survive depends on the restart date — the four on record were
+    # extracted 07-20, 07-10, 07-03, 07-03, hence: 2 survive on 08-09, 1 from 08-12, and **0
+    # from 08-20 on**, at which point `_render_lessons` emits "none on record" permanently
+    # unless new trades produce new lessons. That last state is the damper fully removed, and
+    # it is reached by doing nothing — do not read it as a bug.
+    # `None` = off (pre-H4-a behaviour, kept for a controlled A/B).
     lesson_max_age_days: int | None = 30
 
     # --- trade-history provenance filter (v1.6 Phase-8 hotfix, Cause A part 2, 2026-07-02) ---

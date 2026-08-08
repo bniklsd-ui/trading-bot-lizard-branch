@@ -86,6 +86,15 @@ def _trim_to_sentence(text: str, limit: int) -> str | None:
     cut mid-sentence. A lesson truncated mid-clause can read as the opposite of what the
     model meant ("BUY nach Drift war nicht schlecht" → "BUY nach Drift war nicht"), and a
     silently inverted lesson is worse in the prompt than a missing one.
+
+    **Known limitation, stated rather than papered over:** this keeps the *head* of the
+    text, so a lesson whose actionable part is trailing loses it and still reads as a
+    grammatical sentence. That shape is real — all four lessons on record put the
+    conclusion last ("…, was auf sauberes Risikomanagement hindeutet — überprüfe …"). It
+    is not measurable here: the 10 over-long texts from the 08-03/07 week were never
+    stored, only their rejection was. Whoever reviews the first trimmed lessons should
+    check specifically for a missing conclusion. Salvage still beats the current zero;
+    the claim is "better than nothing", not "quality preserved".
     """
     window = text[: limit + 1]
     cut = max((window.rfind(end) for end in _SENTENCE_ENDINGS), default=-1)
