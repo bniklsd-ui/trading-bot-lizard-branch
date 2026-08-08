@@ -71,21 +71,68 @@ def build_paper_lesson_prompt(trade: "PaperTrade", sibling: "PaperTrade | None")
     return "\n".join(lines)
 
 
+# An over-long lesson is only salvaged if trimming to whole sentences leaves at least
+# this much text. Below it we are no longer shortening a lesson, we are inventing a
+# different (shorter, possibly meaning-inverted) one — better to keep none.
+_MIN_SALVAGED_LESSON_CHARS = 150
+
+_SENTENCE_ENDINGS = (". ", "! ", "? ")
+
+
+def _trim_to_sentence(text: str, limit: int) -> str | None:
+    """Longest prefix of ``text`` that ends on a sentence boundary within ``limit``.
+
+    ``None`` when no boundary exists in range — the caller must then reject rather than
+    cut mid-sentence. A lesson truncated mid-clause can read as the opposite of what the
+    model meant ("BUY nach Drift war nicht schlecht" → "BUY nach Drift war nicht"), and a
+    silently inverted lesson is worse in the prompt than a missing one.
+    """
+    window = text[: limit + 1]
+    cut = max((window.rfind(end) for end in _SENTENCE_ENDINGS), default=-1)
+    if cut == -1:
+        # A single sentence ending exactly at the limit has no trailing space to find.
+        if len(text) > limit and text[limit - 1] in ".!?":
+            return text[:limit].strip()
+        return None
+    return text[: cut + 1].strip()
+
+
 def validate_abstain_lesson(text: str) -> str:
     """Strip + validate a lesson string: non-empty, <=300 chars, single-line.
 
+    Over-long text is **salvaged, not rejected** (B5 residual, 2026-08-08): the 300-char
+    limit is stated in the prompt, but the model still overshot on 10 of 68 attempts in
+    the 08-03/07 week (321-382 chars), and each of those produced **no lesson at all**.
+    Trimming to the last whole sentence under the limit recovers a coherent lesson where
+    the alternative is silence — strictly better, as long as the trim never manufactures
+    a meaning the model did not write. Two guards enforce that: the cut must land on a
+    sentence boundary, and what survives must still be substantial
+    (``_MIN_SALVAGED_LESSON_CHARS``). Failing either, the old rejection stands.
+
+    Text already within the limit is returned byte-identical — the 58 of 68 that were
+    fine are untouched by this path.
+
     Raises:
-        AbstainLessonError: the text is empty, too long, or spans multiple lines.
+        AbstainLessonError: the text is empty, spans multiple lines, or is too long and
+            cannot be trimmed to a whole sentence with enough substance left.
     """
     stripped = text.strip()
     if not stripped:
         raise AbstainLessonError("lesson text is empty")
-    if len(stripped) > _MAX_LESSON_CHARS:
-        raise AbstainLessonError(
-            f"lesson text too long ({len(stripped)} > {_MAX_LESSON_CHARS} chars)"
-        )
     if "\n" in stripped:
         raise AbstainLessonError("lesson text must be a single line")
+    if len(stripped) > _MAX_LESSON_CHARS:
+        salvaged = _trim_to_sentence(stripped, _MAX_LESSON_CHARS)
+        if salvaged is None or len(salvaged) < _MIN_SALVAGED_LESSON_CHARS:
+            raise AbstainLessonError(
+                f"lesson text too long ({len(stripped)} > {_MAX_LESSON_CHARS} chars) "
+                "and not trimmable to a whole sentence"
+            )
+        logger.warning(
+            "lesson text trimmed from %d to %d chars at a sentence boundary",
+            len(stripped), len(salvaged),
+        )
+        return salvaged
     return stripped
 
 

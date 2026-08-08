@@ -89,3 +89,42 @@ def test_validate_abstain_lesson_rejects_301_chars():
 
 def test_validate_abstain_lesson_accepts_exactly_300_chars():
     assert validate_abstain_lesson("x" * 300) == "x" * 300
+
+
+# --- B5 residual: salvage an over-long lesson instead of losing it (2026-08-08) ------
+# 10 of 68 reflect attempts in the 08-03/07 week overshot the stated 300-char limit and
+# produced NO lesson at all. Trimming to a whole sentence recovers those, but must never
+# manufacture a meaning the model did not write.
+
+
+def test_over_long_lesson_is_trimmed_to_the_last_whole_sentence():
+    first = "BUY auf DAX nach starker Drift lief schlecht. " * 6   # 270 chars, 6 sentences
+    text = first + "Dieser angehaengte Satz sprengt die Grenze deutlich und faellt weg."
+    assert len(text) > 300
+
+    result = validate_abstain_lesson(text)
+
+    assert len(result) <= 300
+    assert result.endswith(".")
+    assert "faellt weg" not in result       # the over-hanging sentence is gone
+    assert result == first.strip()          # and nothing else was altered
+
+
+def test_over_long_lesson_without_a_sentence_boundary_is_still_rejected():
+    """No boundary in range means the only cut available is mid-clause — and a lesson
+    truncated mid-clause can read as the opposite of what was meant."""
+    with pytest.raises(AbstainLessonError):
+        validate_abstain_lesson("x" * 301)
+
+
+def test_over_long_lesson_is_rejected_when_too_little_survives_the_trim():
+    """A 40-char survivor is a different lesson, not a shorter one — keep none."""
+    text = "Kurz. " + "y" * 400
+    with pytest.raises(AbstainLessonError):
+        validate_abstain_lesson(text)
+
+
+def test_lesson_within_the_limit_is_returned_byte_identical():
+    """The 58 of 68 that already worked must not be touched by the salvage path."""
+    text = "BUY auf DAX nach +2,3 % Drift lief schlecht. Entry-Timing pruefen."
+    assert validate_abstain_lesson(text) == text
