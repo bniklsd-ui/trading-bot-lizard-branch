@@ -4,7 +4,7 @@ purpose: Verbatim session-history archive rotated out of `CLAUDE.md`
 read-when: auditing how a past phase-10 (V3) decision came about — never needed at session start
 detail: L3
 up: ./CLAUDE.md
-updated: 2026-08-07
+updated: 2026-08-08
 ---
 
 # phase10_v3 — Session Archive
@@ -13,6 +13,123 @@ updated: 2026-08-07
 > rotation rule ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)). Source order
 > preserved (newest-first). The newest `## Session stopped` block always stays in the source file;
 > at each session end, the previously-newest block rotates here.
+
+## Session stopped — 2026-08-07 (Fr — erste H1-Live-Woche ausgewertet, read-only)
+
+> Read-only Datenwoche-Review, angestoßen durch den Nikinger ("week is over now. wanna have a
+> look? the bots paused, everything should be safe"). Kein Code berührt, keine Migration, kein
+> Scheduler-Neustart — nur `mode=ro`-DB-Reads + Log-Lesen, exakt wie die beiden Vorwochen-
+> Reviews. Vollständige Auswertung: `phase10_v3/DATA_WEEK_REVIEW_2026-08-07.md`.
+
+### Completed
+- Verifiziert: Scheduler lief die ganze Woche durchgehend (ein Start 2026-08-01 12:18 lokal,
+  kein Neustart, kein Crash), sauberer Stop kurz vor dieser Session (kein `KILL`-File, letzter
+  Reconcile 23:13 lokal). **Kein Order-Risiko** — 0 echte Trades, `trade_outcomes` unverändert
+  seit 07-20.
+- **Funnel weiterhin vollständig kollabiert:** 360 `abstain_records`, 100 % `REASON_NO_CANDIDATES`,
+  5/5 Tage — unverändert gegenüber den beiden Vorwochen, nichts Neues.
+- **H1 produzierte wie geplant** (600 Shadow-Pairs geöffnet, 0 `open_scheduled_pairs failed`)
+  — aber deckte dabei einen **IG-`/prices`-Endpoint-Ausfall** auf, der ab 08-04 einsetzte und
+  bis zum letzten Verify-Versuch heute (08-07 15:14 lokal) anhält. Erst als Chat-Erstauswertung
+  falsch gelesen (52 SL / 43 TP als "Trefferquote"), dann per Advisor-Pass korrigiert: die
+  SL/TP-Verteilung eines Both-Sides-Paars ist mechanisch gekoppelt, keine Edge-Aussage — s.
+  Review §2 für die korrigierte Lesart.
+- **Root Cause identifiziert:** nicht der 30-Minuten-`shadow_schedule_interval_min` (öffnet nur
+  neue Paare), sondern die vorbestehende **5-Minuten-`_run_paper_tracker()`-Kadenz** (Block B,
+  seit 07-17, vor H1 mit fast nichts zu tun) — ein wachsender Rückstand fälliger `OPEN`-Trades
+  erzeugt monoton eskalierende `get_ohlcv`-Fehlversuche (218→516→786→1148→1564 CRITICAL-
+  Zeilen/Tag, Σ 4232). **Korrektur der eigenen Empfehlung aus der letzten Session:** dort stand
+  "der Intervall-Regler ist die Stellschraube, falls die Allowance zu heiß läuft" — falsch für
+  dieses Ausfallmuster, der Intervall-Regler wirkt auf einen anderen Mechanismus.
+  `instrument_universe.checks_json` liefert einen sauberen endpoint-spezifischen Beleg
+  (`get_market_info`-Checks grün, `ig_ohlcv_available: false`, gleiche Verify-Runde).
+- **Kaskaden-Schaden gefunden:** dieselbe `check_ig_side`-Probe läuft unabhängig von H1 auch in
+  der Phase-9-Promotion-Pipeline — 18 von 22 `instrument_universe`-Epics sind jetzt
+  `quarantined`, **inklusive des seit Wochen live-verifizierten Kerns** (DAX/CAC/IBEX/AEX/STXE,
+  `point_value_source='ig_fields'`). Die verbleibenden 4 aktiven Epics stehen bei
+  `fail_count=2` gegen `demote_after_fails=3` — eine Verify-Runde vom vollständigen Leerlauf
+  entfernt. Das ist der wichtigste Befund der Woche, nicht die Shadow-Pair-Zahlen selbst.
+- **WI-2/W2 bleibt unbeantwortet** — 0 `TIME_STOP` unter den 95 resolved Pairs ist ein Artefakt
+  des Ausfalls (keine Bars bis `time_stop_utc`), keine Antwort auf die Geometrie-Frage.
+- Zwei Nebenbefunde protokolliert, nicht gefixt: B5-Restfehlerrate (10/68 Reflect-Versuche
+  überschreiten weiterhin die 300-Zeichen-Grenze trotz des 07-31-Fixes), `env.error` wird in
+  `wiring.py::_build_paper_tracker`s `bar_fetch` verschluckt — die gesamte Diagnose dieser
+  Woche lief über `instrument_universe.checks_json`, nicht über die 4232 CRITICAL-Zeilen selbst,
+  die den echten IG-Fehlercode nirgends trugen.
+- `phase10_v3/DATA_WEEK_REVIEW_2026-08-07.md` geschrieben + in `docs/INDEX.md` registriert.
+  Vorheriger Session-Block (2026-08-01, H1 built) verbatim nach `SESSIONS_ARCHIVE.md` rotiert.
+
+### Nachtrag (gleiche Session, Chat-Follow-up) — Strategie-Priorisierung für die
+### Wochenend-Session morgen
+
+Der Nikinger fragte nach einer Gesamteinordnung über alle drei Datenwochen + diesen Vorfall
+hinweg. Ein Advisor-Pass vor der Antwort korrigierte drei Punkte an der Erstfassung — die
+Korrekturen sind unten bereits eingearbeitet, nicht separat vermerkt:
+
+1. **Das Universum ist eingefroren, nicht am Verfallen.** Die Promotion-Pipeline läuft nur,
+   wenn der Daemon läuft — solange der Bot pausiert ist, tickt keine Uhr gegen die 4
+   verbleibenden aktiven Epics. Das Risiko ist **nicht** „jeder Tag, der vergeht", sondern **der
+   nächste Daemon-Start mit einem noch toten Endpoint**. Das nimmt den falschen Zeitdruck fürs
+   Wochenende raus — der Health-Check vor dem Neustart ist der eigentliche Gate, keine Uhr.
+2. **Der Tracker-Fix braucht eine benannte Eigenschaft, keine bloße Form.** „Kadenz
+   entkoppeln/drosseln" beschreibt eine Form, keine Anforderung. Die tatsächlich nötige
+   Eigenschaft: **ein wiederholter `get_ohlcv`-Fehler muss künftiges Call-Volumen SENKEN, nicht
+   erhöhen.** Heute ist es umgekehrt — ein Fehler lässt den Trade `OPEN`, `OPEN`-Trades
+   akkumulieren, der nächste Tick hat mehr Epics zum erneuten Scheitern. Ein reines
+   Intervall-Verlängern verlangsamt nur dieselbe Divergenz, kehrt sie nicht um. Der Mechanismus
+   (Backoff, Circuit-Breaker, Retry-Cap pro Trade) ist der Wochenend-Session überlassen — aber
+   er muss zusätzlich die **bestehenden 328 Rückstands-Zeilen** behandeln, nicht nur neuen
+   Rückstand verhindern.
+3. **`env.error` nicht verschlucken** bleibt ein kleiner, kostenloser Mitnahme-Fix im selben
+   File (`wiring.py::_build_paper_tracker`s `bar_fetch`).
+4. **Korrektur der eigenen Zuschreibung:** H1 hat den Ausfall nicht *verursacht* — es hat das
+   Call-Volumen erhöht, das eine bereits vorhandene Phase-9-Lücke (`check_ig_side`s
+   Demote-bei-IG-Fail-Pfad) freigelegt hat. Dieser Pfad hätte bei jedem sustained
+   `/prices`-Ausfall demotiert, unabhängig von H1 (steht bereits so in
+   `DATA_WEEK_REVIEW_2026-08-07.md` — hier nur nochmal explizit festgehalten, damit die
+   Zuschreibung im Kopf konsistent bleibt).
+5. **Die H3/H4/H5/H7-Sequenzierung neu bewertet, mit einer Empfehlung, nicht nur einer Frage:**
+   die bisherige Reihenfolge gatete H4 (Lesson-Feedback-Loop) auf eine „saubere H1-Woche". Das
+   Gate ist jetzt **dreimal an drei unabhängigen Gründen gescheitert** (Tracker-Bug Woche 1,
+   Funnel-Kollaps Woche 2, IG-Ausfall Woche 3) — das ist selbst Evidenz, dass das Gate
+   unzuverlässig ist, nicht dass eine saubere Woche kurz bevorsteht. H4s eigene Evidenzbasis
+   hängt nicht von WI-2 ab: W5 ist bereits bestätigt, 4.529 Lesson-Renderings, explizites Zitieren
+   in jeder bisher eingefangenen Begründung, jetzt drei Wochen in Folge dasselbe Abstain-Muster.
+   **Empfehlung: H4 muss nicht auf H1 warten** — Scoping kann parallel zum Infra-Fix laufen,
+   braucht keinen laufenden Daemon. Ehrliches Gegenargument aus H7s eigener Logik: nicht an der
+   Richtungslogik drehen, bevor die Geometrie bekannt ist. Aber H4 ist keine Richtungslogik —
+   es entfernt einen Dämpfer, der die **Sample-Erzeugung selbst** unterdrückt, eine andere
+   Kategorie als das, was H7 meinte. Die ursprüngliche Reihenfolge hat das vermutlich vermengt.
+   **Das ist eine Empfehlung, keine getroffene Entscheidung** — der Nikinger kann sie morgen
+   bestätigen oder überstimmen, ohne dass vorher etwas umgeschrieben werden muss.
+
+### Next (morgige Wochenend-Session startet hier)
+
+1. **Nikinger, vor allem anderen:** ein einzelner `get_ohlcv`-Live-Call gegen z. B.
+   `IX.D.DAX.IFMM.IP`, um `/prices` zu bestätigen. Kein Zeitdruck (s. Punkt 1 oben) — aber
+   nichts danach ist sicher zu sequenzieren, ohne das zu wissen.
+2. **Branch auf das Ergebnis:**
+   - Gesund → DB-Reset der 18 quarantined Epics (Präzedenzfall 2026-07-06).
+   - Weiterhin tot → **keinen Neustart**, auch nicht ohne `--enable-shadow-schedule` — der
+     nächste Punkt (Fix) kommt zuerst so oder so.
+3. **Bevor irgendein Neustart mit dem Flag passiert:** der Tracker-Fix nach der oben benannten
+   Eigenschaft (Punkt 2 im Nachtrag) + der `env.error`-Mitnahme-Fix, im selben File.
+4. **Erst danach H1 wieder scharf schalten** für eine echte Datenwoche.
+5. **H4 (Lesson-Feedback-Loop) parallel scopen** — unabhängig von 1–4, kein laufender Daemon
+   nötig, s. Empfehlung Punkt 5 oben. Startpunkt: `DATA_WEEK_REVIEW_2026-07-31.md` §5 H4 (die
+   drei konkreten Kandidaten: Relevanz-Decay, Doppelzählungs-Ende, Lesson-Skopierung).
+6. **B3 (Margin-Headroom) bleibt unverändert parkiert**, unabhängig von alldem — eigene Session,
+   startet mit dem live `/markets/{epic}`-Check (`phase5_execution/CLAUDE.md`).
+7. **H3/H5/H7** bleiben offen, jetzt nachrangig zu H4 statt gleichrangig gegatet.
+
+### Open questions / blockers
+- **Root Cause des IG-`/prices`-Ausfalls selbst** (Wochenkontingent erschöpft vs. etwas
+  anderes) — nicht aus dem Repo feststellbar, braucht den Live-Check aus Next #1.
+- **W2 (Sub-Noise-Geometrie) weiterhin unbeantwortet** — unverändert der Wurzel-Punkt, jetzt
+  zum dritten Mal an einer externen Störung statt am Funnel selbst gescheitert.
+- **H4-vor-H1-Empfehlung ist unbestätigt** — s. Nachtrag Punkt 5, wartet auf Nikinger-Go/No-Go.
+
+---
 
 ## Session stopped — 2026-08-01 (H1 built: time-scheduled shadow pairs, default OFF)
 
