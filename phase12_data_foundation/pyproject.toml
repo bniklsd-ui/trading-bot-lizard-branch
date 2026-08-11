@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "data_foundation"
+version = "0.1.0"
+description = "Phase 12 — Datenfundament: instrument registry (one truth), BarService (one bar path), bars.sqlite archive (write-through, provenance), yF-only Recorder. Bauprinzip: NULL new AI (D1/§1) — symbol resolution is code-verified price comparison, not an LLM guess."
+requires-python = ">=3.11"
+# Packaging metadata only, enabling an editable install (`pip install -e`) so
+# `import data_foundation` resolves at runtime without sys.path hacks — same
+# pattern as `phase9_universe` (`universe`) and `phase10_v3` (`abstain_lessons`).
+# The sibling `tests`/`scripts` dirs are deliberately excluded from the
+# installed package. Own-connection SQLite (`data/bars.sqlite`, D4) — no
+# cross-phase import at module load time (lazy imports in function bodies only,
+# D3), so this package's position in dev_install.sh is by phase number, not a
+# real dependency order.
+
+[tool.setuptools.packages.find]
+include = ["data_foundation*"]
