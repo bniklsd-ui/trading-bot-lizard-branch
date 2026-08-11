@@ -310,7 +310,7 @@ weiterlaufenden Betriebs, ist aber **nicht** Bedingung dieses ✅-Flips (der dec
 > der Baseline-Lauf genug Marktdaten geliefert hat.
 
 **Goal:** die zwei strukturellen Lücken schließen, die den gesamten v1.5→v1.7-Hotfix-Arc
-getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 11/V4)
+getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 13/V4)
 auf einem unzuverlässigen Datenfundament aufbaut.
 
 > **Korrektur (2026-07-08, M1-Housekeeping):** die Checkliste unten stand noch auf `[ ]`,
@@ -415,11 +415,15 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 > Vollständige Begründung, Durability-Anforderungen (A–G) und offene Entscheidungen:
 > [`phase10_v3/PHASE11_DEFERRAL_HANDOVER.md`](./phase10_v3/PHASE11_DEFERRAL_HANDOVER.md),
 > Bild: [`docs/architecture/data_foundation.svg`](./docs/architecture/data_foundation.svg).
-> **Offene Nummerierungs-Entscheidung:** Vorschlag „Phase 12 = Datenfundament, V4 → Phase 13"
-> (Handover §4.1) — bis zur Nikinger-Entscheidung bleibt die Tabelle unten unverändert.
+> **Nummerierung final (Nikinger-Entscheidung 2026-08-11):** „Phase 12 = Datenfundament, V4 →
+> Phase 13" (Handover §4.1, ausgeführt in [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md) D2).
+> Der neue Datenfundament-Track lebt als eigene Phase 12 direkt unter dieser (s. u.); V4 ist
+> jetzt **Phase 13** (weiter unten), unverändert im Inhalt, zusätzlich gegatet auf ein
+> bestandenes Phase-12-PASS (dieselbe Logik wie diese Notbremse: keine weitere
+> AI-Sophistication-Arbeit auf einem unzuverlässigen Datenfundament).
 >
 > Numbering claimed 2026-08-01 (Nikinger-Entscheidung)
-> — vorher stand hier "Phase 11 = V4"; V4 ist jetzt **Phase 12** (unten), unverändert im Inhalt.
+> — vorher stand hier "Phase 11 = V4"; V4 ist jetzt **Phase 13** (unten), unverändert im Inhalt.
 > Diese Phase ist **keine** neue AI-Sophistication-Arbeit, sondern das Fix-/Diagnostik-Ergebnis
 > der zweiten V3-Datenwoche: [`phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`](./phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md)
 > §4 (Befunde B1-B5) + §5 (Hypothesen H1-H7). **Directory:** lebt vorerst weiter in
@@ -466,33 +470,58 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 
 ---
 
-## Phase 12 — V4: Sophisticated / Optional *(die alte Phase 9, deferred; vormals "Phase 11" —
-umnummeriert 2026-08-01, s. Phase 11 oben)*
+## Phase 12 — Datenfundament (Registry + BarService + Bar-Archiv + Recorder)
 
-> **Status: deferred, gegatet auf Phase 9+11 UND reale Outcomes** (unverändert aus der
-> ursprünglichen Phase-9-Formulierung — nur numerisch verschoben, kein Inhalt geändert).
+> **Status: 🆕 geöffnet 2026-08-11, Ausführung begonnen.** Notbremse aus Phase 11 (oben):
+> drei Datenwochen sind an drei Infrastruktur-Ausfällen gescheitert, nie an der Messung — die
+> gemeinsame Wurzel (**eine Tatsache in drei divergenten Speichern**, die Mehrquellen-Kette aus
+> Phase 9 nie eingeschaltet) ist wichtiger als die vorherige Phase. Execution-ready Plan
+> (Überweg C, Decisions D1–D20, Steps 0–10): [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md).
+> Bild: [`docs/architecture/data_foundation.svg`](./docs/architecture/data_foundation.svg).
+
+**Goal:** eine echte Beweis-Messwoche läuft durch, ohne dass Infrastruktur die Messung tötet.
+Instrument-Registry wird die eine Wahrheit (abgeleitetes, code-verifiziertes Symbol-Mapping statt
+Deklaration), ein `BarService` wird der eine Bar-Pfad für alle Konsumenten, jede gefetchte Bar
+landet in einem eigenen Archiv (`data/bars.sqlite`), ein Recorder-Prozess (yFinance-only) schreibt
+kontinuierlich unabhängig vom Bot-Zustand, und ein Mess-Heartbeat lässt einen Ausfalltag am selben
+Tag auffallen statt erst Wochen später.
+
+**Done when:** siehe Plan §7 (PASS-Kriterien A–G + Kern). WI-2/W2-Auswertung selbst bleibt
+Phase-11-Wiederaufnahme, nicht Teil dieser Phase.
+
+**Directory:** [`phase12_data_foundation/`](./phase12_data_foundation/)
+
+---
+
+## Phase 13 — V4: Sophisticated / Optional *(die alte Phase 9, deferred; vormals "Phase 12" —
+umnummeriert 2026-08-11, s. Phase 12 oben)*
+
+> **Status: deferred, gegatet auf Phase 9+11+12 UND reale Outcomes** (unverändert aus der
+> ursprünglichen Phase-9-Formulierung — nur numerisch verschoben, kein Inhalt geändert; Phase 12
+> als zusätzliches Gate ergänzt, 2026-08-11 — dieselbe Notbremsen-Logik wie Phase 11: kein
+> weiterer AI-Sophistication-Ausbau auf einem unzuverlässigen Datenfundament).
 
 **Goal:** Implement the V2 improvements identified in the Council analysis.
 
-### 12a — Council Skill Integration *(vormals 9a / 11a)*
+### 13a — Council Skill Integration *(vormals 9a / 11a / 12a)*
 - [ ] Integrate `verbesserungsvorschlaege` as structured input to pipeline
 - [ ] Trigger detection for ad-hoc strategy evaluation
 
-### 12b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b / 11b)*
+### 13b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b / 11b / 12b)*
 - [ ] Context-window monitoring during debate (~60–70 %)
 - [ ] Compression of Bull/Bear/Judge state into summary
 - [ ] New session continuation
 
-### 12c — Reward/Punishment Reform *(vormals 9d / 11c)*
+### 13c — Reward/Punishment Reform *(vormals 9d / 11c / 12c)*
 - [ ] `+ process_quality_score` (VETOs, confidence, debate quality, gate path)
 - [ ] Anti-emotionality: separate process score from outcome score
 
-### 12d — Force Trigger Safeguard *(vormals 9e / 11d)*
+### 13d — Force Trigger Safeguard *(vormals 9e / 11d / 12d)*
 - [ ] Lock force trigger when daily PNL < 0 — das P2-Schema-Feld `force_trigger_locked` existiert
   bereits seit Phase 2, wird aber von keiner Funktion durchgesetzt (kein Force-Trigger existiert
   bisher überhaupt)
 
-### 12e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f / 11e, aus Phase 7 hierher verschoben)*
+### 13e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f / 11e / 12e, aus Phase 7 hierher verschoben)*
 - [ ] AI extrahiert strukturierte Instincts (`trigger` / `domain` / `confidence` / `evidence_trade_ids`) aus P7 `trade_lessons` + `reward_pts`
 - [ ] Code **validiert** Instincts gegen reale Outcomes; bewährte werden zu **deterministischen Regeln promotet** (`longterm_pre_trade_check()` VETO), mit Prune→Archiv der widerlegten
 - [ ] **Harte Leitplanke:** Promotion in die VETO-Schicht **nur** über einen deterministischen / menschlich gegateten Schritt — eine promotete Regel wird deterministischer Code, die AI sitzt nie in der VETO-Auswertung. Gegatet auf reale Outcomes (≫ `n_min`)

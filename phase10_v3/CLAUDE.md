@@ -18,7 +18,7 @@ down:
   - ./PHASE11_DEFERRAL_HANDOVER.md   # 🛑 Notbremse 2026-08-11 — Status, Anforderungen A-G, offene Entscheidungen (L3, dated) — ZUERST LESEN
   - ../docs/architecture/data_foundation.svg   # Fehlerbild + Zielbild, 1080x1080
   - ./DATA_SOURCE_STRATEGY_2026-08-11.md   # Entscheidung: Tracker auf ChainedBarProvider (IG→yFinance), NICHT Lightstreamer; IG-Kontingent bestätigt 10.000/Woche (L3, dated)
-  - ../ROADMAP.md   # Phase 11 (this work) + Phase 12 (V4, renumbered 2026-08-01) sections
+  - ../ROADMAP.md   # Phase 11 (this work, deferred) + Phase 12 (Datenfundament, opened 2026-08-11) + Phase 13 (V4) sections
   - ./SESSIONS_ARCHIVE.md   # full session history (L3)
 updated: 2026-08-11
 ---
@@ -297,11 +297,12 @@ Time-Stop-Dauer-Key: `max_hold_minutes` (Default 240), konsumiert in `monitor.py
 
 1. **`PHASE11_DEFERRAL_HANDOVER.md` lesen** — §3 (Anforderungen A–G) und §4 (offene
    Entscheidungen) sind der eigentliche Auftrag.
-2. **Nikinger-Entscheidung: Nummerierung** — Vorschlag „Phase 12 = Datenfundament, V4 →
-   Phase 13". Bewusst nicht eigenmächtig entschieden (projektweit in fünf Dokumenten sichtbar).
-3. **Nikinger-Live-Check als Gate vor jeder Technologiewahl:** `get_market_info` auf einem
-   zugeordneten und einem nicht zugeordneten Epic — welche Felder liefert IG überhaupt?
-   Sinnvoll gebündelt mit B3s ausstehendem `/markets/{epic}`-Margin-Check (dieselbe Response).
+2. ✅ **Nummerierung final (2026-08-11):** „Phase 12 = Datenfundament, V4 → Phase 13" —
+   entschieden, in allen fünf Dokumenten nachgezogen (Root-`CLAUDE.md`, `ROADMAP.md`,
+   `README.md`, `ARCHITECTURE.md`, `docs/INDEX.md`). Plan: `docs/concepts/phase12_data_foundation_plan.md`.
+3. ✅ **Live-Check erledigt (2026-08-11):** `GET /markets/{epic}` (Rohdaten, nicht die
+   projizierte `get_market_info`-Envelope) auf DAX (gemappt), US 500 (ungemappt), SUNDAX
+   (Wochenend) — Ergebnis + B3-Margin-Felder in `phase12_data_foundation/CLAUDE.md`.
 4. **Erst danach** den Datenfundament-Plan entwerfen. Ein Rewrite der Datenschicht ist
    ausdrücklich erlaubt („by all means", Nikinger 2026-08-11).
 5. **Restart-Gate + Universe-Reset** unverändert gesperrt — aber **nicht mehr dringend**,
