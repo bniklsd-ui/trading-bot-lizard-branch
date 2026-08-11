@@ -15,9 +15,10 @@ down:
   - ./DATA_WEEK_REVIEW_2026-08-07.md   # Datenwoche 3 (erste H1-Live-Woche): IG-/prices-Ausfall + Universe-Quarantäne-Kaskade (L3, dated) — §3 Root Cause SUPERSEDED, s. nächste Zeile
   - ./ALLOWANCE_INCIDENT_2026-08-08.md   # korrigiert obige §3.1/§3.2: kein IG-Ausfall, sondern erschöpftes Konto-Kontingent; + Fix + Restart-Gate (L3, dated)
   - ./H4_LESSON_FEEDBACK_SCOPE_2026-08-08.md   # H4-Scoping gegen As-Built: 4 Trades → 4 Lessons → 5.973 Renderings, relevance_score tot (L3, dated)
+  - ./DATA_SOURCE_STRATEGY_2026-08-11.md   # Entscheidung: Tracker auf ChainedBarProvider (IG→yFinance), NICHT Lightstreamer; IG-Kontingent bestätigt 10.000/Woche (L3, dated)
   - ../ROADMAP.md   # Phase 11 (this work) + Phase 12 (V4, renumbered 2026-08-01) sections
   - ./SESSIONS_ARCHIVE.md   # full session history (L3)
-updated: 2026-08-08
+updated: 2026-08-11
 ---
 # CLAUDE.md — Phase 10 (V3): Abstain-Lessons + Persistenz-Reform + Paper-Trades (`phase10_v3/`)
 
@@ -392,9 +393,21 @@ und zwei Hebel gleichzeitig zu ziehen hat bei H1 schon Messwochen gekostet.
 2. **Erst danach** Universe-Reset der 18 quarantined Epics (Präzedenzfall 2026-07-06). Vorher
    ist er **schädlich**, nicht nur wirkungslos: `fail_count=0` gegen ein noch erschöpftes
    Kontingent quarantäniert alle 22 binnen drei Verify-Runden erneut.
-3. **Vor einer echten Messwoche: H1s Grundverbrauch budgetieren.** Die Fixes verhindern
-   Eskalation, Datenkorruption und unbegrenzte Retries, senken aber ~33 Fetches × 300
-   Punkte/Tag im **Gutfall** nicht. Zwei Hebel:
+3. **Vor einer echten Messwoche: H1s Grundverbrauch budgetieren. → ENTSCHIEDEN 2026-08-11,
+   eigenes Dokument:** [`DATA_SOURCE_STRATEGY_2026-08-11.md`](./DATA_SOURCE_STRATEGY_2026-08-11.md).
+   Kurzfassung: IGs Kontingent ist bestätigt **10.000 Datenpunkte/Woche** (festes 7-Tage-Fenster
+   ab dem ersten Request nach einem Reset, **nicht** rollend — Korrektur zur Erstannahme). H1
+   bräuchte ~49.500; selbst `MINUTE_5`×60 landet bei 9.900 = 99 % ohne jede Reserve. Damit ist
+   das kein Tuning-, sondern ein Architektur-Problem: **IG darf nicht die Bar-Quelle bleiben.**
+   Entscheidung: der Paper-Tracker geht auf die **bereits gebaute** `ChainedBarProvider`-Kette
+   (IG→yFinance, Phase 9 Step 6) — er ist der einzige Bar-Konsument, der noch fest an
+   `broker.get_ohlcv` hängt. **Nicht** Lightstreamer: das ist ein Live-Tick-Strom, der Tracker
+   braucht *historische* Bars; ihn dafür zu nutzen hieße den Strom selbst mitzuschreiben und zu
+   persistieren — das *ist* der Eigenbau. Unabhängig bestätigt: ein Kollege des Nikinger lief
+   mit eigenem IG-Setup auf dasselbe Limit und landete bei derselben Multi-Source-Antwort;
+   seine Limit-Erhöhungs-Anfrage bei IG scheiterte, weshalb **kein Schritt darauf warten darf**.
+   Ungebaut — Reihenfolge in §6 des Dokuments. Die alte Zwei-Hebel-Notiz darunter ist damit
+   überholt, bleibt aber als Kontext stehen:
    (a) `MINUTE_5` × 60 = ⅕ der Kosten, (b) weniger Epics/Paare. **(a) nicht blind schalten** —
    `resolve_paper_trade` löst Same-Bar-SL+TP bedingungslos zu SL auf, gröbere Bars könnten den
    SL-Anteil systematisch aufblähen. Der Offline-Test dazu ist **nicht möglich** (Roh-Bars
