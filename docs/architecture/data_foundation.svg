@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" font-family="Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6470"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1e7a4d"/>
+    </marker>
+  </defs>
+
+  <rect width="1080" height="1080" fill="#f7f8fa"/>
+
+  <text x="40" y="46" font-size="25" font-weight="bold" fill="#1b1f24">Datenfundament — Fehlerbild und Zielbild</text>
+  <text x="40" y="70" font-size="14" fill="#5b6470">Phase 11 deferred, 2026-08-11 · Notbremse nach drei ergebnislosen Datenwochen · Code ist Wahrheit, dies ist die Landkarte</text>
+  <line x1="40" y1="82" x2="1040" y2="82" stroke="#d5d9de" stroke-width="1"/>
+
+  <!-- ============ IST ============ -->
+  <text x="40" y="112" font-size="18" font-weight="bold" fill="#c0392b">IST — eine Tatsache, drei Speicher, ein Writer</text>
+  <text x="40" y="133" font-size="13" fill="#5b6470">„Welches yFinance-Symbol gehört zu diesem Epic?“ — geschrieben genau einmal, per Namensabgleich, bei der Entdeckung.</text>
+
+  <rect x="40" y="148" width="1000" height="232" rx="6" fill="#fdf2f1" stroke="#e8c4bf"/>
+
+  <rect x="62" y="170" width="200" height="80" rx="5" fill="#fff" stroke="#c9a7a1"/>
+  <text x="76" y="192" font-size="13" font-weight="bold" fill="#1b1f24">KNOWN_YF_TICKERS</text>
+  <text x="76" y="211" font-size="11.5" fill="#5b6470">discovery.py:57</text>
+  <text x="76" y="228" font-size="11.5" fill="#5b6470">12 Namensmuster</text>
+  <text x="76" y="243" font-size="11.5" fill="#c0392b">nur per Source-Edit</text>
+
+  <rect x="300" y="170" width="220" height="80" rx="5" fill="#fff" stroke="#c9a7a1"/>
+  <text x="314" y="192" font-size="13" font-weight="bold" fill="#1b1f24">instrument_universe</text>
+  <text x="314" y="211" font-size="11.5" fill="#5b6470">Spalte yf_ticker (DB)</text>
+  <text x="314" y="228" font-size="11.5" fill="#5b6470">15 von 22 befüllt</text>
+  <text x="314" y="243" font-size="11.5" fill="#c0392b">1 von 4 AKTIVEN</text>
+
+  <rect x="558" y="170" width="200" height="80" rx="5" fill="#fff" stroke="#c9a7a1"/>
+  <text x="572" y="192" font-size="13" font-weight="bold" fill="#1b1f24">TickerMapper._MAP</text>
+  <text x="572" y="211" font-size="11.5" fill="#5b6470">ticker_map.py:31</text>
+  <text x="572" y="228" font-size="11.5" fill="#5b6470">7 statische Defaults</text>
+  <text x="572" y="243" font-size="11.5" fill="#c0392b">nur per Source-Edit</text>
+
+  <rect x="796" y="170" width="222" height="80" rx="5" fill="#fff" stroke="#c9a7a1"/>
+  <text x="810" y="192" font-size="13" font-weight="bold" fill="#1b1f24">Discovery (V2a)</text>
+  <text x="810" y="211" font-size="11.5" fill="#5b6470">findet autonom Instrumente</text>
+  <text x="810" y="228" font-size="11.5" fill="#5b6470">läuft laufend weiter</text>
+  <text x="810" y="243" font-size="11.5" fill="#c0392b">Zuordnung wächst nicht mit</text>
+
+  <line x1="262" y1="210" x2="298" y2="210" stroke="#c0392b" stroke-width="1.6" marker-end="url(#ar)"/>
+  <line x1="796" y1="210" x2="760" y2="210" stroke="#c0392b" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <text x="62" y="285" font-size="13.5" font-weight="bold" fill="#c0392b">Fehlerklasse (dritte Instanz):</text>
+  <text x="62" y="306" font-size="13" fill="#1b1f24">Ein statisches, handgepflegtes Artefakt muss mit einer autonom wachsenden Menge synchron bleiben —</text>
+  <text x="62" y="325" font-size="13" fill="#1b1f24">und nichts erkennt die Divergenz.</text>
+  <text x="62" y="350" font-size="12" fill="#5b6470">1. B1 (07-31): EXTENDED_UNIVERSE point_values vs. DB-Universum → 40×-Oversizing, 3 Broker-Rejects</text>
+  <text x="62" y="367" font-size="12" fill="#5b6470">2. heute: Ticker-Zuordnung vs. entdecktes Universum   ·   3. latent: „Bars sind gratis“ vs. IG-Kontingent</text>
+
+  <!-- ============ WARUM ============ -->
+  <text x="40" y="418" font-size="18" font-weight="bold" fill="#b26a00">WARUM ES DREIMAL DIE MESSUNG TRAF</text>
+
+  <rect x="40" y="432" width="1000" height="150" rx="6" fill="#fdf7ec" stroke="#e8d5b0"/>
+  <text x="62" y="456" font-size="13" fill="#1b1f24">Phase 11 sollte <tspan font-weight="bold">eine</tspan> Frage beantworten — WI-2/W2: erreicht ein 30-Pkt-Stop / 45-Pkt-Ziel je seinen 240-Min-Time-Stop?</text>
+
+  <rect x="62" y="470" width="300" height="46" rx="4" fill="#fff" stroke="#dcc79a"/>
+  <text x="76" y="489" font-size="12" font-weight="bold" fill="#1b1f24">Woche 1 · 07-20/24</text>
+  <text x="76" y="507" font-size="11.5" fill="#5b6470">„MINUTE_1“ keine gültige IG-Resolution</text>
+
+  <rect x="390" y="470" width="300" height="46" rx="4" fill="#fff" stroke="#dcc79a"/>
+  <text x="404" y="489" font-size="12" font-weight="bold" fill="#1b1f24">Woche 2 · 07-27/31</text>
+  <text x="404" y="507" font-size="11.5" fill="#5b6470">Funnel liefert 0 Kandidaten</text>
+
+  <rect x="718" y="470" width="300" height="46" rx="4" fill="#fff" stroke="#dcc79a"/>
+  <text x="732" y="489" font-size="12" font-weight="bold" fill="#1b1f24">Woche 3 · 08-03/07</text>
+  <text x="732" y="507" font-size="11.5" fill="#5b6470">IG-Kontingent erschöpft, 18/22 quarantined</text>
+
+  <text x="62" y="543" font-size="13" fill="#1b1f24">Drei Symptome, eine Ebene: die <tspan font-weight="bold">Beschaffung</tspan>, nie die Auswertung. Die Messlogik war jedes Mal in Ordnung.</text>
+  <text x="62" y="566" font-size="13" fill="#c0392b" font-weight="bold">Und: drei Wochen Totalausfall ohne einen einzigen Alarm — das ist selbst ein Befund.</text>
+
+  <!-- ============ DER BEFUND ============ -->
+  <rect x="40" y="600" width="1000" height="92" rx="6" fill="#fbecec" stroke="#c0392b" stroke-width="1.6"/>
+  <text x="62" y="626" font-size="15" font-weight="bold" fill="#c0392b">Der Befund, der alles einordnet</text>
+  <text x="62" y="650" font-size="13" fill="#1b1f24">Die Mehrquellen-Kette, die genau dieses Problem löst, existiert seit Phase 9 Step 6 fertig gebaut und getestet —</text>
+  <text x="62" y="671" font-size="13" fill="#1b1f24"><tspan font-weight="bold">und lief noch nie.</tspan> enable_ig_bars = False, von keinem Startskript gesetzt, in keinem Log. V2a lief voll, V2b blieb dunkel.</text>
+
+  <!-- ============ ZIEL ============ -->
+  <text x="40" y="736" font-size="18" font-weight="bold" fill="#1e7a4d">ZIEL — Anforderungen, keine Technologie</text>
+  <text x="40" y="757" font-size="13" fill="#5b6470">Prüfbare Eigenschaften. Die Lösung entwirft die nächste Session gegen den Code. „by all means“ — ein Rewrite ist erlaubt.</text>
+
+  <rect x="40" y="772" width="1000" height="216" rx="6" fill="#eef7f1" stroke="#b9dcc7"/>
+
+  <rect x="62" y="792" width="232" height="58" rx="4" fill="#fff" stroke="#a9cdb8"/>
+  <text x="76" y="812" font-size="12.5" font-weight="bold" fill="#1e7a4d">A · Eine Wahrheit pro Tatsache</text>
+  <text x="76" y="830" font-size="11.5" fill="#5b6470">ein Speicher, eine Naht,</text>
+  <text x="76" y="845" font-size="11.5" fill="#5b6470">ein schreibender Ort — nicht drei</text>
+
+  <rect x="308" y="792" width="232" height="58" rx="4" fill="#fff" stroke="#a9cdb8"/>
+  <text x="322" y="812" font-size="12.5" font-weight="bold" fill="#1e7a4d">B · Abgeleitet, nicht deklariert</text>
+  <text x="322" y="830" font-size="11.5" fill="#5b6470">Eigenschaften kommen vom</text>
+  <text x="322" y="845" font-size="11.5" fill="#5b6470">Instrument, Tabellen nur Fallback</text>
+
+  <rect x="554" y="792" width="232" height="58" rx="4" fill="#fff" stroke="#a9cdb8"/>
+  <text x="568" y="812" font-size="12.5" font-weight="bold" fill="#1e7a4d">C · Divergenz ist erkennbar</text>
+  <text x="568" y="830" font-size="11.5" fill="#5b6470">wiederkehrender Abgleich,</text>
+  <text x="568" y="845" font-size="11.5" fill="#5b6470">der laut fehlschlägt</text>
+
+  <rect x="800" y="792" width="218" height="58" rx="4" fill="#fff" stroke="#a9cdb8"/>
+  <text x="814" y="812" font-size="12.5" font-weight="bold" fill="#1e7a4d">D · Degradierung typisiert</text>
+  <text x="814" y="830" font-size="11.5" fill="#5b6470">„keine Quelle“ = Zustand,</text>
+  <text x="814" y="845" font-size="11.5" fill="#5b6470">kein NULL; aus der Messung raus</text>
+
+  <rect x="62" y="862" width="232" height="58" rx="4" fill="#fff" stroke="#a9cdb8"/>
+  <text x="76" y="882" font-size="12.5" font-weight="bold" fill="#1e7a4d">E · Provenienz je Messzeile</text>
+  <text x="76" y="900" font-size="11.5" fill="#5b6470">welche Quelle lieferte die Bar —</text>
+  <text x="76" y="915" font-size="11.5" fill="#5b6470">sonst ist eine Mischwoche wertlos</text>
+
+  <rect x="308" y="862" width="232" height="58" rx="4" fill="#fff" stroke="#a9cdb8"/>
+  <text x="322" y="882" font-size="12.5" font-weight="bold" fill="#1e7a4d">F · Ressourcen modelliert</text>
+  <text x="322" y="900" font-size="11.5" fill="#5b6470">Kontingent wird vorhergesagt,</text>
+  <text x="322" y="915" font-size="11.5" fill="#5b6470">nicht als 403 erlebt</text>
+
+  <rect x="554" y="862" width="232" height="58" rx="4" fill="#fff" stroke="#a9cdb8"/>
+  <text x="568" y="882" font-size="12.5" font-weight="bold" fill="#1e7a4d">G · Messfähigkeit als Betrieb</text>
+  <text x="568" y="900" font-size="11.5" fill="#5b6470">eine Woche ohne Messung fällt</text>
+  <text x="568" y="915" font-size="11.5" fill="#5b6470">am selben Tag auf, nicht Freitags</text>
+
+  <rect x="800" y="862" width="218" height="58" rx="4" fill="#fff" stroke="#c9a7a1"/>
+  <text x="814" y="882" font-size="12.5" font-weight="bold" fill="#c0392b">NICHT gesetzt</text>
+  <text x="814" y="900" font-size="11.5" fill="#5b6470">Lightstreamer / Tick-Recorder /</text>
+  <text x="814" y="915" font-size="11.5" fill="#5b6470">weitere Provider = Kandidaten</text>
+
+  <text x="62" y="947" font-size="12.5" fill="#1b1f24"><tspan font-weight="bold">Gate vor jeder Technologiewahl:</tspan> Live-Check von get_market_info (zugeordnetes + nicht zugeordnetes Epic) — Nikinger-Aufgabe,</text>
+  <text x="62" y="966" font-size="12.5" fill="#1b1f24">sinnvoll gebündelt mit B3s ausstehendem /markets/{epic}-Margin-Check. Dieselbe Response, eine Session.</text>
+
+  <line x1="40" y1="1006" x2="1040" y2="1006" stroke="#d5d9de"/>
+  <text x="40" y="1028" font-size="11.5" fill="#5b6470">Handover: phase10_v3/PHASE11_DEFERRAL_HANDOVER.md · Kontingent: ALLOWANCE_INCIDENT_2026-08-08.md · Richtung: DATA_SOURCE_STRATEGY_2026-08-11.md</text>
+  <text x="40" y="1047" font-size="11.5" fill="#5b6470">Offen (Nikinger): Nummerierung (Vorschlag Phase 12 = Datenfundament, V4 → 13) · Reichweite von B · Universe-Reset · Restart-Gate</text>
+  <text x="40" y="1066" font-size="11.5" fill="#8a929c">Alles vom 08-08 Gebaute ist ausschließlich offline bewiesen — 1336 grüne Tests, kein Lauf gegen echte IG-Daten.</text>
+</svg>

@@ -26,10 +26,13 @@ updated: 2026-07-06
 - [README.md](../README.md) — 📗 13KB · human overview + machine setup (venv, keyring, smoke test)
 - [ROADMAP.md](../ROADMAP.md) — 📗 25KB · Phase 1–11 plan + status per phase
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — 📗 18KB · system layers, components, risks
+- [HANDOVER_PROMPT.md](./HANDOVER_PROMPT.md) — 📗 · wiederverwendbarer Auftragstext für Phasen-Abschluss/-Deferral; seit 2026-08-11 auf Claude Code umgeschrieben (Repo statt Google Drive)
 - [DOC_LAYERS_CONVENTION.md](./DOC_LAYERS_CONVENTION.md) — 📗 · generic (project-agnostic) doc-layers spec
 
 ## Active phases (10 — V3: Abstain-Lessons + Persistenz-Reform + Paper-Trades; 11 — V3-Fortsetzung: Funnel-/Mess-Fixes, lives in the same directory)
 - [phase10_v3/CLAUDE.md](../phase10_v3/CLAUDE.md) — 🔄 phase head (covers both Phase 10 and Phase 11 work); Block A ✅ (Monday-restart-proof 2026-07-14) + Block B ✅ (market_context + Paper-Pipeline live 2026-07-17); Council-Paper-Call deferred; Phase 11 (2026-08-01, claimed from the deferred "V4" numbering — V4 is now Phase 12) — B1/B2/B5/B4(H6) fixed, B3 deferred, H1 (time-scheduled shadow pairs) built + wired default OFF, awaiting a live arm · [archive](../phase10_v3/SESSIONS_ARCHIVE.md)
+- [phase10_v3/PHASE11_DEFERRAL_HANDOVER.md](../phase10_v3/PHASE11_DEFERRAL_HANDOVER.md) — 📕 **Notbremse 2026-08-11: Phase 11 DEFERRED** vor Erreichen ihrer Ziele. Status · Delta · Durability-Anforderungen A–G für den neuen Datenfundament-Track · offene Entscheidungen (u. a. Nummerierung). **Erstes Dokument der nächsten Session.**
+- [docs/architecture/data_foundation.svg](./architecture/data_foundation.svg) — 📕 1080×1080: Fehlerbild (eine Tatsache, drei Speicher) + Zielbild (Anforderungen A–G); enthält den Befund, dass die Mehrquellen-Kette seit Phase 9 gebaut ist und nie lief
 - [phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md](../phase10_v3/STEP0_DATA_ANALYSIS_2026-07-10.md) — 📕 dated Step-2 data analysis (V2-baseline, abstain reasons, gap-check)
 - [phase10_v3/WEEK1_REVIEW_2026-07-17.md](../phase10_v3/WEEK1_REVIEW_2026-07-17.md) — 📕 Step-8 catch-up review: abstain-record distribution + first live `REASON_DEBATE_ABSTAIN` cluster (reflect path unproven, watch item)
 - [phase10_v3/TRADE_DATA_DIAGNOSIS_2026-07-19.md](../phase10_v3/TRADE_DATA_DIAGNOSIS_2026-07-19.md) — 📕 pre-V4 Strukturdiagnose: 6 Befunde (BUY-Abstain-Asymmetrie, Sub-Noise-Stop, Budget-Blindfleck …) + falsifizierbare Watch-Items WI-1…WI-6 für die Datenwoche ab 2026-07-20

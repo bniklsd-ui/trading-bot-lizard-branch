@@ -1,7 +1,7 @@
 ---
 status: live
-purpose: ACTIVE phase head — covers Phase 10 (V3: Abstain-/No-Trade-Lessons + Persistenz-Reform + Paper-Trades, alles live auf main) UND Phase 11 (V3-Fortsetzung: Funnel-/Mess-Fixes aus der Datenwoche-2-Review, claimed 2026-08-01 — ROADMAP's alte "Phase 11 = V4" ist jetzt Phase 12). Fünf Befunde B1-B5: B1/B2/B5/B4(H6) gefixt (07-31/08-01); B3 (Margin-Headroom) design-dokumentiert, eigene Session. H1 (zeitgesteuerte Shadow-Pairs) gebaut (08-01), erste Live-Woche gefahren (08-03/07) — Funnel weiterhin kollabiert, WI-2/W2 unbeantwortet. **Der `/prices`-Live-Check (08-08) korrigierte die Diagnose: kein IG-Ausfall, sondern das erschöpfte Konto-Kontingent für historische Kursdaten, verbraucht vom Paper-Tracker (300 Datenpunkte pro Fetch).** Tracker-Fix (Stale-Expiry + Budget-Breaker + Fetch-Attempt-Cap + `env.error`) gebaut und grün; ebenso der Phase-9-Fix (ein kontoweiter `RATE_LIMIT` demotiert kein Instrument mehr), die B5-Satzgrenzen-Trimmung und **H4-a** (`lesson_max_age_days = 30`). **Universe-Reset und H1-Scharfschaltung bleiben gesperrt, bis ein `remainingAllowance` beobachtet ist** — und H4-as Wirkung ist noch ungemessen.
-read-when: working in phase10_v3/ — read this head + its newest Session-stopped block first; vor jedem Scheduler-Neustart zusätzlich ALLOWANCE_INCIDENT_2026-08-08.md
+purpose: PHASE-HEAD, Phase 10 (V3) ✅ abgeschlossen und live auf `main`. **Phase 11 ist seit 2026-08-11 🛑 DEFERRED (Notbremse)** — B1/B2/B4/B5 + H1 + H4-a gebaut, aber WI-2/W2 nach drei Datenwochen unbeantwortet; alle drei Wochen scheiterten an Infrastruktur, nie an der Messung. Gemeinsame Wurzel = das **Datenfundament** (eine Tatsache in drei divergenten Speichern → Fallback deckt 1 von 4 aktiven Epics; dazu: die Mehrquellen-Kette aus Phase 9 Step 6 lief nie, `enable_ig_bars` default `False`). Nichts zurückgerollt. **Einstieg für die nächste Session ist PHASE11_DEFERRAL_HANDOVER.md**, nicht dieser Kopf.
+read-when: working in phase10_v3/ — ZUERST PHASE11_DEFERRAL_HANDOVER.md, dann dieser Kopf + newest Session-stopped block; vor jedem Scheduler-Neustart zusätzlich ALLOWANCE_INCIDENT_2026-08-08.md
 detail: L2
 up: ../CLAUDE.md
 down:
@@ -15,6 +15,8 @@ down:
   - ./DATA_WEEK_REVIEW_2026-08-07.md   # Datenwoche 3 (erste H1-Live-Woche): IG-/prices-Ausfall + Universe-Quarantäne-Kaskade (L3, dated) — §3 Root Cause SUPERSEDED, s. nächste Zeile
   - ./ALLOWANCE_INCIDENT_2026-08-08.md   # korrigiert obige §3.1/§3.2: kein IG-Ausfall, sondern erschöpftes Konto-Kontingent; + Fix + Restart-Gate (L3, dated)
   - ./H4_LESSON_FEEDBACK_SCOPE_2026-08-08.md   # H4-Scoping gegen As-Built: 4 Trades → 4 Lessons → 5.973 Renderings, relevance_score tot (L3, dated)
+  - ./PHASE11_DEFERRAL_HANDOVER.md   # 🛑 Notbremse 2026-08-11 — Status, Anforderungen A-G, offene Entscheidungen (L3, dated) — ZUERST LESEN
+  - ../docs/architecture/data_foundation.svg   # Fehlerbild + Zielbild, 1080x1080
   - ./DATA_SOURCE_STRATEGY_2026-08-11.md   # Entscheidung: Tracker auf ChainedBarProvider (IG→yFinance), NICHT Lightstreamer; IG-Kontingent bestätigt 10.000/Woche (L3, dated)
   - ../ROADMAP.md   # Phase 11 (this work) + Phase 12 (V4, renumbered 2026-08-01) sections
   - ./SESSIONS_ARCHIVE.md   # full session history (L3)
@@ -246,212 +248,78 @@ Time-Stop-Dauer-Key: `max_hold_minutes` (Default 240), konsumiert in `monitor.py
 
 **9. Test-Baseline-Korrektur:** siehe Step-1-Abschnitt oben (1162 grün, P4 141→148).
 
-## Session stopped — 2026-08-08 (Sa — Allowance-Root-Cause + Tracker-Fix; Neustart bleibt gesperrt)
+## Session stopped — 2026-08-11 (Di — 🛑 NOTBREMSE: Phase 11 deferred, Datenfundament-Track eröffnet)
 
-> **BLUF:** Der `/prices`-Health-Check des Nikinger hat die Diagnose der letzten Session
-> umgeworfen. **Kein IG-Ausfall — unser eigenes Konto-Kontingent für historische Kursdaten,
-> aufgebraucht vom Paper-Tracker.** Der Tracker-Fix ist gebaut und grün; **Universe-Reset und
-> H1-Scharfschaltung sind bewusst NICHT erfolgt** — beide hängen an einem beobachteten
-> `remainingAllowance`. Volle Forensik: [`ALLOWANCE_INCIDENT_2026-08-08.md`](./ALLOWANCE_INCIDENT_2026-08-08.md).
+> **BLUF:** Der Nikinger zieht die Notbremse. Phase 11 wird **vor Erreichen ihrer Ziele**
+> zurückgestellt, weil drei Datenwochen an derselben Wurzel gescheitert sind und diese Wurzel
+> wichtiger ist als die Phase. Vollständiger Handover — **das erste Dokument der nächsten
+> Session**: [`PHASE11_DEFERRAL_HANDOVER.md`](./PHASE11_DEFERRAL_HANDOVER.md).
+> Docs-only, kein Code berührt.
 
 ### Completed
 
-- **Root Cause korrigiert.** Live-Check (Nikinger, 08-08 06:44 UTC) gegen `IX.D.DAX.IFMM.IP`:
-  `error.public-api.exceeded-account-historical-data-allowance`. IG rechnet `/prices` in
-  **Datenpunkten, nicht Requests** ab — `_PAPER_BAR_COUNT = 300` heißt 300 Punkte **pro
-  Fetch**. Aus `paper_trades` rekonstruiert: ≥66 erfolgreiche Fetches ≈ **19.800 Punkte** am
-  08-03/08-04, Erschöpfung nach ~einem Tag H1-Vollbetrieb. `DATA_WEEK_REVIEW_2026-08-07.md`
-  §3.1/§3.2 hatte Symptom und Mechanismus richtig, die **Ursachenzuschreibung falsch**
-  (dated snapshot → nicht editiert, per Konvention superseded).
-- **Phase-9-Promotion-Probe als Verursacher ausgeschlossen:** `verify_instrument.py:78-79`
-  nutzt `MINUTE_5` × 3 Bars = 3 Punkte/Epic/Runde, 100× billiger als der Tracker. Phase 9 ist
-  **Opfer**, nicht Mitverursacher.
-- **Zweiter, unabhängiger Befund — eine Datenintegritäts-Falle:** `resolve_paper_trade`
-  filtert Bars nur über `timestamp >= created_utc` und prüft den SL-Treffer **bedingungslos
-  vor** dem Time-Stop-Ausstieg. Der erste Tick nach einem Neustart hätte einen Teil der **390**
-  liegengebliebenen `OPEN`-Zeilen mit **erfundenem** `exit_level`/`pnl_points` als `RESOLVED`
-  ins WI-2-Substrat geschrieben — **auch bei gesundem Endpoint, auch ohne
-  `--enable-shadow-schedule`** (`_run_paper_tracker` tickt an `enable_paper_trades` allein).
-  Das ist der Grund, warum die Branch-Logik der letzten Session („gesund → Reset") nicht
-  tragfähig war.
-- **Fix gebaut** (2 Dateien, additiv, keine Gate-/VETO-/Order-Pfade):
-  - `abstain_lessons/paper.py` — `PaperTradeTracker` bekommt `stale_after_minutes` (Trade
-    älter als der Schnitt → `EXPIRED_UNRESOLVED` **ohne Fetch**) und `budget_ok` (**einmal**
-    pro Tick geprüft → ein erschöpftes Budget kostet null Calls für den ganzen Tick, nicht
-    einen pro Epic; gleiche Callable-Form wie das bestehende `reflect_cap_check`).
-    Schnitt ist **Wanduhr**, nicht `bar_count × bar_minutes`, und wird aus
-    `exec_cfg.max_hold_minutes + 60` gezogen — eine zweite hartcodierte Kopie dieser Zahl wäre
-    die Drift-Klasse von Befund B1.
-  - `phase8_scheduler/scripts/wiring.py` — `bar_fetch` trippt bei `RATE_LIMIT` einen
-    60-Minuten-Cooldown und unterhalb eines Reserve-Floors (`_PAPER_ALLOWANCE_FLOOR = 2000`,
-    **Platzhalter bis ein `totalAllowance` beobachtet ist**, existiert damit die Phase-9-Probe
-    weiterläuft); `env.error` wird **nicht mehr verschluckt** (4.232 CRITICAL-Zeilen letzte
-    Woche trugen den echten IG-Code nirgends); das `allowance`-Objekt wird einmal pro Prozess
-    geloggt (`totalAllowance` = Deckel, `allowanceExpiry` = Reset-Termin — beides kommt gratis
-    in jeder erfolgreichen Antwort und wurde bisher weggeworfen).
-    `_build_paper_tracker` nimmt dafür `exec_cfg` entgegen (Call-Site mitgezogen).
-- **Zur Abnahme-Eigenschaft, ohne Schönfärberei:** die letzte Session forderte „ein
-  wiederholter `get_ohlcv`-Fehler muss künftiges Call-Volumen **senken**".
-  `stale_after_minutes` **begrenzt** nur (monotones Wachstum → Plateau); erst `budget_ok`
-  **senkt** tatsächlich, auf null während des Cooldowns. Zusammen erfüllt.
-- **Verifiziert:** `pytest phase10_v3/tests` **141 passed** (138 + 3 neue). `pytest
-  phase8_scheduler/tests` **229 passed**. `wiring.py` per `py_compile` (kein pytest-Testfile,
-  dokumentierte „operator-run"-Konvention). **Hinweis:** die Zählungen im Modul-Tree oben
-  („125 Tests") und in älteren Blöcken („P8 217/222") sind stale — real 141 bzw. 229.
-  Gegen die echte DB gerechnet (read-only, Stichtag Mo 08-10 07:05 UTC): **390/390 Rückstands-
-  Zeilen fallen unter den Stale-Schnitt → alle expiren beim ersten Tick, 0 Fetches.**
-- **H4 gescopet** (Nikinger-Go, docs-only): [`H4_LESSON_FEEDBACK_SCOPE_2026-08-08.md`](./H4_LESSON_FEEDBACK_SCOPE_2026-08-08.md).
-  Kernbefund live gemessen: **4 Trades total, alle BUY, alle Verluste** → **4 Lessons** aus
-  genau diesen 4 Trades → beide Blöcke (`recent_trades` **und** `Active lessons`) stehen in
-  **jedem** Prompt, inzwischen **5.973 Lesson-Renderings**. Und: `relevance_score` existiert
-  als Spalte, wird als Konstante 1.0 geschrieben (`reward/recorder.py:394`) und von **keiner**
-  Query gelesen — **Kandidat H4-a braucht keine Migration.** Empfehlung: H4-a (Alters-Cap)
-  zuerst und allein, H4-b danach entscheiden (wird durch a evtl. gegenstandslos), H4-c erst
-  wenn wieder Trades entstehen. Warnung im Doc: ein 30-Tage-Cap entfernt 3 von 4 Lessons, ein
-  14-Tage-Cap alle 4 — Verhaltenswechsel für die einzige AI-Entscheidung, Nikinger-Sache.
-- **Output-Style** `~/.claude/output-styles/military-brief.md` erstellt (Nikinger-Nebenauftrag,
-  außerhalb des Repos, gegen die offizielle Doku verifiziert statt geraten:
-  `keep-coding-instructions: true`). BLUF-Format + WHY-Sektion; die Spannung zu ponytail-full
-  („drei kurze Zeilen") ist im File **ausgeschrieben** aufgelöst, über ponytails eigene
-  Ausnahme für explizit angeforderte Erklärungen. Aktivierung ist ein Nikinger-Schritt
-  (`/config` → Output style, wirkt nach `/clear`).
+- **36 Commits gepusht.** Der Baum war sauber, aber `main` lag **36 Commits vor
+  `origin/main`** — die gesamte Arbeit seit dem 07-31-Bugfix-Block war lokal geblieben. Jetzt
+  `main...origin/main` ohne Abstand.
+- **`PHASE11_DEFERRAL_HANDOVER.md` geschrieben** — Status, Delta seit dem P8-Closeout,
+  Durability-Anforderungen **A–G** für den neuen Track, offene Entscheidungen, Datei-Anker.
+  Nach Handover-Vertrag: keine Implementierungsdetails wiederholt, Code bleibt Wahrheit.
+- **`docs/architecture/data_foundation.svg`** (1080×1080) — Fehlerbild + Zielbild.
+- **`docs/HANDOVER_PROMPT.md`** — der Handover-Auftrag des Nikinger, von Browser-Chat auf
+  Claude Code umgeschrieben: Google-Drive-Upload und Drive-Analyse entfallen ersatzlos (Claude
+  Code liest das Repo; eine gespiegelte Kopie ist eine zweite Wahrheit mit eigenem
+  Verfallsdatum). Bewusst **dazugekommen**: eine Ergebniszeile „nicht erreicht / offen
+  geblieben" (die alte Fassung listete nur Erfolge — ein Deferral hat genau die andere Sorte
+  Inhalt), die Pflicht zu benennen was **nur offline** bewiesen ist, „selbst nachprüfen statt
+  aus früheren Handovers übernehmen", und Entscheidungen mit Empfehlung statt Fragen ins Leere.
+- **Zwei Befunde, die die Notbremse tragen** (beide neu heute, beide im Handover ausgeführt):
+  1. **Dieselbe Tatsache in drei divergenten Speichern** — `KNOWN_YF_TICKERS` (12
+     Namensmuster) · `instrument_universe.yf_ticker` · `TickerMapper._MAP` (7 Defaults).
+     Ein Writer, einmalig, per Namensabgleich bei der Entdeckung. Ergebnis: der
+     yFinance-Fallback deckt **1 von 4 aktiven Epics**. Das ist die **dritte** Instanz
+     derselben Fehlerklasse wie B1 (statisches Artefakt vs. autonom wachsende Menge, ohne
+     Divergenz-Erkennung).
+  2. **Die Mehrquellen-Kette aus Phase 9 Step 6 lief noch nie.** `enable_ig_bars` ist
+     `False` per Default, wird von keinem Startskript gesetzt, taucht in keinem Log auf. V2s
+     ausdrücklicher zweiter Auftrag hieß „Daten-Input-Zuverlässigkeit" — die **entdeckende**
+     Hälfte lief mit voller Geschwindigkeit, die **absichernde** blieb dunkel. Der Abstand
+     zwischen beiden ist exakt der heutige Ausfall.
+- **Korrektur an [`DATA_SOURCE_STRATEGY_2026-08-11.md`](./DATA_SOURCE_STRATEGY_2026-08-11.md)
+  (heute früher, selbe Session):** dessen §2 stützt sich auf das Setup eines Kollegen als
+  Bestätigung — der Kollege bezeichnet es selbst als **Workaround**, nicht als
+  funktionierendes System. Bestätigung zurückgezogen, Richtung bleibt. Ebenso zu schwach war
+  der dortige Vorschlag, „nur die Kette zu verdrahten": auf dem realen aktiven Universum hätte
+  das 1 von 4 Epics abgedeckt.
+- Status propagiert: Root-`CLAUDE.md` (Phasenzeile + neue Track-Zeile), `ROADMAP.md`
+  (Phase-11-Header auf DEFERRED), `docs/INDEX.md` (3 Einträge), dieser Kopf.
 
-### Nachtrag (gleiche Session) — vier Folge-Fixes gebaut, alle Nikinger-freigegeben
+### Next (die nächste Session startet hier)
 
-Aus der Liste offener Punkte oben wurden vier abgearbeitet. Alles am Wochenende, Bot steht.
-
-1. **Fetch-Versuche pro Paper-Trade gedeckelt** (`paper.py` + `wiring.py`,
-   `_PAPER_MAX_FETCH_ATTEMPTS = 12`). Ein fälliger Trade braucht genau **einen** erfolgreichen
-   Fetch — `_resolve_group` terminiert ihn immer, RESOLVED oder EXPIRED. Ein *fehlgeschlagener*
-   Fetch ist also der einzige Weg, wie ein Trade einen Tick überlebt. Bisher wurde er jeden
-   Zyklus neu geholt, bis `stale_after_minutes` griff: bis zu 60 Versuche bei 5-Minuten-Kadenz.
-   Jetzt sind Retries an **fällige Trades** gebunden, nicht an die Ausfalldauer. Zähler
-   in-memory (Daemon läuft tagelang; `stale_after_minutes` ist der Backstop über Neustarts —
-   eine Spalte wäre eine Migration, um etwas zu begrenzen, das schon begrenzt ist). Wird
-   **nicht** belastet, wenn `budget_ok` den Tick abbricht: kein Call, kein Versuch.
-   **Kein reiner Gewinn — bewusster Tausch** (Advisor-Befund, Zahl daraufhin von 3 auf 12
-   angehoben): der Cap verkürzt auch die Toleranz gegenüber *transienten* Fehlern (500,
-   405-market-offline, Netz-Blip), und was dabei stirbt, ist eine WI-2-Messzeile — genau das
-   Produkt dieser Phase. Bei 3 Versuchen wären das 15 Minuten Toleranz statt vorher 300; bei
-   12 ist es ~1 Stunde, und der unbegrenzte Fall ist immer noch 5× gekappt. Für den
-   Allowance-Fall ist der Cap ohnehin nicht die wirksame Bremse — dort trippt `budget_ok`
-   schon beim ersten `RATE_LIMIT`.
-2. **Phase-9 `check_ig_side` gefixt** (cross-phase, Nikinger-Go): `verdict` trägt jetzt
-   `ig_ohlcv_error_code` — **top-level, bewusst außerhalb von `checks`**, weil sowohl
-   `failed_checks` als auch `_ig_side_failed`/`_yf_side_failed` dort nach Boolean-`False`
-   scannen. `promotion.py` prüft an **beiden** Call-Sites `_ig_side_indeterminate` vor jedem
-   DB-Write: eine unbestimmte Runde schreibt **gar nichts** — nicht den Status, nicht
-   `fail_count`, nicht `checks_json`. „Wir haben nichts gelernt" darf nichts ändern, und
-   insbesondere `fail_count` **nicht zurücksetzen** (der Spiegelfehler). Verworfen:
-   `ig_ohlcv_available: None` — `_ig_side_failed` läse das als Pass, und ein `discovered`
-   Kandidat könnte ohne jeden OHLCV-Beweis `VERIFIED` erreichen (Verstoß gegen D6). Eng
-   gehalten: ein Epic, dessen Bars aus **eigenem** Grund fehlen, demotet unverändert.
-3. **B5-Restfehlerrate geschlossen** (`reflect.py`): zu lange Lessons werden auf den letzten
-   **ganzen Satz** unter der Grenze getrimmt statt verworfen. Zwei Qualitätswächter, weil genau
-   das die Sorge des Nikinger war: der Schnitt **muss** auf einer Satzgrenze landen (ein
-   mitten im Satz gekappter Text kann das Gegenteil des Gemeinten aussagen — „…war nicht
-   schlecht" → „…war nicht"), und was übrig bleibt muss substanziell sein (≥150 Zeichen).
-   Sonst gilt weiter die alte Ablehnung. Text innerhalb der Grenze kommt **byte-identisch**
-   zurück (die 58 von 68 gesunden Fälle sind unberührt, per Test gepinnt).
-   **Grenze der Zusage, ehrlich benannt** (Advisor-Befund): getrimmt wird vom Ende, also
-   bleibt der **Kopf** stehen. Eine Lesson, deren handlungsrelevanter Teil hinten steht,
-   verliert ihn — und liest sich trotzdem als vollständiger Satz. Genau diese Form haben alle
-   vier vorhandenen Lessons („…, was auf sauberes Risikomanagement hindeutet — überprüfe …").
-   **Nicht messbar:** die 10 zu langen Texte wurden nie gespeichert, nur ihre Ablehnung. Wer
-   die ersten getrimmten Lessons reviewt, prüft gezielt auf eine fehlende Schlussfolgerung.
-   Die Zusage lautet „besser als nichts", **nicht** „Qualität erhalten".
-4. **H4-a gebaut** (`lesson_max_age_days = 30`): rollender Alters-Cap auf die Prompt-Lessons.
-   Eigener Knopf, **nicht** `quarantine_before` zweckentfremdet (einmaliger Operator-Reset mit
-   festem Datum vs. stehende Policy mit wanderndem). Cutoff wird in **Python** berechnet, nicht
-   in SQL: SQLites `datetime('now')` liefert `"YYYY-MM-DD HH:MM:SS"` und vergleicht sich
-   **falsch** gegen die `...T...mmmZ`-Timestamps dieses Projekts — eine Falle für stille
-   Fehlergebnisse, keine Stilfrage. `None` = altes Verhalten, für ein kontrolliertes A/B.
-
-**Regression, alle Suiten einzeln** (`tests.conftest`-Kollision): P1 87 · P2 **76** · P3 100 ·
-P4 155 · P5 173 · P6 76 · P7 138 · P8 229 · P9 **75** · P10 **147** · root **80** = **1336**,
-0 failed. `py_compile` clean auf `wiring.py` + `verify_instrument.py`.
-
-**Was H4-a ausdrücklich nicht ist:** es entfernt einen Dämpfer, es fügt kein Signal hinzu.
-Liefert der Funnel mit nur noch einer Lesson weiterhin 0 Kandidaten, waren die Lessons nicht
-die Ursache — drei Wochen Verdacht sauber ausgeschlossen, was für sich ein Ergebnis ist.
-**H4-b (Doppelzählung) bleibt bewusst danach** — der Alters-Cap kann sie gegenstandslos machen,
-und zwei Hebel gleichzeitig zu ziehen hat bei H1 schon Messwochen gekostet.
-
-### Next
-
-1. **Nikinger, das Restart-Gate:** denselben Einzeiler **einmal täglich** laufen lassen, bis
-   `"ok": true` kommt, dann das `allowance`-Objekt zurückspielen. **Heute (08-08) nicht erneut
-   laufen lassen** — bereits ausgeführt, Ergebnis oben; ein zweiter Lauf am selben Tag liefert
-   dieselbe Antwort, weil das Kontingent an einer Perioden-Grenze zurückgesetzt wird, nicht
-   fortlaufend. Ein abgelehnter Call kostet nichts (403, wird nicht abgerechnet), tägliches
-   Prüfen ist also gratis.
-   ```bash
-   phase1_broker_wrapper/.venv/bin/python -m broker_wrapper.cli \
-     --broker ig_demo ohlcv --epic IX.D.DAX.IFMM.IP --resolution MINUTE --count 5
-   ```
-   `totalAllowance` dimensioniert das Budget, `allowanceExpiry` datiert den Reset.
-2. **Erst danach** Universe-Reset der 18 quarantined Epics (Präzedenzfall 2026-07-06). Vorher
-   ist er **schädlich**, nicht nur wirkungslos: `fail_count=0` gegen ein noch erschöpftes
-   Kontingent quarantäniert alle 22 binnen drei Verify-Runden erneut.
-3. **Vor einer echten Messwoche: H1s Grundverbrauch budgetieren. → ENTSCHIEDEN 2026-08-11,
-   eigenes Dokument:** [`DATA_SOURCE_STRATEGY_2026-08-11.md`](./DATA_SOURCE_STRATEGY_2026-08-11.md).
-   Kurzfassung: IGs Kontingent ist bestätigt **10.000 Datenpunkte/Woche** (festes 7-Tage-Fenster
-   ab dem ersten Request nach einem Reset, **nicht** rollend — Korrektur zur Erstannahme). H1
-   bräuchte ~49.500; selbst `MINUTE_5`×60 landet bei 9.900 = 99 % ohne jede Reserve. Damit ist
-   das kein Tuning-, sondern ein Architektur-Problem: **IG darf nicht die Bar-Quelle bleiben.**
-   Entscheidung: der Paper-Tracker geht auf die **bereits gebaute** `ChainedBarProvider`-Kette
-   (IG→yFinance, Phase 9 Step 6) — er ist der einzige Bar-Konsument, der noch fest an
-   `broker.get_ohlcv` hängt. **Nicht** Lightstreamer: das ist ein Live-Tick-Strom, der Tracker
-   braucht *historische* Bars; ihn dafür zu nutzen hieße den Strom selbst mitzuschreiben und zu
-   persistieren — das *ist* der Eigenbau. Unabhängig bestätigt: ein Kollege des Nikinger lief
-   mit eigenem IG-Setup auf dasselbe Limit und landete bei derselben Multi-Source-Antwort;
-   seine Limit-Erhöhungs-Anfrage bei IG scheiterte, weshalb **kein Schritt darauf warten darf**.
-   Ungebaut — Reihenfolge in §6 des Dokuments. Die alte Zwei-Hebel-Notiz darunter ist damit
-   überholt, bleibt aber als Kontext stehen:
-   (a) `MINUTE_5` × 60 = ⅕ der Kosten, (b) weniger Epics/Paare. **(a) nicht blind schalten** —
-   `resolve_paper_trade` löst Same-Bar-SL+TP bedingungslos zu SL auf, gröbere Bars könnten den
-   SL-Anteil systematisch aufblähen. Der Offline-Test dazu ist **nicht möglich** (Roh-Bars
-   werden nirgends persistiert: nur Auflösungen in `paper_trades`, `data/cache/` sind
-   yFinance-**Tages**bars, alle 1.082 `market_regime_snapshots` sind `quote_only` mit
-   `atr_points IS NULL`). Ersatz: budgetierter Live-Test nach dem Reset — je ein
-   `get_ohlcv(MINUTE,300)` und `get_ohlcv(MINUTE_5,60)` auf demselben Epic, 360 Punkte einmalig.
-4. ~~H4-a bauen~~ ✅ **gebaut** (s. Nachtrag Punkt 4, `lesson_max_age_days = 30`). Der
-   **Effekt** ist ungemessen — das braucht eine Woche mit laufendem Daemon, hängt also an
-   Punkt 1–2. **Die Erwartung ist datumsabhängig, nicht fix** (Korrektur eines Rechenfehlers
-   in der Erstfassung, Advisor-Befund): Lessons vom 07-20/07-10/07-03/07-03 gegen einen
-   rollenden 30-Tage-Cap ⇒ **2 Überlebende bei Neustart am 08-09, 1 ab 08-12, 0 ab 08-20**.
-   Ab dann rendert der Block dauerhaft „none on record", solange keine neuen Trades entstehen
-   — Dämpfer vollständig entfernt, erreicht durch Nichtstun, **kein Bug**. Wer den Effekt
-   auswertet, muss zuerst das Neustart-Datum notieren, sonst prüft er gegen die falsche Zahl.
-5. **H4-b (Doppelzählung) erst nach dieser Messung entscheiden** — der Alters-Cap kann sie
-   gegenstandslos machen (s. Scope-Doc §3/§4).
-6. **B3** (Margin-Headroom) unverändert parkiert, eigene Session.
-7. **H3/H5/H7** offen, nachrangig zu H4.
+1. **`PHASE11_DEFERRAL_HANDOVER.md` lesen** — §3 (Anforderungen A–G) und §4 (offene
+   Entscheidungen) sind der eigentliche Auftrag.
+2. **Nikinger-Entscheidung: Nummerierung** — Vorschlag „Phase 12 = Datenfundament, V4 →
+   Phase 13". Bewusst nicht eigenmächtig entschieden (projektweit in fünf Dokumenten sichtbar).
+3. **Nikinger-Live-Check als Gate vor jeder Technologiewahl:** `get_market_info` auf einem
+   zugeordneten und einem nicht zugeordneten Epic — welche Felder liefert IG überhaupt?
+   Sinnvoll gebündelt mit B3s ausstehendem `/markets/{epic}`-Margin-Check (dieselbe Response).
+4. **Erst danach** den Datenfundament-Plan entwerfen. Ein Rewrite der Datenschicht ist
+   ausdrücklich erlaubt („by all means", Nikinger 2026-08-11).
+5. **Restart-Gate + Universe-Reset** unverändert gesperrt — aber **nicht mehr dringend**,
+   solange nicht gemessen wird. Der Allowance-Probe-Einzeiler bleibt ein kostenloser
+   Tagescheck.
 
 ### Open questions / blockers
 
-- **`totalAllowance`/`allowanceExpiry` unbekannt** — blockiert 1–3 oben. Der Floor-Wert 2000
-  im Code ist ein **deklarierter Platzhalter**, kein gemessener Wert.
-- ~~Phase-9 `check_ig_side` liest einen kontoweiten Budget-Ausfall als
-  Instrumenten-Untauglichkeit.~~ ✅ **gefixt** (Nachtrag Punkt 2, Nikinger-Go für den
-  Cross-Phase-Eingriff). Offline per Test bewiesen, **nicht** live — der Beweis am echten
-  Universum kommt erst mit dem nächsten Daemon-Lauf.
-- **Mess-Substrat WI-2 — gesichert:** die `paper_id`s der 390 Zeilen sind **vor** dem ersten
-  Tick nach `OUTAGE_EXPIRED_PAPER_IDS_2026-08-08.json` geschrieben (read-only erzeugt, kein
-  Schema-Zusatz) — danach wären sie nicht mehr von echten Geometrie-Expiries zu trennen. Die
-  115 bereits am 08-04 expirierten sind **nicht** enthalten; für die bleibt nur die
-  Datumsabgrenzung.
-- **`_PAPER_ALLOWANCE_FLOOR = 2000` ist ein Ausfallrisiko, keine bloße Ungenauigkeit:** liegt
-  das echte `totalAllowance` bei oder unter 2000, ist `budget_ok()` dauerhaft `False` und der
-  Tracker löst **gar nichts** mehr auf — einziges Signal wäre eine CRITICAL-Log-Zeile. Nach
-  dem ersten erfolgreichen Fetch das geloggte `allowance`-Objekt prüfen und ggf. senken.
-- **W2 (Sub-Noise-Geometrie) weiterhin unbeantwortet** — jetzt zum dritten Mal an einer
-  Infrastrukturfrage statt am Funnel gescheitert.
-- ~~B5-Restfehlerrate~~ ✅ **gefixt** (Nachtrag Punkt 3, Satzgrenzen-Trimmung mit zwei
-  Qualitätswächtern).
-- **Neu offen — der Floor und H4-a sind beide ungemessen:** `_PAPER_ALLOWANCE_FLOOR` wartet auf
-  ein echtes `totalAllowance`, H4-as Wirkung auf eine Woche mit laufendem Daemon. Beide sind
-  gebaut und getestet, aber **offline** — keiner von beiden hat je gegen echte IG-Daten gelaufen.
+- **Alles vom 08-08 Gebaute ist ausschließlich offline bewiesen** (1336 grüne Tests, kein Lauf
+  gegen echte IG-Daten). Der nächste Daemon-Start ist ihr erster Realkontakt — beim Auswerten
+  nicht mit „verifiziert" verwechseln.
+- **WI-2/W2 bleibt unbeantwortet**, jetzt zum dritten Mal, und wird es bis nach dem Fundament
+  bleiben. Das ist der bewusst akzeptierte Preis der Notbremse.
+- **H4-as Wirkung ungemessen**, und der Alters-Cap rollt: bei einem Neustart ab **2026-08-20**
+  überleben **0** Lessons und der Prompt-Block rendert dauerhaft „none on record". Gewollt,
+  kein Bug — aber beim Auswerten zu wissen.
+- Offene Nummerierung (s. Next 2) blockiert nichts, sollte aber vor dem nächsten Doc-Schwung
+  entschieden sein, sonst wird sie in weiteren Dateien zementiert.
 ---
 
 > **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).

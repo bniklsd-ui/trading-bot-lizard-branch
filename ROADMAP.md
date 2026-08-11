@@ -406,7 +406,19 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 
 ## Phase 11 — V3-Fortsetzung: Funnel-/Mess-Fixes *(aus der zweiten Datenwoche-Review)*
 
-> **Status: 🔄 in Arbeit (seit 2026-08-01).** Numbering claimed 2026-08-01 (Nikinger-Entscheidung)
+> **Status: 🛑 DEFERRED seit 2026-08-11 (Notbremse, Nikinger-Entscheidung).** B1/B2/B4/B5 sowie
+> H1 und H4-a sind gebaut und liegen auf `main`; **WI-2/W2 — die eine Frage, für die es diese
+> Phase gibt — bleibt unbeantwortet.** Drei Datenwochen sind an drei unterschiedlichen
+> Infrastruktur-Ausfällen gescheitert, nie an der Messung. Die gemeinsame Wurzel ist wichtiger
+> als diese Phase: das **Datenfundament**. Nichts wird zurückgerollt; „deferred" heißt keine
+> weitere H-Serie, kein Paper-Trade-Ausbau, kein H1-Scharfschalten, bis das Fundament steht.
+> Vollständige Begründung, Durability-Anforderungen (A–G) und offene Entscheidungen:
+> [`phase10_v3/PHASE11_DEFERRAL_HANDOVER.md`](./phase10_v3/PHASE11_DEFERRAL_HANDOVER.md),
+> Bild: [`docs/architecture/data_foundation.svg`](./docs/architecture/data_foundation.svg).
+> **Offene Nummerierungs-Entscheidung:** Vorschlag „Phase 12 = Datenfundament, V4 → Phase 13"
+> (Handover §4.1) — bis zur Nikinger-Entscheidung bleibt die Tabelle unten unverändert.
+>
+> Numbering claimed 2026-08-01 (Nikinger-Entscheidung)
 > — vorher stand hier "Phase 11 = V4"; V4 ist jetzt **Phase 12** (unten), unverändert im Inhalt.
 > Diese Phase ist **keine** neue AI-Sophistication-Arbeit, sondern das Fix-/Diagnostik-Ergebnis
 > der zweiten V3-Datenwoche: [`phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`](./phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md)
