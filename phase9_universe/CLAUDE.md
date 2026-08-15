@@ -30,8 +30,13 @@ Zwei Jobs, gleich gewichtet:
 „So wenig AI wie möglich, so viel AI wie nötig." **Phase 9 (V2) fügt NULL neues AI hinzu** —
 Discovery-/Promotion-Kriterien sind 100 % code-evaluiert (Suchbegriff-Sweep + IG-Feld-Filter +
 deterministischer `point_value`-Resolver). Wer hier ein LLM „entscheiden/filtern/mappen" lassen
-will → **stop**, das ist Code. `yf_ticker`-Mapping ist eine statische Code-Tabelle, kein
-LLM-Vorschlag (das wäre V4).
+will → **stop**, das ist Code. `yf_ticker`-Mapping ist deterministisch code-verifiziert
+(nie ein LLM-Vorschlag). **Korrigiert 2026-08-15 (Phase 12, D5/D6):** war bis Phase 12
+eine statische Code-Tabelle (`discovery.KNOWN_YF_TICKERS`); die Tabelle existiert weiterhin
+als *Kandidatenliste* (`data_foundation/symbols.py::SEED_SYMBOL_CANDIDATES`), aber discovery
+selbst schreibt `yf_ticker` nicht mehr — der `SymbolResolver` (Phase 12) leitet ihn ab und
+verifiziert ihn per Preisvergleich (`UniverseStore.set_symbol`, der einzige Schreiber).
+Details: `../phase12_data_foundation/CLAUDE.md`.
 
 ## Scope
 - **DRIN:** `discovery.py` (Seed-Sweep + Code-Filter), `pricing.py` (deterministischer

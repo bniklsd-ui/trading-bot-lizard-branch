@@ -16,12 +16,11 @@ from universe.discovery import DiscoveryReport, discover
 from universe.models import STATUS_DISCOVERED
 from universe.store import UniverseStore
 
-_MIGRATION_004 = (
-    Path(__file__).resolve().parents[2]
-    / "phase2_persistence"
-    / "migrations"
-    / "004_phase9_instrument_universe.sql"
-)
+_MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "phase2_persistence" / "migrations"
+# 006 (Phase 12, D5/D7) ALTERs paper_trades too, which needs 005 to have created it first.
+_MIGRATION_004 = _MIGRATIONS_DIR / "004_phase9_instrument_universe.sql"
+_MIGRATION_005 = _MIGRATIONS_DIR / "005_v3_learning.sql"
+_MIGRATION_006 = _MIGRATIONS_DIR / "006_phase12_data_foundation.sql"
 
 
 @pytest.fixture()
@@ -29,6 +28,8 @@ def store(tmp_path) -> UniverseStore:
     db_path = tmp_path / "discovery_test.sqlite"
     bootstrap = sqlite3.connect(str(db_path))
     bootstrap.executescript(_MIGRATION_004.read_text(encoding="utf-8"))
+    bootstrap.executescript(_MIGRATION_005.read_text(encoding="utf-8"))
+    bootstrap.executescript(_MIGRATION_006.read_text(encoding="utf-8"))
     bootstrap.commit()
     bootstrap.close()
     s = UniverseStore(db_path)
@@ -117,7 +118,10 @@ def test_discover_finds_new_epic(store: UniverseStore):
     assert rec.status == STATUS_DISCOVERED
     assert rec.source == "research_promoted"
     assert rec.point_value is None
-    assert rec.yf_ticker == "^GDAXI"
+    # yf_ticker is no longer declared at discovery time (Decision D5, Phase 12) — the
+    # SymbolResolver derives + verifies it later; a fresh discovery always starts unmapped.
+    assert rec.yf_ticker is None
+    assert rec.data_source_status == "unverified"
     assert rec.volume_proxy == "EXS1.DE"
 
 

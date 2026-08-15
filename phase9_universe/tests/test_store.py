@@ -25,12 +25,13 @@ from universe.models import (
 )
 from universe.store import UniverseStore, utc_iso_now
 
-_MIGRATION_004 = (
-    Path(__file__).resolve().parents[2]
-    / "phase2_persistence"
-    / "migrations"
-    / "004_phase9_instrument_universe.sql"
-)
+_MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "phase2_persistence" / "migrations"
+# 004 creates instrument_universe; 006 (Phase 12, D5/D7) adds registry-truth columns to it
+# plus paper_trades.resolution_source — 006's ALTER on paper_trades needs that table to
+# already exist, hence 005 in between (creates it). Same incremental order as production.
+_MIGRATION_004 = _MIGRATIONS_DIR / "004_phase9_instrument_universe.sql"
+_MIGRATION_005 = _MIGRATIONS_DIR / "005_v3_learning.sql"
+_MIGRATION_006 = _MIGRATIONS_DIR / "006_phase12_data_foundation.sql"
 
 
 @pytest.fixture()
@@ -38,6 +39,8 @@ def store(tmp_path) -> UniverseStore:
     db_path = tmp_path / "universe_test.sqlite"
     bootstrap = sqlite3.connect(str(db_path))
     bootstrap.executescript(_MIGRATION_004.read_text(encoding="utf-8"))
+    bootstrap.executescript(_MIGRATION_005.read_text(encoding="utf-8"))
+    bootstrap.executescript(_MIGRATION_006.read_text(encoding="utf-8"))
     bootstrap.commit()
     bootstrap.close()
     s = UniverseStore(db_path)
@@ -278,6 +281,58 @@ def test_active_universe_deterministic_order(store: UniverseStore):
 
     active = store.active_universe()
     assert [r.epic for r in active] == ["A", "Z"]  # same created_at -> epic tiebreak
+
+
+# -- Phase 12: set_symbol / measurable_universe / conflict-preserve ---------
+
+
+def test_set_symbol_writes_all_four_fields(store: UniverseStore):
+    store.upsert_discovered(_record(epic="IX.D.NEW.IFM.IP", yf_ticker=None))
+    store.set_symbol("IX.D.NEW.IFM.IP", "^GDAXI", symbol_source="resolver", status="ok")
+    fetched = store.get("IX.D.NEW.IFM.IP")
+    assert fetched.yf_ticker == "^GDAXI"
+    assert fetched.data_source_status == "ok"
+    assert fetched.symbol_source == "resolver"
+    assert fetched.symbol_checked_at is not None
+
+
+def test_set_symbol_missing_epic_raises(store: UniverseStore):
+    with pytest.raises(UniverseStoreError):
+        store.set_symbol("IX.D.NOPE.IFM.IP", "^GDAXI", symbol_source="resolver", status="ok")
+
+
+def test_measurable_universe_filters_active_and_ok(store: UniverseStore):
+    store.upsert_discovered(_record(epic="OK-ACTIVE", status=STATUS_ACTIVE))
+    store.set_symbol("OK-ACTIVE", "^GDAXI", symbol_source="resolver", status="ok")
+    store.upsert_discovered(_record(epic="UNVERIFIED-ACTIVE", status=STATUS_ACTIVE))
+    store.upsert_discovered(_record(epic="OK-DISCOVERED", status=STATUS_DISCOVERED))
+    store.set_symbol("OK-DISCOVERED", "^FCHI", symbol_source="resolver", status="ok")
+
+    measurable = store.measurable_universe()
+    assert [r.epic for r in measurable] == ["OK-ACTIVE"]
+
+
+def test_measurable_universe_empty_when_nothing_verified(store: UniverseStore):
+    store.upsert_discovered(_record(epic="A", status=STATUS_ACTIVE))
+    assert store.measurable_universe() == []
+
+
+def test_upsert_discovered_preserves_registry_truth_on_conflict(store: UniverseStore):
+    """A re-discovery of an already-known epic must not clobber a verified symbol (D5) —
+    upsert_discovered's default-record conflict branch excludes registry-truth columns."""
+    store.upsert_discovered(_record(epic="IX.D.DAX.IFMM.IP", yf_ticker=None))
+    store.set_symbol("IX.D.DAX.IFMM.IP", "^GDAXI", symbol_source="resolver", status="ok")
+
+    # Simulate discovery re-touching the same epic with a fresh default-shaped record
+    # (yf_ticker=None, data_source_status=DS_UNVERIFIED — today's actual discovery.py output).
+    store.upsert_discovered(_record(epic="IX.D.DAX.IFMM.IP", yf_ticker=None, name="Germany 40"))
+
+    fetched = store.get("IX.D.DAX.IFMM.IP")
+    assert fetched.yf_ticker == "^GDAXI"
+    assert fetched.data_source_status == "ok"
+    assert fetched.symbol_source == "resolver"
+    # non-preserved columns still update normally
+    assert fetched.name == "Germany 40"
 
 
 def test_to_instrument_spec_shape():

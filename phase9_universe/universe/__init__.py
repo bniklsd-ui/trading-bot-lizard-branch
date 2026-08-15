@@ -10,7 +10,7 @@ Public exports grow per module (mirrors ``research``/``scheduler``/``reward``).
 
 from __future__ import annotations
 
-from .discovery import KNOWN_VOLUME_PROXIES, KNOWN_YF_TICKERS, SEARCH_TERMS, DiscoveryReport, discover
+from .discovery import KNOWN_VOLUME_PROXIES, SEARCH_TERMS, DiscoveryReport, discover
 from .exceptions import UniverseError, UniverseSafetyError, UniverseStoreError
 from .models import (
     POINT_VALUE_SOURCE_CURATED_CONFIRMED,
@@ -50,7 +50,6 @@ __all__ = [
     "discover",
     "DiscoveryReport",
     "SEARCH_TERMS",
-    "KNOWN_YF_TICKERS",
     "KNOWN_VOLUME_PROXIES",
     "run_promotion_cycle",
     "PromotionReport",

@@ -24,12 +24,11 @@ from universe.models import (
 from universe.promotion import PromotionReport, run_promotion_cycle
 from universe.store import UniverseStore, utc_iso_now
 
-_MIGRATION_004 = (
-    Path(__file__).resolve().parents[2]
-    / "phase2_persistence"
-    / "migrations"
-    / "004_phase9_instrument_universe.sql"
-)
+_MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "phase2_persistence" / "migrations"
+# 006 (Phase 12, D5/D7) ALTERs paper_trades too, which needs 005 to have created it first.
+_MIGRATION_004 = _MIGRATIONS_DIR / "004_phase9_instrument_universe.sql"
+_MIGRATION_005 = _MIGRATIONS_DIR / "005_v3_learning.sql"
+_MIGRATION_006 = _MIGRATIONS_DIR / "006_phase12_data_foundation.sql"
 
 
 @pytest.fixture()
@@ -37,6 +36,8 @@ def store(tmp_path) -> UniverseStore:
     db_path = tmp_path / "promotion_test.sqlite"
     bootstrap = sqlite3.connect(str(db_path))
     bootstrap.executescript(_MIGRATION_004.read_text(encoding="utf-8"))
+    bootstrap.executescript(_MIGRATION_005.read_text(encoding="utf-8"))
+    bootstrap.executescript(_MIGRATION_006.read_text(encoding="utf-8"))
     bootstrap.commit()
     bootstrap.close()
     s = UniverseStore(db_path)

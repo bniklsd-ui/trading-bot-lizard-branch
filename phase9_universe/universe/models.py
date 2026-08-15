@@ -49,6 +49,28 @@ POINT_VALUE_SOURCE_IG_FIELDS = "ig_fields"
 POINT_VALUE_SOURCE_NAME_LOTSIZE_AGREE = "name_lotsize_agree"
 POINT_VALUE_SOURCE_CURATED_CONFIRMED = "curated_confirmed"
 
+# data_source_status vocabulary (Phase 12 / Decision D7, migration 006). Measurement
+# (paper/shadow) is gated on DS_OK via UniverseStore.measurable_universe(); every other
+# value is a typed, loud reason it is excluded — never a silent None.
+DS_OK = "ok"
+DS_UNVERIFIED = "unverified"
+DS_NO_SOURCE = "no_source"
+DS_NO_INTRADAY_SOURCE = "no_intraday_source"
+DS_MISMATCH = "mismatch"
+
+_VALID_DATA_SOURCE_STATUSES = frozenset(
+    {DS_OK, DS_UNVERIFIED, DS_NO_SOURCE, DS_NO_INTRADAY_SOURCE, DS_MISMATCH}
+)
+
+# symbol_source vocabulary (Phase 12 / Decision D5-D6) — who last set yf_ticker.
+SYMBOL_SOURCE_SEED = "seed"
+SYMBOL_SOURCE_RESOLVER = "resolver"
+SYMBOL_SOURCE_OPERATOR = "operator"
+
+_VALID_SYMBOL_SOURCES = frozenset(
+    {SYMBOL_SOURCE_SEED, SYMBOL_SOURCE_RESOLVER, SYMBOL_SOURCE_OPERATOR}
+)
+
 
 @dataclass(frozen=True)
 class UniverseRecord:
@@ -76,12 +98,19 @@ class UniverseRecord:
     fail_count: int = 0
     data_degraded: bool = False
     last_verified_at: str | None = None
+    data_source_status: str = DS_UNVERIFIED
+    symbol_source: str | None = None
+    symbol_checked_at: str | None = None
 
     def __post_init__(self) -> None:
         if self.status not in _VALID_STATUSES:
             raise ValueError(f"invalid status: {self.status!r}")
         if self.source not in _VALID_SOURCES:
             raise ValueError(f"invalid source: {self.source!r}")
+        if self.data_source_status not in _VALID_DATA_SOURCE_STATUSES:
+            raise ValueError(f"invalid data_source_status: {self.data_source_status!r}")
+        if self.symbol_source is not None and self.symbol_source not in _VALID_SYMBOL_SOURCES:
+            raise ValueError(f"invalid symbol_source: {self.symbol_source!r}")
 
     def to_row(self) -> dict[str, Any]:
         """Return the DB-column-shaped dict (``checks`` -> JSON text, bool -> int)."""
@@ -102,6 +131,9 @@ class UniverseRecord:
             "last_verified_at": self.last_verified_at,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "data_source_status": self.data_source_status,
+            "symbol_source": self.symbol_source,
+            "symbol_checked_at": self.symbol_checked_at,
         }
 
     @classmethod
@@ -126,6 +158,9 @@ class UniverseRecord:
             last_verified_at=row.get("last_verified_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            data_source_status=row.get("data_source_status") or DS_UNVERIFIED,
+            symbol_source=row.get("symbol_source"),
+            symbol_checked_at=row.get("symbol_checked_at"),
         )
 
     def to_instrument_spec(self) -> dict[str, Any]:

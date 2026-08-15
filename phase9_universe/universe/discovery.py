@@ -52,23 +52,6 @@ SEARCH_TERMS: tuple[str, ...] = (
     "UK 100",
 )
 
-# Static name-pattern -> yFinance ticker mapping (no AI, no guessing — an unmatched
-# name resolves to yf_ticker=None, tolerated as reduced-signal, Konzept C3).
-KNOWN_YF_TICKERS: tuple[tuple[str, str], ...] = (
-    ("Germany 40", "^GDAXI"),
-    ("Deutschland 40", "^GDAXI"),
-    ("Europe 50", "^STOXX50E"),
-    ("EU Stocks 50", "^STOXX50E"),
-    ("France 40", "^FCHI"),
-    ("Frankreich 40", "^FCHI"),
-    ("Spain 35", "^IBEX"),
-    ("Spanien 35", "^IBEX"),
-    ("Netherlands 25", "^AEX"),
-    ("Niederlande 25", "^AEX"),
-    ("Italy 40", "FTSEMIB.MI"),
-    ("Italien 40", "FTSEMIB.MI"),
-)
-
 # Static name-pattern -> ETF volume-proxy ticker mapping. Deliberately sparse — no
 # guessing an ETF ticker for an index without one confidently known (v1.5 principle).
 KNOWN_VOLUME_PROXIES: tuple[tuple[str, str], ...] = (
@@ -237,7 +220,10 @@ def discover(
             record = UniverseRecord(
                 epic=epic,
                 name=name,
-                yf_ticker=_lookup(name, KNOWN_YF_TICKERS),
+                # yf_ticker is no longer declared here (Decision D5, Phase 12) — the
+                # SymbolResolver derives + verifies it later. A fresh discovery always
+                # starts unmapped; discovery is not the source of registry truth.
+                yf_ticker=None,
                 volume_proxy=_lookup(name, KNOWN_VOLUME_PROXIES),
                 point_value=None,
                 point_value_source=None,

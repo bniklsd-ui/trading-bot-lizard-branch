@@ -21,7 +21,16 @@ from pathlib import Path
 from typing import Iterable
 
 from universe.exceptions import UniverseStoreError
-from universe.models import STATUS_ACTIVE, UniverseRecord
+from universe.models import DS_OK, STATUS_ACTIVE, UniverseRecord
+
+# Registry-truth columns (Decision D5/D7): the only writers are `set_symbol` (Phase 12
+# SymbolResolver) and the initial INSERT (`seed_curated`/first `upsert_discovered` for a
+# fresh epic). A later `upsert_discovered` call for an *already-known* epic (its ON
+# CONFLICT branch) must never clobber these — that would silently un-verify a resolved
+# symbol every time discovery re-touches the row.
+_PRESERVE_ON_CONFLICT = frozenset(
+    {"yf_ticker", "data_source_status", "symbol_source", "symbol_checked_at"}
+)
 
 
 def utc_iso_now() -> str:
@@ -108,15 +117,21 @@ class UniverseStore:
     # -- CRUD -------------------------------------------------------------
 
     def upsert_discovered(self, rec: UniverseRecord) -> None:
-        """Insert or replace a record wholesale, keyed on ``epic``."""
+        """Insert a record wholesale, keyed on ``epic``.
+
+        On conflict (an already-known epic re-discovered), registry-truth columns
+        (:data:`_PRESERVE_ON_CONFLICT`) are left untouched — a re-discovery carries no
+        symbol-verification signal, so it must not reset one (D5).
+        """
         row = rec.to_row()
         cols = list(row.keys())
         placeholders = ", ".join("?" for _ in cols)
+        update_cols = [c for c in cols if c != "epic" and c not in _PRESERVE_ON_CONFLICT]
         self.conn.execute(
             f"INSERT INTO instrument_universe ({', '.join(cols)}) "
             f"VALUES ({placeholders}) "
             f"ON CONFLICT(epic) DO UPDATE SET "
-            + ", ".join(f"{c} = excluded.{c}" for c in cols if c != "epic"),
+            + ", ".join(f"{c} = excluded.{c}" for c in update_cols),
             [row[c] for c in cols],
         )
         self.conn.commit()
@@ -195,3 +210,39 @@ class UniverseStore:
     def active_universe(self) -> list[UniverseRecord]:
         """Only ``STATUS_ACTIVE`` rows, deterministic order (``created_at``, ``epic``)."""
         return self.list_by_status(STATUS_ACTIVE)
+
+    def set_symbol(
+        self,
+        epic: str,
+        yf_ticker: str | None,
+        *,
+        symbol_source: str | None,
+        status: str,
+    ) -> None:
+        """The one writer of ``yf_ticker`` (Decision D5) — the ``SymbolResolver`` (Phase 12).
+
+        Sets all four registry-truth columns (``yf_ticker``, ``data_source_status``,
+        ``symbol_source``, ``symbol_checked_at``) atomically, plus ``updated_at``.
+        ``symbol_source=None`` is valid — it is the correct value for a status with no
+        symbol at all (``no_source``/``no_intraday_source``).
+        """
+        existing = self.get(epic)
+        if existing is None:
+            raise UniverseStoreError(f"no instrument_universe row for epic={epic!r}")
+        now = utc_iso_now()
+        self.conn.execute(
+            "UPDATE instrument_universe SET yf_ticker = ?, data_source_status = ?, "
+            "symbol_source = ?, symbol_checked_at = ?, updated_at = ? WHERE epic = ?",
+            (yf_ticker, status, symbol_source, now, now, epic),
+        )
+        self.conn.commit()
+
+    def measurable_universe(self) -> list[UniverseRecord]:
+        """``active`` rows with a verified data source (Decision D7) — the gate for
+        paper/shadow measurement (`PaperEngine.epic_filter`, D19)."""
+        rows = self.conn.execute(
+            "SELECT * FROM instrument_universe WHERE status = ? AND data_source_status = ? "
+            "ORDER BY created_at ASC, epic ASC",
+            (STATUS_ACTIVE, DS_OK),
+        ).fetchall()
+        return [UniverseRecord.from_row(dict(r)) for r in rows]
