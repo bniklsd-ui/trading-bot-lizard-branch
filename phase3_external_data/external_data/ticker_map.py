@@ -28,6 +28,12 @@ class TickerMapper:
     identifiers, so a differently-cased string is treated as unmapped.
     """
 
+    # Deprecated as a runtime source of truth (Decision D5, Phase 12): the ``one writer``
+    # of ``yf_ticker`` is now ``instrument_universe`` (``UniverseStore.set_symbol``),
+    # populated by the ``SymbolResolver``. This class-level default remains only as a
+    # seed/operator fallback for bare Phase-3 scripts run outside the wiring path — it is
+    # never registered from the live daemon (``wiring.py`` builds the mapper from the DB
+    # universe instead, see ``wiring.py:207-208``).
     _MAP: dict[str, str] = {
         "IX.D.DAX.IFMM.IP": "^GDAXI",   # Deutschland 40 Kassa (confirmed Phase 1)
         "IX.D.DAX.DAILY.IP": "^GDAXI",

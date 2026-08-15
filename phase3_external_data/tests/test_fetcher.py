@@ -320,3 +320,57 @@ def test_rate_limiter_wait_invoked_on_miss(
 
     md.get_history(EPIC)
     assert spy.waits == 1  # cache hit → no additional wait
+
+
+# -- get_last_price (Phase 12, D6/N2) -----------------------------------------
+
+def test_get_last_price_returns_close_and_timestamp(
+    monkeypatch, tmp_cache, frozen_clock, sample_dax_5m
+):
+    monkeypatch.setattr(fetcher, "_raw_download", make_fake_download(m5=sample_dax_5m))
+    md = fetcher.MarketDataFetcher(TickerMapper(), tmp_cache)
+
+    result = md.get_last_price(SYMBOL)
+    assert result is not None
+    price, ts = result
+    assert isinstance(price, float)
+    assert isinstance(ts, str) and ts  # ISO 8601 UTC bar timestamp
+
+
+def test_get_last_price_off_hours_returns_none_without_fetching(
+    monkeypatch, tmp_cache, frozen_clock, sample_dax_5m
+):
+    _saturday(frozen_clock)
+    calls: list = []
+    monkeypatch.setattr(fetcher, "_raw_download", make_fake_download(m5=sample_dax_5m, calls=calls))
+    md = fetcher.MarketDataFetcher(TickerMapper(), tmp_cache)
+
+    assert md.get_last_price(SYMBOL) is None
+    assert calls == []
+
+
+def test_get_last_price_empty_data_raises_like_every_other_method(
+    monkeypatch, tmp_cache, frozen_clock, no_sleep
+):
+    """Consistent with get_drift/get_bars/get_momentum: an empty fetch raises
+    DataUnavailableError, it does not silently return None — the caller (the
+    SymbolResolver, mirroring verify_instrument.check_yf_side) is responsible for
+    catching it."""
+    monkeypatch.setattr(fetcher, "_raw_download", make_fake_download(m5=pd.DataFrame()))
+    md = fetcher.MarketDataFetcher(TickerMapper(), tmp_cache)
+
+    with pytest.raises(DataUnavailableError):
+        md.get_last_price("^UNKNOWN")
+
+
+def test_get_last_price_uses_cache_on_second_call(
+    monkeypatch, tmp_cache, frozen_clock, sample_dax_5m
+):
+    calls: list = []
+    monkeypatch.setattr(fetcher, "_raw_download", make_fake_download(m5=sample_dax_5m, calls=calls))
+    md = fetcher.MarketDataFetcher(TickerMapper(), tmp_cache)
+
+    first = md.get_last_price(SYMBOL)
+    second = md.get_last_price(SYMBOL)
+    assert first == second
+    assert len(calls) == 1  # second call is a cache hit, no second network call

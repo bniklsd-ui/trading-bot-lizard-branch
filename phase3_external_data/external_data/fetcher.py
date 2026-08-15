@@ -461,6 +461,27 @@ class MarketDataFetcher:
         bars = _records_to_bars(records)
         return bars[-count:] if count > 0 else bars
 
+    def get_last_price(self, symbol: str) -> tuple[float, str] | None:
+        """Last close + its bar timestamp for a bare yFinance ``symbol`` (Phase 12 D6/N2).
+
+        Symbol-keyed, not epic-keyed — unlike every other public method here, this one
+        is for a candidate ticker that is **not yet** registered in the ``TickerMapper``
+        (the ``SymbolResolver`` verifying an unmapped epic). Off-hours-guarded like the
+        other intraday methods (``None`` when the market is closed — no fetch attempted),
+        and shares the same cache/rate-limiter/circuit-breaker path as everything else
+        (``_get_records``, ``5m`` TTL 120 s) — a resolver poll does not bypass either.
+        The returned timestamp is the bar's own ISO UTC ``ts`` (from ``_get_records``),
+        so a caller can judge freshness independent of the cache's internal TTL.
+        """
+        if not is_market_open():
+            log.info("market closed, skipping last-price fetch for %s", symbol)
+            return None
+        records = self._get_records(symbol, resolution="5m", period="1d", interval="5m")
+        if not records:
+            return None
+        last = records[-1]
+        return float(last["close"]), last["ts"]
+
     def get_history(self, epic: str, days: int = 30) -> list[PriceBar]:
         """Return the last ``days`` daily bars (always runs — daily, off-hours safe)."""
         symbol = self._mapper.epic_to_yf(epic)

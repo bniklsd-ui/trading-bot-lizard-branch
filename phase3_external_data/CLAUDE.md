@@ -134,6 +134,21 @@ single network point.
 > 9 `test_circuit.py`, 18 `test_providers.py`). Detail: `phase9_universe/CLAUDE.md` →
 > `## Session stopped` (Step 6).
 
+> 🔁 **Phase-12 additive edit (2026-08-15, Step 3 — `get_last_price`, code = source of
+> truth):** new public `MarketDataFetcher.get_last_price(symbol)` — **symbol**-keyed
+> (unlike every other public method here, which is epic-keyed via `TickerMapper`), for a
+> candidate yFinance ticker that is not yet registered anywhere (the Phase-12
+> `SymbolResolver` verifying an unmapped epic, D6/N2). Thin wrapper around the existing
+> `_get_records(symbol, resolution="5m", period="1d", interval="5m")` — inherits the same
+> cache (120 s TTL for `5m`), rate limiter and per-symbol circuit breaker as every other
+> method; off-hours guarded the same way (`None` when the market is closed, no fetch
+> attempted). Returns `(last_close, bar_timestamp_iso) | None`; an empty/short fetch
+> **raises** `DataUnavailableError` like every other method here (does not silently
+> return `None`) — the caller (`SymbolResolver`, mirroring `verify_instrument.
+> check_yf_side`) is responsible for catching it. +4 tests (**100 → 104**). Detail:
+> `phase12_data_foundation/CLAUDE.md` Session-Block 2026-08-15,
+> `docs/concepts/phase12_data_foundation_plan.md` §6 Step 3 (Nikinger-Entscheidung N2).
+
 ## ⚠ Phase-5 momentum-VETO flag (cross-phase notice)
 
 The concept (§13) explicitly states: a **hard momentum VETO in Phase 5 must
