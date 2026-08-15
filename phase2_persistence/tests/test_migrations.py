@@ -32,14 +32,14 @@ def test_get_version_zero_on_empty_db(tmp_path):
     assert migrations._get_schema_version(conn) == 0
 
 
-def test_fresh_db_reaches_version_5(tmp_path):
+def test_fresh_db_reaches_version_6(tmp_path):
     conn = sqlite3.connect(str(tmp_path / "x.sqlite"))
     conn.row_factory = sqlite3.Row
     version = migrations.run_migrations(conn, MIGRATIONS_DIR)
     # 001_initial + 002_phase7_reward + 003_phase8_trade_provenance +
-    # 004_phase9_instrument_universe + 005_v3_learning
-    assert version == 5
-    assert migrations._get_schema_version(conn) == 5
+    # 004_phase9_instrument_universe + 005_v3_learning + 006_phase12_data_foundation
+    assert version == 6
+    assert migrations._get_schema_version(conn) == 6
 
 
 def test_all_tables_created(tmp_path):
@@ -74,20 +74,21 @@ def test_rerun_is_noop(tmp_path):
     migrations.run_migrations(conn, MIGRATIONS_DIR)
     # Second run must not raise and must not advance the version.
     version = migrations.run_migrations(conn, MIGRATIONS_DIR)
-    assert version == 5
-    # One version row per applied migration (001 + 002 + 003 + 004 + 005), and no more on rerun.
+    assert version == 6
+    # One version row per applied migration (001+002+003+004+005+006), and no more on rerun.
     count = conn.execute("SELECT COUNT(*) FROM _schema_version").fetchone()[0]
-    assert count == 5
+    assert count == 6
 
 
 def test_find_pending_respects_current(tmp_path):
     pending = migrations._find_pending(MIGRATIONS_DIR, current=0)
-    assert [v for v, _ in pending] == [1, 2, 3, 4, 5]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=1)] == [2, 3, 4, 5]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=2)] == [3, 4, 5]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=3)] == [4, 5]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=4)] == [5]
-    assert migrations._find_pending(MIGRATIONS_DIR, current=5) == []
+    assert [v for v, _ in pending] == [1, 2, 3, 4, 5, 6]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=1)] == [2, 3, 4, 5, 6]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=2)] == [3, 4, 5, 6]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=3)] == [4, 5, 6]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=4)] == [5, 6]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=5)] == [6]
+    assert migrations._find_pending(MIGRATIONS_DIR, current=6) == []
 
 
 def test_database_run_migrations_seeds_defaults(db):
@@ -100,8 +101,8 @@ def test_database_run_migrations_seeds_defaults(db):
 def test_database_run_migrations_idempotent(tmp_path):
     path = str(tmp_path / "x.sqlite")
     d = Database(path)
-    assert d.run_migrations() == 5
-    assert d.run_migrations() == 5  # no error, no change
+    assert d.run_migrations() == 6
+    assert d.run_migrations() == 6  # no error, no change
     d.close()
 
 
@@ -160,6 +161,9 @@ def test_phase9_instrument_universe_table_present(tmp_path):
         "last_verified_at",
         "created_at",
         "updated_at",
+        "data_source_status",
+        "symbol_source",
+        "symbol_checked_at",
     }
     rows = conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()
     assert "idx_instrument_universe_status" in {r["name"] for r in rows}
@@ -185,7 +189,7 @@ def test_v3_learning_tables_present(tmp_path):
         "created_utc", "entry_level", "stop_distance", "limit_distance",
         "time_stop_utc", "status", "resolved_utc", "exit_reason", "exit_level",
         "pnl_points", "r_multiple", "council_confidence", "lesson",
-        "lesson_extracted", "context_json",
+        "lesson_extracted", "context_json", "resolution_source",
     }
     # Epic-scoped V3 schema — no trade_id, the old FK-scoped V2 placeholder is gone.
     assert "trade_id" not in _columns("market_regime_snapshots")
@@ -209,3 +213,38 @@ def test_v3_learning_tables_present(tmp_path):
         "idx_paper_trades_status", "idx_paper_trades_created_utc",
         "idx_decision_context_created_utc", "idx_market_regime_snapshots_created_utc",
     }.issubset(names)
+
+
+def test_phase12_data_foundation_columns_present(tmp_path):
+    """Migration 006 (Phase 12) adds registry-truth + provenance columns, additive only.
+
+    Existing (and freshly inserted) instrument_universe rows default to
+    data_source_status='unverified' — nothing is verified until the SymbolResolver has
+    run against it at least once (Decision D5/D7).
+    """
+    conn = sqlite3.connect(str(tmp_path / "x.sqlite"))
+    conn.row_factory = sqlite3.Row
+    migrations.run_migrations(conn, MIGRATIONS_DIR)
+
+    def _columns(table: str) -> set[str]:
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return {r["name"] for r in rows}
+
+    assert {"data_source_status", "symbol_source", "symbol_checked_at"}.issubset(
+        _columns("instrument_universe")
+    )
+    assert "resolution_source" in _columns("paper_trades")
+
+    conn.execute(
+        "INSERT INTO instrument_universe "
+        "(epic, currency, status, source, created_at, updated_at) "
+        "VALUES ('IX.D.TEST.IP', 'EUR', 'discovered', 'research_promoted', 'now', 'now')"
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT data_source_status, symbol_source, symbol_checked_at "
+        "FROM instrument_universe WHERE epic = 'IX.D.TEST.IP'"
+    ).fetchone()
+    assert row["data_source_status"] == "unverified"
+    assert row["symbol_source"] is None
+    assert row["symbol_checked_at"] is None

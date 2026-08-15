@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS paper_trades (
     council_confidence  INTEGER,
     lesson              TEXT,
     lesson_extracted    INTEGER NOT NULL DEFAULT 0,
-    context_json        TEXT NOT NULL DEFAULT '{}'
+    context_json        TEXT NOT NULL DEFAULT '{}',
+    resolution_source   TEXT
 )
 """
 

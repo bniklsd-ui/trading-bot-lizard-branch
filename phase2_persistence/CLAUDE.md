@@ -89,6 +89,19 @@ Two stores. **100% deterministic code — no LLM calls anywhere in Phase 2.**
 > Detail: `docs/concepts/phase8_v1.6_hotfix_plan.md` §6 + `phase8_scheduler/CLAUDE.md` →
 > `## Session stopped — 2026-07-02 (v1.6-Hotfix: Cause A part 2)`.
 
+> 🔁 **Phase-12 additive edit (2026-08-15, Step 3 — registry-truth + provenance columns,
+> code = source of truth):** `migrations/006_phase12_data_foundation.sql` (fresh DB now
+> reaches **version 6**) adds `instrument_universe.data_source_status` (`NOT NULL DEFAULT
+> 'unverified'` — nothing is verified until the Phase-12 `SymbolResolver` has run against
+> it), `.symbol_source`, `.symbol_checked_at`, and `paper_trades.resolution_source`. Purely
+> additive — no existing column touched, no exception to the additive-only rule (unlike
+> migration 005). `phase9_universe/universe/store.py`'s `UniverseStore.set_symbol` is the
+> **one** writer of `yf_ticker` from here on (Decision D5) — `Database` never gains a
+> writer for any of these columns; Phase 2 stays a dumb parameterised store. +1 test
+> (**76 → 77**: `test_phase12_data_foundation_columns_present`, asserts the columns exist
+> and a freshly-inserted row lands on `data_source_status='unverified'`). Detail:
+> `phase12_data_foundation/CLAUDE.md` → `## Session stopped — 2026-08-15`.
+
 ## Conventions
 - All timestamps ISO 8601 UTC, ms precision, `Z` suffix.
 - All money REAL + explicit `currency` column.
