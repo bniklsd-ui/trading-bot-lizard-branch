@@ -27,6 +27,20 @@ updated: 2026-08-11
 > (projiziert, keine `openingHours`/Margin-Felder) nicht wie ursprünglich geplant beantworten
 > — per Nikinger-Entscheidung per Roh-Dump-Skript gegen `_request()` gelöst (Ergebnis im
 > Session-Block, inkl. `specialInfo`-Fund als besseres Wochenend-Signal als `openingHours`).
+>
+> **Korrigiert gegen Code + zwei Nikinger-Entscheidungen (2026-08-15, Ausführungs-Session 2,
+> Step 3, Details: `phase12_data_foundation/CLAUDE.md` Session-Block 2026-08-15):**
+> Phase-1-`get_price`s `Price.to_dict()` (`broker_wrapper/models.py:26-36`) trägt **keine**
+> `mid`-Spalte und benennt IGs `offer` in `ask` um — D6s Preisvergleich rechnet `(bid+ask)/2`
+> selbst, statt ein `mid`-Feld zu lesen. **N1 (Liveness-Gate):** der Resolver gated auf
+> `is_market_open()` **UND** eine frische yFinance-Bar (nicht nur D6s XETRA-Check) — sonst
+> hätte ein Vergleich außerhalb 15:30-17:30 Berlin IGs 24h-CFD-Livepreis der vier neuen
+> US/UK-Kandidaten gegen yFinance' Vortagesschluss geprüft und wiederholt fälschlich
+> `mismatch` gebucht; bekannte Konsequenz: diese vier Epics verifizieren sich nur in jenem
+> Überlappungsfenster. **N2 (yF-Last-Price):** Phase 3 bekam eine neue additive
+> `MarketDataFetcher.get_last_price(symbol)` — es gab dafür vorher keinen Einstiegspunkt
+> (alles epic-keyed + bar-shaped). Beide Entscheidungen weichen bewusst vom §2-Wortlaut ab,
+> gleiche Absicht, nicht still.
 
 ---
 
