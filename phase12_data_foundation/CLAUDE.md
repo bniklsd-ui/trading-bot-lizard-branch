@@ -1,7 +1,7 @@
 ---
 status: live
-purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder. Step 4 verified+documented this session (BarService, wiring rewire, epic_filter, resolution_source — code was written pre-context-limit, this session confirmed acceptance criteria). UNCOMMITTED. Steps 5-7 sind noch Wochenend-Arbeit.
-read-when: working in phase12_data_foundation/ — read this head + its newest Session-stopped block first (⚠️ operator landmine there before any bot restart); the full plan (docs/concepts/phase12_data_foundation_plan.md) is the execution contract, read its relevant §6 step block before touching anything
+purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder. Step 4 done+committed (49902b6). Step 5 (Recorder, PID-guarded standalone process) done this session, UNCOMMITTED. Steps 6/7 sind noch Wochenend-Arbeit.
+read-when: working in phase12_data_foundation/ — read this head + its newest Session-stopped block first (⚠️ operator landmine there before any bot restart — now affects both the paper tracker AND the Recorder); the full plan (docs/concepts/phase12_data_foundation_plan.md) is the execution contract, read its relevant §6 step block before touching anything
 detail: L2
 up: ../CLAUDE.md
 down:
@@ -57,7 +57,7 @@ Siehe [`README.md`](./README.md).
 
 ---
 
-## Session stopped — 2026-08-16 (Session 3: Step 4 — `BarService` + Tracker-/Research-Rewire, UNCOMMITTED)
+## Session stopped — 2026-08-16 (Session 3: Step 4 committed + Step 5 — Recorder, Step 5 UNCOMMITTED)
 
 > **Vorherige Session ging in Context Limit.** Der Handover-Satz beim Sitzungsstart lautete:
 > „Acceptance grep confirms: only a docstring comment remains, zero real get_ohlcv calls in
@@ -127,25 +127,77 @@ diesem Step nicht mehr (jetzt `enable_bar_service`). Reiner Kommentar in einem P
 außerhalb des Step-4-Dateiumfangs (`phase4_research/`-Edits nur bei zwingendem Grund laut
 Root-`CLAUDE.md`-Scope-Regel) — für den Nikinger notiert, nicht selbst gefixt.
 
+**Step 4 committed** (Commit `49902b6`, `phase12: BarService + tracker/research rewire (Step 4)`).
+
+## Step 5 — Recorder (derselbe Tag, Wochenende, D14/D15)
+
+`data_foundation/recorder.py` (`Recorder`, `RecorderReport`) — yFinance-only Poll-Loop,
+fail-soft je Epic, Dedup über den Archiv-PK (kein eigener Dedup-Code nötig,
+`insert_bars` macht das schon), atomarer Heartbeat-State (`.tmp`+`os.replace`, P8-Muster
+kopiert nicht importiert), `recorder_heartbeat`-Health-Event. `data_foundation/run.py`
+(`python -m data_foundation.run`) — PID-File-Guard (`_pid_alive`/`_already_running`/
+`_write_pid`, doppelstart-sicher, live gegen einen echten `os.getpid()` verifiziert),
+SIGTERM/SIGINT → `request_stop()`. `phase12_data_foundation/scripts/run_recorder.sh`
+(neu, Paket-Code) + Edit an `phase8_scheduler/scripts/run_scheduler.sh` (D14, Cross-Phase
+— `nohup … &` vor dem `exec`, PID-Guard lebt im Recorder-Skript).
+
+**Advisor-Review fand 1 echten Bug vor Abnahme, gefixt:** `_build_recorder`s
+`MarketDataFetcher(TickerMapper(), ...)` nutzte eine **bare** `TickerMapper()` — die kennt
+nur ihre ~7 statischen `_MAP`-Einträge (P3s eigene Smoke-Test-Form), nie einen
+Registry-aufgelösten `yf_ticker` (D5/D6, Step 3). Jeder von `measurable_universe()`
+gelieferte Epic außerhalb der 7 Defaults hätte `EpicNotMappedError` geworfen, still von
+`tick()`s fail-soft-Guard geschluckt — Archiv bleibt leer, Heartbeat schreibt trotzdem
+„gesund". Exakt Phase 11s Fehlerklasse (ein dritter Speicher, der die Registry
+überschattet), reintroduziert in der Phase, die sie beheben soll. Gefixt am gemeinsamen
+Punkt: `epics_fn` registriert jetzt `rec.yf_ticker` auf den geteilten Mapper bei jedem
+Aufruf (spiegelt `phase8_scheduler/scripts/wiring.py`s `mapper.register`-Muster), bevor es
+den Epic zurückgibt — ein Epic ohne `yf_ticker` wird übersprungen (defensiv, sollte durch
+`measurable_universe()`s Gate nie vorkommen). Kein dedizierter Test nötig (Fake-`epics_fn`
+in den bestehenden Recorder-Tests umgeht die reale Mapper-Frage strukturell — dieselbe
+"operator-run, nicht pytest-erfasst"-Konvention wie `wiring.py` selbst).
+
+### Verified
+
+- `pytest phase12_data_foundation/tests -v` → **96 passed** (war 80, +16: ~10
+  `test_recorder.py` + 6 `test_run.py`).
+- Volle Regression unverändert grün, alle 12 Phasen + root: P1 87 · P2 77 · P3 104 ·
+  P4 155 · P5 173 · P6 76 · P7 138 · P8 229 · P9 80 · P10 159 · P12 96 · meta 28 · root 80.
+- `py_compile` clean (`recorder.py`, `run.py`); `bash -n` clean (beide `.sh`).
+- **PID-Guard live gegen einen echten Prozess getestet** (nicht nur gemockt): ein
+  `--pid-file` mit der eigenen PID der laufenden Shell → zweiter Start meldet „already
+  running", **exit 0**, kein zweiter Recorder gestartet.
+- `grep -rn "import broker_wrapper\|from broker_wrapper"
+  phase12_data_foundation/data_foundation/` → 0 Treffer (D14). `test_isolation.py`s
+  AST-Grep deckt beide neuen Dateien automatisch mit ab (paketweit, kein Zusatztest nötig).
+- `scripts/dev_install.sh` hat `phase12_data_foundation` bereits in der editable-Install-
+  Kette (Zeile 55) — `run_recorder.sh`s Prereq-Zeile ist wahr, nicht nur behauptet.
+- `run_scheduler.sh`-Edit nur `bash -n`-geprüft (Syntax), **nicht live ausgeführt** — ein
+  echter Start würde die reale `data/`-DB berühren + einen echten yFinance-Netzwerkruf
+  machen, beides Nikinger-Job laut `feedback_live_testing`-Memory. `data/state/` existiert
+  bereits (Redirect-Ziel sicher).
+
 ### Next
 
-- **⚠️ Operator-Landmine vor jedem Neustart:** alle 22 Produktionszeilen stehen laut Step 3
-  auf `data_source_status='unverified'` → `measurable_universe()` ist **leer** →
-  `epic_filter` lässt den Paper-Tracker **keine** Paare öffnen. Ohne vorherigen
-  `SymbolResolver`-Lauf ist ein Neustart eine stille Nullwoche, ununterscheidbar von den drei
-  Infrastruktur-Ausfällen, die Phase 12 verhindern soll. Step 6 (Heartbeat) ist der geplante
-  Alarm dafür und ist **noch nicht gebaut** — bis dahin: Resolver von Hand laufen lassen und
+- **⚠️ Operator-Landmine vor jedem Neustart (jetzt auf zwei Konsumenten erweitert):**
+  alle 22 Produktionszeilen stehen laut Step 3 auf `data_source_status='unverified'` →
+  `measurable_universe()` ist **leer** → sowohl `epic_filter` (Paper-Tracker öffnet keine
+  Paare) **als auch der neue Recorder** (tickt endlos mit `epics: 0, bars_written: 0`,
+  Heartbeat schreibt trotzdem "erfolgreich") sind betroffen. Beide Symptome sehen wie
+  gesunder Leerlauf aus, nicht wie ein Fehler — Step 6s Heartbeat ist der geplante Alarm
+  dafür und ist **noch nicht gebaut**. Bis dahin: Resolver von Hand laufen lassen und
   `measurable_universe()` vor einem Neustart prüfen.
-- **Step 5** (Recorder, Paket-Code werktags baubar; `run_scheduler.sh`-Edit Wochenende).
+- **Erster echter Start ist Nikinger-Job:** `bash phase12_data_foundation/scripts/
+  run_recorder.sh` standalone (Archiv-Warmlauf) oder automatisch über den nächsten
+  `run_scheduler.sh`-Start — beides live/netzwerkberührend, hier nicht ausgeführt.
 - Steps 6/7 (Wochenende), Steps 8-10 (gated, Operator).
-- Uncommitted: 10 geänderte + 2 neue Dateien (s. `git status`) — Commit ist Nikinger-
-  Entscheidung, nicht automatisch ausgeführt.
+- Uncommitted: Step-5-Dateien (s. `git status`) — Commit ist Nikinger-Entscheidung.
 
 ### Open questions / blockers
 
-- Keine technischen (Advisor-Review dieser Session: 4 gezielte Nachprüfungen, alle sauber).
-- Operator-Landmine oben ist die einzige reale Konsequenz, die vor dem nächsten Bot-Neustart
-  aktiv gemanagt werden muss.
+- Keine technischen (Advisor-Review dieser Session: 4 Step-4-Nachprüfungen + 1
+  Step-5-Fund, alle sauber/gefixt).
+- Operator-Landmine oben ist die einzige reale Konsequenz, die vor dem nächsten
+  Bot-Neustart aktiv gemanagt werden muss — jetzt mit zwei betroffenen Konsumenten.
 ---
 
 > **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).

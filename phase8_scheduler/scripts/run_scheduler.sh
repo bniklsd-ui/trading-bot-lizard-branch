@@ -29,5 +29,14 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
+# Phase 12 (Datenfundament) Step 5, D14: keep the yFinance-only Recorder running
+# alongside the scheduler, independent of the bot's own state — "damit es weniger
+# schnell vergessen wird" (Nikinger). No IG session in the Recorder, ever (parallel
+# IG logins clobber each other's tokens) — the guard against a duplicate Recorder
+# lives in run_recorder.sh/data_foundation.run itself (PID file), not here.
+REPO_ROOT="$(cd "$PROJECT_DIR/.." && pwd)"
+nohup bash "$REPO_ROOT/phase12_data_foundation/scripts/run_recorder.sh" \
+    >>"$REPO_ROOT/data/state/recorder.log" 2>&1 &
+
 echo "[run_scheduler] starting daemon from ${PROJECT_DIR} (keyring must be unlocked)..." >&2
 exec python -m scheduler.run "$@"
