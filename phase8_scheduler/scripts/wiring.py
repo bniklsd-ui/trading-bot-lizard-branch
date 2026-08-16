@@ -742,6 +742,26 @@ def build_scheduler(
     exec_state = ExecutionState(str(_EXEC_STATE_PATH))
 
     bar_service, bar_budget, bar_archive = _build_data_foundation(broker)
+
+    divergence_sampler = None
+    if config.enable_divergence_sampler:
+        # Phase 12 (Datenfundament) Step 6, D12: a budgeted IG probe (spend_kind="sample",
+        # same ledger as the research/tracker legs) vs. the archived yFinance bars of the
+        # same window — never a fresh yFinance fetch (data_foundation/heartbeat.py docstring).
+        from data_foundation.heartbeat import DivergenceSampler
+        from data_foundation.service import BudgetedIGBarProvider
+        from scheduler.observability import record_event as _sampler_record_event
+
+        def _sampler_health_sink(event: dict[str, Any]) -> None:
+            _sampler_record_event(config.observability_path, event)
+
+        sample_ig = BudgetedIGBarProvider(
+            broker, bar_budget, spend_kind="sample", health_sink=_sampler_health_sink
+        )
+        divergence_sampler = DivergenceSampler(
+            sample_ig, bar_archive, health_sink=_sampler_health_sink, now_fn=_now
+        )
+
     research = _build_research(
         broker, db, state, bar_service, enable_bar_service=config.enable_bar_service
     )
@@ -861,8 +881,69 @@ def build_scheduler(
                 universe_store,
                 is_demo=(config.account == "demo"),
             )
+            if divergence_sampler is not None:
+                # Same pass, same store connection (Plan §6 Step 6: "aufgerufen aus dem
+                # bestehenden universe_refresher-Slot im selben Pass") — no new runner seam.
+                # DivergenceSampler throttles itself to once/epic/day internally, so this
+                # running several times/day (universe_refresh_interval_min) is harmless.
+                from data_foundation.models import DS_MISMATCH
+
+                def _mark_mismatch(epic: str) -> None:
+                    rec = universe_store.get(epic)
+                    if rec is None:
+                        return
+                    universe_store.set_symbol(
+                        epic, rec.yf_ticker, symbol_source=rec.symbol_source, status=DS_MISMATCH
+                    )
+                    # D12: "persistenter Drift ⇒ data_source_status='mismatch' (laut)" — a
+                    # one-way door (measurable_universe() drops the epic immediately, and
+                    # nothing re-verifies it automatically), so this must be loud, not a
+                    # silent registry write.
+                    logger.warning(
+                        "divergence sampler: %s marked data_source_status=mismatch after "
+                        "2 consecutive IG/yFinance divergences — dropped from "
+                        "measurable_universe() until an operator re-runs the SymbolResolver",
+                        epic,
+                    )
+
+                for rec in universe_store.measurable_universe():
+                    divergence_sampler.sample_epic(rec.epic, _mark_mismatch)
         finally:
             universe_store.close()
+
+    daily_health_check = None
+    if config.enable_measurement_heartbeat:
+        def daily_health_check() -> None:
+            """Phase 12 (Datenfundament) Step 6 — same-day CRITICAL on a measurement
+            outage (Plan §7 Requirement G). Reads ``bar_archive``/the shared DB (paper
+            trades + registry live in the same physical file, ``_DB_PATH``, mirroring
+            how ``UniverseStore``/``PaperTradeStore`` are both built against it
+            elsewhere in this module) for the current UTC calendar day.
+            """
+            from data_foundation.heartbeat import assess_day
+            from scheduler.observability import record_event as _health_record_event
+
+            day_utc = _now().astimezone(timezone.utc).strftime("%Y-%m-%d")
+            verdict = assess_day(
+                bar_archive, str(_DB_PATH), str(_DB_PATH), day_utc,
+                shadow_enabled=config.enable_shadow_schedule,
+            )
+            _health_record_event(config.observability_path, {
+                "event": "measurement_heartbeat",
+                "day": verdict.day,
+                "bars_today": verdict.bars_today,
+                "pairs_opened": verdict.pairs_opened,
+                "pairs_resolved": verdict.pairs_resolved,
+                "pairs_typed_expired": verdict.pairs_typed_expired,
+                "measurable_epics": verdict.measurable_epics,
+                "ok": verdict.ok,
+                "problems": verdict.problems,
+            })
+            if not verdict.ok:
+                logger.critical(
+                    "measurement heartbeat: %s is not ok — problems: %s",
+                    verdict.day, verdict.problems,
+                )
 
     def preflight_fn() -> None:
         """Fail-closed startup probe: keyring reachable + DB migration 002 applied."""
@@ -892,5 +973,6 @@ def build_scheduler(
         universe_refresher=universe_refresher,
         paper_tracker=paper_tracker,
         shadow_pair_scheduler=shadow_pair_scheduler,
+        daily_health_check=daily_health_check,
         max_iterations=max_iterations,
     )

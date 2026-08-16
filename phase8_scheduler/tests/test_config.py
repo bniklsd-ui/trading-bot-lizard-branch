@@ -65,6 +65,12 @@ def test_defaults_match_locked_concept_values() -> None:
     assert cfg.enable_shadow_schedule is False
     assert cfg.shadow_schedule_interval_min == 30
 
+    # Phase 12 (Datenfundament) Step 6 — measurement heartbeat + divergence sampler on
+    # by default (no new IG spend of its own beyond the budgeted sampler probe)
+    assert cfg.enable_measurement_heartbeat is True
+    assert cfg.health_check_interval_min == 1200
+    assert cfg.enable_divergence_sampler is False  # spends real IG budget — Nikinger arms it
+
     # paths (gitignored data/ tree)
     assert cfg.live_db_path == "data/trading_bot.sqlite"
     assert cfg.state_path == "data/state/scheduler_state.json"

@@ -189,6 +189,23 @@ class SchedulerConfig:
     enable_shadow_schedule: bool = False
     shadow_schedule_interval_min: int = 30
 
+    # --- Phase 12 (Datenfundament) Step 6: measurement heartbeat + divergence sampler ---
+    # `enable_measurement_heartbeat` wires an `assess_day` closure into the runner's
+    # `daily_health_check` seam (default None ⇒ bit-identical); throttled to run once per
+    # `health_check_interval_min` (20h — one call per POST_WINDOW, not one per cycle) so a
+    # measurement-dead day pages CRITICAL the same day it happens (Plan §7 Requirement G),
+    # not silently at the next Friday review. Read-only against the archive/DB, costs
+    # nothing itself — on by default.
+    enable_measurement_heartbeat: bool = True
+    health_check_interval_min: int = 1200  # 20h
+    # `enable_divergence_sampler` wires the once-per-epic-per-day IG-vs-yFinance cross-check
+    # (D12) into the existing `universe_refresher` closure — no new runner seam, it rides
+    # the same pass. Unlike the heartbeat, this DOES spend real IG budget (3 points/epic/day,
+    # ~120/week for ~8 'ok' epics — inside the plan's <1500/week target, but still new spend).
+    # Default OFF, same discipline as `enable_shadow_schedule`/`enable_paper_debate` — the
+    # Nikinger arms it consciously rather than it turning on silently under a Step-6 commit.
+    enable_divergence_sampler: bool = False
+
     # --- paths (gitignored data/ tree) ---
     live_db_path: str = "data/trading_bot.sqlite"          # the real P2 DB
     state_path: str = "data/state/scheduler_state.json"

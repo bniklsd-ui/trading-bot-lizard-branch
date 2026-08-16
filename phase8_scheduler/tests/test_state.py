@@ -47,6 +47,7 @@ def test_save_then_load_roundtrips_all_fields(tmp_path) -> None:
         last_research_ts="2026-06-28T09:05:00Z",
         last_reconcile_ts="2026-06-28T09:00:00Z",
         last_shadow_pairs_ts="2026-06-28T09:10:00Z",
+        last_health_check_ts="2026-06-28T18:00:00Z",
         consecutive_failures=1,
         kill_reason="auto:backoff",
         last_no_trade_reason="LLM_ABSTAIN",
@@ -120,6 +121,7 @@ def test_rollover_new_day_resets_day_scoped_keeps_timestamps(tmp_path) -> None:
         last_research_ts="2026-06-27T10:00:00Z",
         last_reconcile_ts="2026-06-27T17:30:00Z",
         last_shadow_pairs_ts="2026-06-27T11:00:00Z",
+        last_health_check_ts="2026-06-27T18:00:00Z",
     )
     now = datetime(2026, 6, 28, 9, 5, tzinfo=_BERLIN)
     out = store.rollover_if_new_day(state, now)
@@ -136,6 +138,7 @@ def test_rollover_new_day_resets_day_scoped_keeps_timestamps(tmp_path) -> None:
     assert out.last_research_ts == "2026-06-27T10:00:00Z"
     assert out.last_reconcile_ts == "2026-06-27T17:30:00Z"
     assert out.last_shadow_pairs_ts == "2026-06-27T11:00:00Z"
+    assert out.last_health_check_ts == "2026-06-27T18:00:00Z"
 
 
 def test_rollover_same_day_is_noop(tmp_path) -> None:

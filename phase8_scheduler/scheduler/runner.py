@@ -204,6 +204,14 @@ class SchedulerRunner:
             ``config.shadow_schedule_interval_min`` inside the WINDOW phase (same
             throttled pattern as ``universe_refresher``, but **not** also fired in
             :meth:`preflight` -- a timer tick needs no warm-up call). Best-effort/fail-soft.
+        daily_health_check: optional zero-arg callable (Phase 12 / Step 6) the wiring backs
+            with an ``assess_day`` closure — computes the day's ``HealthVerdict``, records a
+            ``measurement_heartbeat`` event, and logs ``critical`` on ``ok=False``. Default
+            ``None`` ⇒ never called, bit-identical. When set, runs at most once per
+            ``config.health_check_interval_min`` (20h default — once per POST_WINDOW, not
+            once per cycle), called from POST_WINDOW **after** the forced reconcile so the
+            day's trade/paper state is settled before it's assessed. Best-effort/fail-soft,
+            same discipline as ``universe_refresher``.
         max_iterations: optional loop bound. ``None`` (default) ⇒ run forever (the real daemon);
             a positive int ⇒ stop after that many iterations (deterministic tests).
     """
@@ -224,6 +232,7 @@ class SchedulerRunner:
         universe_refresher: Callable[[], Any] | None = None,
         paper_tracker: Any | None = None,
         shadow_pair_scheduler: Callable[[], Any] | None = None,
+        daily_health_check: Callable[[], Any] | None = None,
         max_iterations: int | None = None,
     ) -> None:
         self._clock = clock
@@ -239,6 +248,7 @@ class SchedulerRunner:
         self._universe_refresher = universe_refresher
         self._paper_tracker = paper_tracker
         self._shadow_pair_scheduler = shadow_pair_scheduler
+        self._daily_health_check = daily_health_check
         self._max_iterations = max_iterations
         # Non-sticky graceful-stop flag (set by request_stop(), checked at the loop top).
         # Deliberately NOT the kill-switch file: a SIGTERM-driven stop must not persist a
@@ -251,6 +261,7 @@ class SchedulerRunner:
         self._idle_poll_s = config.idle_poll_min * 60
         self._reconcile_interval_s = config.reconcile_interval_min * 60
         self._shadow_schedule_interval_s = config.shadow_schedule_interval_min * 60
+        self._health_check_interval_s = config.health_check_interval_min * 60
 
     # --- preflight ---------------------------------------------------------
 
@@ -390,6 +401,7 @@ class SchedulerRunner:
         elif phase is Phase.POST_WINDOW:
             self._warm_session()
             self._maybe_reconcile(state, now, force=True)
+            self._maybe_run_daily_health_check(state, now)
             self._clock.sleep(
                 min(self._clock.seconds_until(Phase.PRE_OPEN, now), self._idle_poll_s)
             )
@@ -536,6 +548,32 @@ class SchedulerRunner:
             return
         self._run_shadow_pair_scheduler()
         state.last_shadow_pairs_ts = now.isoformat()
+
+    def _run_daily_health_check(self) -> None:
+        """Fire-and-forget call of the injected ``daily_health_check`` (fail-soft),
+        same pattern as ``_run_universe_refresher``. No-op when ``None`` (default —
+        bit-identical, Phase 12 / Step 6 opt-in)."""
+        if self._daily_health_check is None:
+            return
+        try:
+            self._daily_health_check()
+        except Exception:  # noqa: BLE001 — fail-soft, see docstring
+            logger.critical("daily health check failed", exc_info=True)
+
+    def _maybe_run_daily_health_check(self, state: SchedulerState, now: datetime) -> None:
+        """Run the daily health check, throttled to ``config.health_check_interval_min``.
+
+        Called from POST_WINDOW only, after the forced reconcile (Plan §6 Step 6) — the
+        day's trade/paper state must be settled before ``assess_day`` reads it. The 20h
+        default throttle means at most one call per day even across multiple POST_WINDOW
+        entries (e.g. a restart).
+        """
+        if self._daily_health_check is None:
+            return
+        if not self._due_after(state.last_health_check_ts, now, self._health_check_interval_s):
+            return
+        self._run_daily_health_check()
+        state.last_health_check_ts = now.isoformat()
 
     def _startup_reconcile(self, state: SchedulerState) -> None:
         """One forced reconcile before the loop (Decision 11 "Startup"). Fail-soft; saves state.

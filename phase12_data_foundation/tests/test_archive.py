@@ -129,6 +129,28 @@ def test_bars_written_since(archive):
     assert archive.bars_written_since("2026-08-12T00:00:00.000Z") == 0
 
 
+def test_bars_written_since_respects_end_bound(archive):
+    """Without an upper bound, a query for a PAST day would count everything fetched
+    from that day's start until now — silently reporting a dead day as healthy (the
+    exact bug this param exists to close, Plan §6 Step 6)."""
+    archive.insert_bars([Bar(
+        epic="IX.D.DAX.IFMM.IP", resolution="1m", ts_utc="2026-08-11T09:00:00.000Z",
+        open=100, high=100, low=100, close=100, volume=1, source=SOURCE_YF,
+        fetched_at="2026-08-11T09:00:01.000Z",
+    )])
+    archive.insert_bars([Bar(
+        epic="IX.D.DAX.IFMM.IP", resolution="1m", ts_utc="2026-08-12T09:00:00.000Z",
+        open=100, high=100, low=100, close=100, volume=1, source=SOURCE_YF,
+        fetched_at="2026-08-12T09:00:01.000Z",
+    )])
+    # open-ended (no end_utc): both bars count, matches the original contract
+    assert archive.bars_written_since("2026-08-11T00:00:00.000Z") == 2
+    # bounded to just the 11th: only that day's bar counts
+    assert archive.bars_written_since(
+        "2026-08-11T00:00:00.000Z", "2026-08-12T00:00:00.000Z"
+    ) == 1
+
+
 def test_bars_written_since_counts_distinct_minute_not_per_source(archive):
     """The same minute covered by both IG and yFinance must count once, not
     twice -- bars_written_since feeds the Mess-Heartbeat's (Step 6) 'Bars

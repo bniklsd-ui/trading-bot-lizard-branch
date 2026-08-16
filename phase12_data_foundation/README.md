@@ -22,7 +22,8 @@ Phase head / session log: [`CLAUDE.md`](./CLAUDE.md).
 | `recorder.py` | *(Step 5)* `Recorder` — yFinance-only continuous poll loop, fail-soft per epic, own process |
 | `run.py` | *(Step 5)* `python -m data_foundation.run` — PID-guarded entrypoint, SIGTERM/SIGINT → graceful stop |
 | `scripts/run_recorder.sh` | *(Step 5)* operator launcher (standalone, or auto-started from `run_scheduler.sh`) |
-| `heartbeat.py` | *(Step 6)* daily `HealthVerdict` — same-day alarm on a measurement outage |
+| `heartbeat.py` | *(Step 6)* `assess_day` (daily `HealthVerdict`, same-day alarm) + `DivergenceSampler` (IG-vs-yFinance cross-check, D12) |
+| `scripts/data_health.py` | *(Step 6)* operator script — prints the day's `HealthVerdict` + budget standing + Recorder heartbeat age, exits 1 on `ok=False` |
 
 **Bauprinzip:** zero new AI. `SymbolResolver` (Step 3) is a deterministic price-comparison
 check against IG snapshots, not an LLM guess — see root `CLAUDE.md`.

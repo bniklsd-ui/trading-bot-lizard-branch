@@ -80,7 +80,10 @@ def test_budgeted_ig_refuses_when_cannot_spend(archive, budget):
 
     assert result is None
     assert broker.calls == []  # no broker call at all
-    assert events[-1] == {"event": "bar_fetch", "provider": "ig", "epic": EPIC, "ok": False, "reason": "budget"}
+    assert events[-1] == {
+        "event": "bar_fetch", "provider": "ig", "epic": EPIC, "ok": False,
+        "reason": "budget", "spend_kind": "research",
+    }
 
 
 def test_budgeted_ig_books_spend_and_allowance_on_success(archive, budget):

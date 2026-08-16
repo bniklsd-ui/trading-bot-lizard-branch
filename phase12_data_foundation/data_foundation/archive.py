@@ -193,17 +193,29 @@ class BarArchive:
         ).fetchone()
         return row["latest"] if row and row["latest"] is not None else None
 
-    def bars_written_since(self, ts_utc: str) -> int:
-        """Count of distinct ``(epic, resolution, ts_utc)`` bars first observed at or
-        after ``ts_utc`` (by ``fetched_at``) — the Mess-Heartbeat's (Step 6) per-day
-        activity counter. Distinct on purpose: the PK also includes ``source``, so a
-        minute covered by both IG and yFinance must count once, not twice, in a
-        health report."""
-        row = self.conn.execute(
-            "SELECT COUNT(DISTINCT epic || '|' || resolution || '|' || ts_utc) AS n "
-            "FROM bars WHERE fetched_at >= ?",
-            (ts_utc,),
-        ).fetchone()
+    def bars_written_since(self, ts_utc: str, end_utc: str | None = None) -> int:
+        """Count of distinct ``(epic, resolution, ts_utc)`` bars first observed in
+        ``[ts_utc, end_utc)`` (by ``fetched_at``; ``end_utc=None`` ⇒ open-ended, "since
+        forever after") — the Mess-Heartbeat's (Step 6) per-day activity counter.
+        Distinct on purpose: the PK also includes ``source``, so a minute covered by
+        both IG and yFinance must count once, not twice, in a health report.
+
+        ``end_utc`` matters for ``assess_day``: without it, a query for a **past**
+        day (``ts_utc`` = that day's start) would count every bar fetched from then
+        until now, not just that day's — reporting a dead day as healthy.
+        """
+        if end_utc is None:
+            row = self.conn.execute(
+                "SELECT COUNT(DISTINCT epic || '|' || resolution || '|' || ts_utc) AS n "
+                "FROM bars WHERE fetched_at >= ?",
+                (ts_utc,),
+            ).fetchone()
+        else:
+            row = self.conn.execute(
+                "SELECT COUNT(DISTINCT epic || '|' || resolution || '|' || ts_utc) AS n "
+                "FROM bars WHERE fetched_at >= ? AND fetched_at < ?",
+                (ts_utc, end_utc),
+            ).fetchone()
         return int(row["n"]) if row else 0
 
 

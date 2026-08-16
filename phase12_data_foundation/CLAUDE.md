@@ -1,7 +1,7 @@
 ---
 status: live
-purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder. Step 4 done+committed (49902b6). Step 5 (Recorder, PID-guarded standalone process) done this session, UNCOMMITTED. Steps 6/7 sind noch Wochenend-Arbeit.
-read-when: working in phase12_data_foundation/ — read this head + its newest Session-stopped block first (⚠️ operator landmine there before any bot restart — now affects both the paper tracker AND the Recorder); the full plan (docs/concepts/phase12_data_foundation_plan.md) is the execution contract, read its relevant §6 step block before touching anything
+purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder + Heartbeat. Steps 4+5 committed (49902b6, 473c8e4). Step 6 (measurement heartbeat + divergence sampler, enable_divergence_sampler default OFF) done this session, UNCOMMITTED. Step 7 (full integration + offline proof) is next.
+read-when: working in phase12_data_foundation/ — read this head + its newest Session-stopped block first (⚠️ operator landmine there before any bot restart — affects epic_filter, the Recorder, and the divergence sampler, but is deliberately NOT a Step-6 CRITICAL alarm); the full plan (docs/concepts/phase12_data_foundation_plan.md) is the execution contract, read its relevant §6 step block before touching anything
 detail: L2
 up: ../CLAUDE.md
 down:
@@ -57,7 +57,7 @@ Siehe [`README.md`](./README.md).
 
 ---
 
-## Session stopped — 2026-08-16 (Session 3: Step 4 committed + Step 5 — Recorder, Step 5 UNCOMMITTED)
+## Session stopped — 2026-08-16 (Session 3: Steps 4+5 committed, Step 6 — Heartbeat + Divergence Sampler, UNCOMMITTED)
 
 > **Vorherige Session ging in Context Limit.** Der Handover-Satz beim Sitzungsstart lautete:
 > „Acceptance grep confirms: only a docstring comment remains, zero real get_ohlcv calls in
@@ -176,28 +176,129 @@ in den bestehenden Recorder-Tests umgeht die reale Mapper-Frage strukturell — 
   machen, beides Nikinger-Job laut `feedback_live_testing`-Memory. `data/state/` existiert
   bereits (Redirect-Ziel sicher).
 
+**Korrektur (diese Session, vor Step 6):** die vorherige Fassung dieses Blocks behauptete
+„Step 6s Heartbeat ist der geplante Alarm dafür" für die leere `measurable_universe()`.
+**Falsch, gegen den Plan-Text korrigiert:** `assess_day` behandelt `measurable_epics == 0`
+als reine Problem-Notiz mit `ok=True`, nicht als Alarm (s. Step-6-Abschnitt unten,
+`test_assess_day_no_measurable_epic_is_ok_with_problem_note`). Die Operator-Voraussetzung
+(Resolver vor Neustart laufen lassen) bleibt unverändert die eigentliche Abhilfe.
+
+**Step 4 committed** (Commit `49902b6`), **Step 5 committed** (Commit `473c8e4`).
+
+## Step 6 — Divergenz-Sampler + Mess-Heartbeat (derselbe Tag, Wochenende, D12/§7 G)
+
+`data_foundation/heartbeat.py`: `HealthVerdict` + `assess_day(archive, paper_db_path,
+universe_db_path, day_utc, *, shadow_enabled)` — `ok=False` auf genau zwei Bedingungen
+(`measurable_epics > 0 AND bars_today == 0` [Recorder tot] oder `shadow_enabled AND
+pairs_resolved == 0 AND pairs_typed_expired == 0` [Null-Messtag]); `measurable_epics == 0`
+liefert nur eine Problem-Notiz, kein `ok=False` (Bootstrap-Zustand, kein Infra-Fehler).
+`pairs_resolved` zählt SL/TP-Auflösungen, `pairs_typed_expired` Time-Stop-Auflösungen —
+`EXPIRED_UNRESOLVED` (Datenfehler) zählt in keinem der beiden.
+
+`DivergenceSampler` (D12): einmal/Epic/Tag ein budgetiertes IG-`5m×3`-Sample
+(`BudgetedIGBarProvider(spend_kind="sample")`) vs. die archivierten yF-Bars desselben
+Fensters (nie ein frischer yF-Fetch); zweite Folge-Divergenz ⇒ `mark_mismatch_fn(epic)`
+(Wiring löst das über `UniverseStore.set_symbol(..., status=DS_MISMATCH)` auf, inkl.
+`logger.warning`, weil das ein Einbahn-Türverhalten ist — die Epic verschwindet sofort aus
+`measurable_universe()`, nichts verifiziert sie automatisch zurück).
+
+**Wiring** (`phase8_scheduler/scripts/wiring.py`): `daily_health_check`-Closure (neu,
+`SchedulerConfig.enable_measurement_heartbeat` default **True** — rein lesend, kostet
+nichts) — ruft `assess_day` mit dem aktuellen UTC-Kalendertag, schreibt
+`measurement_heartbeat`-Event, `logger.critical` bei `ok=False`. `divergence_sampler`
+reitet im **bestehenden** `universe_refresher`-Pass mit (keine neue Runner-Naht) —
+`SchedulerConfig.enable_divergence_sampler` default **False** (echter neuer IG-Spend,
+~120 Punkte/Woche bei ~8 `'ok'`-Epics — innerhalb des Plan-Budgets, aber ein neuer Posten;
+gleiche Disziplin wie `enable_shadow_schedule`/`enable_paper_debate`: der Nikinger
+scharfschaltet bewusst, kein stiller Default-ON unter einem Step-6-Commit).
+
+`SchedulerRunner`: neuer `daily_health_check`-Konstruktor-Param (Default `None`,
+bit-identisch), im POST_WINDOW-Zweig **nach** dem Force-Reconcile aufgerufen
+(`_maybe_run_daily_health_check`, `_due_after`-Throttle 20h/`health_check_interval_min`).
+`SchedulerState.last_health_check_ts` neu (cross-day, wie `last_shadow_pairs_ts`).
+
+`phase12_data_foundation/scripts/data_health.py` (Operator, read-only, werktags erlaubt):
+druckt `HealthVerdict` + Budget-Stand (`spent_in_window`/`remaining_estimate`/
+`predicted_exhaustion_days`) + Recorder-Heartbeat-Alter; Exit 1 bei `ok=False`.
+
+**Advisor-Review fand 2 echte Bugs vor Abnahme, beide gefixt:**
+1. `BarArchive.bars_written_since(ts_utc)` hatte **keine** obere Grenze — eine Abfrage für
+   einen **vergangenen** Tag hätte alles seit diesem Tagesanfang bis jetzt gezählt, nicht
+   nur den einen Tag. Ein toter Tag hätte sich als "gesund" gemeldet — genau die Frage, die
+   Requirement G stellt. Gefixt: additiver `end_utc: str | None = None`-Parameter
+   (`None` = alte Semantik, offen-endig); `assess_day` reicht jetzt beide Grenzen aus
+   `_day_bounds_iso` durch. Test beweist den Unterschied
+   (`test_bars_written_since_respects_end_bound`,
+   `test_assess_day_does_not_leak_bars_from_other_days`).
+2. `BudgetedIGBarProvider._emit`s Event trug kein `spend_kind` — ein Sampler-Fetch und ein
+   Research-Fetch waren im Observability-Log ununterscheidbar; Requirement C
+   ("auch leere Tage zählen als Beweis der Ausführung via Sampler-Log") wäre am geloggten
+   Event nicht nachweisbar gewesen (der Beweis existiert zwar über `source_spend`-Zeilen
+   mit `kind='sample'`, aber ein Reviewer, der das JSONL liest, hätte nichts gefunden).
+   Gefixt am gemeinsamen Punkt (`service.py`, beide Verbraucher — `BarService` und
+   `DivergenceSampler` — profitieren): Event trägt jetzt `spend_kind`.
+
+### Verified
+
+- `pytest phase12_data_foundation/tests -v` → **109 passed** (war 96, +13: 11
+  `test_heartbeat.py` + 2 Archiv-Regressionstests).
+- `pytest phase8_scheduler/tests -v` → **235 passed** (war 229 nach Step 4, +6:
+  Config-Assertions + 6 neue `test_daily_health_check_*`-Tests in `test_runner.py`,
+  minus die bereits gezählten Step-4-Deltas).
+- Volle Regression, alle 12 Phasen + root: P1 87 · P2 77 · P3 104 · P4 155 · P5 173 ·
+  P6 76 · P7 138 · P8 235 · P9 80 · P10 159 · P12 109 · meta 28 · root 80.
+- `py_compile` clean (`heartbeat.py`, `archive.py`, `service.py`, `data_health.py`,
+  `wiring.py`, `runner.py`, `state.py`, `config.py`); Offline-Smoke 3/3 PASS.
+- `data_health.py` end-to-end offline gegen eine synthetische Migrations-DB gelaufen
+  (kein Netz, keine echte `data/`-Berührung): druckt Verdict + Budget + Recorder-Alter,
+  exit 0 bei leerem/gesundem Synthetik-Zustand.
+- `grep -rn "import broker_wrapper\|from broker_wrapper"
+  phase12_data_foundation/data_foundation/` → 0 Treffer; `test_isolation.py`s AST-Grep
+  deckt `heartbeat.py` automatisch mit ab (das lazy `scheduler.observability`-Import in
+  `DivergenceSampler.sample_epic` ist function-body-scoped, nicht module-top-level).
+- Comparator-Regression bewiesen: `test_sampler_compares_only_yf_bars_not_ig` pflanzt
+  eine IG- **und** eine yF-Bar an derselben Minute und beweist, dass nur die yF-Zeile den
+  Vergleich treibt (`window()`s `prefer` rankt nur, schließt eine IG-Zeile nicht aus —
+  ohne den expliziten `source == "yf"`-Filter hätte der Sampler IG gegen sich selbst
+  verglichen, dauerhaft grün, genau die Klasse toter Check, die diese Phase verhindern soll).
+
 ### Next
 
-- **⚠️ Operator-Landmine vor jedem Neustart (jetzt auf zwei Konsumenten erweitert):**
+- **⚠️ Operator-Landmine vor jedem Neustart (drei Konsumenten, unverändert der Kernpunkt):**
   alle 22 Produktionszeilen stehen laut Step 3 auf `data_source_status='unverified'` →
-  `measurable_universe()` ist **leer** → sowohl `epic_filter` (Paper-Tracker öffnet keine
-  Paare) **als auch der neue Recorder** (tickt endlos mit `epics: 0, bars_written: 0`,
-  Heartbeat schreibt trotzdem "erfolgreich") sind betroffen. Beide Symptome sehen wie
-  gesunder Leerlauf aus, nicht wie ein Fehler — Step 6s Heartbeat ist der geplante Alarm
-  dafür und ist **noch nicht gebaut**. Bis dahin: Resolver von Hand laufen lassen und
-  `measurable_universe()` vor einem Neustart prüfen.
+  `measurable_universe()` ist **leer** → `epic_filter` (Paper-Tracker), der Recorder
+  **und** der Divergenz-Sampler (sobald scharfgeschaltet) sehen alle keine Epics. Der
+  Heartbeat markiert das als Problem-Notiz, **nicht** als `ok=False` — bewusst (s.
+  Korrektur oben), also **kein** automatischer CRITICAL-Alarm dafür. Bis dahin: Resolver
+  von Hand laufen lassen und `measurable_universe()` vor einem Neustart prüfen.
+- **Bekannte Deckungslücke in G (dokumentiert, nicht gebaut):** der 20h-POST_WINDOW-
+  Throttle bedeutet — ein Tag, dessen POST_WINDOW nie läuft (Crash, harter Stop vor
+  Handelsschluss), erzeugt **keinen** Heartbeat überhaupt, nicht einmal einen `ok=False`.
+  "5/5 Handelstage mit Heartbeat" (Requirement G) ist dadurch nicht strukturell garantiert,
+  nur der übliche Fall. Kein Fix in dieser Session — Nikinger-Entscheidung, ob das eine
+  eigene Absicherung braucht (z. B. ein "Heartbeat fehlt komplett"-Check von außen).
+- **In-Memory-Sampler-Throttle:** `DivergenceSampler`s Once-per-Day-Zähler lebt nur im
+  Prozess — jeder Neustart sampled jede Epic erneut am selben Tag (3 Punkte × N Epics pro
+  Neustart). Bei häufigen Neustarts an einem Tag frisst das den Wochen-Budget-Puffer
+  schneller als geplant; im Auge behalten, kein Bug.
+- `enable_divergence_sampler` steht **default False** — Nikinger-Entscheidung, wann
+  scharfgeschaltet wird (kostet echten IG-Spend, s. o.).
 - **Erster echter Start ist Nikinger-Job:** `bash phase12_data_foundation/scripts/
-  run_recorder.sh` standalone (Archiv-Warmlauf) oder automatisch über den nächsten
-  `run_scheduler.sh`-Start — beides live/netzwerkberührend, hier nicht ausgeführt.
-- Steps 6/7 (Wochenende), Steps 8-10 (gated, Operator).
-- Uncommitted: Step-5-Dateien (s. `git status`) — Commit ist Nikinger-Entscheidung.
+  run_recorder.sh` standalone oder automatisch über den nächsten `run_scheduler.sh`-Start,
+  plus `python phase12_data_foundation/scripts/data_health.py` als täglicher Check —
+  alles live/netzwerkberührend, hier nicht ausgeführt.
+- Step 7 (Gesamtintegration + Offline-Beweiskette, Wochenende), Steps 8-10 (gated, Operator).
+- Uncommitted: Step-6-Dateien (s. `git status`) — Commit ist Nikinger-Entscheidung.
 
 ### Open questions / blockers
 
 - Keine technischen (Advisor-Review dieser Session: 4 Step-4-Nachprüfungen + 1
-  Step-5-Fund, alle sauber/gefixt).
-- Operator-Landmine oben ist die einzige reale Konsequenz, die vor dem nächsten
-  Bot-Neustart aktiv gemanagt werden muss — jetzt mit zwei betroffenen Konsumenten.
+  Step-5-Fund + 2 Step-6-Funde, alle sauber/gefixt).
+- Zwei bewusst offene, dokumentierte Lücken (s. Next): die G-Deckungslücke bei einem
+  POST_WINDOW-losen Tag, und der In-Memory-Sampler-Throttle über Neustarts hinweg.
+- Operator-Landmine (leere `measurable_universe()`) bleibt die einzige Konsequenz, die vor
+  dem nächsten Bot-Neustart aktiv gemanagt werden muss — jetzt mit drei betroffenen
+  Konsumenten, aber ohne automatischen Alarm dafür (bewusst, s. Korrektur oben).
 ---
 
 > **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).

@@ -102,6 +102,9 @@ class SchedulerState:
         last_shadow_pairs_ts: ISO timestamp of the last Phase-11 (H1) time-scheduled
             shadow-pair tick (``None`` until the wiring injects a
             ``shadow_pair_scheduler`` — default behaviour untouched otherwise).
+        last_health_check_ts: ISO timestamp of the last Phase-12 (Step 6) daily
+            measurement-health check (``None`` until the wiring injects a
+            ``daily_health_check`` — default behaviour untouched otherwise).
     """
 
     date: str = ""
@@ -111,6 +114,7 @@ class SchedulerState:
     last_reconcile_ts: str | None = None
     last_universe_refresh_ts: str | None = None
     last_shadow_pairs_ts: str | None = None
+    last_health_check_ts: str | None = None
     consecutive_failures: int = 0
     kill_reason: str | None = None
     last_no_trade_reason: str | None = None

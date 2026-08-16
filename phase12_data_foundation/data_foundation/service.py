@@ -78,7 +78,10 @@ class BudgetedIGBarProvider:
     def _emit(self, epic: str, ok: bool, *, reason: str | None = None) -> None:
         if self._health_sink is None:
             return
-        event: dict[str, Any] = {"event": "bar_fetch", "provider": "ig", "epic": epic, "ok": ok}
+        event: dict[str, Any] = {
+            "event": "bar_fetch", "provider": "ig", "epic": epic, "ok": ok,
+            "spend_kind": self._spend_kind,
+        }
         if reason is not None:
             event["reason"] = reason
         try:

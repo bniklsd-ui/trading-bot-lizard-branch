@@ -230,6 +230,7 @@ def _make_runner(
     universe_refresher=None,
     paper_tracker=None,
     shadow_pair_scheduler=None,
+    daily_health_check=None,
     max_iterations: int | None = 1,
 ):
     cfg = config or _config(tmp_path)
@@ -250,6 +251,7 @@ def _make_runner(
         universe_refresher=universe_refresher,
         paper_tracker=paper_tracker,
         shadow_pair_scheduler=shadow_pair_scheduler,
+        daily_health_check=daily_health_check,
         max_iterations=max_iterations,
     )
     return runner, sleep, store, cfg
@@ -416,6 +418,76 @@ def test_shadow_pair_scheduler_failure_is_fail_soft(tmp_path) -> None:
     backoff = _FakeBackoff()
     runner, _, store, _ = _make_runner(
         tmp_path, times=[_WINDOW_T], shadow_pair_scheduler=_boom, backoff=backoff,
+    )
+    runner.run()  # must not raise
+    assert backoff.failures == 0
+    assert store.load().kill_reason is None
+
+
+# --- daily health check (Phase 12 / Step 6, plan §6 Step 6) -----------------
+
+
+def test_daily_health_check_none_is_never_called(tmp_path) -> None:
+    """Default (no wiring opt-in) -> today's behaviour, bit-identical: never called, no field set."""
+    runner, _, store, _ = _make_runner(tmp_path, times=[_POST_WINDOW_T], daily_health_check=None)
+    runner.run()
+    assert store.load().last_health_check_ts is None
+
+
+def test_daily_health_check_runs_once_in_post_window(tmp_path) -> None:
+    calls: list[int] = []
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_POST_WINDOW_T], daily_health_check=lambda: calls.append(1)
+    )
+    runner.run()
+    assert calls == [1]
+    assert store.load().last_health_check_ts is not None
+
+
+def test_daily_health_check_not_run_in_window(tmp_path) -> None:
+    """Only POST_WINDOW calls it — a WINDOW cycle must not trigger a same-day check early."""
+    calls: list[int] = []
+    runner, _, _, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T], daily_health_check=lambda: calls.append(1)
+    )
+    runner.run()
+    assert calls == []
+
+
+def test_daily_health_check_throttled_within_interval(tmp_path) -> None:
+    calls: list[int] = []
+    cfg = _config(tmp_path, health_check_interval_min=1200)  # 20h default
+    runner, _, store, _ = _make_runner(
+        tmp_path,
+        times=[_POST_WINDOW_T, _POST_WINDOW_T + timedelta(minutes=5)],
+        config=cfg, daily_health_check=lambda: calls.append(1), max_iterations=2,
+    )
+    runner.run()
+    # first POST_WINDOW entry (never-run -> due, 1); second one only 5 minutes later,
+    # well under the 20h interval -> not due again.
+    assert calls == [1]
+
+
+def test_daily_health_check_runs_again_after_interval_elapses(tmp_path) -> None:
+    calls: list[int] = []
+    cfg = _config(tmp_path, health_check_interval_min=1)  # 1 minute — trivially elapses
+    runner, _, store, _ = _make_runner(
+        tmp_path,
+        times=[_POST_WINDOW_T, _POST_WINDOW_T + timedelta(minutes=5)],
+        config=cfg, daily_health_check=lambda: calls.append(1), max_iterations=2,
+    )
+    runner.run()
+    assert calls == [1, 1]
+
+
+def test_daily_health_check_failure_is_fail_soft(tmp_path) -> None:
+    """A health-check exception must never crash the cycle or trip backoff."""
+    def _boom() -> None:
+        raise RuntimeError("assess_day exploded")
+
+    backoff = _FakeBackoff()
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_POST_WINDOW_T], daily_health_check=_boom, backoff=backoff,
     )
     runner.run()  # must not raise
     assert backoff.failures == 0
