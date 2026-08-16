@@ -44,8 +44,9 @@ def test_defaults_match_locked_concept_values() -> None:
     # universe refresh (Phase 9 / V2)
     assert cfg.universe_refresh_interval_min == 240
 
-    # data path (Phase 9 / V2) — IG bar chain OFF by default (yFinance-only, bit-identical)
-    assert cfg.enable_ig_bars is False
+    # data path (Phase 12 Datenfundament, Step 4, D17) — BarService ON by default (safe
+    # under the yF-first chain order: no new IG spend by default)
+    assert cfg.enable_bar_service is True
 
     # Phase 10 (V3) abstain-lessons — on by default (classification+persistence),
     # reflect (the one AI call) also on by default, shared daily cap 10

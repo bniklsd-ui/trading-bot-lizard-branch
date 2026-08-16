@@ -1,7 +1,7 @@
 ---
 status: live
-purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder. Step 3 done this session (Migration 006, Registry-Erweiterung, SymbolResolver). Steps 4/6/7 sind noch Wochenend-Arbeit.
-read-when: working in phase12_data_foundation/ — read this head + its newest Session-stopped block first; the full plan (docs/concepts/phase12_data_foundation_plan.md) is the execution contract, read its relevant §6 step block before touching anything
+purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder. Step 4 verified+documented this session (BarService, wiring rewire, epic_filter, resolution_source — code was written pre-context-limit, this session confirmed acceptance criteria). UNCOMMITTED. Steps 5-7 sind noch Wochenend-Arbeit.
+read-when: working in phase12_data_foundation/ — read this head + its newest Session-stopped block first (⚠️ operator landmine there before any bot restart); the full plan (docs/concepts/phase12_data_foundation_plan.md) is the execution contract, read its relevant §6 step block before touching anything
 detail: L2
 up: ../CLAUDE.md
 down:
@@ -9,7 +9,7 @@ down:
   - ../phase10_v3/PHASE11_DEFERRAL_HANDOVER.md          # why this track exists (L3, dated)
   - ../docs/architecture/data_foundation.svg            # Fehlerbild + Zielbild
   - ./SESSIONS_ARCHIVE.md                               # rotierte Session-Blöcke (L3)
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 # CLAUDE.md — Phase 12: Datenfundament (`phase12_data_foundation/`)
 
@@ -57,127 +57,95 @@ Siehe [`README.md`](./README.md).
 
 ---
 
-## Session stopped — 2026-08-15 (Session 2: Step 3 — Migration 006 + Registry + SymbolResolver)
+## Session stopped — 2026-08-16 (Session 3: Step 4 — `BarService` + Tracker-/Research-Rewire, UNCOMMITTED)
 
-### Completed
+> **Vorherige Session ging in Context Limit.** Der Handover-Satz beim Sitzungsstart lautete:
+> „Acceptance grep confirms: only a docstring comment remains, zero real get_ohlcv calls in
+> wiring.py. Task 19 complete." — diese Session hat das As-Built gegen den Plan (§ Step 4,
+> `docs/concepts/phase12_data_foundation_plan.md:394-457`) nachverifiziert (voller Regression-
+> Lauf + 4 Advisor-Nachprüfungen), **kein neuer Code geschrieben**, nur die Doku nachgezogen.
 
-**Migration `006_phase12_data_foundation.sql`** (additiv, Muster 005): `instrument_universe`
-+3 Spalten (`data_source_status` DEFAULT `'unverified'`, `symbol_source`,
-`symbol_checked_at`), `paper_trades` +1 (`resolution_source`). `phase2_persistence/tests/
-test_migrations.py` auf Version 6 gehoben (alle `==5`→`==6`-Stellen), zwei Exact-Equality-
-Spaltenmengen erweitert, +1 neuer Test (`test_phase12_data_foundation_columns_present`,
-prüft Default-Wert auf einer frisch eingefügten Zeile). `paper_store._CREATE_TABLE`
-bekam `resolution_source` **nur im DDL** (kein `_ROW_COLUMNS`/Arity/`from_row`-Touch — das
-ist Step 4) — hält `ensure_schema()` und die Migration in derselben Tabellenform.
+### Completed (in der Vorgänger-Session gebaut, diese Session verifiziert + dokumentiert)
 
-**Registry-Erweiterung** (`phase9_universe/universe/`): `UniverseRecord` +3 Felder ans Ende
-(`data_source_status`, `symbol_source`, `symbol_checked_at`) + Status-Vokabular
-(`DS_OK`/`DS_UNVERIFIED`/`DS_NO_SOURCE`/`DS_NO_INTRADAY_SOURCE`/`DS_MISMATCH`,
-`SYMBOL_SOURCE_SEED`/`_RESOLVER`/`_OPERATOR`). `UniverseStore.set_symbol` — der **einzige**
-`yf_ticker`-Writer (D5) — und `measurable_universe()` (`status='active' AND
-data_source_status='ok'`, D7/D19-Gate). `discovery.py` schreibt `yf_ticker` nicht mehr
-(`KNOWN_YF_TICKERS` entfernt, Neuanlage immer `yf_ticker=None`); `__init__.py`-Re-Exports
-mitgezogen.
+**`data_foundation/service.py`** (neu, 267 Zeilen): `BudgetedIGBarProvider` (`BarProvider`-
+Protocol, gated auf `SourceBudget.can_spend` **vor** dem Broker-Call, bucht nach Erfolg
+`record_spend(len(bars))` + `record_allowance(...)` aus `env.data['allowance']`, emittiert
+`bar_fetch`-Health-Events) und `BarService` (Archiv-first via `coverage_ratio`/`window`, sonst
+`ChainedBarProvider([yf, ig])` + Write-Through mit Provenienz; `get_bars` für die Research-Naht,
+`get_window` für den Tracker — bei unvollständiger yF-Deckung ein expliziter IG-Top-up-Zweig,
+bewusst außerhalb der Chain-Reihenfolge, weil Korrektheit hier vor Kosten geht).
 
-**Advisor-gefundener Bug vor Commit, gefixt:** `upsert_discovered`s `ON CONFLICT ... DO
-UPDATE SET` baute sich aus *allen* `to_row()`-Spalten — sobald die drei neuen Felder in
-`to_row()` standen, wurde eine Re-Discovery eines bereits bekannten Epics zu einem zweiten
-`yf_ticker`-Writer, der ein verifiziertes Symbol mit `None`/`'unverified'` überschrieben
-hätte. Gefixt am gemeinsamen Punkt: `_PRESERVE_ON_CONFLICT`-Tupel
-(`yf_ticker`/`data_source_status`/`symbol_source`/`symbol_checked_at`), aus der
-`DO UPDATE SET`-Comprehension gefiltert — beim Insert weiter geschrieben, beim Update nie.
-Strukturell (`tests/test_criterion_a.py`) + verhaltensbasiert (`test_store.py::
-test_upsert_discovered_preserves_registry_truth_on_conflict`) abgesichert.
+**Wiring-Rewire** (`phase8_scheduler/scripts/wiring.py`): neu `_build_data_foundation`
+(lazy imports, `bars.sqlite`-Pfad); `_build_market_data`s `enable_ig_bars`-Zweig ersetzt durch
+`enable_bar_service` (Kette `[("ig", BudgetedIGBarProvider), ("yf", YFinanceBarProvider)]`,
+außen `BarService`); `_build_paper_tracker`s `bar_fetch(epic)` ist jetzt ein dünner Closure über
+`bar_service.get_window(...)` — die alten Budget-Konstanten `_PAPER_BAR_COUNT`/
+`_PAPER_BUDGET_COOLDOWN_MIN`/`_PAPER_ALLOWANCE_FLOOR` sind **entfallen** (bestätigt per Grep,
+0 Treffer), `_PAPER_MAX_FETCH_ATTEMPTS` bleibt (Korrektheitsguard, quellenneutral); `budget_ok`
+ist jetzt ein dokumentierter No-Op (`lambda: True`, Kommentar erklärt warum — der reale Gate
+lebt in `BudgetedIGBarProvider.can_spend`, ein zweiter Tick-Level-Gate wäre redundant).
 
-**`MarketDataFetcher.get_last_price(symbol)`** (Phase 3, additiv, N2 — Nikinger-
-Entscheidung in der Planungssession): symbol-keyed (nicht epic-keyed, für einen im
-`TickerMapper` noch unregistrierten Kandidaten), dünner Wrapper um `_get_records(resolution
-="5m", period="1d", interval="5m")` — erbt Cache/RateLimiter/Circuit unverändert.
-Off-Hours-gated wie jede andere intraday-Methode. Leerer Fetch **raised**
-`DataUnavailableError` (konsistent mit `get_drift`/`get_bars`/`get_momentum` — nicht
-stillschweigend `None`).
+**`PaperTradeTracker._resolve_group`** (`phase10_v3/abstain_lessons/paper.py:581-627`):
+`resolution_source = "+".join(sorted(sources))` über die tatsächlich konsumierten Bars,
+gefiltert auf `b["timestamp"] >= trade.created_utc` (spiegelt `resolve_paper_trade`s eigenen
+Filter, keine zweite Traversierung mit anderer Semantik) — kein Fallback-Default für Bars ohne
+`source`-Key, ein ehrliches `None` statt eines geratenen Werts.
 
-**`data_foundation/symbols.py` — `SymbolResolver`** (D6/D7, N1): `SEED_SYMBOL_CANDIDATES`
-(die alten 12 + 4 neue Werktags-Klassen: `^GSPC`/`^NDX`/`^DJI`/`^FTSE`), `candidates_for`,
-`is_weekend_instrument` (primär `specialInfo`-Substring, sekundär `openingHours`, Fallback
-Name+Epic-Segment — **live bestätigt 2026-08-15**: alle 4 aktiven Wochenend-Epics
-(`SUNDAX`/`SUNNAS`/`SUNDOW`/`SUNFUN`) tragen "Wochenend" im Namen, der Fallback allein
-deckt heute die reale Produktions-Universe), `price_agreement` ((bid+ask)/2 vs. yF-Last,
-2%-Toleranz), `ResolverReport`, `SymbolResolver.resolve_epic`/`resolve_universe`
-(fail-soft je Epic).
+**`PaperEngine.epic_filter`** (D19): Wiring injiziert
+`lambda epic: epic in {r.epic for r in store.measurable_universe()}`.
 
-**N1 — Liveness-Gate (Nikinger-Entscheidung, weicht bewusst vom Plan-Wortlaut ab):** beide
-Gates (`is_market_open()` XETRA-Fenster **UND** Frische des yF-Bars, nicht nur D6s
-XETRA-Check) — ohne die Frische-Hälfte hätte ein Vergleich außerhalb 15:30-17:30 Berlin
-IGs 24h-CFD-Livepreis gegen yFinance' Vortagesschluss für die vier neuen US/UK-Kandidaten
-verglichen und wiederholt fälschlich `mismatch` gebucht. Bekannte, dokumentierte Konsequenz:
-diese vier Epics verifizieren sich nur im 15:30-17:30-Berlin-Überlappungsfenster — Alarm
-dafür ist Step 6 (`data_health.py`/Heartbeat), nicht Step 3.
+**`SchedulerConfig`**: `enable_ig_bars` → `enable_bar_service: bool = True` (D17,
+Docstring erklärt die Ablösung); `scheduler/run.py` bekam `--no-bar-service`-Flag nachgezogen.
 
-**Advisor-Review (2. Runde, vor Abnahme) fand 2 echte Bugs, beide gefixt:**
-1. Die Mismatch-Eskalation gatete auf `data_source_status == DS_UNVERIFIED` — Migration 006
-   setzt aber **jede** Zeile initial auf `'unverified'`, also wäre die erste Preis-
-   Abweichung eines **frischen** Epics sofort zu `mismatch` eskaliert (bewiesen gegen die
-   echte DB: alle 22 Produktionszeilen starten `'unverified'`). Gefixt: die Eskalation
-   gated jetzt auf `rec.yf_ticker == candidate` ("wurde dieser Kandidat schon in einem
-   früheren Pass gebucht") statt auf den Status allein — ein frischer Epic bekommt immer
-   einen kostenlosen ersten `unverified`-Pass; ein bestehendes `mismatch` bleibt jetzt auch
-   sticky (flatterte vorher zurück zu `unverified`).
-2. `is_weekend_instrument(rec.name, None)` — der `epic`-Parameter fehlte im Aufruf, die
-   SUN-Segment-Fallback-Hälfte war unerreichbar. Signatur um `epic: str | None = None`
-   erweitert, `resolve_epic` reicht `rec.epic` durch; per Live-Query gegen die echte DB
-   bestätigt, dass der Namens-Fallback die heutige Produktions-Universe bereits allein
-   deckt (s.o.), der Epic-Fallback ist Defense-in-Depth für zukünftige Namen ohne
-   "Wochenend"-Substring.
-3. `resolve_universe` fing nur `ResolverError` — ein `store.set_symbol`-Fehler (z. B. Zeile
-   während des Laufs verschwunden) hätte den ganzen Pass abgebrochen. Auf `Exception`
-   verbreitert; `resolve_epic`s Docstring korrigiert (raised `ResolverError` nur bei
-   unparsebarem Timestamp, kein "never raises" mehr).
+### Verified (diese Session, gegen den Plan-Text Zeile für Zeile)
 
-Alle drei Funde durch neue/erweiterte Tests abgesichert (s. Verified).
+- **Volle Regression, alle 12 Phasen + root, 0 Failures:** P1 87 · P2 77 · P3 104 · P4 155 ·
+  P5 173 · P6 76 · P7 138 · **P8 229** (unverändert trotz 3 geänderter Dateien — plausibel,
+  keine Netto-Testzahl-Änderung) · P9 80 · **P10 159** (+12 ggü. 147) · **P12 80** (+16 ggü. 64)
+  · meta 28 · root 80.
+- Offline-Smoke (`phase8_scheduler/scripts/smoke_test.py`) 3/3 PASS.
+- **Akzeptanz-Grep, repo-weit (nicht nur `wiring.py` wie der Handover-Satz nahelegte):**
+  `grep -rn "get_ohlcv"` außerhalb `wiring.py`s Docstring-Kommentar trifft ausschließlich
+  `broker_wrapper`s eigene Definition, den Momentum-VETO-Pfad (`phase5_execution/execution/
+  vetos.py`), `verify_instrument`/`resolve_epics`-Skripte, Phase-4/6/9-eigene (unabhängige)
+  Nähte und `data_foundation/service.py` selbst (`BudgetedIGBarProvider`) — keine vierte
+  IG-Bar-Direktleitung übersehen. `grep -rn "enable_ig_bars"` zeigt nur noch `phase4_research`s
+  **eigenes**, unabhängiges Flag (sein eigenständiges `scripts/wiring.py`, nicht Teil des
+  Scheduler-Laufpfads — außerhalb Step-4-Scope) + einen Wiring-Kommentar, der die Ablösung
+  erklärt.
+- `resolution_source` per Lesen von `paper.py:581-627` bestätigt korrekt gefiltert (nicht aus
+  allen zurückgegebenen Bars, nur aus den tatsächlich für die Auflösung relevanten).
+- `BudgetedIGBarProvider.get_bars` gelesen: bucht `record_spend`/`record_allowance` nur nach
+  erfolgreichem Fetch, verweigert vor jedem Broker-Call bei `can_spend()==False` (kein toter
+  Breaker).
+- `test_config.py:49` trägt eine echte Assertion (`cfg.enable_bar_service is True`), keine
+  stumme Umbenennung.
 
-**Doku-Korrekturen (Code = Source of Truth):** `phase9_universe/CLAUDE.md`s Bauprinzip-Zeile
-("statische Code-Tabelle") war seit diesem Step falsch — datierte Korrekturnotiz ergänzt.
-`phase3_external_data/CLAUDE.md` bekam den vierten `🔁`-Edit-Eintrag für `get_last_price`.
-
-### Verified
-
-- **`pytest phase12_data_foundation/tests -v` → 64 passed** (war 28 vor diesem Step: +5
-  set_symbol/measurable_universe/conflict-preserve-Tests wanderten nach P9, +31 `test_
-  symbols.py`, +3 `test_criterion_a.py`, +5 Advisor-Nachschärfung).
-- Volle per-Phase-Regression: P1 87 · P2 77 (+1) · P3 104 (+4) · P4 155 · P5 173 · P6 76 ·
-  P7 138 · P8 229 · P9 80 (+5) · P10 147 · P12 64 (+36 ggü. 28) · root 80 · meta 28 —
-  Summe ohne P12 **1374** (Baseline **1364** + die 10 erwarteten neuen Tests in P2/P3/P9,
-  keine Regression sonst).
-- **Migrations-Trockenlauf gegen eine Scratchpad-Kopie der echten `data/trading_bot.
-  sqlite`** (Original nie geöffnet): Version 5→6, 22 `instrument_universe`-Zeilen + 615
-  `paper_trades`-Zeilen zahlenmäßig unverändert (additiv bewiesen, nicht nur behauptet),
-  alle 22 landen auf `data_source_status='unverified'` (bestätigt die im Plan
-  dokumentierte Konsequenz: `measurable_universe()` startet leer), Re-Lauf idempotent
-  (Version bleibt 6, keine zweite `_schema_version`-Zeile).
-- **Live-Query gegen die echte DB** (read-only, `mode=ro`): die vier aktiven Wochenend-
-  Epics bestätigt (`IX.D.SUNDAX.IGN.IP`/`IX.D.SUNNAS.IAE.IP`/`IX.D.SUNDOW.IAE.IP`/
-  `IX.D.SUNFUN.IFE.IP`, alle `name` enthält "Wochenend") — trägt Step-3-Doku direkt gegen
-  Produktionsdaten, nicht nur gegen Fixtures.
+**Kleiner, außerhalb-Scope-Fund (nicht angefasst):** `phase4_research/research/models.py:623`
+kommentiert noch „the daemon's own SchedulerConfig.enable_ig_bars" — dieses Feld existiert seit
+diesem Step nicht mehr (jetzt `enable_bar_service`). Reiner Kommentar in einem Phase-4-File,
+außerhalb des Step-4-Dateiumfangs (`phase4_research/`-Edits nur bei zwingendem Grund laut
+Root-`CLAUDE.md`-Scope-Regel) — für den Nikinger notiert, nicht selbst gefixt.
 
 ### Next
 
-- **Step 4** (Wochenende, Cross-Phase): `BarService` + Tracker-/Research-Rewire in
-  `phase8_scheduler/scripts/wiring.py`, `SchedulerConfig.enable_bar_service` (löst
-  `enable_ig_bars` ab, D17). `BudgetedIGBarProvider`, `_resolve_group`s
-  `resolution_source`-Durchreichung, `PaperEngine.epic_filter` (D19).
-- Step 5 (Recorder, Paket-Code werktags baubar; `run_scheduler.sh`-Edit Wochenende), Steps
-  6/7 (Wochenende), Steps 8-10 (gated, Operator).
+- **⚠️ Operator-Landmine vor jedem Neustart:** alle 22 Produktionszeilen stehen laut Step 3
+  auf `data_source_status='unverified'` → `measurable_universe()` ist **leer** →
+  `epic_filter` lässt den Paper-Tracker **keine** Paare öffnen. Ohne vorherigen
+  `SymbolResolver`-Lauf ist ein Neustart eine stille Nullwoche, ununterscheidbar von den drei
+  Infrastruktur-Ausfällen, die Phase 12 verhindern soll. Step 6 (Heartbeat) ist der geplante
+  Alarm dafür und ist **noch nicht gebaut** — bis dahin: Resolver von Hand laufen lassen und
+  `measurable_universe()` vor einem Neustart prüfen.
+- **Step 5** (Recorder, Paket-Code werktags baubar; `run_scheduler.sh`-Edit Wochenende).
+- Steps 6/7 (Wochenende), Steps 8-10 (gated, Operator).
+- Uncommitted: 10 geänderte + 2 neue Dateien (s. `git status`) — Commit ist Nikinger-
+  Entscheidung, nicht automatisch ausgeführt.
 
 ### Open questions / blockers
 
-- Keine technischen. Die im Plan dokumentierte Konsequenz (leere `measurable_universe()`
-  bis der Resolver + der `universe_refresher` mehrfach gelaufen sind) ist jetzt gegen die
-  echte DB bestätigt, nicht nur eine Annahme — 22/22 Zeilen starten `unverified`. Step 6
-  muss das als Alarmbedingung in `data_health.py`/`measurement_heartbeat` fangen, nicht
-  erst am Freitag der Beweiswoche auffallen.
-- Die vier neuen US/UK-Kandidaten (`^GSPC`/`^NDX`/`^DJI`/`^FTSE`) verifizieren sich nur im
-  15:30-17:30-Berlin-Fenster (N1-Konsequenz) — erwartungsgemäß, dokumentiert, kein Bug.
+- Keine technischen (Advisor-Review dieser Session: 4 gezielte Nachprüfungen, alle sauber).
+- Operator-Landmine oben ist die einzige reale Konsequenz, die vor dem nächsten Bot-Neustart
+  aktiv gemanagt werden muss.
 ---
 
 > **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).

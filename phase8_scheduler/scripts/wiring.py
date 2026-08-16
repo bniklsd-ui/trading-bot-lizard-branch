@@ -72,11 +72,22 @@ from scheduler.state import StateStore
 
 logger = logging.getLogger("phase8.wiring")
 
+
+def _utc_iso(dt: datetime) -> str:
+    """ISO 8601 UTC with ms precision and 'Z' suffix — the repo-wide canonical format
+    (mirrors ``phase10_v3/abstain_lessons/paper.py::_utc_iso``, duplicated here rather
+    than imported for the same phase-isolation reason every other phase duplicates it)."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    dt = dt.astimezone(timezone.utc)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
+
 # --- Runtime data locations (gitignored) ------------------------------------
 # scripts/wiring.py -> scripts/ -> phase8_scheduler/ -> repo root
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DATA_DIR = _REPO_ROOT / "data"
 _DB_PATH = _DATA_DIR / "trading_bot.sqlite"           # the real Phase-2 DB
+_BARS_DB_PATH = _DATA_DIR / "bars.sqlite"             # Phase-12 bar archive + budget ledger (D4)
 _STATE_DIR = _DATA_DIR / "state"
 _CACHE_DIR = _DATA_DIR / "cache"
 _USAGE_LOG = _STATE_DIR / "llm_usage.json"            # shared 8-field token meter
@@ -129,56 +140,78 @@ def _build_universe_from_db(db_path: Any = None) -> tuple:
     return universe_from_records(records, fallback=EXTENDED_UNIVERSE)
 
 
-def _build_market_data(mapper: Any, cache: Any, broker: Any, *, enable_ig_bars: bool) -> Any:
-    """Build the research ``MarketDataFetcher``, optionally with the IG→yFinance chain.
+def _build_data_foundation(broker: Any) -> tuple[Any, Any, Any]:
+    """Build the Phase-12 (Datenfundament) ``BarService``/``SourceBudget``/``BarArchive``
+    trio over ``bars.sqlite`` (D4) — the one bar-fetching seam for research and the paper
+    tracker (D8/Step 4). Built once in :func:`build_scheduler`, mirrors how ``broker``/
+    ``db``/``state`` are built once and threaded through everywhere they're needed.
 
-    ``enable_ig_bars=False`` (default) ⇒ ``MarketDataFetcher(mapper, cache)`` — the
-    yFinance-only path, bit-identical. ``True`` (Phase 9 / V2 Step 6) injects a
-    :class:`~external_data.providers.ChainedBarProvider` (IG real-time REST bars primary,
-    yFinance fallback) so ``get_bars()`` prefers IG; each attempt's ``bar_fetch`` event
-    lands in the v1.6 ``research_health.jsonl`` log via ``observability.record_event``.
-    The yFinance leg delegates to a *raw* fetcher (no ``bar_provider`` — breaks the
-    self-reference); the raw and outer fetchers share **one** ``RateLimiter`` and **one**
-    circuit breaker so the anti-429 spacing / per-symbol circuit state are not duplicated.
-    Only ``get_bars()`` consults the chain — drift/momentum/history/volume are unaffected.
+    Builds its own ``TickerMapper``, populated from the DB universe exactly like
+    ``_build_research`` populates its own — **not** shared with it, deliberately: the two
+    mappers cover the same epics (both are built from ``_build_universe_from_db()``) but
+    stay separate instances, same isolation as the pre-existing ``raw_fetcher`` pattern
+    this replaces (`_build_market_data` used to build one raw fetcher per call too). An
+    unpopulated bare ``TickerMapper()`` here would raise ``EpicNotMappedError`` for every
+    epic the yFinance leg is asked to fetch — this was caught before committing, not a
+    theoretical concern.
     """
-    from external_data import MarketDataFetcher
-
-    if not enable_ig_bars:
-        return MarketDataFetcher(mapper, cache)
-
-    from external_data.fetcher import RateLimiter, _TickerCircuit
-    from external_data.providers import (
-        ChainedBarProvider,
-        IGBarProvider,
-        YFinanceBarProvider,
-    )
+    from data_foundation.archive import BarArchive
+    from data_foundation.budget import IG_QUOTA_V1, SourceBudget
+    from data_foundation.service import BarService, BudgetedIGBarProvider
+    from external_data import FileCache, TickerMapper
+    from external_data.fetcher import MarketDataFetcher, RateLimiter, _TickerCircuit
+    from external_data.providers import YFinanceBarProvider
     from scheduler.observability import record_event
+
+    archive = BarArchive(_BARS_DB_PATH)
+    archive.ensure_schema()
+    budget = SourceBudget(_BARS_DB_PATH, IG_QUOTA_V1)
 
     obs_path = str(_OBSERVABILITY_PATH)
 
     def _health_sink(event: dict[str, Any]) -> None:
         record_event(obs_path, event)
 
-    shared_limiter = RateLimiter()
-    shared_circuit = _TickerCircuit()
+    mapper = TickerMapper()
+    for spec in _build_universe_from_db() or ():
+        if spec.yf_ticker:
+            mapper.register(spec.epic, spec.yf_ticker)
+        if spec.volume_proxy:
+            mapper.register_volume_proxy(spec.epic, spec.volume_proxy)
     raw_fetcher = MarketDataFetcher(
-        mapper, cache, rate_limiter=shared_limiter, circuit=shared_circuit
+        mapper, FileCache(str(_CACHE_DIR)), rate_limiter=RateLimiter(), circuit=_TickerCircuit()
     )
-    chain = ChainedBarProvider(
-        [("ig", IGBarProvider(broker)), ("yf", YFinanceBarProvider(raw_fetcher))],
-        health_sink=_health_sink,
-    )
-    return MarketDataFetcher(
-        mapper,
-        cache,
-        rate_limiter=shared_limiter,
-        circuit=shared_circuit,
-        bar_provider=chain,
-    )
+    # yFinance first (free), IG only on a real gap — Nikinger-decision this session,
+    # resolves a contradiction between D9's prose and the plan's original chain-order
+    # sketch (docs/concepts/phase12_data_foundation_plan.md, dated correction).
+    providers = [
+        ("yf", YFinanceBarProvider(raw_fetcher)),
+        ("ig", BudgetedIGBarProvider(broker, budget, spend_kind="research", health_sink=_health_sink)),
+    ]
+    bar_service = BarService(archive, providers, budget, health_sink=_health_sink)
+    return bar_service, budget, archive
 
 
-def _build_research(broker: Any, db: Any, state: Any, *, enable_ig_bars: bool = False) -> Any:
+def _build_market_data(mapper: Any, cache: Any, bar_service: Any, *, enable_bar_service: bool) -> Any:
+    """Build the research ``MarketDataFetcher``, optionally through ``BarService``.
+
+    ``enable_bar_service=False`` ⇒ ``MarketDataFetcher(mapper, cache)`` — the yFinance-only
+    path, bit-identical to the daemon's original behaviour (no archive, no IG leg at all).
+    ``True`` (default, D17) injects ``bar_service`` (Phase 12 Step 4) as the fetcher's
+    ``bar_provider`` — archive-first, then the yF-first/IG-fallback chain built once in
+    :func:`_build_data_foundation`. Only ``get_bars()`` consults it — drift/momentum/
+    history/volume are unaffected, same as the flag it replaces (``enable_ig_bars``).
+    """
+    from external_data import MarketDataFetcher
+
+    if not enable_bar_service:
+        return MarketDataFetcher(mapper, cache)
+    return MarketDataFetcher(mapper, cache, bar_provider=bar_service)
+
+
+def _build_research(
+    broker: Any, db: Any, state: Any, bar_service: Any, *, enable_bar_service: bool = True
+) -> Any:
     """Build the real Phase-4 :class:`Research` over the shared broker/db/state (Contract G).
 
     Mirrors Phase-4 ``scripts.wiring.build_research`` but takes the *shared* broker/db/state so the
@@ -209,7 +242,7 @@ def _build_research(broker: Any, db: Any, state: Any, *, enable_ig_bars: bool = 
         if spec.volume_proxy:
             mapper.register_volume_proxy(spec.epic, spec.volume_proxy)
     market_data = _build_market_data(
-        mapper, FileCache(str(_CACHE_DIR)), broker, enable_ig_bars=enable_ig_bars
+        mapper, FileCache(str(_CACHE_DIR)), bar_service, enable_bar_service=enable_bar_service
     )
     llm = LLMClient(
         model=config.model,
@@ -412,26 +445,25 @@ def _build_paper_engine(config: SchedulerConfig, broker: Any, exec_cfg: Any) -> 
         )
         debate_caller = PaperDebateCaller(client, build_paper_pick_prompt)
 
+    def epic_filter(epic: str) -> bool:
+        # Phase 12 D7/D19: paper trades only open for a verified data source — a fresh
+        # UniverseStore connection per call (cheap; mirrors shadow_pair_scheduler's own
+        # open/close pattern below rather than caching, since staleness here is a
+        # correctness concern D7 exists to prevent, not just a performance one).
+        from universe import UniverseStore  # noqa: PLC0415 — lazy, phase isolation
+
+        store2 = UniverseStore(_DB_PATH)
+        try:
+            return epic in {r.epic for r in store2.measurable_universe()}
+        finally:
+            store2.close()
+
     return PaperEngine(
         store, quote_fetch, exec_cfg,
         debate_caller=debate_caller, council_daily_cap=config.paper_debate_daily_cap,
+        epic_filter=epic_filter,
     )
 
-
-# 1-min bars covering the longest possible hold (v1 max_hold_minutes=240) — well under
-# the IG get_ohlcv 1000-bar cap (phase1_broker_wrapper/adapters/ig_adapter.py:423-441).
-#
-# ⚠ COST: IG bills /prices in **data points, not requests** — this constant is the price
-# of every single tracker fetch. The first H1 live week (2026-08-03/07) exhausted the
-# account's historical-data allowance in about one day at this rate (≥66 successful
-# fetches ≈ 19.800 points) and cascaded 18 of 22 instrument_universe epics into
-# quarantine. Do not raise it without a budget calculation.
-_PAPER_BAR_COUNT = 300
-
-# How long the tracker stands down after IG reports the allowance exhausted. While
-# tripped it makes **zero** calls (budget_ok is checked once per tick), so the worst case
-# is one probe per cooldown instead of one per epic per 5-minute cycle.
-_PAPER_BUDGET_COOLDOWN_MIN = 60
 
 # A due trade needs exactly one successful fetch. After this many failed ones it is
 # written off as unresolvable rather than retried until the staleness cut catches it
@@ -442,31 +474,22 @@ _PAPER_BUDGET_COOLDOWN_MIN = 60
 # *transient* failure (a 500, a 405 market-offline, a network blip) before being written
 # off — and what gets destroyed is a WI-2 measurement row, the output this phase exists to
 # produce. 12 attempts x the 5-minute cadence ~ one hour of tolerance, while still cutting
-# the unbounded case 5x. It is deliberately NOT tuned for the allowance case: there,
-# `budget_ok` trips on the first RATE_LIMIT and stands the tick down for an hour, and no
-# attempt is charged while stood down, so the breaker does that bounding already.
+# the unbounded case 5x. Since Phase 12 Step 4, the tracker itself never calls IG directly
+# (BarService.get_window's own budget-aware chain does, gated by SourceBudget — one shared
+# ledger, not a per-tracker guess), so a tripped budget shows up as a short/failed
+# get_window result like any other fetch problem, subject to this same cap.
 _PAPER_MAX_FETCH_ATTEMPTS = 12
 
-# ponytail: leave a reserve rather than running to zero, so the Phase-9 promotion probe
-# (verify_instrument.check_ig_side, ~3 points/epic/round) keeps working and does not read
-# our own budget exhaustion as instrument unsuitability — that is exactly the cascade of
-# 2026-08-04. The number is a placeholder until a successful call reports the real
-# `totalAllowance`; it is logged on the first success (see bar_fetch) so it can be tuned
-# against an observed value instead of a guess.
-#
-# ⚠ FAILURE MODE, not just imprecision: if the real totalAllowance turns out to be at or
-# below this floor, budget_ok() is false essentially always and the tracker silently
-# resolves nothing — the only signal is a CRITICAL log line. Check the logged allowance
-# object after the first successful fetch and lower this if needed.
-_PAPER_ALLOWANCE_FLOOR = 2000
 
-
-def _build_paper_tracker(config: SchedulerConfig, broker: Any, exec_cfg: Any) -> Any:
-    """Build the Phase-10 (V3) Block-B :class:`PaperTradeTracker`. ``bar_fetch`` wraps
-    one ``get_ohlcv(epic, "MINUTE", _PAPER_BAR_COUNT)`` call per affected epic per
-    tick. ``reflect_cap_check`` reads **both** stores' daily lesson counts against the
-    shared ``reflect_daily_cap`` (V3-D8) — own connections (cheap; mirrors
-    ``_observed_abstain_sink``'s "recompute rather than thread state" choice).
+def _build_paper_tracker(config: SchedulerConfig, exec_cfg: Any, bar_service: Any) -> Any:
+    """Build the Phase-10 (V3) Block-B :class:`PaperTradeTracker`. ``bar_fetch`` wraps one
+    ``bar_service.get_window`` call per affected epic per tick (Phase 12 Step 4 — replaces
+    the tracker's former raw ``get_ohlcv`` call and its own ad-hoc allowance bookkeeping;
+    ``BarService`` is archive-first, yFinance-first/IG-fallback, and write-through with
+    provenance — see ``data_foundation/service.py``). ``reflect_cap_check`` reads **both**
+    stores' daily lesson counts against the shared ``reflect_daily_cap`` (V3-D8) — own
+    connections (cheap; mirrors ``_observed_abstain_sink``'s "recompute rather than thread
+    state" choice).
 
     Deliberately **not** threaded with the scheduler's shared (``config.tz``-local,
     test-injectable) ``_now`` clock: the tracker's own default (real UTC) is always
@@ -488,48 +511,19 @@ def _build_paper_tracker(config: SchedulerConfig, broker: Any, exec_cfg: Any) ->
     abstain_store = AbstainStore(str(_DB_PATH))
     abstain_store.ensure_schema()
 
-    blocked_until: datetime | None = None
-    allowance_logged = False
-
     def bar_fetch(epic: str) -> list[dict[str, Any]]:
-        nonlocal blocked_until, allowance_logged
-        env = broker.get_ohlcv(epic, "MINUTE", _PAPER_BAR_COUNT)
-        if not env.ok:
-            err = env.error or {}
-            code = err.get("code") if isinstance(err, dict) else getattr(err, "code", None)
-            if code == "RATE_LIMIT":
-                # IG reports allowance exhaustion as 403 exceeded-*-allowance, mapped to
-                # RATE_LIMIT by the adapter. Retrying costs calls we do not have.
-                blocked_until = datetime.now(timezone.utc) + timedelta(
-                    minutes=_PAPER_BUDGET_COOLDOWN_MIN
-                )
-                logger.critical(
-                    "PaperTradeTracker fetch budget tripped until %s: %s", blocked_until, err
-                )
-            # env.error carried the only copy of IG's real error code and was dropped
-            # here until 2026-08-08 — 4232 CRITICAL lines that quarter named no cause.
-            raise RuntimeError(f"get_ohlcv not ok for {epic}: {err}")
-        data = env.data or {}
-        allowance = data.get("allowance") or {}
-        if not allowance_logged and allowance:
-            allowance_logged = True
-            # totalAllowance sizes the budget, allowanceExpiry dates its reset — both are
-            # the open questions from DATA_WEEK_REVIEW_2026-08-07 and both arrive free in
-            # this envelope. Log once per process, not per fetch.
-            logger.info("IG historical-data allowance: %s", allowance)
-        remaining = allowance.get("remainingAllowance")
-        if isinstance(remaining, (int, float)) and remaining < _PAPER_ALLOWANCE_FLOOR:
-            blocked_until = datetime.now(timezone.utc) + timedelta(
-                minutes=_PAPER_BUDGET_COOLDOWN_MIN
-            )
-            logger.critical(
-                "PaperTradeTracker fetch budget floor reached (remaining=%s < %s), "
-                "standing down until %s", remaining, _PAPER_ALLOWANCE_FLOOR, blocked_until
-            )
-        return data.get("bars", [])
+        now = datetime.now(timezone.utc)
+        start = _utc_iso(now - timedelta(minutes=exec_cfg.max_hold_minutes + 60))
+        return bar_service.get_window(epic, "1m", start, _utc_iso(now))
 
+    # The tracker itself makes zero direct IG calls since Phase 12 Step 4 — BarService's
+    # internal BudgetedIGBarProvider.can_spend gate (SourceBudget, shared with research) is
+    # what protects the ledger now. A tick-level budget_ok pre-check here would just be a
+    # second, redundant gate on the same fact — kept as a permissive no-op purely because
+    # PaperTradeTracker's constructor still has the seam (not worth removing it there for
+    # one caller that no longer needs it).
     def budget_ok() -> bool:
-        return blocked_until is None or datetime.now(timezone.utc) >= blocked_until
+        return True
 
     llm = None
     if config.enable_abstain_reflect:
@@ -747,22 +741,26 @@ def build_scheduler(
     state = StateManager(str(_STATE_DIR))
     exec_state = ExecutionState(str(_EXEC_STATE_PATH))
 
-    research = _build_research(broker, db, state, enable_ig_bars=config.enable_ig_bars)
+    bar_service, bar_budget, bar_archive = _build_data_foundation(broker)
+    research = _build_research(
+        broker, db, state, bar_service, enable_bar_service=config.enable_bar_service
+    )
     debate_runner = _make_debate_runner(broker)
     reward_sink = _build_reward_sink(broker, db)
     paper_engine = None
     paper_tracker = None
     if config.enable_paper_trades:
         paper_engine = _build_paper_engine(config, broker, exec_cfg)
-        paper_tracker = _build_paper_tracker(config, broker, exec_cfg)
+        paper_tracker = _build_paper_tracker(config, exec_cfg, bar_service)
     shadow_pair_scheduler = None
     if config.enable_paper_trades and config.enable_shadow_schedule:
         def shadow_pair_scheduler() -> None:
             """H1 (Phase 11): time-scheduled Both-Sides-Shadow pairs, decoupled from
             ``REASON_DEBATE_ABSTAIN`` (``phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`` §5
             H1 — two data-weeks of measurement died on that same coupling). Reuses the
-            ``paper_engine`` built above + the active DB universe (the identical
-            ``UniverseStore`` query the ``universe_refresher`` closure below uses).
+            ``paper_engine`` built above + the measurable DB universe (Phase 12 D7/D19 —
+            ``measurable_universe()``, not ``active_universe()``: only epics with a
+            verified data source, ``status='active' AND data_source_status='ok'``).
 
             Passes today's daemon ``window_close`` as the engine's same-session
             ``deadline`` — a pair whose time-stop would land past market close would
@@ -773,7 +771,7 @@ def build_scheduler(
 
             store = UniverseStore(_DB_PATH)
             try:
-                epics = [rec.epic for rec in store.active_universe()]
+                epics = [rec.epic for rec in store.measurable_universe()]
             finally:
                 store.close()
             now = _now()

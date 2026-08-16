@@ -87,11 +87,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="consecutive cycle exceptions before the backoff trips the kill-switch (default 3).",
     )
     parser.add_argument(
-        "--enable-ig-bars",
+        "--no-bar-service",
         action="store_true",
-        help="prefer IG real-time REST bars over yFinance for research get_bars (Phase 9 / V2 "
-        "Step 6 — yFinance stays the fallback). Default OFF = yFinance-only path, bit-identical. "
-        "Flip on only after a live run has confirmed the IG→yFinance chain.",
+        help="disable BarService (Phase 12 Datenfundament, Step 4): research get_bars() and "
+        "the paper tracker fall back to the plain yFinance-only path with no archive, no "
+        "budget-aware IG fallback (sets enable_bar_service=False). Default is bar_service "
+        "ON (archive-first, yFinance-first/IG-fallback chain).",
     )
     parser.add_argument(
         "--enable-paper-debate",
@@ -131,10 +132,10 @@ def config_from_args(args: argparse.Namespace) -> SchedulerConfig:
         account="demo",
         daily_loss_cap=None if args.no_loss_cap else args.daily_loss_cap,
         daily_token_budget=None if args.no_token_budget else args.daily_token_budget,
+        enable_bar_service=not args.no_bar_service,
         max_trades_per_day=args.max_trades,
         cycle_interval_min=args.cycle_interval_min,
         max_consecutive_failures=args.max_consecutive_failures,
-        enable_ig_bars=args.enable_ig_bars,
         enable_paper_debate=args.enable_paper_debate,
         enable_shadow_schedule=args.enable_shadow_schedule,
     )

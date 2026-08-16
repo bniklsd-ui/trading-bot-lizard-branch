@@ -140,14 +140,20 @@ class SchedulerConfig:
     universe_refresh_interval_min: int = 240
 
     # --- data path (Phase 9 / V2, consumed by scripts/wiring.py) ---
-    # When True, the wiring builds a ChainedBarProvider (IG real-time REST bars
-    # primary, yFinance fallback) and injects it into the research MarketDataFetcher
-    # so get_bars() prefers IG. Default False ⇒ the fetcher is built without a
-    # bar_provider = the original yFinance-only path, bit-identical. Flipping the live
-    # research data path is a conscious operator step (mirrors the Step-7 LiveQuoteCache
-    # flag's "default off, activate only after a live PASS" discipline) — arm it with
-    # `--enable-ig-bars` on scheduler.run once a live run has confirmed the chain.
-    enable_ig_bars: bool = False
+    # Phase 12 (Datenfundament) Step 4, D17 — replaces the old `enable_ig_bars` (which was
+    # "gebaut, nie gelaufen": default off, never flipped on, the root cause traced in
+    # PHASE11_DEFERRAL_HANDOVER.md). When True (default), the wiring builds a `BarService`
+    # (archive-first, yFinance-first/IG-fallback, budget-aware — data_foundation/service.py)
+    # and injects it as the research MarketDataFetcher's bar_provider, AND it's what the
+    # paper tracker fetches through (data_foundation.BarService.get_window) instead of a raw
+    # IG call. Default True is safe under the yF-first chain order (Nikinger decision,
+    # docs/concepts/phase12_data_foundation_plan.md dated correction): it does not newly
+    # enable any IG spend by default, it only adds an archive-read layer in front of the
+    # yFinance path that already ran unconditionally before. False ⇒ the research fetcher is
+    # built without a bar_provider (the original yFinance-only path, bit-identical) — real
+    # off-switch via `--no-bar-service` on scheduler.run, not just a rename with nothing to
+    # turn off.
+    enable_bar_service: bool = True
 
     # --- Phase 10 (V3) abstain-/no-trade-lessons (Block A) ---
     # `enable_abstain_lessons` wires an `AbstainStore` + `AbstainLessonSink` into the

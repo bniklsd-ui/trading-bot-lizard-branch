@@ -100,6 +100,7 @@ class PaperTrade:
     lesson: str | None = None
     lesson_extracted: bool = False
     context_json: str = "{}"
+    resolution_source: str | None = None  # 'yf'|'ig'|'ig+yf'|'ls'|None (Phase 12 Step 4/D11)
 
     @classmethod
     def new(
@@ -153,6 +154,7 @@ class PaperTrade:
             self.lesson,
             int(self.lesson_extracted),
             self.context_json,
+            self.resolution_source,
         )
 
     @classmethod
@@ -179,6 +181,10 @@ class PaperTrade:
             lesson=row[17],
             lesson_extracted=bool(row[18]),
             context_json=row[19],
+            # len() guard: a pre-Phase-12 20-column row (legacy _ROW_COLUMNS shape) has no
+            # index 20 at all — read back as None (honest: provenance genuinely unknown for
+            # trades resolved before this column existed), never an IndexError.
+            resolution_source=row[20] if len(row) > 20 else None,
         )
 
 
@@ -337,6 +343,7 @@ class PaperEngine:
         debate_caller: "PaperDebateCaller | None" = None,
         council_daily_cap: int = 3,
         now_fn: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+        epic_filter: Callable[[str], bool] | None = None,
     ) -> None:
         self.store = store
         self.quote_fetch = quote_fetch
@@ -344,13 +351,20 @@ class PaperEngine:
         self.debate_caller = debate_caller  # None (default) -> Council-Paper-Call never fires
         self.council_daily_cap = council_daily_cap
         self.now_fn = now_fn
+        # None (default) -> bit-identical (every epic passes). Phase 12 D7/D19: the
+        # wiring injects a measurable_universe() ('active' + data_source_status='ok')
+        # check so paper trades only open for epics with a verified data source.
+        self.epic_filter = epic_filter
 
     def on_debate_abstain(self, cycle_outcome: Mapping[str, Any], record: AbstainRecord) -> None:
         """Open a Both-Sides-Shadow pair, then (if wired) an optional Council-Pick.
         No-op (silent) unless ``record`` is a real debate-abstain with a known epic —
         the V3-D5 guard doubled here even though the sink already filters on ``reason``
-        before calling (§10.4)."""
+        before calling (§10.4). Also no-op (silent) if ``epic_filter`` rejects the epic
+        (D19) — same shape as the reason/epic-None guard, not a separate error path."""
         if record.reason != AbstainReason.REASON_DEBATE_ABSTAIN or record.epic is None:
+            return
+        if self.epic_filter is not None and not self.epic_filter(record.epic):
             return
         try:
             quote = self.quote_fetch(record.epic)
@@ -430,6 +444,8 @@ class PaperEngine:
             if prospective_stop > deadline:
                 return
         for epic in epics:
+            if self.epic_filter is not None and not self.epic_filter(epic):
+                continue
             try:
                 quote = self.quote_fetch(epic)
                 pair = open_shadow_pair(f"sched:{uuid4()}", epic, quote, self.config, now)
@@ -575,6 +591,17 @@ class PaperTradeTracker:
                 exit_reason, exit_level = outcome
                 pnl_points = _pnl_points(trade, exit_level)
                 r_multiple = pnl_points / trade.stop_distance if trade.stop_distance else 0.0
+                # Mirrors resolve_paper_trade's own `timestamp >= trade.created_utc` filter
+                # (paper.py — the pure function itself stays untouched, this is a thin
+                # wrapper around the same filter, not a second traversal with different
+                # semantics) to report which source(s) the bars that actually resolved this
+                # trade came from (Phase 12 D11). Deliberately no fallback default (e.g.
+                # "yf") for a bar without a `source` key — an honest None ("we don't know
+                # the provenance") is auditable; a guessed value would corrupt the SL/TP-
+                # by-source breakdown the Phase-12 proof week (Plan §7, Requirement E) reads.
+                relevant = [b for b in bars if b.get("timestamp", "") >= trade.created_utc]
+                sources = {s for b in relevant if (s := b.get("source"))}
+                resolution_source = "+".join(sorted(sources)) if sources else None
                 self.store.mark_resolved(
                     trade.paper_id,
                     exit_reason=exit_reason.value,
@@ -582,6 +609,7 @@ class PaperTradeTracker:
                     pnl_points=pnl_points,
                     r_multiple=r_multiple,
                     resolved_utc=now,
+                    resolution_source=resolution_source,
                 )
                 # in-memory copy carrying the resolution (mark_resolved only updates the
                 # DB row; `trade` itself is frozen) -- build_paper_lesson_prompt reads
@@ -594,6 +622,7 @@ class PaperTradeTracker:
                     exit_level=exit_level,
                     pnl_points=pnl_points,
                     r_multiple=r_multiple,
+                    resolution_source=resolution_source,
                 )
                 resolved_by_record.setdefault(trade.abstain_record_id, []).append(resolved)
             except Exception as exc:  # noqa: BLE001 — isolate one trade's failure (J)

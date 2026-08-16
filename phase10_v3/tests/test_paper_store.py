@@ -70,6 +70,32 @@ def test_mark_resolved(store):
     assert store.open_trades() == []
 
 
+def test_mark_resolved_writes_resolution_source(store):
+    t = _trade()
+    store.insert(t)
+    store.mark_resolved(
+        t.paper_id, exit_reason="SL", exit_level=18030.0, pnl_points=-30.0,
+        r_multiple=-1.0, resolved_utc="2026-07-11T12:30:00.000Z", resolution_source="ig+yf",
+    )
+    row = store.conn.execute(
+        "SELECT resolution_source FROM paper_trades WHERE paper_id = ?", (t.paper_id,)
+    ).fetchone()
+    assert row["resolution_source"] == "ig+yf"
+
+
+def test_mark_resolved_default_resolution_source_is_none(store):
+    t = _trade()
+    store.insert(t)
+    store.mark_resolved(
+        t.paper_id, exit_reason="SL", exit_level=18030.0, pnl_points=-30.0,
+        r_multiple=-1.0, resolved_utc="2026-07-11T12:30:00.000Z",
+    )
+    row = store.conn.execute(
+        "SELECT resolution_source FROM paper_trades WHERE paper_id = ?", (t.paper_id,)
+    ).fetchone()
+    assert row["resolution_source"] is None
+
+
 def test_mark_expired(store):
     t = _trade()
     store.insert(t)

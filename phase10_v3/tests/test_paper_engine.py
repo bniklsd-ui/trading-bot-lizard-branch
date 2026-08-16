@@ -210,6 +210,44 @@ def test_open_scheduled_pairs_opens_pair_per_epic():
     assert by_epic["EPIC.A"][0].abstain_record_id != by_epic["EPIC.B"][0].abstain_record_id
 
 
+def test_epic_filter_blocks_on_debate_abstain_for_non_matching_epic():
+    store = _RecordingStore()
+    engine = PaperEngine(
+        store, lambda epic: {"bid": 1.0, "ask": 2.0}, _Config(),
+        epic_filter=lambda epic: epic == "ALLOWED",
+    )
+    engine.on_debate_abstain({}, _record(epic="BLOCKED"))
+    assert store.inserted == []
+
+
+def test_epic_filter_allows_matching_epic_on_debate_abstain():
+    store = _RecordingStore()
+    engine = PaperEngine(
+        store, lambda epic: {"bid": 1.0, "ask": 2.0}, _Config(),
+        epic_filter=lambda epic: epic == "ALLOWED",
+    )
+    engine.on_debate_abstain({}, _record(epic="ALLOWED"))
+    assert len(store.inserted) == 2
+
+
+def test_epic_filter_filters_open_scheduled_pairs_epic_list():
+    store = _RecordingStore()
+    engine = PaperEngine(
+        store, lambda epic: {"bid": 1.0, "ask": 2.0}, _Config(),
+        epic_filter=lambda epic: epic == "EPIC.A",
+    )
+    engine.open_scheduled_pairs(["EPIC.A", "EPIC.B"])
+    epics = {t.epic for t in store.inserted}
+    assert epics == {"EPIC.A"}
+
+
+def test_epic_filter_none_default_is_bit_identical():
+    store = _RecordingStore()
+    engine = PaperEngine(store, lambda epic: {"bid": 1.0, "ask": 2.0}, _Config())
+    engine.open_scheduled_pairs(["EPIC.A", "EPIC.B"])
+    assert {t.epic for t in store.inserted} == {"EPIC.A", "EPIC.B"}
+
+
 def test_open_scheduled_pairs_isolates_per_epic_failure():
     store = _RecordingStore()
 
@@ -443,6 +481,64 @@ def test_tracker_resolves_due_trade_and_marks_resolved(paper_store):
     ).fetchone()
     assert row[0] == "RESOLVED"
     assert row[1] == "TP"
+
+
+def test_tracker_resolution_source_single_source(paper_store):
+    """Phase 12 D11: resolution_source records which bar source(s) resolved the trade."""
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+    bar = {**_bar("2026-07-17T09:05:00.000Z", 18000, 18050, 17990, 18040), "source": "yf"}
+    tracker = PaperTradeTracker(paper_store, bar_fetch=lambda epic: [bar])
+    tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    row = paper_store.conn.execute(
+        "SELECT resolution_source FROM paper_trades WHERE paper_id = ?", (trade.paper_id,)
+    ).fetchone()
+    assert row[0] == "yf"
+
+
+def test_tracker_resolution_source_mixed_sources_sorted_and_joined(paper_store):
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+    bars = [
+        {**_bar("2026-07-17T09:01:00.000Z", 18000, 18010, 17995, 18005), "source": "ig"},
+        {**_bar("2026-07-17T09:05:00.000Z", 18000, 18050, 17990, 18040), "source": "yf"},  # TP touch
+    ]
+    tracker = PaperTradeTracker(paper_store, bar_fetch=lambda epic: bars)
+    tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    row = paper_store.conn.execute(
+        "SELECT resolution_source FROM paper_trades WHERE paper_id = ?", (trade.paper_id,)
+    ).fetchone()
+    assert row[0] == "ig+yf"  # sorted, +-joined
+
+
+def test_tracker_resolution_source_none_when_bars_have_no_source_key(paper_store):
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+    bars = [_bar("2026-07-17T09:05:00.000Z", 18000, 18050, 17990, 18040)]  # no "source" key
+    tracker = PaperTradeTracker(paper_store, bar_fetch=lambda epic: bars)
+    tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    row = paper_store.conn.execute(
+        "SELECT resolution_source FROM paper_trades WHERE paper_id = ?", (trade.paper_id,)
+    ).fetchone()
+    assert row[0] is None  # honest — never guessed
 
 
 def test_tracker_marks_expired_when_unresolvable(paper_store):

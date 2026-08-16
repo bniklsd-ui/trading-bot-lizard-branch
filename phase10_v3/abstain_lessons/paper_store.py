@@ -45,7 +45,7 @@ _ROW_COLUMNS = (
     "paper_id, abstain_record_id, variant, epic, direction, created_utc, "
     "entry_level, stop_distance, limit_distance, time_stop_utc, status, "
     "resolved_utc, exit_reason, exit_level, pnl_points, r_multiple, "
-    "council_confidence, lesson, lesson_extracted, context_json"
+    "council_confidence, lesson, lesson_extracted, context_json, resolution_source"
 )
 
 
@@ -74,7 +74,7 @@ class PaperTradeStore:
         try:
             self.conn.execute(
                 f"INSERT OR IGNORE INTO paper_trades ({_ROW_COLUMNS}) "
-                f"VALUES ({', '.join('?' * 20)})",
+                f"VALUES ({', '.join('?' * 21)})",
                 trade.to_row(),
             )
             self.conn.commit()
@@ -101,14 +101,20 @@ class PaperTradeStore:
         pnl_points: float,
         r_multiple: float,
         resolved_utc: str,
+        resolution_source: str | None = None,
     ) -> None:
-        """Move ``paper_id`` from OPEN to RESOLVED with its exit details."""
+        """Move ``paper_id`` from OPEN to RESOLVED with its exit details.
+
+        ``resolution_source`` (Phase 12 D11) records which bar source(s) actually
+        resolved this trade (``'yf'``/``'ig'``/``'ig+yf'``) — ``None`` when the caller
+        genuinely doesn't know (e.g. a legacy caller predating this column).
+        """
         try:
             self.conn.execute(
                 "UPDATE paper_trades SET status = 'RESOLVED', exit_reason = ?, "
-                "exit_level = ?, pnl_points = ?, r_multiple = ?, resolved_utc = ? "
-                "WHERE paper_id = ?",
-                (exit_reason, exit_level, pnl_points, r_multiple, resolved_utc, paper_id),
+                "exit_level = ?, pnl_points = ?, r_multiple = ?, resolved_utc = ?, "
+                "resolution_source = ? WHERE paper_id = ?",
+                (exit_reason, exit_level, pnl_points, r_multiple, resolved_utc, resolution_source, paper_id),
             )
             self.conn.commit()
         except sqlite3.Error as exc:
