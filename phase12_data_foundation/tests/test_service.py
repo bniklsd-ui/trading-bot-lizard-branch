@@ -116,6 +116,31 @@ def test_budgeted_ig_unmapped_resolution_returns_none(archive, budget):
     assert provider.get_bars(EPIC, resolution="bogus", count=1) is None
 
 
+def test_ig_provider_normalizes_ig_raw_timestamps(archive, budget):
+    """U1 (P12.5 plan §3): IG's real ``get_ohlcv`` shape is ``"yyyy/MM/dd HH:mm:ss"``,
+    never ISO -- the provider must normalize it, not pass it through raw."""
+    broker = _FakeBroker(bars=[
+        {"timestamp": "2026/08/17 14:15:00", "open": 1, "high": 2, "low": 0.5, "close": 1.5, "volume": 9}
+    ])
+    provider = BudgetedIGBarProvider(broker, budget)
+
+    bars = provider.get_bars(EPIC, resolution="1m", count=1)
+
+    assert bars is not None
+    assert bars[0].ts == "2026-08-17T14:15:00.000Z"
+
+
+def test_ig_provider_returns_none_on_unparseable_timestamp(archive, budget):
+    broker = _FakeBroker(bars=[
+        {"timestamp": "not a date", "open": 1, "high": 2, "low": 0.5, "close": 1.5, "volume": 9}
+    ])
+    events = []
+    provider = BudgetedIGBarProvider(broker, budget, health_sink=events.append)
+
+    assert provider.get_bars(EPIC, resolution="1m", count=1) is None
+    assert events[-1]["reason"] == "bad_timestamp"
+
+
 # -- BarService.get_bars (research seam) --------------------------------------
 
 
@@ -183,7 +208,9 @@ def test_get_window_archive_hit_makes_zero_chain_calls(archive, budget):
     yf, ig = _FakeProvider(), _FakeProvider()
     svc = BarService(archive, [("yf", yf), ("ig", ig)], budget, now_fn=lambda: NOW)
 
-    result = svc.get_window(EPIC, "1m", _iso(NOW - timedelta(minutes=5)), _iso(NOW))
+    # Window shrunk to 1 minute (was 5) so one archived bar is full coverage under the
+    # U3 fix's coverage_ratio threshold, not a 1/5-covered short archive (P12.5 §3/U3).
+    result = svc.get_window(EPIC, "1m", _iso(NOW - timedelta(minutes=1)), _iso(NOW))
 
     assert result and result[0]["source"] == "ig"
     assert yf.calls == [] and ig.calls == []
@@ -236,6 +263,53 @@ def test_get_window_mixed_source_reports_per_bar_source(archive, budget):
     by_ts = {b["timestamp"]: b["source"] for b in result}
     assert by_ts[old_ts] == "ig"   # archive's preferred source wins (BarArchive.window's `prefer`)
     assert by_ts[tail_ts] == "yf"
+
+
+def test_get_window_refetches_when_archive_window_is_too_short(archive, budget):
+    """U3 (P12.5 plan §3): a fresh-but-short archive (recorder restart, first day, gap)
+    satisfies the tail check but covers almost none of the requested window -- the chain
+    must still fire instead of silently returning a near-empty result."""
+    from data_foundation.models import Bar
+
+    start = NOW - timedelta(minutes=300)
+    end = NOW
+    archived_bars = [
+        Bar(
+            epic=EPIC, resolution="1m", ts_utc=_iso(end - timedelta(minutes=m)),
+            open=1, high=1, low=1, close=1, volume=1, source="yf", fetched_at=_iso(end),
+        )
+        for m in range(10)  # only the last 10 of 300 requested minutes
+    ]
+    archive.insert_bars(archived_bars)
+    yf = _FakeProvider([_pricebar(_iso(end))])
+    svc = BarService(archive, [("yf", yf), ("ig", _FakeProvider())], budget, now_fn=lambda: NOW)
+
+    svc.get_window(EPIC, "1m", _iso(start), _iso(end))
+
+    assert yf.calls, "a 10/300-minute archive must not short-circuit the chain"
+
+
+def test_get_window_uses_archive_when_coverage_is_adequate(archive, budget):
+    """Regression guard for the U3 fix: a genuinely healthy archive (the real 240/300
+    trading-hours case, §3/U3 table) must still short-circuit -- no permanent refetch."""
+    from data_foundation.models import Bar
+
+    start = NOW - timedelta(minutes=300)
+    end = NOW
+    archived_bars = [
+        Bar(
+            epic=EPIC, resolution="1m", ts_utc=_iso(end - timedelta(minutes=m)),
+            open=1, high=1, low=1, close=1, volume=1, source="yf", fetched_at=_iso(end),
+        )
+        for m in range(240)  # 240 of 300 requested minutes, including the tail
+    ]
+    archive.insert_bars(archived_bars)
+    yf = _FakeProvider([_pricebar(_iso(end))])
+    svc = BarService(archive, [("yf", yf), ("ig", _FakeProvider())], budget, now_fn=lambda: NOW)
+
+    svc.get_window(EPIC, "1m", _iso(start), _iso(end))
+
+    assert not yf.calls, "adequate coverage must not trigger a refetch (cost regression)"
 
 
 def test_get_window_no_ig_provider_configured_returns_whatever_archive_has(archive, budget):

@@ -10,8 +10,10 @@ from types import SimpleNamespace
 import pytest
 
 from data_foundation.archive import BarArchive
+from data_foundation.budget import IG_QUOTA_V1, SourceBudget
 from data_foundation.heartbeat import DivergenceSampler, HealthVerdict, assess_day
 from data_foundation.models import Bar
+from data_foundation.service import BudgetedIGBarProvider
 
 _MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "phase2_persistence" / "migrations"
 _MIGRATION_004 = _MIGRATIONS_DIR / "004_phase9_instrument_universe.sql"
@@ -120,8 +122,14 @@ def test_assess_day_recorder_dead(archive, db_path):
 
 
 def test_assess_day_no_measurable_epic_is_ok_with_problem_note(archive, db_path):
-    # no universe row inserted at all -> measurable_universe() is empty
-    verdict = assess_day(archive, db_path, db_path, DAY, shadow_enabled=False)
+    # no universe row inserted at all -> measurable_universe() is empty.
+    # shadow_enabled=True + a real resolution isolates this from E8's new
+    # "measurement arm off" check (P12.5 plan §2), which would otherwise flip ok on
+    # its own and defeat this test's actual point: measurable_epics==0 alone is a
+    # note, not a failure.
+    _insert_paper_trade(db_path, created_utc=f"{DAY}T09:00:00.000Z", status="RESOLVED",
+                         resolved_utc=f"{DAY}T10:00:00.000Z", exit_reason="TP")
+    verdict = assess_day(archive, db_path, db_path, DAY, shadow_enabled=True)
     assert verdict.ok is True
     assert verdict.measurable_epics == 0
     assert any("no measurable epic" in p for p in verdict.problems)
@@ -143,6 +151,20 @@ def test_assess_day_does_not_leak_bars_from_other_days(archive, db_path):
     assert verdict.bars_today == 1  # not 2 — the next day's bar must not leak in
 
 
+def test_assess_day_flags_measurement_arm_off(archive, db_path):
+    """E8 (P12.5 plan §2): the exact Tag-1 situation that live-reported ``ok=True`` --
+    bars flowing, a measurable epic, but enable_shadow_schedule off means zero shadow
+    pairs can ever open. The daemon must not be able to call that a healthy day."""
+    _insert_universe_row(db_path, EPIC)
+    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T09:05:00.000Z",
+                              open=1, high=1, low=1, close=1, volume=1, source="yf",
+                              fetched_at=f"{DAY}T09:05:01.000Z")])
+
+    verdict = assess_day(archive, db_path, db_path, DAY, shadow_enabled=False)
+    assert verdict.ok is False
+    assert any("measurement arm off" in p for p in verdict.problems)
+
+
 def test_assess_day_typed_expiry_counts_as_measurement(archive, db_path):
     _insert_universe_row(db_path, EPIC)
     archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T09:05:00.000Z",
@@ -160,23 +182,38 @@ def test_assess_day_typed_expiry_counts_as_measurement(archive, db_path):
 # -- DivergenceSampler ------------------------------------------------------
 
 
-class _FakeBudgetedIG:
-    """Returns a bar whose ``ts`` tracks an injectable "current day" — a fixed
+class _FakeIGBroker:
+    """Returns a bar in IG's real raw ``get_ohlcv`` shape (``"yyyy/MM/dd HH:mm:ss"``,
+    never ISO) whose ``timestamp`` tracks an injectable "current day" — a fixed
     timestamp here would make every probe query the same archive window regardless
-    of which day the test has advanced ``now_fn`` to."""
+    of which day the test has advanced ``now_fn`` to.
+
+    Wired through the real :class:`BudgetedIGBarProvider` (not a stand-in that hands
+    ``DivergenceSampler`` an already-ISO ``ts``) so these tests exercise the actual U1
+    fix (``service.py``'s ``normalize_bar_ts`` call) instead of skipping the seam it
+    fixes (P12.5 plan §3/U1)."""
 
     def __init__(self, close: float):
         self.close = close
         self.calls = 0
         self.day = DAY
 
-    def get_bars(self, epic, *, resolution, count):
+    def get_ohlcv(self, epic, resolution, count):
         self.calls += 1
-        return [SimpleNamespace(ts=f"{self.day}T09:00:00.000Z", close=self.close)]
+        raw_ts = datetime.strptime(self.day, "%Y-%m-%d").strftime("%Y/%m/%d") + " 09:00:00"
+        bar = {"timestamp": raw_ts, "open": self.close, "high": self.close,
+               "low": self.close, "close": self.close, "volume": 1}
+        return SimpleNamespace(ok=True, data={"bars": [bar]})
 
 
-def test_sampler_throttles_to_once_per_day(archive):
-    ig = _FakeBudgetedIG(100.0)
+def _budgeted_ig(tmp_path, close: float) -> tuple[_FakeIGBroker, BudgetedIGBarProvider]:
+    broker = _FakeIGBroker(close)
+    budget = SourceBudget(tmp_path / "ig_budget.sqlite", IG_QUOTA_V1)
+    return broker, BudgetedIGBarProvider(broker, budget, spend_kind="sample")
+
+
+def test_sampler_throttles_to_once_per_day(archive, tmp_path):
+    broker, ig = _budgeted_ig(tmp_path, 100.0)
     now = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
     sampler = DivergenceSampler(ig, archive, now_fn=lambda: now)
     archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T09:00:00.000Z",
@@ -185,13 +222,13 @@ def test_sampler_throttles_to_once_per_day(archive):
 
     sampler.sample_epic(EPIC, lambda e: None)
     sampler.sample_epic(EPIC, lambda e: None)
-    assert ig.calls == 1  # second call same day is a no-op
+    assert broker.calls == 1  # second call same day is a no-op
 
 
-def test_sampler_compares_only_yf_bars_not_ig(archive):
+def test_sampler_compares_only_yf_bars_not_ig(archive, tmp_path):
     """The regression this exists to catch: an IG bar at the same minute must never be
     picked as the yFinance comparator (it would always agree with itself)."""
-    ig = _FakeBudgetedIG(100.0)
+    _, ig = _budgeted_ig(tmp_path, 100.0)
     now = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
     # an IG bar at the exact probed minute, wildly different from the IG probe's own
     # close would still "agree" if picked as the comparator by mistake — plant a yF bar
@@ -211,8 +248,8 @@ def test_sampler_compares_only_yf_bars_not_ig(archive):
     assert events[0]["event"] == "quote_divergence"
 
 
-def test_sampler_no_yf_bar_in_window_is_a_noop(archive):
-    ig = _FakeBudgetedIG(100.0)
+def test_sampler_no_yf_bar_in_window_is_a_noop(archive, tmp_path):
+    _, ig = _budgeted_ig(tmp_path, 100.0)
     now = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
     events = []
     sampler = DivergenceSampler(ig, archive, health_sink=events.append, now_fn=lambda: now)
@@ -221,14 +258,14 @@ def test_sampler_no_yf_bar_in_window_is_a_noop(archive):
     assert events == []
 
 
-def test_sampler_mismatch_fires_after_two_consecutive_divergences_not_one(archive):
-    ig = _FakeBudgetedIG(100.0)
+def test_sampler_mismatch_fires_after_two_consecutive_divergences_not_one(archive, tmp_path):
+    broker, ig = _budgeted_ig(tmp_path, 100.0)
     day1 = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
     day2 = datetime(2026, 8, 17, 9, 5, tzinfo=timezone.utc)
     marked = []
     sampler = DivergenceSampler(ig, archive, now_fn=lambda: day1)
 
-    ig.day = "2026-08-16"
+    broker.day = "2026-08-16"
     archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-16T09:00:00.000Z",
                               open=90, high=90, low=90, close=90.0, volume=1, source="yf",
                               fetched_at="2026-08-16T09:00:01.000Z")])
@@ -236,7 +273,7 @@ def test_sampler_mismatch_fires_after_two_consecutive_divergences_not_one(archiv
     assert marked == []  # first divergence — not yet a sticky mismatch
 
     sampler.now_fn = lambda: day2
-    ig.day = "2026-08-17"
+    broker.day = "2026-08-17"
     archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-17T09:00:00.000Z",
                               open=90, high=90, low=90, close=90.0, volume=1, source="yf",
                               fetched_at="2026-08-17T09:00:01.000Z")])
@@ -244,29 +281,29 @@ def test_sampler_mismatch_fires_after_two_consecutive_divergences_not_one(archiv
     assert marked == [EPIC]  # second consecutive divergence — now mark mismatch
 
 
-def test_sampler_agreement_resets_streak(archive):
-    ig = _FakeBudgetedIG(100.0)
+def test_sampler_agreement_resets_streak(archive, tmp_path):
+    broker, ig = _budgeted_ig(tmp_path, 100.0)
     day1 = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
     day2 = datetime(2026, 8, 17, 9, 5, tzinfo=timezone.utc)
     day3 = datetime(2026, 8, 18, 9, 5, tzinfo=timezone.utc)
     marked = []
     sampler = DivergenceSampler(ig, archive, now_fn=lambda: day1)
 
-    ig.day = "2026-08-16"
+    broker.day = "2026-08-16"
     archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-16T09:00:00.000Z",
                               open=90, high=90, low=90, close=90.0, volume=1, source="yf",
                               fetched_at="2026-08-16T09:00:01.000Z")])
     sampler.sample_epic(EPIC, marked.append)  # divergence 1
 
     sampler.now_fn = lambda: day2
-    ig.day = "2026-08-17"
+    broker.day = "2026-08-17"
     archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-17T09:00:00.000Z",
                               open=100, high=100, low=100, close=100.0, volume=1, source="yf",
                               fetched_at="2026-08-17T09:00:01.000Z")])
     sampler.sample_epic(EPIC, marked.append)  # agreement — resets streak
 
     sampler.now_fn = lambda: day3
-    ig.day = "2026-08-18"
+    broker.day = "2026-08-18"
     archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-18T09:00:00.000Z",
                               open=90, high=90, low=90, close=90.0, volume=1, source="yf",
                               fetched_at="2026-08-18T09:00:01.000Z")])

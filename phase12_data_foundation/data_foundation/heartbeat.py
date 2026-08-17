@@ -55,12 +55,16 @@ def assess_day(
     are a data-quality problem the Recorder/archive side should surface, not a "the
     measurement ran" signal.
 
-    ``ok=False`` on exactly two conditions (Plan §6 Step 6): ``measurable_epics > 0``
-    and zero bars were archived today (the Recorder appears dead), or shadow pairs are
-    enabled and neither a real resolution nor a typed expiry happened all day (a
-    zero-measurement day). ``measurable_epics == 0`` on its own only adds a problem
-    note — it is the known bootstrap/operator-prerequisite state (Step 3's
-    ``SymbolResolver`` hasn't run yet), not an infrastructure failure to page on.
+    ``ok=False`` on exactly three conditions (P12.5 plan §2/E8 added the third):
+    ``measurable_epics > 0`` and zero bars were archived today (the Recorder appears
+    dead); shadow pairs are enabled and neither a real resolution nor a typed expiry
+    happened all day (a zero-measurement day); or shadow pairs are *not* enabled at
+    all — the measurement arm is off, so the day measures nothing regardless of what
+    else ran (Phase-12 §7 "Kern" cannot pass, and the daemon cannot lie about this:
+    ``shadow_enabled`` is read straight from ``config.enable_shadow_schedule``).
+    ``measurable_epics == 0`` on its own only adds a problem note — it is the known
+    bootstrap/operator-prerequisite state (Step 3's ``SymbolResolver`` hasn't run
+    yet), not an infrastructure failure to page on.
     """
     from universe.store import UniverseStore
 
@@ -101,6 +105,12 @@ def assess_day(
         )
     if measurable_epics > 0 and bars_today == 0:
         problems.append("zero bars archived today despite measurable epics (Recorder appears dead)")
+        ok = False
+    if not shadow_enabled:
+        problems.append(
+            "measurement arm off: enable_shadow_schedule is False — no shadow pairs can be "
+            "opened, so this day measures nothing (Phase-12 §7 Kern cannot pass)"
+        )
         ok = False
     if shadow_enabled and pairs_resolved == 0 and pairs_typed_expired == 0:
         problems.append("shadow pairs enabled but zero resolved/expired paper trades today")

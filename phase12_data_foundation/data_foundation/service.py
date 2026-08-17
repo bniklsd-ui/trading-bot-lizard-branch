@@ -22,6 +22,7 @@ from typing import Any, Callable, Sequence
 
 import logging
 
+from data_foundation.exceptions import ArchiveError
 from data_foundation.models import Bar, normalize_bar_ts
 
 logger = logging.getLogger("data_foundation.service")
@@ -29,6 +30,12 @@ logger = logging.getLogger("data_foundation.service")
 # Phase-3-side resolution names -> minutes per bar (for count/window-span estimation).
 # Mirrors external_data.providers._IG_RESOLUTION_MAP's key set exactly.
 _RESOLUTION_MINUTES: dict[str, int] = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "1d": 1440}
+
+# ponytail: fixed threshold, calibrated against the observed spread (0.80 healthy vs. 0.03
+# for the short-archive case this guards, P12.5 plan §3/U3). Ceiling: coverage_ratio counts
+# naive wall-clock minutes, so it never reaches 1.0 across a pre-market span. Upgrade path if
+# it ever misfires: a trading-calendar-aware expected-minutes count in BarArchive.
+_MIN_WINDOW_COVERAGE = 0.5
 
 
 def _default_now() -> datetime:
@@ -114,17 +121,21 @@ class BudgetedIGBarProvider:
         if not raw_bars:
             self._emit(epic, False, reason="empty")
             return None
-        bars = [
-            PriceBar(
-                ts=b.get("timestamp", ""),
-                open=float(b.get("open", 0.0)),
-                high=float(b.get("high", 0.0)),
-                low=float(b.get("low", 0.0)),
-                close=float(b.get("close", 0.0)),
-                volume=float(b.get("volume", 0.0)),
-            )
-            for b in raw_bars
-        ]
+        try:
+            bars = [
+                PriceBar(
+                    ts=normalize_bar_ts(b.get("timestamp", "")),
+                    open=float(b.get("open", 0.0)),
+                    high=float(b.get("high", 0.0)),
+                    low=float(b.get("low", 0.0)),
+                    close=float(b.get("close", 0.0)),
+                    volume=float(b.get("volume", 0.0)),
+                )
+                for b in raw_bars
+            ]
+        except ArchiveError:
+            self._emit(epic, False, reason="bad_timestamp")
+            return None
         self._budget.record_spend(len(bars), self._spend_kind)
         allowance = data.get("allowance") or {}
         if allowance:
@@ -204,7 +215,8 @@ class BarService:
     ) -> list[dict[str, Any]]:
         minutes = _RESOLUTION_MINUTES.get(resolution, 1)
         archived = self._archive.window(epic, resolution, start_utc, end_utc)
-        if _covers_tail(archived, end_utc, minutes):
+        if (_covers_tail(archived, end_utc, minutes)
+                and self._archive.coverage_ratio(epic, resolution, start_utc, end_utc) >= _MIN_WINDOW_COVERAGE):
             return [_bar_to_dict(b) for b in archived]
 
         count = max(1, int((_parse_iso(end_utc) - _parse_iso(start_utc)).total_seconds() // 60 // minutes) + 1)
