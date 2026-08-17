@@ -567,6 +567,67 @@ POST_WINDOW genau 1×/Tag (Fake-Clock) · Default `None` bit-identisch · Sample
    `data_source_status` (Erwartung: DAX/CAC/IBEX/AEX/MIB/STXE + Dow/FTSE/Nasdaq/S&P → `ok`
    nach Marktöffnungs-Check; SUN* → `no_intraday_source`).
 
+### Step 8.5 — `SymbolResolver`-Wiring (NEU, gefunden 2026-08-17 live, eigene Plan-Session) — **blockiert Step 9**
+
+**Befund (Plan↔Code-Drift, kein Rätsel — s. `phase12_data_foundation/CLAUDE.md` Session-5-
+Nachtrag für die volle Herleitung):** D6 verlangt, dass `SymbolResolver` „wiederkehrend im
+`universe_refresher`-Pass" läuft; Step 8 Bullet 6 listet „Resolver vergibt
+`data_source_status`" als **erwartete Beobachtung**. Tatsächlich wird `SymbolResolver(`
+an **keiner** Laufzeit-Stelle instanziiert (`wiring.py:855-912`s `universe_refresher`
+ruft nur `seed_curated → discover → run_promotion_cycle → Divergenz-Sampler`). Live
+bestätigt 2026-08-17: 22/22 Epics bleiben `data_source_status='unverified'`, auch nach
+mehreren `universe_refresher`-Durchläufen — `measurable_universe()` liefert dauerhaft 0,
+der Recorder schreibt dauerhaft 0 Bars/Epics. **Selbstheilt nicht, egal wie lange der
+Bot läuft.** Ohne diesen Fix kann Step 9 (Beweiswoche) nicht bestehen — dieselbe
+Fehlerklasse wie `enable_ig_bars` (`PHASE11_DEFERRAL_HANDOVER.md`).
+
+**Seams bereits vorhanden (Advisor-bestätigt, kein neues Plumbing):** an der
+`universe_refresher`-Stelle liegen beide von `SymbolResolver.__init__` benötigten
+Callables bereits in Scope — `broker` (`broker.get_price(epic).data` → `{bid, ask}`) und
+`research.market_data` (bereits verdrahteter `MarketDataFetcher`,
+`.get_last_price(symbol) -> tuple[float, str] | None`, exakt die erwartete Signatur,
+`phase3_external_data/external_data/fetcher.py:464`, Commit `066949f` extra dafür
+gebaut). Der Fix ist damit additiv (~5-10 Zeilen Call in `universe_refresher`, nach
+`run_promotion_cycle`, vor dem Divergenz-Sampler-Block, der bereits von
+`measurable_universe()` abhängt) — **kein** Redesign, aber Cross-Phase (P8-Wiring
+ruft eine P12-Klasse) + Bot-berührend während eines laufenden Live-Tests.
+
+**Nikinger-Entscheidung (2026-08-17):** sofort umsetzen, aber **erst nach einer
+eigenen Plan-Mode-Session** (Root-`CLAUDE.md`-Konvention: kein Task ohne Plan bei
+nicht-trivialem/Cross-Phase-Scope) — nicht als spontane Inline-Änderung. Diese
+Plan-Session deckt mindestens: exakte Call-Stelle + Fehlerbehandlung (fail-soft wie
+`run_promotion_cycle`?), Test-Erwartung (mind. 1 Test, dass `universe_refresher` den
+Resolver tatsächlich aufruft — die Lücke, die Steps 4-7s eigene Akzeptanz-Greps nie
+gefangen haben, weil nie auf einen Resolver-*Caller* gegrept wurde, nur auf
+`enable_ig_bars`/`KNOWN_YF_TICKERS`), Live-Effekt auf den laufenden Scheduler
+(Neustart nötig — Wiring-Edits wirken erst beim nächsten Prozessstart), IG-
+Allowance-Kosten (`get_price` ist Snapshot, kein Historien-Kontingent, D6 —
+gegenprüfen).
+
+**✅ Umgesetzt (2026-08-17, gleiche Session, Plan `peaceful-juggling-lemon.md` —
+supersedet die ursprüngliche `cheeky-floating-hopcroft.md`-Planpass):** Call in
+`wiring.py`s `universe_refresher()` zwischen `run_promotion_cycle(...)` und dem
+`divergence_sampler`-Block eingefügt (Zeile ~893), plus `logger.info` mit dem vollen
+`ResolverReport`-Zählwerten (macht den Live-Beweis falsifizierbar). Zwei Korrekturen
+gegen die ursprüngliche Planpass-Fassung, beide vor der Umsetzung code-verifiziert:
+1. **Test doch nötig** — die ursprüngliche Fassung wollte den Test unter Verweis auf
+   "`wiring.py` hat keine dedizierte Testsuite" weglassen; diese Konvention (bestätigt:
+   `test_run.py:3`) verbietet nur einen *Laufzeit*-Import von `wiring`, keinen
+   statischen Check. Neue Datei `phase12_data_foundation/tests/
+   test_resolver_wiring.py` (AST-Guard, Vorbild `test_isolation.py`) — parst
+   `wiring.py`, isoliert `universe_refresher`s Funktionskörper, assert einen
+   `SymbolResolver(`-Call darin (ein datei-weiter Grep hätte einen toten/verschobenen
+   Call nicht gefangen). P12 116 → **117**.
+2. **Namenskorrektur:** die throttelnde Methode heißt `_maybe_refresh_universe`
+   (`runner.py:510`), nicht `_maybe_run_universe_refresher` — reine Dokukorrektur, kein
+   Code-Effekt.
+Status-Konstanten gegenchecked (`_STATUS_ACTIVE`/`_STATUS_DISCOVERED` = `"active"`/
+`"discovered"` — identisch zu `universe/models.py`), sonst keine Abweichung vom
+ursprünglichen Plan. Volle Regression unverändert: P1 87 · P2 77 · P3 104 · P4 155 ·
+P5 173 · P6 76 · P7 138 · P8 237 · P9 80 · P10 159 · **P12 117** · meta 28 · root 80.
+Live-Beweis (Scheduler-Neustart + Restart-Fenster innerhalb der XETRA-Handelszeit)
+bleibt Nikinger-Job, s. `phase12_data_foundation/CLAUDE.md` Session-5-Block.
+
 ### Step 9 — Beweiswoche + Abnahme (Operator + eine Review-Session)
 
 Täglich `data_health.py` (Exit 0 erwartet). Freitags eine Review-Session:

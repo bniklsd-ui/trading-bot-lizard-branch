@@ -864,6 +864,7 @@ def build_scheduler(
         line that passes it to ``SchedulerRunner`` below), so an ``ImportError`` here
         would only surface at daemon start, not at module import time.
         """
+        from data_foundation.symbols import SymbolResolver
         from research import EXTENDED_UNIVERSE
         from universe import UniverseStore, discover, run_promotion_cycle
 
@@ -881,6 +882,26 @@ def build_scheduler(
                 universe_store,
                 is_demo=(config.account == "demo"),
             )
+
+            # Phase 12 (Datenfundament) D6 / Plan §6 Step 8.5: stamp data_source_status
+            # for every active/discovered epic — after promotion (so a freshly-promoted
+            # epic is visible this same pass) and before the sampler below (which reads
+            # measurable_universe()). Built in Step 3, never wired in until now — found
+            # live 2026-08-17: every epic stuck at data_source_status='unverified'
+            # forever, measurable_universe() permanently empty, Recorder writing 0
+            # bars/epics regardless of runtime (same failure class as enable_ig_bars).
+            report = SymbolResolver(
+                universe_store,
+                quote_fetch=lambda epic: broker.get_price(epic).data,
+                yf_last_fetch=research.market_data.get_last_price,
+            ).resolve_universe()
+            logger.info(
+                "symbol resolver: checked=%d ok=%d no_source=%d no_intraday=%d "
+                "mismatch=%d unverified=%d",
+                report.checked, len(report.verified), len(report.no_source),
+                len(report.no_intraday), len(report.mismatch), len(report.unverified),
+            )
+
             if divergence_sampler is not None:
                 # Same pass, same store connection (Plan §6 Step 6: "aufgerufen aus dem
                 # bestehenden universe_refresher-Slot im selben Pass") — no new runner seam.
