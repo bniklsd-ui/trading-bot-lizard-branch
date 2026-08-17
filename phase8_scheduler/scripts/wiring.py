@@ -478,6 +478,12 @@ def _build_paper_engine(config: SchedulerConfig, broker: Any, exec_cfg: Any) -> 
 # (BarService.get_window's own budget-aware chain does, gated by SourceBudget — one shared
 # ledger, not a per-tracker guess), so a tripped budget shows up as a short/failed
 # get_window result like any other fetch problem, subject to this same cap.
+#
+# Corrected 2026-08-17 (P12.5 plan §3/U2): the paragraph above was written as a design
+# intent, but until the U2 fix a short get_window result (empty bars, not a raised
+# exception) hit paper.py's `outcome is None` branch, which wrote the trade off on its
+# *first* miss instead of charging this cap. It is true now that _resolve_group charges
+# a failed attempt for that case too.
 _PAPER_MAX_FETCH_ATTEMPTS = 12
 
 
@@ -782,10 +788,17 @@ def build_scheduler(
             ``measurable_universe()``, not ``active_universe()``: only epics with a
             verified data source, ``status='active' AND data_source_status='ok'``).
 
-            Passes today's daemon ``window_close`` as the engine's same-session
-            ``deadline`` — a pair whose time-stop would land past market close would
-            otherwise sit unresolved overnight and risk a next-morning gap bar
-            mis-resolving it (see ``PaperEngine.open_scheduled_pairs`` docstring).
+            Passes today's daemon ``window_close`` **minus a two-cycle margin** as the
+            engine's same-session ``deadline`` — a pair whose time-stop would land past
+            market close would otherwise sit unresolved overnight and risk a
+            next-morning gap bar mis-resolving it (see ``PaperEngine.open_scheduled_pairs``
+            docstring). The margin itself (P12.5 plan §3/U5, 2026-08-17): ``window_close``
+            *itself* left the day's last cohort zero tracker ticks — the tracker only runs
+            in the WINDOW phase (``runner.py``'s ``_run_phase``), and a pair whose time-stop
+            equals ``window_close`` goes due exactly when the phase flips to POST_WINDOW,
+            then dies on the staleness cut the next morning without a single fetch
+            (~10% of a day's measurement rows). Two cycle intervals of margin give that
+            cohort two real chances before the tracker stops running for the day.
             """
             from universe import UniverseStore  # noqa: PLC0415 — lazy, phase isolation
 
@@ -796,7 +809,9 @@ def build_scheduler(
                 store.close()
             now = _now()
             close_hour, close_minute = (int(p) for p in config.window_close.split(":"))
-            deadline = now.replace(hour=close_hour, minute=close_minute, second=0, microsecond=0)
+            deadline = now.replace(
+                hour=close_hour, minute=close_minute, second=0, microsecond=0
+            ) - timedelta(minutes=2 * config.cycle_interval_min)
             paper_engine.open_scheduled_pairs(epics, deadline=deadline)
     abstain_sink = None
     if config.enable_abstain_lessons:

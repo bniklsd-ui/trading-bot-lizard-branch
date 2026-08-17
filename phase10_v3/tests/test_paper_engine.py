@@ -541,7 +541,11 @@ def test_tracker_resolution_source_none_when_bars_have_no_source_key(paper_store
     assert row[0] is None  # honest — never guessed
 
 
-def test_tracker_marks_expired_when_unresolvable(paper_store):
+def test_tick_charges_attempt_instead_of_expiring_on_empty_bars(paper_store):
+    """P12.5 plan §3/U2: resolve_paper_trade returning None means "not enough bar data
+    yet", not "no outcome" — a single empty-bars tick must charge the retry cap, not
+    write the trade off immediately (this test replaces the old
+    test_tracker_marks_expired_when_unresolvable, which asserted the pre-fix bug)."""
     trade = PaperTrade.new(
         abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
         direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
@@ -550,8 +554,31 @@ def test_tracker_marks_expired_when_unresolvable(paper_store):
     trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
     paper_store.insert(trade)
 
-    tracker = PaperTradeTracker(paper_store, bar_fetch=lambda epic: [])  # no bars at all
+    tracker = PaperTradeTracker(
+        paper_store, bar_fetch=lambda epic: [], max_fetch_attempts=12  # no bars at all
+    )
     tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    assert len(paper_store.open_trades()) == 1  # still OPEN, not written off
+    assert tracker._fetch_attempts[trade.paper_id] == 1
+
+
+def test_tick_expires_after_the_attempt_cap(paper_store):
+    """The cap behavior itself is unchanged (P12.5 plan §3/U2) -- only the trigger
+    (empty bars, not just a raised exception) is new."""
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+
+    tracker = PaperTradeTracker(
+        paper_store, bar_fetch=lambda epic: [], max_fetch_attempts=12
+    )
+    for _ in range(12):
+        tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
 
     row = paper_store.conn.execute(
         "SELECT status FROM paper_trades WHERE paper_id = ?", (trade.paper_id,)

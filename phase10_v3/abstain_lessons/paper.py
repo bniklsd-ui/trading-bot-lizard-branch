@@ -550,11 +550,15 @@ class PaperTradeTracker:
             self._resolve_group(trades, bars, now)
 
     def _charge_failed_attempt(self, trades: list[PaperTrade], now: str) -> None:
-        """Count one failed fetch against each trade in the group; expire at the cap.
+        """Count one failed resolution attempt against each trade in the group; expire
+        at the cap.
 
-        A trade needs exactly **one** successful fetch: a successful `_resolve_group`
-        always terminates it, either RESOLVED or EXPIRED_UNRESOLVED. So a failed fetch is
-        the only way a trade survives a tick, and capping those failures caps the retries.
+        "Failed" covers two cases (P12.5 plan §3/U2, corrected 2026-08-17 — the previous
+        docstring here claimed a successful `_resolve_group` always terminates a trade,
+        which was never true): a raised fetch error (`bar_fetch` itself raising) **or**
+        a fetch that came back without enough bars for `resolve_paper_trade` to decide an
+        outcome (`outcome is None`). Both mean "not enough data yet, try again next
+        tick" — capping them caps the retries either way.
 
         Without this, a due trade is re-fetched every cycle until `stale_after_minutes`
         expires it — up to 60 attempts at a 5-minute cadence, all of them against an
@@ -586,7 +590,11 @@ class PaperTradeTracker:
             try:
                 outcome = resolve_paper_trade(trade, bars)
                 if outcome is None:
-                    self.store.mark_expired(trade.paper_id, now)
+                    # Both of resolve_paper_trade's None-returns mean "not enough bar data yet",
+                    # never "no outcome" -- so this is a failed resolution attempt, subject to
+                    # the same cap as a raised fetch error, not an immediate write-off
+                    # (P12.5 plan §3/U2).
+                    self._charge_failed_attempt([trade], now)
                     continue
                 exit_reason, exit_level = outcome
                 pnl_points = _pnl_points(trade, exit_level)
