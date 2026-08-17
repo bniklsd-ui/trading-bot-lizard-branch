@@ -4,7 +4,7 @@ purpose: Verbatim session-history archive rotated out of `CLAUDE.md`
 read-when: auditing how a past Phase-12 decision came about — never needed at session start
 detail: L3
 up: ./CLAUDE.md
-updated: 2026-08-15
+updated: 2026-08-17
 ---
 
 # phase12_data_foundation — Session Archive
@@ -13,6 +13,440 @@ updated: 2026-08-15
 > rotation rule ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)). Source order
 > preserved (newest-first). The newest `## Session stopped` block always stays in the source file;
 > at each session end, the previously-newest block rotates here.
+
+## Session stopped — 2026-08-16 (Session 4: Step 7 — Gesamtintegration + Offline-Beweiskette)
+
+> **Ausgangslage (Advisor-bestätigt, kein Re-Plan nötig):** der Großteil von Step 7 war
+> bereits in Steps 4/6 gebaut — `_build_data_foundation` (einmal, verifiziert), BarService in
+> Research+Tracker, `epic_filter`, `daily_health_check`-Closure inkl. echter
+> `SchedulerRunner(...)`-Kwarg-Übergabe. Diese Session war daher **Verifikation + zwei echte
+> Lücken schließen**, kein Neubau.
+
+### Completed
+
+1. **CLI-Lücke geschlossen** (Advisor-Fund, Plan §9.9): `enable_divergence_sampler` (D12) und
+   `enable_measurement_heartbeat` (D13) hatten seit Step 6 **keinen** CLI-Arm in
+   `scheduler/run.py` — nur `--no-bar-service` (Step 4) existierte. „Der Nikinger
+   scharfschaltet bewusst" war damit ohne Code-Edit operativ unmöglich, exakt die
+   `enable_ig_bars`-Fehlerklasse (gebaut, nie erreichbar), die diese Phase beheben soll.
+   Gefixt: `--enable-divergence-sampler` (store_true, Default OFF, spiegelt
+   `--enable-shadow-schedule`s Muster) + `--no-measurement-heartbeat` (store_true, Default
+   Heartbeat AN, spiegelt `--no-bar-service`s Muster) in `phase8_scheduler/scheduler/run.py`,
+   beide in `config_from_args` verdrahtet. +2 Tests in `test_run.py`
+   (`test_enable_divergence_sampler_flag_threads_through`,
+   `test_no_measurement_heartbeat_flag_threads_through`).
+2. **Synthetischer Tag — der geplante Step-7-Beweis** (Plan §6 Step 7, Akzeptanz-Bullet 2):
+   neu `phase12_data_foundation/tests/test_step7_integration.py`. Komponiert, was Steps 1-6
+   isoliert getestet hatten, zum ersten Mal zusammen: `BarArchive` mit vorab geschriebenen
+   yF-Bars (simuliert den Recorder), `BarService` mit einer **`_RaisingProvider`**-Chain (wirft
+   bei jedem Aufruf — beweist "zero chain calls", nicht nur "keiner beobachtet"), zwei direkt
+   konstruierte Both-Sides-Shadow-`PaperTrade`s (BUY/SELL, `PaperTrade.new()`s echte
+   Wanduhr-`created_utc` umgangen — gleiche Konvention wie `test_paper.py`s eigene
+   Direkt-Konstruktion), `PaperTradeTracker.tick()` mit `bar_fetch = bar_service.get_window`,
+   dann `assess_day` auf derselben synthetischen DB. Beweist: beide Trades lösen exakt aus dem
+   Archiv auf (SL/TP, kein Chain-Call), `resolution_source == 'yf'` in beiden Zeilen,
+   `assess_day` meldet `ok=True`, `measurable_epics=1`, `pairs_opened=2`, `pairs_resolved=2`,
+   `problems=[]`. **Bewusst positiv assertiert** (Advisor-Warnung ernst genommen: ein
+   sorglos leerer Zustand hätte `ok=True` auch **ohne** echte Messung geliefert, weil
+   `measurable_epics==0` nur eine Problem-Notiz ist, kein Alarm — dieser Test seedet die
+   Universe-Zeile explizit auf `data_source_status='ok'`, sonst wäre er ein toter Check).
+3. **Doku-Drift gefixt** (Session-Start): `CLAUDE.md`s Header behauptete „Step 6 done this
+   session, UNCOMMITTED" — `git log`/`git status` zeigten Step 6 bereits als Commit `65ebec7`,
+   Baum sauber. Reine Faktenkorrektur, kein Code betroffen.
+
+### Verified
+
+- `pytest phase12_data_foundation/tests -v` → **110 passed** (war 109, +1: der neue
+  Integrationstest).
+- `pytest phase8_scheduler/tests -v` → **237 passed** (war 235, +2: die neuen CLI-Flag-Tests).
+- Volle Regression, alle 12 Phasen + root: P1 87 · P2 77 · P3 104 · P4 155 · P5 173 · P6 76 ·
+  P7 138 · **P8 237** · P9 80 · P10 159 · **P12 110** · meta 28 · root 80.
+- Offline-Smoke (`phase8_scheduler/scripts/smoke_test.py`) 3/3 PASS.
+- **Akzeptanz-Greps (Plan §6 Step 7, „kein vierter Patch"):**
+  `grep -rn "KNOWN_YF_TICKERS" --include="*.py"` → nur noch der `test_criterion_a.py`-Grep-Test
+  selbst (kein Deklarations-Fund mehr). `grep -rn "enable_ig_bars" --include="*.py"` → nur
+  `phase4_research`s eigenes, unabhängiges Flag (außerhalb Scheduler-Laufpfad,
+  außerhalb Phase-12-Scope) + erklärende Kommentare — keine vierte IG-Bar-Direktleitung.
+- **`_build_data_foundation` genau einmal aufgerufen** (`wiring.py:744`) — kein zweiter
+  `bars.sqlite`-Connection-Aufbau, kein Locking-Risiko (Plan §8).
+- **`daily_health_check` wirklich an `SchedulerRunner(...)` übergeben** (`wiring.py:976`,
+  nicht nur die Closure darüber definiert) — bestätigt gegen genau die Advisor-Sorge, dass ein
+  definierter-aber-nie-durchgereichter Callable dieselbe Fehlerklasse wie `enable_ig_bars`
+  reproduziert hätte.
+
+### Nachtrag (gleiche Session) — Step 8: die zwei fehlenden D18-Skripte gebaut
+
+Der Nikinger fragte nach den heute (Wochenende, Markt zu) ausführbaren Schritten. Plan
+§6 Step 8 referenziert zwei Skripte, die in Steps 1-7 nie gebaut wurden:
+`scripts/probe_allowance.py` und `scripts/reset_universe.py` (beide nur in D18/§6 als
+Namen genannt, nie als Datei angelegt — ein echter Plan↔Code-Drift, jetzt geschlossen).
+
+- **`phase12_data_foundation/scripts/probe_allowance.py`** (neu): wrappt den bekannten
+  CLI-Einzeiler (`ALLOWANCE_INCIDENT_2026-08-08.md` §6, `get_ohlcv(epic, "MINUTE", 5)`,
+  5 Punkte) und bucht Erfolg via `SourceBudget.record_spend(5, "probe")` +
+  `record_allowance(...)` in `data/bars.sqlite` — genau die Beobachtung, die
+  `reset_universe.py`s D18-Gate liest. Live/Netz/Keyring — nicht diese Session ausgeführt.
+- **`phase12_data_foundation/scripts/reset_universe.py`** (neu): `_check_restart_gate`
+  (pure Funktion) verweigert den Reset ohne eine **frische** (< 24h) `allowance_observations`-
+  Zeile mit `remaining > reserve_points` (D18) — liest `data/bars.sqlite` direkt (kein
+  `SourceBudget`-Objekt nötig, reiner Lesezugriff). Bei Freigabe: setzt alle `quarantined`-
+  Zeilen in `instrument_universe` auf `status='discovered', fail_count=0,
+  last_verified_at=NULL` (Präzedenzfall 2026-07-06, damals manuelles SQL — jetzt ein
+  wiederholbares Skript). `--force` als dokumentierter, absichtlicher Overrde (nicht
+  Default). Live, schreibt die echte Trading-DB — nicht diese Session ausgeführt.
+- **Test:** `phase12_data_foundation/tests/test_reset_universe.py` (neu, 6 Tests, via
+  `importlib.util` geladen — gleiche Konvention wie `verify_instrument.py`, das Skript
+  liegt außerhalb des installierten Pakets) — deckt alle vier Gate-Zweige (keine Tabelle,
+  keine Beobachtung, zu alt, `remaining <= reserve`) + den Erfolgsfall + die
+  24h-Grenze exakt. Nur `_check_restart_gate` getestet (pure), nicht `main()`
+  (Netz/DB-Writes — Nikinger-Job).
+- **Verifiziert:** `pytest phase12_data_foundation/tests -v` → **116 passed** (war 110,
+  +6). `--help` beider Skripte lädt sauber (kein versehentlicher Netz-Import am Modul-Top).
+  Gate live gegen eine leere synthetische `bars.sqlite` durchexerziert (kein
+  echtes Repo-`data/` berührt): verweigert korrekt, exit 1, JSON auf stdout.
+
+### Next
+
+- **SOFORT-NÄCHSTER SCHRITT (freigegeben, Nikinger 2026-08-17, kein Re-Ask nötig):** die
+  zwei Allowance-Bugs fixen, **bevor** irgendein weiterer `probe_allowance.py`-Lauf Sinn
+  ergibt — der Probe bleibt sonst strukturell blind (`allowance={}` egal wie oft man
+  läuft). Exakter Fix-Plan, keine erneute Diagnose nötig:
+  1. `phase1_broker_wrapper/broker_wrapper/adapters/ig_adapter.py:436` UND `:466`:
+     `allowance = body.get("allowance", {})` → `allowance = body.get("metadata", {}).get("allowance", {})`.
+  2. `phase1_broker_wrapper/tests/test_ig_adapter.py:499` (und der `{}`-Fall um Zeile 525):
+     Mock-Body auf die echte `{"metadata": {"allowance": {...}}}`-Verschachtelung umstellen —
+     sonst bleibt der Test grün gegen die falsche Annahme (toter Check).
+  3. `phase12_data_foundation/data_foundation/service.py`s `BudgetedIGBarProvider.get_bars()`
+     UND `phase12_data_foundation/scripts/probe_allowance.py`: `allowanceExpiry` ist
+     Sekunden-Restwert, nicht absolutes ISO — vor `record_allowance(...)` konvertieren:
+     `expiry_iso = _iso(now_fn() + timedelta(seconds=int(allowanceExpiry)))` (nur wenn
+     `allowanceExpiry is not None`, sonst `None` durchreichen wie bisher).
+  4. Volle Regression (mind. P1 + P12 + P8, dann alle Phasen) + `pytest -v` grün.
+  5. **Dann erst** `probe_allowance.py` erneut (Nikinger-Lauf) — sollte jetzt ein echtes
+     `remaining`/`expiry` in `data/bars.sqlite` schreiben.
+- **Danach, heute noch möglich (Nikinger, per `feedback_live_testing`-Memory):**
+  1. `probe_allowance.py` (s. o., jetzt mit echten Daten).
+  2. Sobald `remaining > 1500` beobachtet: `... scripts/reset_universe.py`
+     (kein Argument nötig — Defaults zeigen auf `data/trading_bot.sqlite`/`data/bars.sqlite`)
+     — setzt die quarantined Zeilen zurück.
+  3. Recorder-Warmlauf (werktags erlaubt, yF-only):
+     `bash phase12_data_foundation/scripts/run_recorder.sh`.
+  4. **Erst danach**, falls gewünscht: Scheduler-Neustart (`run_scheduler.sh`) — beachtet
+     die Operator-Landmine unten.
+- Steps 9-10 (Beweiswoche, Lightstreamer) — gated auf einen laufenden Scheduler + 5
+  Handelstage, kein heutiger Schritt.
+- **Erster echter Start ist weiterhin Nikinger-Job**, unverändert seit Step 6: Recorder
+  standalone oder über `run_scheduler.sh`, `data_health.py` als täglicher Check — vor jedem
+  Neustart die Operator-Landmine (leere `measurable_universe()` bis der Resolver lief)
+  beachten.
+- Uncommitted: diese Session (`run.py`, `test_run.py`, `test_step7_integration.py`,
+  `probe_allowance.py`, `reset_universe.py`, `test_reset_universe.py`,
+  `diag_allowance_raw.py`, `CLAUDE.md`, `SESSIONS_ARCHIVE.md`, s. `git status`) — Commit
+  ist Nikinger-Entscheidung (frühestens nach dem Allowance-Bugfix oben, sonst commitet man
+  ein bekannt-blindes `probe_allowance.py` mit).
+- Die beiden aus Step 6 bekannten, bewusst offenen Lücken (G-Deckungslücke bei einem
+  POST_WINDOW-losen Tag; In-Memory-Sampler-Throttle über Neustarts) bleiben unverändert offen
+  — kein Teil dieser Session.
+
+### Open questions / blockers
+
+- Keine technischen. Step 7s Plan-Akzeptanz ist vollständig erfüllt (Smoke 3/3,
+  synthetischer Tag, volle Regression, Akzeptanz-Greps). Die zwei D18-Skripte sind
+  offline verifiziert, aber **ihr erster echter Lauf ist unbewiesen** — nicht mit
+  "verifiziert" verwechseln (gleiche Disziplin wie der 08-11-Notbremse-Befund).
+- **Echter Bug, live gefunden + gefixt (Nikinger-Lauf, 2026-08-16):** `probe_allowance.py`
+  rief `get_ohlcv` ohne vorheriges `broker.connect()` — `AUTH_ERROR "not connected"`.
+  Gefixt nach `verify_instrument.py`s Muster (`connect()` vor dem ersten Call, Fail-Fast
+  bei `connect_env.ok is False`), kein `disconnect()` (In-Memory-Session heilt sich laut
+  `reference_ig_parallel_login_trap`-Memory selbst, gleiche Konvention wie das Vorbild).
+- **Empirische Frage aufgelöst — zwei echte Bugs gefunden (Nikinger-Lauf 2026-08-17,
+  Dienstag, Markt offen 09:13):** der 08-16-Sonntags-Befund („`allowance={}`, evtl.
+  Markt-zu") ist **falsifiziert** — derselbe Probe mit offenem Markt lieferte immer noch
+  `allowance={}`. Root-Cause per Roh-Dump ermittelt: `phase12_data_foundation/scripts/
+  diag_allowance_raw.py` (neu, gebaut + verifiziert diese Session) ruft `broker._request()`
+  direkt auf und zeigt IGs **echten** `/prices`-Response-Shape:
+  ```json
+  {"prices": [...], "instrumentType": "INDICES",
+   "metadata": {"allowance": {"remainingAllowance": 9985, "totalAllowance": 10000,
+                               "allowanceExpiry": 567432},
+                "size": 5, "pageData": {...}}}
+  ```
+  **Bug 1 (root cause des leeren `allowance`):** `phase1_broker_wrapper/broker_wrapper/
+  adapters/ig_adapter.py` liest in `get_ohlcv` (Zeile 436) UND `get_historical_ohlcv`
+  (Zeile 466) `allowance = body.get("allowance", {})` — IG verschachtelt es aber unter
+  `metadata.allowance`, nicht top-level. Fix: `body.get("metadata", {}).get("allowance", {})`
+  an beiden Stellen. **Der P1-Test dafür ist selbst ein toter Check:**
+  `phase1_broker_wrapper/tests/test_ig_adapter.py:499` mockt den Response-Body mit
+  `allowance` **top-level** (spiegelt exakt die falsche Code-Annahme, nicht IGs echten
+  Shape) — muss beim Fix auf die `metadata`-Verschachtelung umgestellt werden, sonst bleibt
+  der Test grün und blind.
+  **Bug 2 (gefunden beim Lesen der echten Werte, nicht nur der Struktur):**
+  `allowanceExpiry: 567432` ist ein **Sekunden-Restwert** (≈6,57 Tage — passt zu einem
+  gerade zurückgesetzten 10.000-Punkte/7-Tage-Fenster), **kein** absoluter ISO-Zeitstempel.
+  `SourceBudget.record_allowance`s Docstring (`budget.py:81-87`) hat genau diesen Fall
+  bereits vorausgesehen: „the caller converts it to an absolute instant before calling this
+  method" — aber weder `BudgetedIGBarProvider.get_bars()` (`service.py`, bereits **committed**
+  in Step 4, `49902b6`) noch `probe_allowance.py` (diese Session) tun das; beide reichen
+  `allowance.get("allowanceExpiry")` unkonvertiert durch.
+  **Tragweite:** Bug 1 bedeutet, dass das gesamte D10-Budget-System (Steps 2+4, bereits
+  committed) seit seinem Bau **nie echte Allowance-Daten empfangen hat** — nur gegen Fakes
+  getestet, die dieselbe falsche Top-Level-Annahme teilen (`test_service.py`s `_FakeBroker`
+  baut `data={"allowance": ...}` direkt auf Envelope-Ebene, das bleibt nach dem Fix korrekt,
+  da der Envelope-Vertrag `data["allowance"]` sich nicht ändert — nur `ig_adapter.py`s
+  Befüllung dieses Feldes). **Kein Schaden am D18-Gate:** `SourceBudget`/
+  `_check_restart_gate` filtern beide auf `remaining IS NOT NULL` — die leere Beobachtung
+  wurde korrekt ignoriert, nie als `remaining=0` fehlinterpretiert; das Gate blieb sicher
+  verweigert (fail-closed), konnte aber strukturell nie grün werden, bis jetzt.
+  **Nikinger-Entscheidung (2026-08-17):** beide Bugs fixen, **aber nicht in dieser Session**
+  (Context knapp) — Bug 1 ist ein Cross-Phase-Edit (Phase 1, bereits ✅ live-verifiziert)
+  und fällt unter die Wochenend-Regel, aber der Nikinger hat es für **sofort im
+  nächsten Zug freigegeben** ("wofür warten wir sonst, der Bot kann eh nicht laufen") —
+  keine weitere Rückfrage nötig, direkt umsetzen.
+
+## Session stopped — 2026-08-16 (Session 3: Steps 4+5 committed, Step 6 — Heartbeat + Divergence Sampler, UNCOMMITTED)
+
+> **Vorherige Session ging in Context Limit.** Der Handover-Satz beim Sitzungsstart lautete:
+> „Acceptance grep confirms: only a docstring comment remains, zero real get_ohlcv calls in
+> wiring.py. Task 19 complete." — diese Session hat das As-Built gegen den Plan (§ Step 4,
+> `docs/concepts/phase12_data_foundation_plan.md:394-457`) nachverifiziert (voller Regression-
+> Lauf + 4 Advisor-Nachprüfungen), **kein neuer Code geschrieben**, nur die Doku nachgezogen.
+
+### Completed (in der Vorgänger-Session gebaut, diese Session verifiziert + dokumentiert)
+
+**`data_foundation/service.py`** (neu, 267 Zeilen): `BudgetedIGBarProvider` (`BarProvider`-
+Protocol, gated auf `SourceBudget.can_spend` **vor** dem Broker-Call, bucht nach Erfolg
+`record_spend(len(bars))` + `record_allowance(...)` aus `env.data['allowance']`, emittiert
+`bar_fetch`-Health-Events) und `BarService` (Archiv-first via `coverage_ratio`/`window`, sonst
+`ChainedBarProvider([yf, ig])` + Write-Through mit Provenienz; `get_bars` für die Research-Naht,
+`get_window` für den Tracker — bei unvollständiger yF-Deckung ein expliziter IG-Top-up-Zweig,
+bewusst außerhalb der Chain-Reihenfolge, weil Korrektheit hier vor Kosten geht).
+
+**Wiring-Rewire** (`phase8_scheduler/scripts/wiring.py`): neu `_build_data_foundation`
+(lazy imports, `bars.sqlite`-Pfad); `_build_market_data`s `enable_ig_bars`-Zweig ersetzt durch
+`enable_bar_service` (Kette `[("ig", BudgetedIGBarProvider), ("yf", YFinanceBarProvider)]`,
+außen `BarService`); `_build_paper_tracker`s `bar_fetch(epic)` ist jetzt ein dünner Closure über
+`bar_service.get_window(...)` — die alten Budget-Konstanten `_PAPER_BAR_COUNT`/
+`_PAPER_BUDGET_COOLDOWN_MIN`/`_PAPER_ALLOWANCE_FLOOR` sind **entfallen** (bestätigt per Grep,
+0 Treffer), `_PAPER_MAX_FETCH_ATTEMPTS` bleibt (Korrektheitsguard, quellenneutral); `budget_ok`
+ist jetzt ein dokumentierter No-Op (`lambda: True`, Kommentar erklärt warum — der reale Gate
+lebt in `BudgetedIGBarProvider.can_spend`, ein zweiter Tick-Level-Gate wäre redundant).
+
+**`PaperTradeTracker._resolve_group`** (`phase10_v3/abstain_lessons/paper.py:581-627`):
+`resolution_source = "+".join(sorted(sources))` über die tatsächlich konsumierten Bars,
+gefiltert auf `b["timestamp"] >= trade.created_utc` (spiegelt `resolve_paper_trade`s eigenen
+Filter, keine zweite Traversierung mit anderer Semantik) — kein Fallback-Default für Bars ohne
+`source`-Key, ein ehrliches `None` statt eines geratenen Werts.
+
+**`PaperEngine.epic_filter`** (D19): Wiring injiziert
+`lambda epic: epic in {r.epic for r in store.measurable_universe()}`.
+
+**`SchedulerConfig`**: `enable_ig_bars` → `enable_bar_service: bool = True` (D17,
+Docstring erklärt die Ablösung); `scheduler/run.py` bekam `--no-bar-service`-Flag nachgezogen.
+
+### Verified (diese Session, gegen den Plan-Text Zeile für Zeile)
+
+- **Volle Regression, alle 12 Phasen + root, 0 Failures:** P1 87 · P2 77 · P3 104 · P4 155 ·
+  P5 173 · P6 76 · P7 138 · **P8 229** (unverändert trotz 3 geänderter Dateien — plausibel,
+  keine Netto-Testzahl-Änderung) · P9 80 · **P10 159** (+12 ggü. 147) · **P12 80** (+16 ggü. 64)
+  · meta 28 · root 80.
+- Offline-Smoke (`phase8_scheduler/scripts/smoke_test.py`) 3/3 PASS.
+- **Akzeptanz-Grep, repo-weit (nicht nur `wiring.py` wie der Handover-Satz nahelegte):**
+  `grep -rn "get_ohlcv"` außerhalb `wiring.py`s Docstring-Kommentar trifft ausschließlich
+  `broker_wrapper`s eigene Definition, den Momentum-VETO-Pfad (`phase5_execution/execution/
+  vetos.py`), `verify_instrument`/`resolve_epics`-Skripte, Phase-4/6/9-eigene (unabhängige)
+  Nähte und `data_foundation/service.py` selbst (`BudgetedIGBarProvider`) — keine vierte
+  IG-Bar-Direktleitung übersehen. `grep -rn "enable_ig_bars"` zeigt nur noch `phase4_research`s
+  **eigenes**, unabhängiges Flag (sein eigenständiges `scripts/wiring.py`, nicht Teil des
+  Scheduler-Laufpfads — außerhalb Step-4-Scope) + einen Wiring-Kommentar, der die Ablösung
+  erklärt.
+- `resolution_source` per Lesen von `paper.py:581-627` bestätigt korrekt gefiltert (nicht aus
+  allen zurückgegebenen Bars, nur aus den tatsächlich für die Auflösung relevanten).
+- `BudgetedIGBarProvider.get_bars` gelesen: bucht `record_spend`/`record_allowance` nur nach
+  erfolgreichem Fetch, verweigert vor jedem Broker-Call bei `can_spend()==False` (kein toter
+  Breaker).
+- `test_config.py:49` trägt eine echte Assertion (`cfg.enable_bar_service is True`), keine
+  stumme Umbenennung.
+
+**Kleiner, außerhalb-Scope-Fund (nicht angefasst):** `phase4_research/research/models.py:623`
+kommentiert noch „the daemon's own SchedulerConfig.enable_ig_bars" — dieses Feld existiert seit
+diesem Step nicht mehr (jetzt `enable_bar_service`). Reiner Kommentar in einem Phase-4-File,
+außerhalb des Step-4-Dateiumfangs (`phase4_research/`-Edits nur bei zwingendem Grund laut
+Root-`CLAUDE.md`-Scope-Regel) — für den Nikinger notiert, nicht selbst gefixt.
+
+**Step 4 committed** (Commit `49902b6`, `phase12: BarService + tracker/research rewire (Step 4)`).
+
+## Step 5 — Recorder (derselbe Tag, Wochenende, D14/D15)
+
+`data_foundation/recorder.py` (`Recorder`, `RecorderReport`) — yFinance-only Poll-Loop,
+fail-soft je Epic, Dedup über den Archiv-PK (kein eigener Dedup-Code nötig,
+`insert_bars` macht das schon), atomarer Heartbeat-State (`.tmp`+`os.replace`, P8-Muster
+kopiert nicht importiert), `recorder_heartbeat`-Health-Event. `data_foundation/run.py`
+(`python -m data_foundation.run`) — PID-File-Guard (`_pid_alive`/`_already_running`/
+`_write_pid`, doppelstart-sicher, live gegen einen echten `os.getpid()` verifiziert),
+SIGTERM/SIGINT → `request_stop()`. `phase12_data_foundation/scripts/run_recorder.sh`
+(neu, Paket-Code) + Edit an `phase8_scheduler/scripts/run_scheduler.sh` (D14, Cross-Phase
+— `nohup … &` vor dem `exec`, PID-Guard lebt im Recorder-Skript).
+
+**Advisor-Review fand 1 echten Bug vor Abnahme, gefixt:** `_build_recorder`s
+`MarketDataFetcher(TickerMapper(), ...)` nutzte eine **bare** `TickerMapper()` — die kennt
+nur ihre ~7 statischen `_MAP`-Einträge (P3s eigene Smoke-Test-Form), nie einen
+Registry-aufgelösten `yf_ticker` (D5/D6, Step 3). Jeder von `measurable_universe()`
+gelieferte Epic außerhalb der 7 Defaults hätte `EpicNotMappedError` geworfen, still von
+`tick()`s fail-soft-Guard geschluckt — Archiv bleibt leer, Heartbeat schreibt trotzdem
+„gesund". Exakt Phase 11s Fehlerklasse (ein dritter Speicher, der die Registry
+überschattet), reintroduziert in der Phase, die sie beheben soll. Gefixt am gemeinsamen
+Punkt: `epics_fn` registriert jetzt `rec.yf_ticker` auf den geteilten Mapper bei jedem
+Aufruf (spiegelt `phase8_scheduler/scripts/wiring.py`s `mapper.register`-Muster), bevor es
+den Epic zurückgibt — ein Epic ohne `yf_ticker` wird übersprungen (defensiv, sollte durch
+`measurable_universe()`s Gate nie vorkommen). Kein dedizierter Test nötig (Fake-`epics_fn`
+in den bestehenden Recorder-Tests umgeht die reale Mapper-Frage strukturell — dieselbe
+"operator-run, nicht pytest-erfasst"-Konvention wie `wiring.py` selbst).
+
+### Verified
+
+- `pytest phase12_data_foundation/tests -v` → **96 passed** (war 80, +16: ~10
+  `test_recorder.py` + 6 `test_run.py`).
+- Volle Regression unverändert grün, alle 12 Phasen + root: P1 87 · P2 77 · P3 104 ·
+  P4 155 · P5 173 · P6 76 · P7 138 · P8 229 · P9 80 · P10 159 · P12 96 · meta 28 · root 80.
+- `py_compile` clean (`recorder.py`, `run.py`); `bash -n` clean (beide `.sh`).
+- **PID-Guard live gegen einen echten Prozess getestet** (nicht nur gemockt): ein
+  `--pid-file` mit der eigenen PID der laufenden Shell → zweiter Start meldet „already
+  running", **exit 0**, kein zweiter Recorder gestartet.
+- `grep -rn "import broker_wrapper\|from broker_wrapper"
+  phase12_data_foundation/data_foundation/` → 0 Treffer (D14). `test_isolation.py`s
+  AST-Grep deckt beide neuen Dateien automatisch mit ab (paketweit, kein Zusatztest nötig).
+- `scripts/dev_install.sh` hat `phase12_data_foundation` bereits in der editable-Install-
+  Kette (Zeile 55) — `run_recorder.sh`s Prereq-Zeile ist wahr, nicht nur behauptet.
+- `run_scheduler.sh`-Edit nur `bash -n`-geprüft (Syntax), **nicht live ausgeführt** — ein
+  echter Start würde die reale `data/`-DB berühren + einen echten yFinance-Netzwerkruf
+  machen, beides Nikinger-Job laut `feedback_live_testing`-Memory. `data/state/` existiert
+  bereits (Redirect-Ziel sicher).
+
+**Korrektur (diese Session, vor Step 6):** die vorherige Fassung dieses Blocks behauptete
+„Step 6s Heartbeat ist der geplante Alarm dafür" für die leere `measurable_universe()`.
+**Falsch, gegen den Plan-Text korrigiert:** `assess_day` behandelt `measurable_epics == 0`
+als reine Problem-Notiz mit `ok=True`, nicht als Alarm (s. Step-6-Abschnitt unten,
+`test_assess_day_no_measurable_epic_is_ok_with_problem_note`). Die Operator-Voraussetzung
+(Resolver vor Neustart laufen lassen) bleibt unverändert die eigentliche Abhilfe.
+
+**Step 4 committed** (Commit `49902b6`), **Step 5 committed** (Commit `473c8e4`).
+
+## Step 6 — Divergenz-Sampler + Mess-Heartbeat (derselbe Tag, Wochenende, D12/§7 G)
+
+`data_foundation/heartbeat.py`: `HealthVerdict` + `assess_day(archive, paper_db_path,
+universe_db_path, day_utc, *, shadow_enabled)` — `ok=False` auf genau zwei Bedingungen
+(`measurable_epics > 0 AND bars_today == 0` [Recorder tot] oder `shadow_enabled AND
+pairs_resolved == 0 AND pairs_typed_expired == 0` [Null-Messtag]); `measurable_epics == 0`
+liefert nur eine Problem-Notiz, kein `ok=False` (Bootstrap-Zustand, kein Infra-Fehler).
+`pairs_resolved` zählt SL/TP-Auflösungen, `pairs_typed_expired` Time-Stop-Auflösungen —
+`EXPIRED_UNRESOLVED` (Datenfehler) zählt in keinem der beiden.
+
+`DivergenceSampler` (D12): einmal/Epic/Tag ein budgetiertes IG-`5m×3`-Sample
+(`BudgetedIGBarProvider(spend_kind="sample")`) vs. die archivierten yF-Bars desselben
+Fensters (nie ein frischer yF-Fetch); zweite Folge-Divergenz ⇒ `mark_mismatch_fn(epic)`
+(Wiring löst das über `UniverseStore.set_symbol(..., status=DS_MISMATCH)` auf, inkl.
+`logger.warning`, weil das ein Einbahn-Türverhalten ist — die Epic verschwindet sofort aus
+`measurable_universe()`, nichts verifiziert sie automatisch zurück).
+
+**Wiring** (`phase8_scheduler/scripts/wiring.py`): `daily_health_check`-Closure (neu,
+`SchedulerConfig.enable_measurement_heartbeat` default **True** — rein lesend, kostet
+nichts) — ruft `assess_day` mit dem aktuellen UTC-Kalendertag, schreibt
+`measurement_heartbeat`-Event, `logger.critical` bei `ok=False`. `divergence_sampler`
+reitet im **bestehenden** `universe_refresher`-Pass mit (keine neue Runner-Naht) —
+`SchedulerConfig.enable_divergence_sampler` default **False** (echter neuer IG-Spend,
+~120 Punkte/Woche bei ~8 `'ok'`-Epics — innerhalb des Plan-Budgets, aber ein neuer Posten;
+gleiche Disziplin wie `enable_shadow_schedule`/`enable_paper_debate`: der Nikinger
+scharfschaltet bewusst, kein stiller Default-ON unter einem Step-6-Commit).
+
+`SchedulerRunner`: neuer `daily_health_check`-Konstruktor-Param (Default `None`,
+bit-identisch), im POST_WINDOW-Zweig **nach** dem Force-Reconcile aufgerufen
+(`_maybe_run_daily_health_check`, `_due_after`-Throttle 20h/`health_check_interval_min`).
+`SchedulerState.last_health_check_ts` neu (cross-day, wie `last_shadow_pairs_ts`).
+
+`phase12_data_foundation/scripts/data_health.py` (Operator, read-only, werktags erlaubt):
+druckt `HealthVerdict` + Budget-Stand (`spent_in_window`/`remaining_estimate`/
+`predicted_exhaustion_days`) + Recorder-Heartbeat-Alter; Exit 1 bei `ok=False`.
+
+**Advisor-Review fand 2 echte Bugs vor Abnahme, beide gefixt:**
+1. `BarArchive.bars_written_since(ts_utc)` hatte **keine** obere Grenze — eine Abfrage für
+   einen **vergangenen** Tag hätte alles seit diesem Tagesanfang bis jetzt gezählt, nicht
+   nur den einen Tag. Ein toter Tag hätte sich als "gesund" gemeldet — genau die Frage, die
+   Requirement G stellt. Gefixt: additiver `end_utc: str | None = None`-Parameter
+   (`None` = alte Semantik, offen-endig); `assess_day` reicht jetzt beide Grenzen aus
+   `_day_bounds_iso` durch. Test beweist den Unterschied
+   (`test_bars_written_since_respects_end_bound`,
+   `test_assess_day_does_not_leak_bars_from_other_days`).
+2. `BudgetedIGBarProvider._emit`s Event trug kein `spend_kind` — ein Sampler-Fetch und ein
+   Research-Fetch waren im Observability-Log ununterscheidbar; Requirement C
+   ("auch leere Tage zählen als Beweis der Ausführung via Sampler-Log") wäre am geloggten
+   Event nicht nachweisbar gewesen (der Beweis existiert zwar über `source_spend`-Zeilen
+   mit `kind='sample'`, aber ein Reviewer, der das JSONL liest, hätte nichts gefunden).
+   Gefixt am gemeinsamen Punkt (`service.py`, beide Verbraucher — `BarService` und
+   `DivergenceSampler` — profitieren): Event trägt jetzt `spend_kind`.
+
+### Verified
+
+- `pytest phase12_data_foundation/tests -v` → **109 passed** (war 96, +13: 11
+  `test_heartbeat.py` + 2 Archiv-Regressionstests).
+- `pytest phase8_scheduler/tests -v` → **235 passed** (war 229 nach Step 4, +6:
+  Config-Assertions + 6 neue `test_daily_health_check_*`-Tests in `test_runner.py`,
+  minus die bereits gezählten Step-4-Deltas).
+- Volle Regression, alle 12 Phasen + root: P1 87 · P2 77 · P3 104 · P4 155 · P5 173 ·
+  P6 76 · P7 138 · P8 235 · P9 80 · P10 159 · P12 109 · meta 28 · root 80.
+- `py_compile` clean (`heartbeat.py`, `archive.py`, `service.py`, `data_health.py`,
+  `wiring.py`, `runner.py`, `state.py`, `config.py`); Offline-Smoke 3/3 PASS.
+- `data_health.py` end-to-end offline gegen eine synthetische Migrations-DB gelaufen
+  (kein Netz, keine echte `data/`-Berührung): druckt Verdict + Budget + Recorder-Alter,
+  exit 0 bei leerem/gesundem Synthetik-Zustand.
+- `grep -rn "import broker_wrapper\|from broker_wrapper"
+  phase12_data_foundation/data_foundation/` → 0 Treffer; `test_isolation.py`s AST-Grep
+  deckt `heartbeat.py` automatisch mit ab (das lazy `scheduler.observability`-Import in
+  `DivergenceSampler.sample_epic` ist function-body-scoped, nicht module-top-level).
+- Comparator-Regression bewiesen: `test_sampler_compares_only_yf_bars_not_ig` pflanzt
+  eine IG- **und** eine yF-Bar an derselben Minute und beweist, dass nur die yF-Zeile den
+  Vergleich treibt (`window()`s `prefer` rankt nur, schließt eine IG-Zeile nicht aus —
+  ohne den expliziten `source == "yf"`-Filter hätte der Sampler IG gegen sich selbst
+  verglichen, dauerhaft grün, genau die Klasse toter Check, die diese Phase verhindern soll).
+
+### Next
+
+- **⚠️ Operator-Landmine vor jedem Neustart (drei Konsumenten, unverändert der Kernpunkt):**
+  alle 22 Produktionszeilen stehen laut Step 3 auf `data_source_status='unverified'` →
+  `measurable_universe()` ist **leer** → `epic_filter` (Paper-Tracker), der Recorder
+  **und** der Divergenz-Sampler (sobald scharfgeschaltet) sehen alle keine Epics. Der
+  Heartbeat markiert das als Problem-Notiz, **nicht** als `ok=False` — bewusst (s.
+  Korrektur oben), also **kein** automatischer CRITICAL-Alarm dafür. Bis dahin: Resolver
+  von Hand laufen lassen und `measurable_universe()` vor einem Neustart prüfen.
+- **Bekannte Deckungslücke in G (dokumentiert, nicht gebaut):** der 20h-POST_WINDOW-
+  Throttle bedeutet — ein Tag, dessen POST_WINDOW nie läuft (Crash, harter Stop vor
+  Handelsschluss), erzeugt **keinen** Heartbeat überhaupt, nicht einmal einen `ok=False`.
+  "5/5 Handelstage mit Heartbeat" (Requirement G) ist dadurch nicht strukturell garantiert,
+  nur der übliche Fall. Kein Fix in dieser Session — Nikinger-Entscheidung, ob das eine
+  eigene Absicherung braucht (z. B. ein "Heartbeat fehlt komplett"-Check von außen).
+- **In-Memory-Sampler-Throttle:** `DivergenceSampler`s Once-per-Day-Zähler lebt nur im
+  Prozess — jeder Neustart sampled jede Epic erneut am selben Tag (3 Punkte × N Epics pro
+  Neustart). Bei häufigen Neustarts an einem Tag frisst das den Wochen-Budget-Puffer
+  schneller als geplant; im Auge behalten, kein Bug.
+- `enable_divergence_sampler` steht **default False** — Nikinger-Entscheidung, wann
+  scharfgeschaltet wird (kostet echten IG-Spend, s. o.).
+- **Erster echter Start ist Nikinger-Job:** `bash phase12_data_foundation/scripts/
+  run_recorder.sh` standalone oder automatisch über den nächsten `run_scheduler.sh`-Start,
+  plus `python phase12_data_foundation/scripts/data_health.py` als täglicher Check —
+  alles live/netzwerkberührend, hier nicht ausgeführt.
+- Step 7 (Gesamtintegration + Offline-Beweiskette, Wochenende), Steps 8-10 (gated, Operator).
+- **Step 6 committed** (Commit `65ebec7`, `phase12: measurement heartbeat + divergence sampler (Step 6)`); `git status` clean.
+
+### Open questions / blockers
+
+- Keine technischen (Advisor-Review dieser Session: 4 Step-4-Nachprüfungen + 1
+  Step-5-Fund + 2 Step-6-Funde, alle sauber/gefixt).
+- Zwei bewusst offene, dokumentierte Lücken (s. Next): die G-Deckungslücke bei einem
+  POST_WINDOW-losen Tag, und der In-Memory-Sampler-Throttle über Neustarts hinweg.
+- Operator-Landmine (leere `measurable_universe()`) bleibt die einzige Konsequenz, die vor
+  dem nächsten Bot-Neustart aktiv gemanagt werden muss — jetzt mit drei betroffenen
+  Konsumenten, aber ohne automatischen Alarm dafür (bewusst, s. Korrektur oben).
+
+---
 
 ## Session stopped — 2026-08-15 (Session 2: Step 3 — Migration 006 + Registry + SymbolResolver)
 

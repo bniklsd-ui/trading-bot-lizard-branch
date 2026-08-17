@@ -111,6 +111,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "(~130-136 extra quote-calls/day at the default interval/universe size). "
         "Default OFF.",
     )
+    parser.add_argument(
+        "--enable-divergence-sampler",
+        action="store_true",
+        help="enable the Phase 12 (Datenfundament, Step 6 / D12) once-per-epic-per-day "
+        "IG-vs-yFinance divergence check: a persistently drifting instrument is demoted "
+        "to data_source_status='mismatch' and drops out of measurable_universe(). Real "
+        "IG-allowance cost (~3 points/epic/day, ~120/week at the default universe size). "
+        "Default OFF (der Nikinger scharfschaltet bewusst).",
+    )
+    parser.add_argument(
+        "--no-measurement-heartbeat",
+        action="store_true",
+        help="disable the Phase 12 (Datenfundament, Step 6 / D13) daily measurement "
+        "heartbeat: a same-day CRITICAL alarm for a dead measurement day (sets "
+        "enable_measurement_heartbeat=False). Read-only, no IG cost. Default is heartbeat ON.",
+    )
     parser.add_argument("--verbose", action="store_true", help="DEBUG logging to stderr.")
     return parser
 
@@ -138,6 +154,8 @@ def config_from_args(args: argparse.Namespace) -> SchedulerConfig:
         max_consecutive_failures=args.max_consecutive_failures,
         enable_paper_debate=args.enable_paper_debate,
         enable_shadow_schedule=args.enable_shadow_schedule,
+        enable_divergence_sampler=args.enable_divergence_sampler,
+        enable_measurement_heartbeat=not args.no_measurement_heartbeat,
     )
 
 

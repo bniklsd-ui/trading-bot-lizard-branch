@@ -73,6 +73,22 @@ def test_enable_shadow_schedule_flag_threads_through() -> None:
     )
 
 
+def test_enable_divergence_sampler_flag_threads_through() -> None:
+    assert config_from_args(parse_args([])).enable_divergence_sampler is False
+    assert (
+        config_from_args(parse_args(["--enable-divergence-sampler"])).enable_divergence_sampler
+        is True
+    )
+
+
+def test_no_measurement_heartbeat_flag_threads_through() -> None:
+    assert config_from_args(parse_args([])).enable_measurement_heartbeat is True
+    assert (
+        config_from_args(parse_args(["--no-measurement-heartbeat"])).enable_measurement_heartbeat
+        is False
+    )
+
+
 def test_config_from_args_threads_overrides() -> None:
     cfg = config_from_args(
         parse_args(["--daily-loss-cap", "750", "--max-trades", "3", "--cycle-interval-min", "2"])

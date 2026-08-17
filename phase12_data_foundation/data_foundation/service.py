@@ -69,11 +69,13 @@ class BudgetedIGBarProvider:
         *,
         spend_kind: str = "research",
         health_sink: Callable[[dict], None] | None = None,
+        now_fn: Callable[[], datetime] = _default_now,
     ) -> None:
         self._broker = broker
         self._budget = budget
         self._spend_kind = spend_kind
         self._health_sink = health_sink
+        self._now_fn = now_fn
 
     def _emit(self, epic: str, ok: bool, *, reason: str | None = None) -> None:
         if self._health_sink is None:
@@ -126,10 +128,15 @@ class BudgetedIGBarProvider:
         self._budget.record_spend(len(bars), self._spend_kind)
         allowance = data.get("allowance") or {}
         if allowance:
+            expiry_seconds = allowance.get("allowanceExpiry")
+            expiry_iso = (
+                _iso(self._now_fn() + timedelta(seconds=int(expiry_seconds)))
+                if expiry_seconds is not None else None
+            )
             self._budget.record_allowance(
                 allowance.get("totalAllowance"),
                 allowance.get("remainingAllowance"),
-                allowance.get("allowanceExpiry"),
+                expiry_iso,
             )
         self._emit(epic, True)
         return bars

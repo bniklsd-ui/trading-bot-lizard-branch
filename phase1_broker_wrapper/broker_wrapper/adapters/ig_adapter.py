@@ -433,7 +433,7 @@ class IGAdapter(BrokerAdapter):
                     params={"resolution": resolution, "max": count, "pageSize": count},
                 )
                 bars = [_parse_bar(p) for p in body.get("prices", [])]
-                allowance = body.get("allowance", {})
+                allowance = body.get("metadata", {}).get("allowance", {})
                 return ok_envelope(
                     broker=self.name, method="get_ohlcv",
                     data={"bars": [b.__dict__ for b in bars], "allowance": allowance},
@@ -463,7 +463,7 @@ class IGAdapter(BrokerAdapter):
                     },
                 )
                 bars = [_parse_bar(p) for p in body.get("prices", [])]
-                allowance = body.get("allowance", {})
+                allowance = body.get("metadata", {}).get("allowance", {})
                 return ok_envelope(
                     broker=self.name, method="get_historical_ohlcv",
                     data={"bars": [b.__dict__ for b in bars], "allowance": allowance},

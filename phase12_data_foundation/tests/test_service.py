@@ -87,8 +87,10 @@ def test_budgeted_ig_refuses_when_cannot_spend(archive, budget):
 
 
 def test_budgeted_ig_books_spend_and_allowance_on_success(archive, budget):
-    broker = _FakeBroker(allowance={"totalAllowance": 10_000, "remainingAllowance": 9_700, "allowanceExpiry": "2026-08-20T00:00:00Z"})
-    provider = BudgetedIGBarProvider(broker, budget)
+    # allowanceExpiry is IG's real shape: seconds remaining, not absolute ISO
+    # (phase12_data_foundation/CLAUDE.md Session 4, live-verified 2026-08-17).
+    broker = _FakeBroker(allowance={"totalAllowance": 10_000, "remainingAllowance": 9_700, "allowanceExpiry": 345_600})
+    provider = BudgetedIGBarProvider(broker, budget, now_fn=lambda: NOW)
 
     bars = provider.get_bars(EPIC, resolution="1m", count=1)
 

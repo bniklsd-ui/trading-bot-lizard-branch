@@ -496,7 +496,7 @@ def test_get_ohlcv_happy_path_envelope_shape():
                 "closePrice": {"bid": 18005.0, "ask": 18007.0},
                 "lastTradedVolume": 42,
             }],
-            "allowance": {"remainingAllowance": 9999},
+            "metadata": {"allowance": {"remainingAllowance": 9999}},
         })
         env = a.get_ohlcv("IX.D.DAX.IFMM.IP", "MINUTE_5", 1)
 
@@ -522,7 +522,7 @@ def test_get_historical_ohlcv_happy_path():
                 "closePrice": {"bid": 100.5, "ask": 100.5},
                 "lastTradedVolume": 5,
             }],
-            "allowance": {},
+            "metadata": {"allowance": {}},
         })
         env = a.get_historical_ohlcv(
             "IX.D.DAX.IFMM.IP", "2026-07-01T00:00:00", "2026-07-02T00:00:00", "DAY",
