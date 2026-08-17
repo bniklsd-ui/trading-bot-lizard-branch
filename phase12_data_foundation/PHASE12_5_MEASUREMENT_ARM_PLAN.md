@@ -458,17 +458,30 @@ print(c.execute(
 (heute verifiziert) — jede Zeile mit heutigem Datum ist damit netto neu und nicht mit
 Altbestand verwechselbar.
 
-**(d) Der Alarm-Positivtest** — der Alarm muss auch *anschlagen* können:
-```bash
-phase1_broker_wrapper/.venv/bin/python phase12_data_foundation/scripts/data_health.py \
-  --day <heute> --shadow-enabled
-```
-Bei null Pairs muss das jetzt `ok=False` / Exit `1` liefern. Liefert es `ok=True`, ist
-Entscheidung B nicht wirksam geworden — dann **stoppen und nachsehen**, nicht die Woche starten.
+**(d) Der Alarm-Positivtest — zweiteilig, und die Reihenfolge ist wichtig.**
 
-**Wenn (c) leer bleibt:** nicht warten, nicht hoffen. Erst prüfen ob `measurable_universe()`
-noch 5 Epics liefert, dann ob `shadow_pair_scheduler` gebaut wurde
-(`wiring.py:775-776` verlangt **beide** Config-Flags), dann den Logauszug lesen.
+> ⚠️ **Ein `ok=False` am Starttag beweist gar nichts.** `data_health.py`s eigener Docstring
+> sagt es: ein Lauf **vor** dem POST_WINDOW-Pass zeigt legitim `ok=False`, weil noch nichts
+> passiert ist. Das ist von dem Alarm, den wir testen wollen, ununterscheidbar.
+
+- **(d-i) am Starttag** — Entscheidung B isoliert prüfen, an einem **vergangenen** Tag und
+  **ohne** `--shadow-enabled`:
+  ```bash
+  phase1_broker_wrapper/.venv/bin/python phase12_data_foundation/scripts/data_health.py \
+    --day 2026-08-17
+  ```
+  ⇒ muss `ok=False` liefern **und** den Problem-String `measurement arm off` enthalten. Der
+  String ist der Beweis, nicht der Exit-Code. Fehlt er, ist Entscheidung B nicht wirksam
+  geworden — dann **stoppen und nachsehen**, nicht die Woche starten.
+- **(d-ii) ab dem Folgetag** — der echte Tagesabschluss, gegen den **vorherigen** Handelstag
+  und **mit** `--shadow-enabled`. Das ist der Befehl, der ab dann täglich in Step 6 läuft.
+
+**Wenn (c) leer bleibt:** nicht warten, nicht hoffen. Reihenfolge der Verdächtigen:
+1. **U5s Deadline** (§8.3 — der teuerste Fehlgriff, siehe dort),
+2. `measurable_universe()` liefert noch 5 Epics?
+3. wurde `shadow_pair_scheduler` überhaupt gebaut (`wiring.py:775-776` verlangt **beide**
+   Config-Flags)?
+4. dann erst den Logauszug lesen.
 
 ---
 
@@ -559,6 +572,13 @@ Nachweis diesmal *vor* dem Weiterarbeiten erbracht wurde.
 Ändert sich eine Zahl außerhalb dieser Tabelle, ist das ein Befund und gehört in den
 Session-Block — nicht stillschweigend übernehmen.
 
+> ⚠️ **Erwartetes rotes Pytest in `phase10_v3`, und es ist das richtige Rot.** Anders als
+> `wiring.py` hat `paper.py` eine echte Testsuite. Jeder bestehende Test, der auf
+> **sofortiges** `EXPIRED_UNRESOLVED` bei unauflösbaren Bars assertet, kodiert ab Step 3a das
+> alte, falsche Verhalten und wird rot. **Den Test anpassen — mit einer Zeile Kommentar,
+> warum — nicht den Fix zurückdrehen.** Ein Test, der nach der Anpassung *immer noch* rot
+> ist, ist dagegen ein echter Befund ⇒ Advisor.
+
 ---
 
 ## §6 Risiken
@@ -605,16 +625,27 @@ Session-Block — nicht stillschweigend übernehmen.
    `cycle_interval_min` an (die Phasen-Doku nennt „`cycle_interval_min = 5`"), im Runner
    existiert außerdem ein abgeleitetes `_cycle_interval_s`. Vor dem Edit greppen; ebenso, ob
    `timedelta` in `wiring.py` importiert ist.
+   > ⚠️ **Das ist kein Namens-Nitpick, das ist eine Falle.** Greift Sonnet versehentlich zu
+   > einem Sekunden-Feld, rechnet der Ausdruck `timedelta(minutes=2*300)` = **10 Stunden**
+   > Marge. Dann liegt die Deadline vor dem Marktstart, `open_scheduled_pairs`' Guard
+   > (`paper.py:442-445`) überspringt **jeden** Tick des ganzen Tages — und das Symptom ist
+   > **null Paper-Zeilen**, also exakt der Ausfall, den P12.5 beseitigen soll, ununterscheidbar
+   > von „das Flag hat nicht gegriffen".
+   > **Pflicht-Gegenprobe nach dem U5-Edit:** die berechnete Deadline muss bei
+   > `window_close = "17:30"` auf **17:20** landen. Einmal ausrechnen lassen und den Wert in
+   > den Session-Block schreiben.
+   > **Und in Step 5:** bleibt `pairs_opened` bei 0, ist **U5s Deadline der erste Verdächtige**,
+   > noch vor den Flags.
 4. **Die exakte Flag-Schreibweise** `--enable-shadow-schedule` / `--enable-divergence-sampler`
    gegen die 12 `add_argument`-Blöcke in `phase8_scheduler/scheduler/run.py` — der Handover
    nennt `:105` und `:115`, das wurde **nicht** zeilengenau nachgeprüft. Ein Tippfehler hier
    sieht exakt aus wie „der Fix wirkt nicht".
-5. **`data_health.py` weist den Archiv-/Fetch-Split heute nicht aus.** §6/F braucht ihn, um
-   eine fehlkalibrierte U3-Schwelle **in** der Woche zu sehen statt am Freitag. Die Daten
-   liegen bereits vor (`bar_fetch`-Events im Observability-Log, `source_spend` nach `kind`).
-   **Entscheidung der ausführenden Session:** entweder eine Zeile in `data_health.py`
-   ergänzen (klein, phasen-intern, kein Gate) oder den Split am Freitag manuell aus dem Log
-   ziehen. Empfehlung: **die Zeile ergänzen**, in Step 2.
+5. **Archiv-/Fetch-Split für die U3-Schwelle:** am Freitag **aus dem Log ziehen**, nicht
+   `data_health.py` erweitern. Die Daten liegen bereits vor (`bar_fetch`-Events im
+   Observability-Log, `source_spend` nach `kind`) — ein Skript-Umbau wäre der einzige Punkt
+   im Plan ohne verifizierten Anker und der einzige Scope jenseits der fünf Befunde.
+   Dieselbe Disziplin wie E9. Und falls die Schwelle wirklich falsch sitzt, zeigt es
+   Kriterium F ohnehin an der Punktesumme.
 6. **`abstain_report.py --paper` gruppiert nach `resolution_source`** — Kriterium E verlangt
    das. Die Spalte existiert seit Migration 006, war aber **nie mit echten Daten befüllt**.
    Vor der Freitags-Review einmal gegen echte Zeilen laufen lassen, nicht erst währenddessen.
