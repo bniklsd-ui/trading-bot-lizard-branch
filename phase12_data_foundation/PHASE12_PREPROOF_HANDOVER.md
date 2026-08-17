@@ -85,7 +85,7 @@ Prozesse: Recorder `pid 33151` (09:56 CEST), Scheduler `pid 35195` (12:09 CEST,
 | **Archiv (Step 1)** | **1891 Bars, alle heute geschrieben** (das Archiv war heute früh leer): yf 1m (5 Epics, Recorder), yf 5m + ig 5m (BarService-Write-Through) | Bars überleben jetzt den Bot-Zustand — die Wurzel von Ausfall 3 |
 | **Budget (Step 2) + Allowance-Bugfix** | 28 echte `allowance_observations`: `total=10000`, `remaining=9724`, `expiry=2026-08-23T20:53Z`. Verbrauch heute **136 Punkte** (probe 20 / research 110 / sample 6), Prognose ~500 Tage bis Erschöpfung | Der Fix aus Session 5 wirkt **live**: vorher war das Feld strukturell blind (`body["allowance"]` statt `body["metadata"]["allowance"]`). Verbrauch ist jetzt gemessen, nicht geschätzt — Soll laut §7/F: < 1500 |
 | **Heartbeat (Step 6)** | `data_health.py --day 2026-08-17` → `ok: True`, Exit `0`, `bars_today: 1891`, `measurable_epics: 5`, **`pairs_opened: 0`** | Erste echte Ausführung des Operator-Pfads — **und zugleich der schärfste Befund dieser Session**, s. §3.2 |
-| **Divergenz-Sampler** | 2 Samples (`source_spend.kind='sample'`), **kein** `mismatch` gestempelt | Läuft; die Tagesabdeckung über 5 `ok`-Epics ist in der Beweiswoche zu prüfen (Kriterium C) |
+| **Divergenz-Sampler** | 2 Samples (`source_spend.kind='sample'`), **kein** `mismatch` gestempelt | Läuft. **Sollwert:** der Sampler iteriert `measurable_universe()` und drosselt sich auf 1×/Epic/Tag (`wiring.py:905-930`) ⇒ im Normalbetrieb **5 Samples/Tag**. Heute 2 — plausibel, weil beim ersten Pass (`10:14Z`) noch fast keine archivierten yF-Bars vorlagen (Recorder-Start `10:16:32Z`), der Sampler aber nie frisch fetcht. **In der Beweiswoche ist 5/Tag der Prüfwert für Kriterium C**, nicht „es lief" |
 | **Scheduler** | `consecutive_failures: 0`, `trades_today: 0`, 79 Research-Ticks, alle Abstain | Kein Crash, kein KILL, kein Backoff — der Stack trägt einen vollen Tag |
 
 **Antwort auf „was hat die Notbremse gebracht?"** — nach einem Tag, ehrlich:
@@ -199,12 +199,24 @@ Zusätzlich seit dem Deferral-Handover: zwei echte IG-Allowance-Bugs gefunden **
   (b) aus §3.2 wird im selben Zug scharf. Kosten: ein Neustart, keine Code-Änderung.
 - (b) Beweiswoche ohne Shadow starten. → Garantierter FAIL an §7 „Kern"; vierte verlorene
   Datenwoche.
-- Befehl (Nikinger, Markt-offen oder vor Handelsstart):
-  `bash phase8_scheduler/scripts/run_scheduler.sh --enable-divergence-sampler --enable-shadow-schedule`
-  (der Recorder wird vom Skript mitgestartet; die PID-Datei verhindert ein Duplikat).
-  **Prüfpunkt danach:** binnen ~30 Min neue Zeilen in `paper_trades` mit `variant IN
+- **Ablauf (Nikinger) — erst stoppen, dann starten.** Ein zweiter Scheduler neben dem
+  laufenden würde zwei IG-Logins parallel öffnen und sich gegenseitig die Session-Tokens
+  zerschießen (`phase1_broker_wrapper/lightstreamer_integration_notes.md`, „Parallel-login
+  auth trap") — der Fehler sähe dann aus wie „das Flag wirkt nicht":
+  1. Laufenden Scheduler stoppen (Kill-Switch im Dashboard oder `kill <pid>`; POST_WINDOW
+     greift seit dem 2026-07-11-Hotfix binnen ≤ 5 Min) und mit `ps aux | grep scheduler.run`
+     **bestätigen, dass keiner mehr läuft**.
+  2. `bash phase8_scheduler/scripts/run_scheduler.sh --enable-divergence-sampler --enable-shadow-schedule`
+     (Flags verbatim gegen `phase8_scheduler/scheduler/run.py:105,115` geprüft). Der Recorder
+     wird vom Skript mitgestartet und darf ruhig weiterlaufen — seine PID-Datei verweigert
+     das Duplikat selbst. **Ein zweites Flag ist nicht nötig:** `enable_paper_trades` ist
+     bereits Default `True` (`config.py:177`).
+  3. Der Universe-Refresher läuft im Preflight sofort (`runner.py:285`), nicht erst nach der
+     240-Min-Drossel — der Resolver-Log mit den `ResolverReport`-Zählern kommt also binnen
+     Minuten.
+- **Prüfpunkt danach:** binnen ~30 Min neue Zeilen in `paper_trades` mit `variant IN
   ('SHADOW_BUY','SHADOW_SELL')`; `data_health.py --day <heute> --shadow-enabled` als
-  Gegenprobe.
+  Gegenprobe (muss dann bei null Pairs `ok=False` liefern — das ist der gewünschte Alarm).
 
 **B — Soll der Heartbeat „Messarm aus" als Problem werten?**
 - (a) **`assess_day` meldet an einem geplanten Messtag mit `shadow_enabled=False` ein

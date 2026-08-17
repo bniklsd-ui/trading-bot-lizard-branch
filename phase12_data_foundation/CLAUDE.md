@@ -128,7 +128,8 @@ Siehe [`README.md`](./README.md).
 ### Next
 
 - **Nikinger-Entscheidungen A–D** (Handover §5). **A ist blockierend für Step 9:**
-  Neustart mit
+  laufenden Scheduler **erst stoppen** (Parallel-Login-Falle — sonst zwei IG-Sessions),
+  `ps aux | grep scheduler.run` als Gegenprobe, dann
   `bash phase8_scheduler/scripts/run_scheduler.sh --enable-divergence-sampler --enable-shadow-schedule`
   — danach binnen ~30 Min neue `SHADOW_BUY`/`SHADOW_SELL`-Zeilen erwarten.
 - Danach erst Step 9 (Beweiswoche, 5 Handelstage, täglich `data_health.py`), dann Step 10.
