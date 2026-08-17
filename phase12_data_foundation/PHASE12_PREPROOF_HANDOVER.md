@@ -35,7 +35,12 @@ zu damals: sie ist **an Tag 1 aufgefallen**, nicht nach drei Wochen.
 Die Beweiswoche (Step 9) kann in der aktuellen Konfiguration **strukturell nicht bestehen**
 — Plan §7 „Kern" verlangt aufgelöste Shadow-Pairs an ≥ 4 von 5 Handelstagen je `ok`-Epic;
 heute wurden **null** Paper-Zeilen erzeugt (die letzten überhaupt: 2026-08-07).
-**Ein Neustart mit einem zusätzlichen Flag ist die einzige Voraussetzung** (Entscheidung A).
+
+**Dazu kommen drei verifizierte Code-Befunde aus dem Ultrareview vom selben Tag** (§3.0):
+der Divergenz-Sampler ist tot (crasht an IGs Timestamp-Format — Kriterium C), und zwei
+Bugs im Paper-Pfad schreiben Messzeilen still als `EXPIRED_UNRESOLVED` ab (Kriterium E/Kern).
+**Reihenfolge daher: erst diese drei kleinen Fixes (Wochenendfenster), dann der Neustart mit
+dem Messarm, dann Step 9** (Entscheidung A).
 
 ---
 
@@ -85,7 +90,7 @@ Prozesse: Recorder `pid 33151` (09:56 CEST), Scheduler `pid 35195` (12:09 CEST,
 | **Archiv (Step 1)** | **1891 Bars, alle heute geschrieben** (das Archiv war heute früh leer): yf 1m (5 Epics, Recorder), yf 5m + ig 5m (BarService-Write-Through) | Bars überleben jetzt den Bot-Zustand — die Wurzel von Ausfall 3 |
 | **Budget (Step 2) + Allowance-Bugfix** | 28 echte `allowance_observations`: `total=10000`, `remaining=9724`, `expiry=2026-08-23T20:53Z`. Verbrauch heute **136 Punkte** (probe 20 / research 110 / sample 6), Prognose ~500 Tage bis Erschöpfung | Der Fix aus Session 5 wirkt **live**: vorher war das Feld strukturell blind (`body["allowance"]` statt `body["metadata"]["allowance"]`). Verbrauch ist jetzt gemessen, nicht geschätzt — Soll laut §7/F: < 1500 |
 | **Heartbeat (Step 6)** | `data_health.py --day 2026-08-17` → `ok: True`, Exit `0`, `bars_today: 1891`, `measurable_epics: 5`, **`pairs_opened: 0`** | Erste echte Ausführung des Operator-Pfads — **und zugleich der schärfste Befund dieser Session**, s. §3.2 |
-| **Divergenz-Sampler** | 2 Samples (`source_spend.kind='sample'`), **kein** `mismatch` gestempelt | Läuft. **Sollwert:** der Sampler iteriert `measurable_universe()` und drosselt sich auf 1×/Epic/Tag (`wiring.py:905-930`) ⇒ im Normalbetrieb **5 Samples/Tag**. Heute 2 — plausibel, weil beim ersten Pass (`10:14Z`) noch fast keine archivierten yF-Bars vorlagen (Recorder-Start `10:16:32Z`), der Sampler aber nie frisch fetcht. **In der Beweiswoche ist 5/Tag der Prüfwert für Kriterium C**, nicht „es lief" |
+| **Divergenz-Sampler** | 2 Samples (`source_spend.kind='sample'`), **kein** `mismatch`, **null** `quote_divergence`-Events | ❌ **Läuft NICHT** — er crasht beim ersten Epic jedes Passes (§3.0 / U1). Sollwert wäre 5 Samples/Tag (1×/Epic/Tag über `measurable_universe()`); beobachtet: **exakt 1 Epic pro Pass, und pro Pass rückt es um genau eins weiter** — der Fingerabdruck eines Absturzes nach dem ersten Epic bei bereits gesetzter Tages-Drossel, nicht eines laufenden Samplers |
 | **Scheduler** | `consecutive_failures: 0`, `trades_today: 0`, 79 Research-Ticks, alle Abstain | Kein Crash, kein KILL, kein Backoff — der Stack trägt einen vollen Tag |
 
 **Antwort auf „was hat die Notbremse gebracht?"** — nach einem Tag, ehrlich:
@@ -97,6 +102,30 @@ persistiert. **Was sie noch nicht gebracht hat: einen einzigen gemessenen Tag.**
 ---
 
 ## §3 Befunde, die vor Step 9 entschieden werden müssen
+
+### 3.0 Vier Code-Befunde aus dem Ultrareview — alle gegen den Code nachverifiziert
+
+Ein Cloud-Ultrareview über den Phase-12-Diff (2026-08-17) lieferte vier Befunde. Alle vier
+sind **nachgelesen und bestätigt**, einer zusätzlich **live belegt**. Sie sind hier
+absichtlich **nicht gefixt** (Analyse/Fix-Trennung, Werktag, laufender Bot) — die Fixes sind
+klein und gehören ins nächste Wochenendfenster.
+
+| # | Befund | Ort | Wirkung auf §7 |
+|---|---|---|---|
+| **U1** | **`DivergenceSampler` crasht an echten IG-Bar-Timestamps.** `BudgetedIGBarProvider` reicht IGs Rohformat `yyyy/MM/dd HH:mm:ss` unnormalisiert durch (`service.py:119`), `heartbeat.py:175` parst es mit `datetime.fromisoformat` ⇒ `ValueError`. Die Tages-Drossel wird **vor** dem Crash gesetzt (`heartbeat.py:167`) und die Ausnahme killt die ganze Epic-Schleife | `data_foundation/heartbeat.py:175` (Fix: `normalize_bar_ts` aus `models.py:70` — existiert bereits und kann beide Formate) oder kanonisch `service.py:119` | **Kriterium C tot.** Nie ein `quote_divergence`-Event, nie ein `mismatch` |
+| **U2** | **Der Retry-Cap des Paper-Trackers ist wirkungslos.** `_charge_failed_attempt` feuert nur im `except` um `bar_fetch` (`paper.py:544-548`), aber `BarService.get_window` ist durchgehend fail-soft und liefert `[]` statt zu werfen ⇒ eine Zeile wird beim **ersten** schlechten Tick als `EXPIRED_UNRESOLVED` abgeschrieben statt ~1 h lang erneut versucht | `phase8_scheduler/scripts/wiring.py:514-517`; der Kommentar bei `:477-480` behauptet ausdrücklich das Gegenteil und ist damit falsch | **Kriterium E / Kern gefährdet** — genau die WI-2-Zeilen, die die Phase erzeugen soll |
+| **U3** | **`_covers_tail` prüft nur das Fensterende, nie den Anfang** (`service.py:254-261`) ⇒ ein frisches, aber kurzes Archiv (Recorder-Neustart, erster Tag, Lücke) kurzschließt die Kette, `resolve_paper_trade` findet keine Bar ≤ `time_stop_utc` und die Zeile läuft still ab. Kombiniert mit U2 ohne zweiten Versuch | `data_foundation/service.py:202-228` | **Kriterium E / Kern**, verstärkt U2 |
+| **U4** | **Der Scheduler-`TickerMapper` wird nur beim Start befüllt** (`wiring.py:175-180`, `if spec.yf_ticker:`). Ein Epic, dessen `yf_ticker` erst ein späterer Resolver-Pass setzt, fehlt bis zum Neustart ⇒ yF-Leg wirft `EpicNotMappedError`, die Kette fällt auf IG zurück und verbrennt Allowance. Der Recorder macht es richtig (registriert pro Tick neu, `run.py:82-99`) | `phase8_scheduler/scripts/wiring.py:175-180` | Nur Kosten (F); heilt beim Neustart, heute vermutlich nicht ausgelöst |
+
+**U1 ist zusätzlich live belegt** (`data/state/research_health.jsonl`): Pass 1 (12:14 CEST)
+sampelte genau **ein** Epic (`IX.D.DAX.IFMM.IP`, `ok: true`), Pass 2 (14:19 CEST) genau eines
+(`IX.D.DAX.IGN.IP`) — das jeweils nächste in der Liste. Ein funktionierender Sampler hätte im
+ersten Pass alle 5 `ok`-Epics abgearbeitet. Der IG-Fetch **gelingt** (die Punkte werden
+gebucht), der Crash liegt danach.
+
+**Folge für die Reihenfolge:** ein Neustart mit dem Shadow-Flag allein genügt **nicht** mehr —
+er würde Pairs erzeugen, die U2/U3 still abschreiben können, während der Sampler weiter tot
+ist. Siehe die korrigierte Entscheidung A in §5.
 
 ### 3.1 Der Messarm ist aus — und er ist der einzige (blockierend)
 
@@ -193,12 +222,22 @@ Zusätzlich seit dem Deferral-Handover: zwei echte IG-Allowance-Bugs gefunden **
 
 ## §5 Offene Entscheidungen (Optionen → Empfehlung → Folge)
 
-**A — Neustart mit `--enable-shadow-schedule`?** *(blockierend für Step 9)*
-- (a) **Neustart mit `--enable-divergence-sampler --enable-shadow-schedule`**, danach Step 9
-  starten. → *Empfehlung.* Der H1-Timer erzeugt Pairs je `ok`-Epic alle 30 Min, und Alarm
-  (b) aus §3.2 wird im selben Zug scharf. Kosten: ein Neustart, keine Code-Änderung.
-- (b) Beweiswoche ohne Shadow starten. → Garantierter FAIL an §7 „Kern"; vierte verlorene
+**A — Wann startet die Beweiswoche?** *(blockierend für Step 9; korrigiert nach dem
+Ultrareview — die ursprüngliche Fassung „nur ein Flag" ist überholt)*
+- (a) **Erst U1–U3 fixen (nächstes Wochenendfenster, Bot steht), dann Neustart mit
+  `--enable-divergence-sampler --enable-shadow-schedule`, dann Step 9.** → *Empfehlung.*
+  Die drei Fixes sind klein und liegen zu zweidritteln in Phase-12-eigenem Code
+  (`heartbeat.py`/`service.py`; nur U2s Fix-Ort liegt in `wiring.py`). Ohne sie misst die
+  Woche entweder nichts (C) oder schreibt ihre eigenen Messzeilen ab (E/Kern).
+- (b) Sofort neu starten, nur mit dem Flag, Fixes danach. → Pairs entstehen, aber U2/U3
+  können sie still abschreiben und der Sampler bleibt tot ⇒ die Woche wäre bestenfalls
+  teilweise auswertbar. Nur sinnvoll, wenn Zeitdruck über Datenqualität geht.
+- (c) Beweiswoche ohne Shadow starten. → Garantierter FAIL an §7 „Kern"; vierte verlorene
   Datenwoche.
+- **Fix-Reihenfolge innerhalb (a):** U1 (eine Zeile, `normalize_bar_ts` existiert bereits) →
+  U3 (Start-Seite in `_covers_tail` bzw. `coverage_ratio` prüfen) → U2 (Retry-Cap greifen
+  lassen **und** den falschen Kommentar bei `wiring.py:477-480` korrigieren). U4 ist reine
+  Kostenoptimierung und kann warten.
 - **Ablauf (Nikinger) — erst stoppen, dann starten.** Ein zweiter Scheduler neben dem
   laufenden würde zwei IG-Logins parallel öffnen und sich gegenseitig die Session-Tokens
   zerschießen (`phase1_broker_wrapper/lightstreamer_integration_notes.md`, „Parallel-login

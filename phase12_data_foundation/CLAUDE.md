@@ -1,6 +1,6 @@
 ---
 status: live
-purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder + Heartbeat. Steps 0-8.5 gebaut, getestet (P12 117) und auf main committed (zuletzt 47d89b0) — die "still UNCOMMITTED"-Aussage früherer Fassungen ist überholt, korrigiert 2026-08-17 gegen git log. Session 6 (2026-08-17): erster voller Handelstag live ausgewertet — Resolver/Recorder/Archiv/Budget end-to-end bewiesen, ABER der Messarm (enable_shadow_schedule) ist aus ⇒ 0 Paper-Zeilen, Step 9 kann so nicht bestehen. Phase 12 ist OFFEN, nicht abgeschlossen; Done-Kriterium (Beweiswoche, Plan §7) nicht erreicht.
+purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder + Heartbeat. Steps 0-8.5 gebaut, getestet (P12 117) und auf main committed (zuletzt 47d89b0) — die "still UNCOMMITTED"-Aussage früherer Fassungen ist überholt, korrigiert 2026-08-17 gegen git log. Session 6 (2026-08-17): erster voller Handelstag live ausgewertet — Resolver/Recorder/Archiv/Budget end-to-end bewiesen, ABER der Messarm (enable_shadow_schedule) ist aus ⇒ 0 Paper-Zeilen; dazu vier verifizierte Ultrareview-Befunde U1-U4 (Sampler tot, Paper-Retry-Cap wirkungslos, _covers_tail einseitig, Mapper stale) — alle ungefixt, Fix-Orte im Handover §3.0. Step 9 kann so nicht bestehen. Phase 12 ist OFFEN, nicht abgeschlossen; Done-Kriterium (Beweiswoche, Plan §7) nicht erreicht.
 read-when: working in phase12_data_foundation/ — read PHASE12_PREPROOF_HANDOVER.md first (Tag-1-Ergebnisse, die drei Befunde vor Step 9, Entscheidungen A-D), dann diesen Kopf + den newest Session-stopped block; der volle Plan (docs/concepts/phase12_data_foundation_plan.md) ist der Ausführungsvertrag, dessen §6-Step-Block vor jedem Bauen lesen
 detail: L2
 up: ../CLAUDE.md
@@ -124,6 +124,21 @@ Siehe [`README.md`](./README.md).
 - 🟡 **Nur Befund, fremder Scope:** `reason_no_candidates` vermischt „keine Daten" mit
   „LLM enthält sich bewusst" (der feinere Name `REASON_LLM_ABSTAIN` existiert bereits
   scheduler-seitig); `market_regime_snapshots` ist zu 100 % (1162/1162) degradiert leer.
+- 🔴 **Nachtrag gleiche Session — Ultrareview, vier Befunde, alle gegen den Code
+  nachverifiziert, keiner gefixt** (Analyse/Fix-Trennung, Werktag, Bot läuft). Details +
+  Fix-Orte: Handover §3.0. Kurz:
+  **U1** `DivergenceSampler` crasht an IGs `yyyy/MM/dd HH:mm:ss` (`heartbeat.py:175` parst
+  mit `fromisoformat`, `service.py:119` normalisiert nicht) — Drossel wird vor dem Crash
+  gesetzt, die Ausnahme killt die Epic-Schleife ⇒ **Kriterium C tot**. **Live belegt:**
+  je Pass genau ein Epic, jeweils das nächste (`research_health.jsonl`) — meine frühere
+  Aussage „Sampler läuft" war damit falsch und ist im Handover korrigiert.
+  **U2** Retry-Cap des Paper-Trackers wirkungslos, weil `get_window` nie wirft
+  (`wiring.py:514-517`, Kommentar `:477-480` behauptet das Gegenteil).
+  **U3** `_covers_tail` prüft nur das Fensterende, nie den Anfang (`service.py:254-261`).
+  **U4** Scheduler-`TickerMapper` wird nur beim Start befüllt (`wiring.py:175-180`) —
+  reine Kostenfrage, heilt beim Neustart.
+  ⇒ **Entscheidung A im Handover ist korrigiert:** erst U1–U3 fixen, dann Neustart,
+  dann Step 9. „Nur ein Flag" reicht nicht mehr.
 
 ### Next
 
