@@ -49,10 +49,27 @@ kein LLM-Aufruf. Wer hier ein LLM „mappen/prüfen/schätzen" lassen will → s
   Archiv-Mitschrieb, anderer Zweck). Momentum-VETO bleibt unangetastet (D16) — sourct immer
   direkt aus P1-IG-Echtzeit-Bars, nie aus BarService/Archiv/yF.
 
-## Rahmen (Plan §1, verbindlich)
-Bot-berührende Steps nur am Wochenende (Bot steht, Markt zu). Werktags: docs-only /
-`data_foundation/`-Paket-Code selbst (eigene Dateien, eigene Tests, kein bestehender
-Phasen-Code, nichts in `data/` geschrieben). Live-/Netz-/Kosten-Tests macht der Nikinger.
+## Rahmen (Plan §1) — ⚠️ seit 2026-08-17 geändert
+
+> **Nikinger-Entscheidung 2026-08-17 (überschreibt Plan §1 für den Rest von Phase 12):**
+> **Arbeit findet ab jetzt direkt unter der Woche statt**, auch bot-berührend. Begründung:
+> der Bot läuft ohne die ausstehenden Fixes (U1–U3, s. Handover §3.0) **nicht gescheit** —
+> die Wochenend-Regel würde einen kaputten Messbetrieb um jeweils eine ganze Woche
+> verlängern, also genau das produzieren, wogegen die Notbremse gezogen wurde.
+> **Diese Entscheidung ist für die nächste Planungssession verbindlich zu übernehmen.**
+
+Daraus folgt für Werktags-Sessions:
+- Bot-berührende Änderungen sind erlaubt. **Vorher den Bot stoppen** (Kill-Switch oder
+  `kill <pid>`, `ps aux | grep scheduler.run` als Gegenprobe) — ein Datei-Edit wirkt ohnehin
+  nicht auf einen laufenden Prozess, und ein zweiter Scheduler daneben löst die
+  Parallel-Login-Falle aus. Nach dem Edit gezielt neu starten.
+- Unverändert gültig: Live-/Netz-/kostenpflichtige Läufe macht der **Nikinger**; die
+  Live-DB wird von Claude nur read-only (`mode=ro`) gelesen; Cross-Phase-Edits außerhalb
+  `data_foundation/` bleiben freigabepflichtig (die U2/U4-Fixorte in `wiring.py` fallen
+  darunter).
+
+**Vorherige Regel (historisch, bis 2026-08-17):** bot-berührende Steps nur am Wochenende
+(Bot steht, Markt zu); werktags docs-only / `data_foundation/`-Paket-Code selbst.
 
 ## Modul-Tabelle
 Siehe [`README.md`](./README.md).
@@ -152,13 +169,18 @@ Siehe [`README.md`](./README.md).
   Phase-11/WI-2-Wiederaufnahme (Handover §6). Nummerierung entscheidet der Nikinger.
 - Die zwei bekannten Step-6-Lücken (G-Deckung an einem POST_WINDOW-losen Tag;
   In-Memory-Sampler-Throttle über Neustarts) bleiben unverändert offen.
+- ⚠️ **Rahmen-Änderung (Nikinger, 2026-08-17):** die Wochenend-Regel ist aufgehoben —
+  gearbeitet wird ab jetzt **direkt unter der Woche**, auch bot-berührend, weil der Bot
+  ohne U1–U3 nicht gescheit läuft. Für die Planungssession verbindlich; s. `## Rahmen`
+  oben und Handover §1a.
+- **Gepusht:** dieser Stand ist auf `origin/main` (Nikinger-Freigabe 2026-08-17).
 
 ### Open questions / blockers
 
-- **Blocker für Step 9: Entscheidung A** (Messarm einschalten). Ohne sie misst die
-  Beweiswoche nichts und läuft in einen garantierten FAIL.
-- `main` ist **12 Commits ahead of `origin/main`** — committet wie beauftragt, **nicht
-  gepusht** (Entscheidung D).
+- **Blocker für Step 9: Entscheidung A** (U1–U3 fixen + Messarm einschalten). Ohne sie
+  misst die Beweiswoche nichts und läuft in einen garantierten FAIL.
+- Entscheidung D (Push) ist **erledigt** — der Nikinger hat freigegeben, `main` ist
+  gepusht.
 
 ---
 

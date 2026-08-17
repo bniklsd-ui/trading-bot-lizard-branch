@@ -1,7 +1,7 @@
 ---
 status: snapshot
 purpose: Phase 12 (Datenfundament) — Stand VOR der Beweiswoche. Steps 0–8.5 gebaut, getestet und am 2026-08-17 erstmals einen ganzen Handelstag live beobachtet. Enthält die Tag-1-Messergebnisse, den Befund warum Step 9 in der aktuellen Konfiguration NICHT bestehen kann, das Delta seit PHASE11_DEFERRAL_HANDOVER.md und die offenen Entscheidungen A–D. Keine Implementierungsdetails — Code ist Wahrheit.
-read-when: als erstes Dokument der nächsten Session; zwingend vor jedem Scheduler-Neustart, vor Step 9 (Beweiswoche) und vor jeder Aussage darüber, was die Notbremse vom 2026-08-11 gebracht hat
+read-when: als erstes Dokument der nächsten Session (insb. der Planungssession — §1a enthält eine verbindliche Rahmen-Änderung: Arbeit ab jetzt unter der Woche, nicht am Wochenende); zwingend vor jedem Scheduler-Neustart, vor Step 9 (Beweiswoche) und vor jeder Aussage darüber, was die Notbremse vom 2026-08-11 gebracht hat
 detail: L3
 up: ./CLAUDE.md
 down:
@@ -39,10 +39,25 @@ heute wurden **null** Paper-Zeilen erzeugt (die letzten überhaupt: 2026-08-07).
 **Dazu kommen drei verifizierte Code-Befunde aus dem Ultrareview vom selben Tag** (§3.0):
 der Divergenz-Sampler ist tot (crasht an IGs Timestamp-Format — Kriterium C), und zwei
 Bugs im Paper-Pfad schreiben Messzeilen still als `EXPIRED_UNRESOLVED` ab (Kriterium E/Kern).
-**Reihenfolge daher: erst diese drei kleinen Fixes (Wochenendfenster), dann der Neustart mit
-dem Messarm, dann Step 9** (Entscheidung A).
+**Reihenfolge daher: erst diese drei kleinen Fixes, dann der Neustart mit dem Messarm, dann
+Step 9** (Entscheidung A) — **unter der Woche, nicht am Wochenende** (Rahmen-Änderung, s. §1a).
 
 ---
+
+## §1a Rahmen-Änderung — für die Planungssession verbindlich (2026-08-17)
+
+> **Nikinger-Entscheidung:** die Phase-12-Regel „bot-berührende Steps nur am Wochenende"
+> (Plan §1) ist **aufgehoben**. Ab jetzt wird **direkt unter der Woche** gearbeitet, auch
+> bot-berührend. **Begründung: der Bot läuft ohne die ausstehenden Fixes nicht gescheit** —
+> jede Wochenend-Wartezeit verlängert einen kaputten Messbetrieb um eine volle Woche und
+> produziert damit genau das, wogegen die Notbremse vom 2026-08-11 gezogen wurde.
+>
+> **Die nächste Planungssession muss diese Regel übernehmen** und darf U1–U3 (§3.0) nicht
+> mehr auf ein Wochenendfenster terminieren. Praktisch: Bot vor dem Edit stoppen (`ps aux |
+> grep scheduler.run` als Gegenprobe — sonst Parallel-Login-Falle), Edit, gezielt neu starten.
+> Unverändert: Live-/Netz-/Kostenläufe macht der Nikinger, die Live-DB liest Claude nur
+> `mode=ro`, Cross-Phase-Edits außerhalb `data_foundation/` bleiben freigabepflichtig
+> (U2/U4 liegen in `wiring.py` und fallen darunter).
 
 ## §1 Ergebnisse (ehrliche Teilbilanz)
 
@@ -60,10 +75,10 @@ root 80.
 Kurz: Resolver, Recorder, Archiv, Budget-Metering und der BarService-Write-Through sind
 **alle** end-to-end im Echtbetrieb beobachtet — nicht nur offline bewiesen.
 
-**Gepusht und committet:** committet ✅ — die Steps 4–8.5 liegen auf `main`
+**Gepusht und committet:** ✅ beides — die Steps 4–8.5 liegen auf `main`
 (`49902b6`, `473c8e4`, `65ebec7`, `37f2f0a`, `47d89b0`; diese Session ergänzt Doku +
-`.gitignore`). **Gepusht ❌** — `main` ist **12 Commits ahead of `origin/main`**; Push ist
-eine Nikinger-Entscheidung (Entscheidung D), diese Session hat bewusst nicht gepusht.
+`.gitignore`), und der komplette Stand ist auf `origin/main` gepusht (Nikinger-Freigabe
+2026-08-17).
 
 **Nicht erreicht / offen geblieben:**
 1. **Die Beweiswoche (Step 9) hat nicht begonnen** und kann im aktuellen Zustand nicht
@@ -107,8 +122,9 @@ persistiert. **Was sie noch nicht gebracht hat: einen einzigen gemessenen Tag.**
 
 Ein Cloud-Ultrareview über den Phase-12-Diff (2026-08-17) lieferte vier Befunde. Alle vier
 sind **nachgelesen und bestätigt**, einer zusätzlich **live belegt**. Sie sind hier
-absichtlich **nicht gefixt** (Analyse/Fix-Trennung, Werktag, laufender Bot) — die Fixes sind
-klein und gehören ins nächste Wochenendfenster.
+absichtlich **nicht gefixt** (Analyse/Fix-Trennung — Opus analysiert, die Umsetzung ist ein
+eigener Schritt). Die Fixes sind klein und werden **unter der Woche** gemacht, nicht am
+Wochenende (§1a).
 
 | # | Befund | Ort | Wirkung auf §7 |
 |---|---|---|---|
@@ -224,7 +240,7 @@ Zusätzlich seit dem Deferral-Handover: zwei echte IG-Allowance-Bugs gefunden **
 
 **A — Wann startet die Beweiswoche?** *(blockierend für Step 9; korrigiert nach dem
 Ultrareview — die ursprüngliche Fassung „nur ein Flag" ist überholt)*
-- (a) **Erst U1–U3 fixen (nächstes Wochenendfenster, Bot steht), dann Neustart mit
+- (a) **Erst U1–U3 fixen (unter der Woche, Bot vorher stoppen — §1a), dann Neustart mit
   `--enable-divergence-sampler --enable-shadow-schedule`, dann Step 9.** → *Empfehlung.*
   Die drei Fixes sind klein und liegen zu zweidritteln in Phase-12-eigenem Code
   (`heartbeat.py`/`service.py`; nur U2s Fix-Ort liegt in `wiring.py`). Ohne sie misst die
@@ -260,7 +276,7 @@ Ultrareview — die ursprüngliche Fassung „nur ein Flag" ist überholt)*
 **B — Soll der Heartbeat „Messarm aus" als Problem werten?**
 - (a) **`assess_day` meldet an einem geplanten Messtag mit `shadow_enabled=False` ein
   Problem + `ok=False`.** → *Empfehlung.* Kleine, phasen-interne Änderung
-  (`data_foundation/heartbeat.py`, + Test), gehört ins nächste Wochenendfenster. Danach kann
+  (`data_foundation/heartbeat.py`, + Test), zusammen mit U1–U3 unter der Woche (§1a). Danach kann
   der Alarm nicht mehr „gesund" sagen, während null gemessen wird.
 - (b) So lassen, nur dokumentieren. → Der Alarm bleibt genau für die Fehlerklasse blind,
   wegen der die Phase existiert.
@@ -268,14 +284,15 @@ Ultrareview — die ursprüngliche Fassung „nur ein Flag" ist überholt)*
 **C — Wochenend-Epics in den Aktiv-Plätzen** *(cross-phase, `phase9_universe`)*
 - (a) `run_promotion_cycle` berücksichtigt `data_source_status` (SUN* zählen werktags nicht
   gegen `max_active`). → Messbarer Pool wächst 5 → bis 8, die Beweiswoche wird statistisch
-  belastbarer. Kosten: Eingriff in Phase-9-Code, Wochenende + Freigabe.
+  belastbarer. Kosten: Eingriff in Phase-9-Code, daher weiterhin Nikinger-Freigabe (der
+  Cross-Phase-Vorbehalt bleibt auch unter der neuen Werktags-Regel bestehen, §1a).
 - (b) `max_active` anheben. → Billiger, aber erhöht auch den IG-Verbrauch; Budget hat
   Luft (136/10000).
 - (c) Nichts tun, Pool bleibt 5. → *Für die erste Beweiswoche vertretbar* — 5 Epics × 5 Tage
   reichen für §7 „Kern". Empfehlung: **(c) jetzt, (a) nach Step 9.**
 
-**D — Push?** `main` ist 12 Commits ahead of `origin/main`. Committet wurde wie beauftragt;
-gepusht **nicht**. Nikinger-Entscheidung.
+**D — Push?** ✅ **erledigt (Nikinger-Freigabe 2026-08-17)** — der komplette Phase-12-Stand
+ist auf `origin/main`.
 
 ---
 
