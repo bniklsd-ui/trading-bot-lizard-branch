@@ -472,12 +472,22 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 
 ## Phase 12 — Datenfundament (Registry + BarService + Bar-Archiv + Recorder)
 
-> **Status: 🆕 geöffnet 2026-08-11, Ausführung begonnen.** Notbremse aus Phase 11 (oben):
+> **Status: 🔄 in Arbeit — Steps 0–8.5 gebaut, getestet (P12 117) und auf `main`; Step 9
+> (Beweiswoche) nicht begonnen, Done-Kriterium offen.** Notbremse aus Phase 11 (oben):
 > drei Datenwochen sind an drei Infrastruktur-Ausfällen gescheitert, nie an der Messung — die
 > gemeinsame Wurzel (**eine Tatsache in drei divergenten Speichern**, die Mehrquellen-Kette aus
 > Phase 9 nie eingeschaltet) ist wichtiger als die vorherige Phase. Execution-ready Plan
 > (Überweg C, Decisions D1–D20, Steps 0–10): [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md).
 > Bild: [`docs/architecture/data_foundation.svg`](./docs/architecture/data_foundation.svg).
+>
+> **Tag-1-Live-Auswertung (2026-08-17):** die Kette Resolver → Registry → `measurable_universe()`
+> → Recorder/BarService → `bars.sqlite` läuft end-to-end im Echtbetrieb (5 `ok`-Epics, 3 typisiert
+> `no_intraday_source`, 1891 Bars an einem Tag, IG-Verbrauch erstmals gemessen: 136/10 000 Punkte).
+> **Gemessen wurde trotzdem nichts:** der Messarm `enable_shadow_schedule` ist Default `False` und
+> im laufenden Prozess nicht gesetzt ⇒ 0 Paper-Zeilen — dieselbe Fehlerklasse wie `enable_ig_bars`,
+> diesmal aber an Tag 1 bemerkt. Stand, Befunde und Entscheidungen A–D:
+> [`phase12_data_foundation/PHASE12_PREPROOF_HANDOVER.md`](./phase12_data_foundation/PHASE12_PREPROOF_HANDOVER.md),
+> Bild dazu: [`docs/architecture/phase12_preproof.svg`](./docs/architecture/phase12_preproof.svg).
 
 **Goal:** eine echte Beweis-Messwoche läuft durch, ohne dass Infrastruktur die Messung tötet.
 Instrument-Registry wird die eine Wahrheit (abgeleitetes, code-verifiziertes Symbol-Mapping statt

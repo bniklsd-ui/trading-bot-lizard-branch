@@ -1,0 +1,168 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" font-family="Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6470"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1e7a4d"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+  </defs>
+
+  <rect width="1080" height="1080" fill="#f7f8fa"/>
+
+  <text x="40" y="46" font-size="25" font-weight="bold" fill="#1b1f24">Phase 12 — das Fundament steht, gemessen wird noch nichts</text>
+  <text x="40" y="70" font-size="13.5" fill="#5b6470">Stand 2026-08-17, erster voller Handelstag mit dem kompletten Stack · Steps 0–8.5 gebaut · Step 9 (Beweiswoche) nicht begonnen</text>
+  <line x1="40" y1="84" x2="1040" y2="84" stroke="#d5d9de" stroke-width="1"/>
+
+  <!-- ================= PANEL 1 — was live bewiesen ist ================= -->
+  <rect x="40" y="100" width="1000" height="286" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="100" width="1000" height="30" rx="6" fill="#e8f5ee"/>
+  <rect x="40" y="120" width="1000" height="10" fill="#e8f5ee"/>
+  <text x="56" y="121" font-size="15" font-weight="bold" fill="#1e7a4d">① GEBAUT UND LIVE BEWIESEN — nicht nur offline grün</text>
+
+  <!-- chain -->
+  <rect x="56" y="150" width="176" height="86" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="144" y="176" font-size="13" font-weight="bold" fill="#1b1f24" text-anchor="middle">Quellen</text>
+  <text x="144" y="196" font-size="11.5" fill="#5b6470" text-anchor="middle">IG /prices (Snapshot)</text>
+  <text x="144" y="212" font-size="11.5" fill="#5b6470" text-anchor="middle">yFinance (Last + Bars)</text>
+  <text x="144" y="228" font-size="11.5" fill="#5b6470" text-anchor="middle">kein LLM, nirgends</text>
+
+  <line x1="234" y1="193" x2="248" y2="193" stroke="#1e7a4d" stroke-width="2" marker-end="url(#ag)"/>
+
+  <rect x="252" y="150" width="176" height="86" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="340" y="176" font-size="13" font-weight="bold" fill="#1b1f24" text-anchor="middle">SymbolResolver</text>
+  <text x="340" y="196" font-size="11.5" fill="#1b1f24" text-anchor="middle">Preisvergleich, 2 % Toleranz</text>
+  <text x="340" y="212" font-size="11.5" fill="#1e7a4d" text-anchor="middle">Pass 1: 10:14:38Z</text>
+  <text x="340" y="228" font-size="11.5" fill="#5b6470" text-anchor="middle">Step 8.5 — erst heute gewirt</text>
+
+  <line x1="430" y1="193" x2="444" y2="193" stroke="#1e7a4d" stroke-width="2" marker-end="url(#ag)"/>
+
+  <rect x="448" y="150" width="176" height="86" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="536" y="176" font-size="13" font-weight="bold" fill="#1b1f24" text-anchor="middle">Registry (eine Wahrheit)</text>
+  <text x="536" y="196" font-size="11.5" fill="#1b1f24" text-anchor="middle">5 ok · 3 no_intraday_source</text>
+  <text x="536" y="212" font-size="11.5" fill="#1b1f24" text-anchor="middle">13 verified · 1 quarantined</text>
+  <text x="536" y="228" font-size="11.5" fill="#1e7a4d" text-anchor="middle">0 stille NULL-Fallbacks</text>
+
+  <line x1="626" y1="193" x2="640" y2="193" stroke="#1e7a4d" stroke-width="2" marker-end="url(#ag)"/>
+
+  <rect x="644" y="150" width="176" height="86" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="732" y="176" font-size="13" font-weight="bold" fill="#1b1f24" text-anchor="middle">Recorder + BarService</text>
+  <text x="732" y="196" font-size="11.5" fill="#1b1f24" text-anchor="middle">eigener Prozess, yF-only</text>
+  <text x="732" y="212" font-size="11.5" fill="#1e7a4d" text-anchor="middle">1. Write: 10:16:32Z</text>
+  <text x="732" y="228" font-size="11.5" fill="#5b6470" text-anchor="middle">= 114 s nach dem Resolver</text>
+
+  <line x1="822" y1="193" x2="836" y2="193" stroke="#1e7a4d" stroke-width="2" marker-end="url(#ag)"/>
+
+  <rect x="840" y="150" width="176" height="86" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="928" y="176" font-size="13" font-weight="bold" fill="#1b1f24" text-anchor="middle">data/bars.sqlite</text>
+  <text x="928" y="196" font-size="11.5" fill="#1b1f24" text-anchor="middle">1891 Bars — alle heute</text>
+  <text x="928" y="212" font-size="11.5" fill="#1b1f24" text-anchor="middle">62 Fetches im 5-Min-Takt</text>
+  <text x="928" y="228" font-size="11.5" fill="#5b6470" text-anchor="middle">überlebt den Bot-Zustand</text>
+
+  <!-- supporting row -->
+  <rect x="56" y="256" width="470" height="60" rx="5" fill="#f7f8fa" stroke="#d5d9de"/>
+  <text x="72" y="278" font-size="12.5" font-weight="bold" fill="#1b1f24">SourceBudget — Verbrauch gemessen statt geraten</text>
+  <text x="72" y="298" font-size="11.5" fill="#5b6470">136 von 10 000 Punkten · expiry 2026-08-23 · Soll laut Plan &lt; 1 500</text>
+
+  <rect x="546" y="256" width="470" height="60" rx="5" fill="#f7f8fa" stroke="#d5d9de"/>
+  <text x="562" y="278" font-size="12.5" font-weight="bold" fill="#1b1f24">Divergenz-Sampler — läuft</text>
+  <text x="562" y="298" font-size="11.5" fill="#5b6470">2 Samples · 0 mismatch · Tagesabdeckung in der Beweiswoche zu prüfen</text>
+
+  <text x="56" y="342" font-size="12" fill="#5b6470">Die drei Mechanismen, an denen drei Datenwochen starben, sind einzeln entschärft: Mapping abgeleitet + verifiziert · IG-Verbrauch gemessen · Bars</text>
+  <text x="56" y="360" font-size="12" fill="#5b6470">unabhängig vom Bot persistiert. Auch der Allowance-Bugfix aus Session 5 wirkt live — das Feld war vorher strukturell blind.</text>
+
+  <!-- ================= PANEL 2 — der Messarm ================= -->
+  <rect x="40" y="402" width="1000" height="300" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="402" width="1000" height="30" rx="6" fill="#fdecea"/>
+  <rect x="40" y="422" width="1000" height="10" fill="#fdecea"/>
+  <text x="56" y="423" font-size="15" font-weight="bold" fill="#c0392b">② WAS FEHLT — der Messarm ist ausgeschaltet, und er ist der einzige</text>
+
+  <rect x="56" y="452" width="210" height="72" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="161" y="478" font-size="13" font-weight="bold" fill="#1b1f24" text-anchor="middle">measurable_universe()</text>
+  <text x="161" y="498" font-size="11.5" fill="#1e7a4d" text-anchor="middle">= 5 Epics (heute erstmals)</text>
+  <text x="161" y="514" font-size="11.5" fill="#5b6470" text-anchor="middle">active AND data_source_status='ok'</text>
+
+  <line x1="268" y1="488" x2="322" y2="488" stroke="#c0392b" stroke-width="2" marker-end="url(#ar)"/>
+
+  <rect x="326" y="452" width="290" height="72" rx="5" fill="#fdecea" stroke="#c0392b" stroke-dasharray="5 4"/>
+  <text x="471" y="478" font-size="13" font-weight="bold" fill="#c0392b" text-anchor="middle">H1 Shadow-Scheduler — AUS</text>
+  <text x="471" y="498" font-size="11.5" fill="#1b1f24" text-anchor="middle" font-family="monospace">enable_shadow_schedule = False</text>
+  <text x="471" y="514" font-size="11.5" fill="#5b6470" text-anchor="middle">Default; Prozess ohne das Flag gestartet</text>
+
+  <line x1="618" y1="488" x2="672" y2="488" stroke="#c0392b" stroke-width="2" marker-end="url(#ar)"/>
+
+  <rect x="676" y="452" width="340" height="72" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="846" y="478" font-size="13" font-weight="bold" fill="#c0392b" text-anchor="middle">paper_trades — 0 Zeilen heute</text>
+  <text x="846" y="498" font-size="11.5" fill="#1b1f24" text-anchor="middle">letzte Zeile überhaupt: 2026-08-07</text>
+  <text x="846" y="514" font-size="11.5" fill="#5b6470" text-anchor="middle">also: null gemessene Tage, weiterhin</text>
+
+  <!-- second, inert path -->
+  <rect x="56" y="546" width="210" height="72" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="161" y="572" font-size="13" font-weight="bold" fill="#1b1f24" text-anchor="middle">abstain_records</text>
+  <text x="161" y="592" font-size="11.5" fill="#5b6470" text-anchor="middle">79 heute, alle research_empty</text>
+  <text x="161" y="608" font-size="11.5" fill="#5b6470" text-anchor="middle">der zweite, ältere Messpfad</text>
+
+  <line x1="268" y1="582" x2="322" y2="582" stroke="#c0392b" stroke-width="2" marker-end="url(#ar)"/>
+
+  <rect x="326" y="546" width="290" height="72" rx="5" fill="#fdecea" stroke="#c0392b" stroke-dasharray="5 4"/>
+  <text x="471" y="572" font-size="13" font-weight="bold" fill="#c0392b" text-anchor="middle">strukturell inert</text>
+  <text x="471" y="592" font-size="11.5" fill="#1b1f24" text-anchor="middle" font-family="monospace">open_shadow_pair()</text>
+  <text x="471" y="608" font-size="11.5" fill="#1b1f24" text-anchor="middle">braucht ein Epic — 1465 von 1476 sind NULL</text>
+
+  <line x1="618" y1="582" x2="672" y2="582" stroke="#c0392b" stroke-width="2" marker-end="url(#ar)"/>
+
+  <rect x="676" y="546" width="340" height="72" rx="5" fill="#fdf6e3" stroke="#b7791f"/>
+  <text x="846" y="572" font-size="13" font-weight="bold" fill="#b7791f" text-anchor="middle">⇒ H1 ist der einzige lebende Messarm</text>
+  <text x="846" y="592" font-size="11.5" fill="#1b1f24" text-anchor="middle">Plan §7 »Kern«: aufgelöste Pairs an ≥ 4/5 Tagen</text>
+  <text x="846" y="608" font-size="11.5" fill="#c0392b" text-anchor="middle">Step 9 kann so nicht bestehen — garantierter FAIL</text>
+
+  <text x="56" y="650" font-size="12" fill="#5b6470">Dieselbe Fehlerklasse wie <tspan font-family="monospace">enable_ig_bars</tspan>, wegen der die Notbremse gezogen wurde: gebaut, nie scharfgeschaltet. Unterschied zu damals —</text>
+  <text x="56" y="668" font-size="12" fill="#5b6470">es ist an Tag 1 aufgefallen, nicht nach drei Wochen. Und zusätzlich: 3 der 8 Aktiv-Plätze halten SUN*-Wochenend-Epics, die werktags nie messbar</text>
+  <text x="56" y="686" font-size="12" fill="#5b6470">werden — der messbare Pool ist damit auf 5 gedeckelt (<tspan font-family="monospace">promotion.py</tspan> kennt <tspan font-family="monospace">data_source_status</tspan> nicht).</text>
+
+  <!-- ================= PANEL 3 — der blinde Alarm ================= -->
+  <rect x="40" y="718" width="1000" height="176" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="718" width="1000" height="30" rx="6" fill="#fdf6e3"/>
+  <rect x="40" y="738" width="1000" height="10" fill="#fdf6e3"/>
+  <text x="56" y="739" font-size="15" font-weight="bold" fill="#b7791f">③ UND DER AUSFALL-ALARM MERKT ES NICHT (Requirement G, heute live vorgeführt)</text>
+
+  <rect x="56" y="768" width="300" height="104" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="206" y="794" font-size="13" font-weight="bold" fill="#1b1f24" text-anchor="middle" font-family="monospace">assess_day()</text>
+  <text x="72" y="818" font-size="11.5" fill="#1b1f24">ok=False nur bei:</text>
+  <text x="72" y="838" font-size="11.5" fill="#5b6470">(a) messbare Epics &gt; 0 und null Bars</text>
+  <text x="72" y="858" font-size="11.5" fill="#c0392b">(b) shadow_enabled UND null Pairs</text>
+
+  <line x1="358" y1="820" x2="412" y2="820" stroke="#b7791f" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="416" y="768" width="290" height="104" rx="5" fill="#fdf6e3" stroke="#b7791f"/>
+  <text x="561" y="794" font-size="13" font-weight="bold" fill="#b7791f" text-anchor="middle">data_health.py, heute</text>
+  <text x="561" y="818" font-size="12" fill="#1e7a4d" text-anchor="middle" font-family="monospace">ok: True · Exit 0</text>
+  <text x="561" y="840" font-size="12" fill="#c0392b" text-anchor="middle" font-family="monospace">pairs_opened: 0</text>
+  <text x="561" y="860" font-size="11.5" fill="#5b6470" text-anchor="middle">bars_today 1891 · measurable 5</text>
+
+  <line x1="708" y1="820" x2="762" y2="820" stroke="#b7791f" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="766" y="768" width="250" height="104" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="891" y="794" font-size="13" font-weight="bold" fill="#c0392b" text-anchor="middle">Ein Nulltag gilt als gesund</text>
+  <text x="891" y="818" font-size="11.5" fill="#1b1f24" text-anchor="middle">Ist der Messarm aus, kann</text>
+  <text x="891" y="836" font-size="11.5" fill="#1b1f24" text-anchor="middle">der Ausfalltag nicht auffallen —</text>
+  <text x="891" y="854" font-size="11.5" fill="#1b1f24" text-anchor="middle">genau das sollte G verhindern.</text>
+
+  <!-- ================= FOOTER ================= -->
+  <rect x="40" y="910" width="614" height="130" rx="6" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="56" y="936" font-size="15" font-weight="bold" fill="#1e7a4d">Ein Flag schließt beide Lücken</text>
+  <text x="56" y="962" font-size="12.5" fill="#1b1f24" font-family="monospace">run_scheduler.sh --enable-divergence-sampler --enable-shadow-schedule</text>
+  <text x="56" y="986" font-size="12" fill="#1b1f24">H1 erzeugt dann Pairs je ok-Epic alle 30 Min — und schärft im selben Zug</text>
+  <text x="56" y="1004" font-size="12" fill="#1b1f24">Bedingung (b) des Heartbeats. Keine Code-Änderung, nur ein Neustart.</text>
+  <text x="56" y="1026" font-size="12" fill="#5b6470">Prüfpunkt: binnen 30 Min neue SHADOW_BUY/SHADOW_SELL-Zeilen.</text>
+
+  <rect x="666" y="910" width="374" height="130" rx="6" fill="#ffffff" stroke="#c0392b"/>
+  <text x="682" y="936" font-size="15" font-weight="bold" fill="#c0392b">Nicht erreicht</text>
+  <text x="682" y="962" font-size="12" fill="#1b1f24">· Beweiswoche (Step 9) nicht begonnen</text>
+  <text x="682" y="982" font-size="12" fill="#1b1f24">· Step 10 (Lightstreamer) weiter gegatet</text>
+  <text x="682" y="1002" font-size="12" fill="#1b1f24">· WI-2/W2 weiterhin unbeantwortet</text>
+  <text x="682" y="1022" font-size="12" fill="#5b6470">Phase 12 ist offen, nicht abgeschlossen.</text>
+</svg>

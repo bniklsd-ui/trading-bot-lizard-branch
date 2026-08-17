@@ -1,12 +1,14 @@
 ---
 status: live
-purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder + Heartbeat. Steps 4+5+6 committed (49902b6, 473c8e4, 65ebec7). Step 7 (full integration + offline proof) + Step 8's two scripts (probe_allowance.py, reset_universe.py, D18) built Session 4, still UNCOMMITTED. Session 5 (2026-08-17): both real IG allowance bugs fixed. Same-day live run then found Step 8.5 (NEW, blocking Step 9): SymbolResolver built in Step 3, never wired into universe_refresher — measurable_universe() permanently empty. Step 8.5 now IMPLEMENTED + regression-green (P12 117) — still UNCOMMITTED; live proof (scheduler restart inside XETRA hours) is the Nikinger's next step. Steps 9-10 (gated, operator) come after that.
-read-when: working in phase12_data_foundation/ — read this head + its newest Session-stopped block first (⚠️ operator landmine there before any bot restart — affects epic_filter, the Recorder, and the divergence sampler, but is deliberately NOT a Step-6 CRITICAL alarm); the full plan (docs/concepts/phase12_data_foundation_plan.md) is the execution contract, read its relevant §6 step block before touching anything
+purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder + Heartbeat. Steps 0-8.5 gebaut, getestet (P12 117) und auf main committed (zuletzt 47d89b0) — die "still UNCOMMITTED"-Aussage früherer Fassungen ist überholt, korrigiert 2026-08-17 gegen git log. Session 6 (2026-08-17): erster voller Handelstag live ausgewertet — Resolver/Recorder/Archiv/Budget end-to-end bewiesen, ABER der Messarm (enable_shadow_schedule) ist aus ⇒ 0 Paper-Zeilen, Step 9 kann so nicht bestehen. Phase 12 ist OFFEN, nicht abgeschlossen; Done-Kriterium (Beweiswoche, Plan §7) nicht erreicht.
+read-when: working in phase12_data_foundation/ — read PHASE12_PREPROOF_HANDOVER.md first (Tag-1-Ergebnisse, die drei Befunde vor Step 9, Entscheidungen A-D), dann diesen Kopf + den newest Session-stopped block; der volle Plan (docs/concepts/phase12_data_foundation_plan.md) ist der Ausführungsvertrag, dessen §6-Step-Block vor jedem Bauen lesen
 detail: L2
 up: ../CLAUDE.md
 down:
+  - ./PHASE12_PREPROOF_HANDOVER.md                      # Stand vor der Beweiswoche, Tag-1-Ergebnisse, Entscheidungen A-D (L3, dated)
   - ../docs/concepts/phase12_data_foundation_plan.md   # full execution-ready plan, D1-D20, Steps 0-10 (L3, ausführungsreif)
   - ../phase10_v3/PHASE11_DEFERRAL_HANDOVER.md          # why this track exists (L3, dated)
+  - ../docs/architecture/phase12_preproof.svg           # Tag-1-Bild: was steht, was fehlt
   - ../docs/architecture/data_foundation.svg            # Fehlerbild + Zielbild
   - ./SESSIONS_ARCHIVE.md                               # rotierte Session-Blöcke (L3)
 updated: 2026-08-17
@@ -57,176 +59,90 @@ Siehe [`README.md`](./README.md).
 
 ---
 
-## Session stopped — 2026-08-17 (Session 5: Allowance-Bugfix + Step 8.5 SymbolResolver-Wiring)
+## Session stopped — 2026-08-17 (Session 6: Tag-1-Live-Auswertung + Pre-Proof-Handover)
 
-> **Ausgangslage:** Session 4 endete mit dem exakten, Nikinger-freigegebenen Fix-Plan im
-> `CLAUDE.md`-Next-Block (file:line-Anchors für beide Bugs). Diese Session war reine
-> Umsetzung des vorgegebenen Plans, keine erneute Diagnose.
+> **Auftrag:** Auswertung des ersten vollen Handelstags mit dem kompletten Stack, Antwort
+> auf die offenen Fragen aus Session 5, Vorschlag für die Zeit nach Steps 9/10 — und der
+> Handover. **Kein Bot-berührender Code angefasst** (Werktag, Bot läuft): read-only DB
+> (`mode=ro`), Doku, `.gitignore`. Alle Zahlen unten selbst erhoben, keine aus früheren
+> Blöcken übernommen.
+>
+> **Vollständiges Ergebnis: [`PHASE12_PREPROOF_HANDOVER.md`](./PHASE12_PREPROOF_HANDOVER.md)**
+> — dieser Block ist die Kurzfassung, nicht die Quelle.
 
 ### Completed
 
-1. **Bug 1 (root cause, Cross-Phase-Edit Phase 1, Nikinger-freigegeben 2026-08-17):**
-   `phase1_broker_wrapper/broker_wrapper/adapters/ig_adapter.py:436` (`get_ohlcv`) UND
-   `:466` (`get_historical_ohlcv`): `body.get("allowance", {})` →
-   `body.get("metadata", {}).get("allowance", {})` — spiegelt IGs echten,
-   Roh-Dump-verifizierten `/prices`-Shape (Session 4).
-2. **Der tote Test dafür gefixt:** `phase1_broker_wrapper/tests/test_ig_adapter.py`
-   — `test_get_ohlcv_happy_path_envelope_shape` (Zeile ~499) und
-   `test_get_historical_ohlcv_happy_path` (Zeile ~525): Mock-Body von top-level
-   `"allowance": {...}` auf `"metadata": {"allowance": {...}}}` umgestellt.
-3. **Bug 2 (Sekunden→ISO-Konvertierung):**
-   - `phase12_data_foundation/data_foundation/service.py`: `BudgetedIGBarProvider`
-     bekommt einen `now_fn`-Parameter (Default `_default_now`, gleiche Konvention wie
-     `BarService`/`SourceBudget`); `get_bars()` konvertiert `allowanceExpiry`
-     (Sekunden-Restwert) via `_iso(now_fn() + timedelta(seconds=int(...)))` vor
-     `budget.record_allowance(...)`, `None` bleibt `None`.
-   - `phase12_data_foundation/scripts/probe_allowance.py`: gleiche Konvertierung
-     (eigene kleine `_iso`-Hilfsfunktion, `datetime.now(timezone.utc)` direkt — das
-     Skript hat keinen injizierbaren `now_fn`, Live-Skript, keine Tests dafür nötig).
-4. **Kollateralfund beim Testlauf, nicht im Plan genannt, aber derselbe Fehlerklasse:**
-   `phase12_data_foundation/tests/test_service.py::test_budgeted_ig_books_spend_and_allowance_on_success`
-   mockte `allowanceExpiry` selbst als absolute-ISO-String (die alte, jetzt widerlegte
-   Annahme aus `SourceBudget`s Docstring) — mit dem `int(expiry_seconds)`-Cast schlug
-   das mit `ValueError` fehl. Fixture auf einen echten Sekunden-Wert (`345_600`)
-   umgestellt + `now_fn=lambda: NOW` explizit übergeben, gleiche Korrektur-Logik wie
-   Bug 1s Testfix (falsche Annahme, nicht Timing-Zufall).
+1. **Tag-1-Live-Auswertung** (Recorder `pid 33151` seit 09:56 CEST, Scheduler `pid 35195`
+   seit 12:09 CEST mit `--enable-divergence-sampler`). Ergebnis: die Kette
+   Resolver → Registry → `measurable_universe()` → Recorder/BarService → `bars.sqlite`
+   läuft end-to-end **live**, ohne Operator-Eingriff (Details: Handover §2).
+2. **`PHASE12_PREPROOF_HANDOVER.md`** (neu) — Status, Tag-1-Ergebnisse, die drei Befunde
+   vor Step 9, Delta gegen `PHASE11_DEFERRAL_HANDOVER.md` (A–G), Entscheidungen A–D,
+   Vorschlag für nach Steps 9/10.
+3. **`../docs/architecture/phase12_preproof.svg`** (neu, 1080×1080) — was steht, was fehlt,
+   warum der Alarm es nicht merkt.
+4. **Statuspflege** im selben Commit: Root-`CLAUDE.md`, `ROADMAP.md`, `docs/INDEX.md`,
+   dieser Phasenkopf, Rotation des Session-5-Blocks nach `SESSIONS_ARCHIVE.md`.
+5. **`.gitignore`**: `data/state/recorder.pid` + `data/state/recorder_state.json` ergänzt
+   (Phase-12-Laufzeitdateien, waren als einzige Dateien unter `data/` nicht ignoriert —
+   ein `git add -A` hätte Laufzeitstand committet; gleiche Einzelpfad-Konvention wie
+   `llm_usage.json`/`execution_state.json`).
+6. **Doku-Korrektur gegen Code** (Code gewinnt, datiert vermerkt): Phasenkopf und
+   `docs/INDEX.md` behaupteten „Steps 7/8/8.5 uncommitted" — `47d89b0` (+ `37f2f0a`) haben
+   sie gelandet. Korrigiert.
 
 ### Verified
 
-- `pytest phase1_broker_wrapper/tests -q` → **87 passed** (Baseline unverändert).
-- `pytest phase12_data_foundation/tests -q` → **116 passed** (Baseline unverändert,
-  inkl. des gefixten `test_service.py`-Falls).
-- `pytest phase8_scheduler/tests -q` → **237 passed** (Baseline unverändert).
-- Volle Regression, alle Phasen + root: P1 87 · P2 77 · P3 104 · P4 155 · P5 173 ·
-  P6 76 · P7 138 · P8 237 · P9 80 · P10 159 · P12 116 · meta 28 · root 80 — exakt die
-  Session-4-Baseline, keine Regression, keine neuen Tests nötig (reiner Bugfix +
-  Testkorrektur, kein neues Verhalten).
+- **Registry:** 22 Zeilen → 5 `active`/`ok`, 3 `active`/`no_intraday_source` (SUN*), 13
+  `verified`/`unverified`, 1 `quarantined`. `measurable_universe()` erstmals **nicht leer**
+  ⇒ **Step 8.5 ist live bewiesen**, nicht nur regression-grün.
+- **Resolver-Timing:** Pass 1 `10:14:38Z` (Startup-erzwungen — `runner.py:285` ruft
+  `_run_universe_refresher()` im Preflight, **vor** der 240-Min-Drossel; korrigiert die
+  Session-5-Operator-Notiz, die einen unklaren Wartezeitraum nahelegte), Pass 2 `12:19Z`.
+- **Recorder:** erster 1m-Write `10:16:32Z` = **114 s** nach dem ersten Resolver-Write;
+  62 Fetch-Batches im 5-Min-Takt, `errors: []`.
+- **Archiv:** 1891 Bars, **alle heute** geschrieben.
+- **Allowance-Bugfix aus Session 5 wirkt live:** 28 echte `allowance_observations`
+  (`total=10000`, `remaining=9724`, `expiry=2026-08-23T20:53Z`), Verbrauch 136 Punkte —
+  damit ist die letzte offene Frage aus Session 5 („erster echter Live-Effekt") **geschlossen**.
+- **Step-6-Operator-Pfad erstmals real gelaufen:** `data_health.py --day 2026-08-17` →
+  `ok: True`, Exit `0`.
+- `pytest phase12_data_foundation/tests -q` → **117 passed** (heute nachgelaufen).
+
+### Befunde (Details + Belege: Handover §3)
+
+- 🔴 **Blockierend:** `enable_shadow_schedule` ist Default `False` und im laufenden Prozess
+  nicht gesetzt ⇒ **0 Paper-Zeilen heute** (letzte überhaupt 2026-08-07). Der
+  abstain-getriebene Pfad kann das nicht auffangen (`open_shadow_pair` braucht ein Epic;
+  1465 von 1476 `abstain_records` haben `epic IS NULL`) ⇒ der H1-Timer ist der **einzige**
+  lebende Messarm. Plan §7 „Kern" ⇒ **Step 9 kann so nicht bestehen.**
+- 🟠 `assess_day`s Bedingung (b) hängt selbst an `shadow_enabled` ⇒ ein Nulltag meldet
+  `ok=True`. Requirement G ist im Ist-Zustand blind für genau den laufenden Ausfall —
+  heute live vorgeführt.
+- 🟡 3 der 8 Aktiv-Plätze halten SUN*-Epics (`max_active=8`, `promotion.py` kennt
+  `data_source_status` nicht) ⇒ messbarer Pool auf 5 gedeckelt.
+- 🟡 **Nur Befund, fremder Scope:** `reason_no_candidates` vermischt „keine Daten" mit
+  „LLM enthält sich bewusst" (der feinere Name `REASON_LLM_ABSTAIN` existiert bereits
+  scheduler-seitig); `market_regime_snapshots` ist zu 100 % (1162/1162) degradiert leer.
 
 ### Next
 
-- **Überholt durch die Nachtrag-Sektion unten:** Punkt 4 dieser Liste nannte die
-  leere `measurable_universe()` noch als hinzunehmende Operator-Landmine — das ist
-  jetzt Step 8.5 (s. Nachtrag), **nicht mehr** nur eine Landmine zum Umschiffen, sondern
-  gefixt + regression-grün, aber noch **live unbewiesen**.
-- **Nikinger-Job (freigegeben, per `feedback_live_testing`-Memory):**
-  1. `probe_allowance.py` erneut laufen lassen — sollte jetzt ein echtes
-     `remaining`/`expiry` in `data/bars.sqlite` schreiben (vorher strukturell blind).
-  2. Sobald `remaining > 1500` beobachtet: `scripts/reset_universe.py` (keine Argumente
-     nötig) — setzt die quarantined Zeilen zurück.
-  3. Recorder-Warmlauf (werktags erlaubt, yF-only): `bash phase12_data_foundation/
-     scripts/run_recorder.sh`.
-  4. Scheduler-Neustart (`run_scheduler.sh`) — **innerhalb der XETRA-Handelszeit**
-     (Mo–Fr 09:00–17:30 Berlin), damit der jetzt gewirte `SymbolResolver` seinen
-     ersten echten Beweis liefern kann (s. Nachtrag für die Negativ-Kontrollen).
-- Steps 9-10 (Beweiswoche, Lightstreamer) — gated auf einen laufenden Scheduler +
-  einem bestätigt nicht-leeren `measurable_universe()` + 5 Handelstage, weiterhin
-  kein heutiger Schritt.
-- **Commit:** dieser Stand (Allowance-Bugfix + Step 8.5 Wiring + alle Session-4-
-  Uncommitted-Dateien) ist commit-fertig — Nikinger-Entscheidung, ob jetzt oder nach
-  dem ersten echten Live-Neustart.
-- Die beiden aus Step 6 bekannten, bewusst offenen Lücken (G-Deckungslücke bei einem
-  POST_WINDOW-losen Tag; In-Memory-Sampler-Throttle über Neustarts) bleiben unverändert
-  offen — kein Teil dieser Session.
+- **Nikinger-Entscheidungen A–D** (Handover §5). **A ist blockierend für Step 9:**
+  Neustart mit
+  `bash phase8_scheduler/scripts/run_scheduler.sh --enable-divergence-sampler --enable-shadow-schedule`
+  — danach binnen ~30 Min neue `SHADOW_BUY`/`SHADOW_SELL`-Zeilen erwarten.
+- Danach erst Step 9 (Beweiswoche, 5 Handelstage, täglich `data_health.py`), dann Step 10.
+- Vorschlag für nach 9/10: Funnel-Reason-Split → Promotion lernt `data_source_status` →
+  Phase-11/WI-2-Wiederaufnahme (Handover §6). Nummerierung entscheidet der Nikinger.
+- Die zwei bekannten Step-6-Lücken (G-Deckung an einem POST_WINDOW-losen Tag;
+  In-Memory-Sampler-Throttle über Neustarts) bleiben unverändert offen.
 
 ### Open questions / blockers
 
-- Keine. Beide Bugs sind gefixt und über die volle Regression verifiziert; ihr erster
-  echter Live-Effekt (ein `probe_allowance.py`-Lauf mit echten, nicht-leeren Werten)
-  ist weiterhin unbewiesen bis zum nächsten Nikinger-Lauf — nicht mit "verifiziert"
-  verwechseln (gleiche Disziplin wie der 08-11-Notbremse-Befund).
-
-### Nachtrag (gleiche Session) — Live-Lauf gestartet, ein echter Plan↔Code-Drift gefunden: `SymbolResolver` wird nie aufgerufen
-
-Nach dem Bugfix hat der Nikinger den vollen Stack live gestartet: `init_db.py` (Schema
-war bei v5 hängengeblieben, Migration 006 fehlte real — nachgeholt, additiv, 22 Zeilen
-unangetastet), `probe_allowance.py`, `reset_universe.py` (18 Epics zurückgesetzt),
-Recorder (crashte initial genau an der fehlenden Migration 006, nach dem `init_db.py`-
-Nachholen sauber neu gestartet, pid 33151), Scheduler mit `--enable-divergence-sampler`
-(pid 33397). Alles läuft, kein KILL, `consecutive_failures=0`, `bars.sqlite` wächst
-bereits (116 Zeilen/22 Epics über `BarService`-Write-Through) — **Steps 4-7 sind end-to-
-end bewiesen live**, nicht nur offline.
-
-**Aber:** `measurable_universe()` liefert weiterhin 0 (`status='active' AND
-data_source_status='ok'`) — alle 22 Zeilen stehen unverändert auf `'unverified'`, auch
-nach mehreren `universe_refresher`-Durchläufen (`last_universe_refresh_ts` bewegt sich,
-`status` wandert discovered→verified→active, `data_source_status` nie). **Root Cause
-(Grep, kein Rätsel):** `SymbolResolver` (Step 3, committed `c198ca5`) wird **an keiner
-einzigen Laufzeit-Stelle instanziiert** — `grep -rn "SymbolResolver(" phase8_scheduler
-phase9_universe phase12_data_foundation --include="*.py"` (Tests ausgenommen) liefert
-null Treffer. `universe_refresher` (`wiring.py:855-912`) ruft `seed_curated` →
-`discover` → `run_promotion_cycle` → (falls aktiv) den Divergenz-Sampler — nie den
-Resolver. D6 sagt explizit „läuft wiederkehrend (im `universe_refresher`-Pass)"; Plan
-§6 Step 8 Bullet 6 listet „Resolver vergibt `data_source_status`" als **erwartete
-Beobachtung**, nicht als manuellen Schritt. Kein späterer Step (9/10) verdrahtet das
-nach — es ist schlicht nie gebaut worden, obwohl der Plan es für Steps 3-7 vorsah.
-
-**Folge:** ohne diesen Fix bleibt `measurable_universe()` für immer leer, der Recorder
-schreibt für immer 0 Bars/Epics, Paper/Shadow-Messung startet nie — die Beweiswoche
-(Step 9) kann im aktuellen Zustand **nicht bestehen**. Der laufende Live-Test ist davon
-nicht bedroht (läuft harmlos weiter, produziert echte Archiv-Daten), aber er wird sich
-**nicht selbst heilen**, egal wie lange er läuft. Exakt dasselbe Fehlerbild wie
-`enable_ig_bars` (`PHASE11_DEFERRAL_HANDOVER.md`) — gebaut, nie scharfgeschaltet.
-
-**Advisor-bestätigt (2026-08-17):** die zwei von `SymbolResolver.__init__` benötigten
-Callables sind an der `universe_refresher`-Stelle bereits vorhanden, kein neues
-Plumbing nötig — `broker` (closure-Variable, `broker.get_price(epic).data` liefert
-`{bid, ask}`) und `research.market_data` (bereits verdrahteter `MarketDataFetcher`,
-`.get_last_price(symbol) -> tuple[float, str] | None` — exakt die von `SymbolResolver`
-erwartete Signatur, `phase3_external_data/external_data/fetcher.py:464`, Commit
-`066949f` wurde genau dafür gebaut). Der Fix ist damit ein additiver ~5-10-Zeilen-Call
-in `universe_refresher`, kein Redesign — aber ein Cross-Phase-Edit an einer
-Bot-berührenden Datei, während der Bot live läuft, und eine **neue** Entdeckung ohne
-vorab abgestimmten Fix-Plan (anders als der Allowance-Bugfix oben). Root-`CLAUDE.md`
-+ Phase-12-`Rahmen` legen sowas auf Wochenende/Nikinger-Freigabe.
-
-**Nikinger-Entscheidung (gleiche Session):** sofort wiring, aber über eine eigene
-Plan-Mode-Session (nicht spontan inline) — als neuer **Step 8.5** im Plan-Dokument
-festgehalten (`docs/concepts/phase12_data_foundation_plan.md`, zwischen Step 8 und
-Step 9, explizit **blockierend für Step 9**). Plan-Session ist der nächste Schritt.
-
-**Plan-Mode-Session (Fortsetzung):** execution-ready Plan gespeichert unter
-`/home/trading-bot/.claude/plans/cheeky-floating-hopcroft.md` (Repo-extern,
-`~/.claude/plans/`) — Change an `phase8_scheduler/scripts/wiring.py` innerhalb
-`universe_refresher()`, zwischen `run_promotion_cycle(...)` und dem
-`divergence_sampler`-Block. Session endete ohne Umsetzung.
-
-**✅ Umsetzungs-Session (2026-08-17, Fortsetzung):** eigene Plan-Mode-Session gegen den
-aktuellen Code re-verifiziert (alle Anker exakt bestätigt — `universe_refresher` weiterhin
-`wiring.py:855-912`, `SymbolResolver.__init__`-Kwargs alle mit Defaults, `get_price(epic)
-.data`→`{bid,ask}`, `get_last_price`→`fetcher.py:464`); finaler Plan
-`/home/trading-bot/.claude/plans/peaceful-juggling-lemon.md` (supersedet
-`cheeky-floating-hopcroft.md`), Nikinger-freigegeben, **implementiert**:
-- `wiring.py`: `SymbolResolver(...).resolve_universe()`-Call zwischen
-  `run_promotion_cycle` und dem Sampler-Block (Zeile ~893) + `logger.info` mit den
-  vollen `ResolverReport`-Zählern (macht den künftigen Live-Beweis falsifizierbar,
-  nicht nur "es lief").
-- **Zwei Korrekturen ggü. der ursprünglichen Planpass-Fassung**, beide vor Umsetzung
-  verifiziert: (1) ein Test ist doch nötig — der Plan-Doc-Eintrag für Step 8.5 verlangt
-  ihn explizit, die "`wiring.py` hat keine Testsuite"-Konvention verbietet nur
-  *Laufzeit*-Imports (`test_run.py:3`), keinen statischen Check; neue
-  `phase12_data_foundation/tests/test_resolver_wiring.py` (AST-Guard, Vorbild
-  `test_isolation.py`) prüft, dass `universe_refresher`s Funktionskörper einen
-  `SymbolResolver(`-Call enthält. (2) Namenskorrektur: die throttelnde Methode heißt
-  `_maybe_refresh_universe`, nicht `_maybe_run_universe_refresher`.
-- Status-Konstanten gegengecheckt: `_STATUS_ACTIVE`/`_STATUS_DISCOVERED` = `"active"`/
-  `"discovered"`, identisch zu `universe/models.py` — kein Drift.
-- **Verifiziert:** `py_compile` clean; volle Regression unverändert außer P12:
-  P1 87 · P2 77 · P3 104 · P4 155 · P5 173 · P6 76 · P7 138 · P8 237 · P9 80 · P10 159 ·
-  **P12 117** (116+1) · meta 28 · root 80. Acceptance-Grep `SymbolResolver(` zeigt eine
-  echte Call-Stelle (Zeile 893).
-- **Live-Beweis bleibt Nikinger-Job** (`feedback_live_testing`) — der laufende
-  Scheduler (pid 33397) braucht einen Neustart, ein Datei-Edit wirkt nicht auf einen
-  bereits laufenden Prozess. **Zeitfenster beachten:** der Resolver bucht eine
-  Beobachtung nur bei offenem Markt (XETRA Mo–Fr 09:00–17:30 Berlin) UND einem
-  yFinance-Balken jünger als 30 Min — ein Neustart außerhalb dieses Fensters lässt alle
-  22 Epics bei `unverified`, ununterscheidbar vom unreparierten Bug. Europäische Epics
-  sollten sofort auflösen; US-Epics erst nach ~15:30 Berlin (US-Handelsüberlappung).
-  Negativ-Kontrollen (unterscheidbar über die neue `logger.info`-Zeile): `checked=22,
-  ok=0` ohne Writes = Markt zu/inconclusive; `checked=0` oder keine Log-Zeile = weiterhin
-  kaputt. Danach `measurable_universe()` + nächster Recorder-Tick (`epics > 0`) prüfen.
-- **Commit:** dieser Stand (Wiring + Test + Doku, plus alle vorherigen Session-4/5-
-  Uncommitted-Dateien) ist commit-fertig — weiterhin Nikinger-Entscheidung, ob jetzt
-  oder nach dem ersten echten Live-Neustart.
+- **Blocker für Step 9: Entscheidung A** (Messarm einschalten). Ohne sie misst die
+  Beweiswoche nichts und läuft in einen garantierten FAIL.
+- `main` ist **12 Commits ahead of `origin/main`** — committet wie beauftragt, **nicht
+  gepusht** (Entscheidung D).
 
 ---
 

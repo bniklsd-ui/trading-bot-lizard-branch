@@ -128,6 +128,13 @@ data/state/research_health.jsonl
 # scripts/archive_verification_trades.py before it deletes verification/test trades from the
 # live DB — runtime-generated archival data, same category as the other data/ entries above.
 data/archive/
+# Phase 12 (Datenfundament, Step 5) Recorder runtime files — the duplicate-process PID
+# guard and the heartbeat state the Recorder rewrites every tick. Added 2026-08-17: the
+# same reconciliation P3/P4/P5/P6/P8 did — after the Recorder's first live day these were
+# the only files under data/ still untracked-but-not-ignored, i.e. one `git add -A` away
+# from committing runtime state.
+data/state/recorder.pid
+data/state/recorder_state.json
 
 # --- Logs ---
 *.log
