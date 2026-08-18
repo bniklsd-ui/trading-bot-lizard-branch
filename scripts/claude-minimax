@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Claude Code gegen MiniMax statt Anthropic. Lässt `claude` unangetastet.
+set -euo pipefail
+VENV_PY="$HOME/trading-bot/phase1_broker_wrapper/.venv/bin/python"   # keyring lebt NUR hier
+KEY="$("$VENV_PY" - <<'PY'
+import sys, keyring
+v = keyring.get_password("trading-bot-minimax", "minimax_api_key")
+if not v:
+    sys.exit("minimax key not in keyring — run: python scripts/store_minimax_key.py")
+print(v)
+PY
+)"
+export ANTHROPIC_BASE_URL="${MINIMAX_BASE_URL:-https://api.minimax.io/anthropic}"
+export ANTHROPIC_AUTH_TOKEN="$KEY"
+export ANTHROPIC_MODEL="${MINIMAX_MODEL:-MiniMax-M3}"
+# Ohne diese beiden fragt Claude Code seine Hintergrund-Calls weiter unter einem
+# claude-*-Namen an, den MiniMax nicht kennt — s. Stolperstein 2 unten.
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="$ANTHROPIC_MODEL"
+export ANTHROPIC_SMALL_FAST_MODEL="$ANTHROPIC_MODEL"
+unset ANTHROPIC_API_KEY        # ein vorhandener Anthropic-Key darf nicht still gewinnen
+exec claude "$@"
