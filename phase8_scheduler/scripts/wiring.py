@@ -474,16 +474,34 @@ def _build_paper_engine(config: SchedulerConfig, broker: Any, exec_cfg: Any) -> 
 # *transient* failure (a 500, a 405 market-offline, a network blip) before being written
 # off — and what gets destroyed is a WI-2 measurement row, the output this phase exists to
 # produce. 12 attempts x the 5-minute cadence ~ one hour of tolerance, while still cutting
-# the unbounded case 5x. Since Phase 12 Step 4, the tracker itself never calls IG directly
-# (BarService.get_window's own budget-aware chain does, gated by SourceBudget — one shared
-# ledger, not a per-tracker guess), so a tripped budget shows up as a short/failed
-# get_window result like any other fetch problem, subject to this same cap.
+# the unbounded case 5x.
 #
-# Corrected 2026-08-17 (P12.5 plan §3/U2): the paragraph above was written as a design
-# intent, but until the U2 fix a short get_window result (empty bars, not a raised
-# exception) hit paper.py's `outcome is None` branch, which wrote the trade off on its
-# *first* miss instead of charging this cap. It is true now that _resolve_group charges
-# a failed attempt for that case too.
+# Phase 13 §6 A3 (2026-08-18): the cap is now also charged for a third "not enough data
+# yet" case — a window the coverability guard (`window_ok` closure below) rejects because
+# `assess_window` saw a gap it can't trust. Treating that as a failed attempt is exactly
+# the U2 pattern: not enough bars to decide, try again next tick, expire after the cap.
+# Pre-A3, the same set of bars would have produced a fabricated TIME_STOP exit (P12.5 §4
+# F3) — silently indistinguishable from a clean outcome. The structural fix lives in
+# paper.py; the wiring-side comment here is just so the cap is no longer justified only
+# by the (now stale) "BarService.get_window's own budget-aware chain" paragraph. Read
+# Phase 13 §6 A3 for the full reasoning; do not revert this cap without re-reading F3.
+#
+# Pre-A3 history (kept for the audit trail, no longer the source of truth):
+#   Since Phase 12 Step 4, the tracker itself never calls IG directly (BarService.get_window
+#   used to do so behind a budget-aware chain, gated by SourceBudget — one shared ledger,
+#   not a per-tracker guess). A tripped budget showed up as a short/failed get_window
+#   result like any other fetch problem, subject to this same cap.
+#   Corrected 2026-08-17 (P12.5 plan §3/U2): the paragraph above was written as a design
+#   intent, but until the U2 fix a short get_window result (empty bars, not a raised
+#   exception) hit paper.py's `outcome is None` branch, which wrote the trade off on its
+#   *first* miss instead of charging this cap. It is true now that _resolve_group charges
+#   a failed attempt for that case too.
+# Phase 13 §6 A2 (2026-08-18, the same session as A3): BarService.get_window is now a
+# **pure archive read** — the budget-aware chain is gone from the tracker seam. The chain
+# stays on the research seam (``BarService.get_bars``) where it belongs. The cap here
+# therefore catches *only* three things from now on: a raised fetch error (e.g. broker
+# unreachable), a fetch that returns too few bars for `resolve_paper_trade` to decide
+# an outcome, and a window the `window_ok` guard rejects. No silent fabricated TIME_STOPs.
 _PAPER_MAX_FETCH_ATTEMPTS = 12
 
 
@@ -520,7 +538,35 @@ def _build_paper_tracker(config: SchedulerConfig, exec_cfg: Any, bar_service: An
     def bar_fetch(epic: str) -> list[dict[str, Any]]:
         now = datetime.now(timezone.utc)
         start = _utc_iso(now - timedelta(minutes=exec_cfg.max_hold_minutes + 60))
+        # Phase 13 §6 A2: bar_service.get_window is a **pure archive read** — no IG
+        # fetch, no chain. The window is whatever the archive holds for that epic + range.
+        # The trade's window_ok guard (below) decides whether an archive-only window is
+        # enough to resolve the trade; if not, the tick charges a failed attempt and waits
+        # for more bars to land.
         return bar_service.get_window(epic, "1m", start, _utc_iso(now))
+
+    # Phase 13 §6 A3: the window_ok closure is the guard that sits **before**
+    # resolve_paper_trade in PaperTradeTracker._resolve_group. Without it, a gap *in the
+    # middle* of the trade window would produce a fabricated TIME_STOP exit (P12.5 §4 F3)
+    # because resolve_paper_trade filters bars by `timestamp >= created_utc` and checks
+    # the SL touch unconditionally before the time-stop bail-out. assess_window's
+    # "gap" reason catches the case the old tail-only check didn't see at all.
+    # Lazy import — phase isolation (paper.py is in phase10_v3, coverage.py in phase12).
+    def window_ok(epic: str, bars: Sequence[Mapping[str, Any]], created_utc: str, time_stop_utc: str) -> bool:
+        from data_foundation.coverage import assess_window
+        verdict = assess_window(
+            [b.get("timestamp", "") for b in bars],
+            created_utc, time_stop_utc, 1,
+        )
+        if not verdict.covered:
+            record_event(str(_OBSERVABILITY_PATH), {
+                "event": "window_uncovered",
+                "epic": epic,
+                "reason": verdict.reason,
+                "ratio": verdict.ratio,
+                "largest_gap_min": verdict.largest_gap_min,
+            })
+        return verdict.covered
 
     # The tracker itself makes zero direct IG calls since Phase 12 Step 4 — BarService's
     # internal BudgetedIGBarProvider.can_spend gate (SourceBudget, shared with research) is
@@ -565,6 +611,10 @@ def _build_paper_tracker(config: SchedulerConfig, exec_cfg: Any, bar_service: An
         stale_after_minutes=exec_cfg.max_hold_minutes + 60,
         budget_ok=budget_ok,
         max_fetch_attempts=_PAPER_MAX_FETCH_ATTEMPTS,
+        # Phase 13 §6 A3: window_ok guards against gaps in the middle of the trade window
+        # (F3: fabricated TIME_STOP). Defined above; lazy assess_window import keeps the
+        # phase-isolation contract (paper.py is in phase10_v3, coverage.py in phase12).
+        window_ok=window_ok,
     )
 
 

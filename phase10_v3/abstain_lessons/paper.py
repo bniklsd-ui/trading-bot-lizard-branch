@@ -476,6 +476,7 @@ class PaperTradeTracker:
         stale_after_minutes: int | None = None,
         budget_ok: Callable[[], bool] | None = None,
         max_fetch_attempts: int | None = None,
+        window_ok: Callable[[str, Sequence[Mapping[str, Any]], str, str], bool] | None = None,
     ) -> None:
         self.store = store
         self.bar_fetch = bar_fetch
@@ -485,6 +486,11 @@ class PaperTradeTracker:
         self.stale_after_minutes = stale_after_minutes
         self.budget_ok = budget_ok or (lambda: True)
         self.max_fetch_attempts = max_fetch_attempts
+        # Phase 13 §6 A3: window_ok is the guard that sits **before** resolve_paper_trade.
+        # Default None = bit-identical to the pre-A3 behaviour (the wiring layer supplies
+        # the real closure in production; tests can inject any predicate). Argument order
+        # is locked: (epic, bars, created_utc, time_stop_utc).
+        self.window_ok = window_ok
         # In-memory on purpose: the daemon runs for days at a time, so this is durable
         # enough for its job, and `stale_after_minutes` is the backstop across a restart.
         # A column would cost a migration to bound something already bounded.
@@ -588,6 +594,21 @@ class PaperTradeTracker:
         resolved_by_record: dict[str, list[PaperTrade]] = {}
         for trade in trades:
             try:
+                # Phase 13 §6 A3: window_ok-guard sits **before** resolve_paper_trade.
+                # A gap *in the middle* of the trade window would otherwise produce a
+                # fabricated TIME_STOP exit (P12.5 §4 F3): resolve_paper_trade filters
+                # bars by `timestamp >= created_utc` and checks the SL touch
+                # unconditionally before the time-stop bail-out, so a missing SL-touch
+                # bar runs the loop through to the first bar `>= time_stop_utc` and
+                # returns TIME_STOP -- indistinguishable from a clean outcome. The guard
+                # routes the trade through the existing U2 retry cap (counts as a failed
+                # attempt) so it gets another chance on the next tick with more bars in
+                # the archive, instead of writing a fabricated resolution.
+                if self.window_ok is not None and not self.window_ok(
+                    trade.epic, bars, trade.created_utc, trade.time_stop_utc
+                ):
+                    self._charge_failed_attempt([trade], now)
+                    continue
                 outcome = resolve_paper_trade(trade, bars)
                 if outcome is None:
                     # Both of resolve_paper_trade's None-returns mean "not enough bar data yet",

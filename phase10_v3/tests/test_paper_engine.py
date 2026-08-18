@@ -586,6 +586,163 @@ def test_tick_expires_after_the_attempt_cap(paper_store):
     assert row[0] == "EXPIRED_UNRESOLVED"
 
 
+# --- Phase 13 §6 A3: window_ok-guard (F3: fabricated TIME_STOP) ----------------
+
+
+def test_window_ok_none_default_is_bit_identical(paper_store):
+    """Regression: pre-A3 callers (no `window_ok` kwarg) behave exactly as before.
+
+    Same setup as `test_tracker_resolves_due_trade_and_marks_resolved` — proves the
+    new parameter doesn't change a single line of the resolution path when no guard
+    is supplied."""
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+
+    bars = [_bar("2026-07-17T09:05:00.000Z", 18000, 18050, 17990, 18040)]  # TP touch
+    tracker = PaperTradeTracker(paper_store, bar_fetch=lambda epic: bars)  # no window_ok
+    tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    row = paper_store.conn.execute(
+        "SELECT status, exit_reason FROM paper_trades WHERE paper_id = ?", (trade.paper_id,)
+    ).fetchone()
+    assert row[0] == "RESOLVED"
+    assert row[1] == "TP"
+
+
+def test_window_ok_false_charges_attempt_and_does_not_call_resolve(paper_store):
+    """A guard that says "no" must (a) charge the retry cap, (b) leave the trade
+    OPEN, and (c) never invoke resolve_paper_trade — proven by the exit_reason
+    column staying NULL (resolve_paper_trade is the only writer of that field)."""
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+
+    bars = [_bar("2026-07-17T09:05:00.000Z", 18000, 18050, 17990, 18040)]  # would be TP
+    guard_calls: list[tuple[str, str, str]] = []
+
+    def window_ok(epic, bars_arg, created_utc, time_stop_utc):
+        guard_calls.append((epic, created_utc, time_stop_utc))
+        return False
+
+    tracker = PaperTradeTracker(
+        paper_store, bar_fetch=lambda epic: bars, window_ok=window_ok, max_fetch_attempts=12,
+    )
+    tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    assert guard_calls == [(trade.epic, trade.created_utc, trade.time_stop_utc)]
+    assert tracker._fetch_attempts[trade.paper_id] == 1
+    row = paper_store.conn.execute(
+        "SELECT status, exit_reason FROM paper_trades WHERE paper_id = ?", (trade.paper_id,)
+    ).fetchone()
+    assert row[0] == "OPEN"           # still OPEN, not written off
+    assert row[1] is None              # resolve_paper_trade was never called
+
+
+def test_window_ok_false_eventually_expires_at_cap(paper_store):
+    """Same cap behavior as the empty-bars case (U2): a permanently uncovered window
+    expires after `max_fetch_attempts` ticks, never producing a fabricated resolution."""
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+
+    tracker = PaperTradeTracker(
+        paper_store,
+        bar_fetch=lambda epic: [],
+        window_ok=lambda epic, bars, c, t: False,
+        max_fetch_attempts=12,
+    )
+    for _ in range(12):
+        tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    row = paper_store.conn.execute(
+        "SELECT status, exit_reason FROM paper_trades WHERE paper_id = ?", (trade.paper_id,)
+    ).fetchone()
+    assert row[0] == "EXPIRED_UNRESOLVED"
+    assert row[1] is None              # never produced a TIME_STOP
+
+
+def test_window_ok_mitten_loch_blocks_fabricated_time_stop(paper_store):
+    """F3 — the test that catches the Phase 12.5 failure mode.
+
+    The bar set: two minutes of bars from 09:00 → 09:01, then a 20-minute gap, then
+    bars from 09:22 → 10:00 covering the time-stop. From `resolve_paper_trade`'s
+    perspective this is a *complete* window (SL never touches, first bar `>= time_stop`
+    exists at 10:00) — so without the guard it would happily resolve as a fabricated
+    TIME_STOP. With the guard, `assess_window` sees the 20-minute gap and returns
+    covered=False with reason='gap' — the trade stays OPEN, counted as a failed
+    attempt, with no fabricated exit_reason written.
+
+    This is the most important test of Block A: it fails red on the pre-A3 code path
+    and green on the A3 path."""
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="IX.D.DAX.IFMM.IP",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+
+    # Window 09:00 → 10:00, 20-minute gap from 09:02 → 09:22 in the middle.
+    # SL would be at 17970.0 (entry 18000 - stop 30) — never touched in the bars below.
+    bars = (
+        [_bar(f"2026-07-17T09:0{i}:00.000Z", 18000, 18001, 17995, 18000) for i in range(2)]
+        + [_bar(f"2026-07-17T09:2{j}:00.000Z", 18000, 18001, 17995, 18000) for j in range(2, 10)]
+        + [_bar("2026-07-17T09:30:00.000Z", 18000, 18001, 17995, 18000),
+           _bar("2026-07-17T09:45:00.000Z", 18000, 18001, 17995, 18000),
+           _bar("2026-07-17T10:00:00.000Z", 18000, 18001, 17995, 18000)]
+    )
+
+    # Sanity: without the guard, this set fabricates a TIME_STOP.
+    pre_tracker = PaperTradeTracker(
+        paper_store, bar_fetch=lambda epic: bars, max_fetch_attempts=12,
+    )
+    pre_tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+    pre_row = paper_store.conn.execute(
+        "SELECT status, exit_reason FROM paper_trades WHERE paper_id = ?", (trade.paper_id,)
+    ).fetchone()
+    assert pre_row[0] == "RESOLVED" and pre_row[1] == "TIME_STOP", \
+        "precondition: pre-A3 code WOULD fabricate a TIME_STOP here"
+
+    # Restart with a fresh trade + the real `window_ok` closure (via assess_window).
+    from data_foundation.coverage import assess_window
+
+    paper_store.conn.execute("DELETE FROM paper_trades WHERE paper_id = ?", (trade.paper_id,))
+    paper_store.conn.commit()
+    paper_store.insert(trade)
+
+    def window_ok(epic, bars_arg, created_utc, time_stop_utc):
+        verdict = assess_window(
+            [b.get("timestamp", "") for b in bars_arg],
+            created_utc, time_stop_utc, 1,
+        )
+        return verdict.covered
+
+    guarded_tracker = PaperTradeTracker(
+        paper_store, bar_fetch=lambda epic: bars, window_ok=window_ok, max_fetch_attempts=12,
+    )
+    guarded_tracker.tick(now_utc="2026-07-17T10:05:00.000Z")
+
+    guarded_row = paper_store.conn.execute(
+        "SELECT status, exit_reason FROM paper_trades WHERE paper_id = ?", (trade.paper_id,)
+    ).fetchone()
+    assert guarded_row[0] == "OPEN", "guarded: gap in the middle blocks fabricated TIME_STOP"
+    assert guarded_row[1] is None
+    assert guarded_tracker._fetch_attempts[trade.paper_id] == 1
+
+
 def test_tracker_ignores_not_yet_due_trades(paper_store):
     trade = PaperTrade.new(
         abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
