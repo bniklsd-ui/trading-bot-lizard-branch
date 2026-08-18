@@ -21,15 +21,18 @@ updated: 2026-07-06
 > Glyphs: 🔄 active-phase · 📗 live (maintained) · 📕 snapshot (dated, **never edit**) · 📦 archive (verbatim history).
 
 ## Root & governance
-- [CLAUDE.md](../CLAUDE.md) — 📗 14KB · rules, conventions, working style, current state; auto-loaded every session
+- [CLAUDE.md](../CLAUDE.md) — 📗 20KB · rules, conventions, working style, current state; auto-loaded every session
 - [AGENTS.md](../AGENTS.md) — 📗 1KB · harness-neutral entry point for non-Claude-Code agents; points to `CLAUDE.md` + doc-layers navigation (M1 Step 9)
-- [README.md](../README.md) — 📗 13KB · human overview + machine setup (venv, keyring, smoke test)
-- [ROADMAP.md](../ROADMAP.md) — 📗 25KB · Phase 1–11 plan + status per phase
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — 📗 18KB · system layers, components, risks
+- [README.md](../README.md) — 📗 15KB · human overview + machine setup (venv, keyring, smoke test)
+- [ROADMAP.md](../ROADMAP.md) — 📗 **41KB** · Phase 1–14 plan + status per phase · ⚠ **über der 40KB-Grenze (gemessen 2026-08-18, die frühere „25KB"-Angabe war stale)** — die Phasen 1–8 sind abgeschlossen und gehören in ein `ROADMAP_ARCHIVE.md`; Rotation ist fällig, aber ein eigener Aufräum-Auftrag, nicht Teil von Phase 13
+- [ARCHITECTURE.md](../ARCHITECTURE.md) — 📗 20KB · system layers, components, risks
 - [HANDOVER_PROMPT.md](./HANDOVER_PROMPT.md) — 📗 · wiederverwendbarer Auftragstext für Phasen-Abschluss/-Deferral; seit 2026-08-11 auf Claude Code umgeschrieben (Repo statt Google Drive)
 - [DOC_LAYERS_CONVENTION.md](./DOC_LAYERS_CONVENTION.md) — 📗 · generic (project-agnostic) doc-layers spec
 
-## Active phases (10 — V3: Abstain-Lessons + Persistenz-Reform + Paper-Trades; 11 — V3-Fortsetzung: Funnel-/Mess-Fixes [🛑 deferred 2026-08-11], lives in the same directory; 12 — Datenfundament, new directory)
+## Active phases (10 — V3: Abstain-Lessons + Persistenz-Reform + Paper-Trades; 11 — V3-Fortsetzung: Funnel-/Mess-Fixes [🛑 deferred 2026-08-11], lives in the same directory; 12 — Datenfundament [P12.5 CLOSED/FAILED 2026-08-18]; 13 — Live-Datenfundament, planned 2026-08-18, directory not yet created)
+
+- [phase13_live_data/CLAUDE.md](../phase13_live_data/CLAUDE.md) — 🔄 phase head (Phase 13, eröffnet 2026-08-18); Mission = Beschaffung ≠ Verbrauch, vier Stufen, Modul-Tabelle noch komplett ⬜; Session-Block 1 hält die drei neuen Befunde F1–F3 + das Step-0-Grep-Ritual (No-Op) fest · Archiv noch nicht angelegt
+- [docs/concepts/phase13_live_data_plan.md](./concepts/phase13_live_data_plan.md) — 📕 **Execution-ready Plan für Phase 13 (Live-Datenfundament), 2026-08-18** — der strukturelle Schnitt nach dem Scheitern von P12.5 plus vierstufige Beschaffung (LS-Kerzen → yF-Recorder → Fremdquelle → budgetierte IG-Rettung). Gelockte Entscheidungen **L1–L16** · §4 drei neu nachgemessene Befunde (tote IG-Historie mit `ok=True`, blinder Divergenz-Sampler, erfundene `TIME_STOP` bei Mitten-Lücke) · Blöcke **A** (Schnitt) / **B** (Lightstreamer) / **C** (Stufe 3+4, Reports) mit Verbatim-Ankern · §7 PASS-Kriterien P1–P9 · §8 „Fehlgriffe, die wie andere Fehler aussehen" · §9 vollständige Drift-Liste. **V4 rutscht damit auf Phase 14.**
 - [phase10_v3/CLAUDE.md](../phase10_v3/CLAUDE.md) — 🔄 phase head (covers both Phase 10 and Phase 11 work); Block A ✅ (Monday-restart-proof 2026-07-14) + Block B ✅ (market_context + Paper-Pipeline live 2026-07-17); Council-Paper-Call deferred; Phase 11 (2026-08-01, claimed from the deferred "V4" numbering — V4 is now Phase 13) — B1/B2/B5/B4(H6) fixed, B3 deferred, H1 (time-scheduled shadow pairs) built + wired default OFF; 🛑 **deferred 2026-08-11** (WI-2/W2 unbeantwortet, drei Infrastruktur-Ausfälle) · [archive](../phase10_v3/SESSIONS_ARCHIVE.md)
 - [phase10_v3/PHASE11_DEFERRAL_HANDOVER.md](../phase10_v3/PHASE11_DEFERRAL_HANDOVER.md) — 📕 **Notbremse 2026-08-11: Phase 11 DEFERRED** vor Erreichen ihrer Ziele. Status · Delta · Durability-Anforderungen A–G für den neuen Datenfundament-Track · offene Entscheidungen (u. a. Nummerierung, jetzt final — s. nächster Eintrag).
 - [docs/concepts/phase12_data_foundation_plan.md](./concepts/phase12_data_foundation_plan.md) — 📕 Execution-ready Plan für **Phase 12 (Datenfundament)**: gelockte Entscheidungen D1–D20 (Überweg C: Registry + BarService + Bar-Archiv + Recorder, yF-only v1), Schritt-Sequenz 0–10, §9-Drift-Liste; Nummerierung final (Phase 12 = Datenfundament, altes "V4" → Phase 13); §Ende trägt eine 2026-08-15-Korrekturnotiz (N1/N2 + `bid`/`ask`-Envelope-Drift, Step 3)

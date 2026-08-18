@@ -310,7 +310,7 @@ weiterlaufenden Betriebs, ist aber **nicht** Bedingung dieses ✅-Flips (der dec
 > der Baseline-Lauf genug Marktdaten geliefert hat.
 
 **Goal:** die zwei strukturellen Lücken schließen, die den gesamten v1.5→v1.7-Hotfix-Arc
-getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 13/V4)
+getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 14/V4)
 auf einem unzuverlässigen Datenfundament aufbaut.
 
 > **Korrektur (2026-07-08, M1-Housekeeping):** die Checkliste unten stand noch auf `[ ]`,
@@ -422,6 +422,11 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 > bestandenes Phase-12-PASS (dieselbe Logik wie diese Notbremse: keine weitere
 > AI-Sophistication-Arbeit auf einem unzuverlässigen Datenfundament).
 >
+> ⟳ **Korrektur (2026-08-18, Nikinger-Entscheidung):** nach dem Scheitern von P12.5 ist
+> **Phase 13 = Live-Datenfundament** (der strukturelle Schnitt + vierstufige Beschaffung,
+> s. u.); **V4 rutscht auf Phase 14**. Jede „Phase 13 (V4)"-Nennung in älteren Zeilen meint
+> jetzt Phase 14. Plan: [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md).
+>
 > Numbering claimed 2026-08-01 (Nikinger-Entscheidung)
 > — vorher stand hier "Phase 11 = V4"; V4 ist jetzt **Phase 13** (unten), unverändert im Inhalt.
 > Diese Phase ist **keine** neue AI-Sophistication-Arbeit, sondern das Fix-/Diagnostik-Ergebnis
@@ -526,8 +531,30 @@ Phase-11-Wiederaufnahme, nicht Teil dieser Phase.
 
 ---
 
-## Phase 13 — V4: Sophisticated / Optional *(die alte Phase 9, deferred; vormals "Phase 12" —
-umnummeriert 2026-08-11, s. Phase 12 oben)*
+## Phase 13 — Live-Datenfundament *(eröffnet 2026-08-18 nach dem Scheitern von P12.5)*
+
+> **Status: 🔄 geplant, execution-ready — Bau noch nicht begonnen.**
+> **Plan:** [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md)
+> (gelockte Entscheidungen L1–L16, Blöcke A/B/C, §9-Drift-Liste).
+> **Vorgeschichte:** [`phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md).
+
+**Goal:** Beschaffung und Verbrauch von Kursdaten endgültig trennen. Kein Konsumentenpfad löst
+je einen externen Fetch aus; Beschaffung ist ein vierstufiges, nach Kosten/Latenz gestaffeltes
+System in *ein* Archiv (S1 LS-Kerzen → S2 yF-Recorder → S3 Fremdquelle → S4 budgetierte
+IG-Rettung, Default AUS). Die Abdeckungsfrage gilt dem **ganzen Trade-Fenster** statt dem
+Schwanz. Drei nachgemessene Befunde tragen die Phase (Plan §4): tote IG-Historie mit `ok=True`,
+ein dagegen blinder Divergenz-Sampler, und eine **erfundene** `TIME_STOP`-Auflösung bei einer
+Lücke mitten im Fenster.
+
+**Done-Kriterium:** Beweiswoche gegen P1–P9 (Plan §7); erste Akzeptanzbedingung ist eine
+strukturelle Kostenzusicherung, kein Zählwert.
+
+**Directory:** [`phase13_live_data/`](./phase13_live_data/) (Kopf angelegt, Paket folgt in Block A).
+
+---
+
+## Phase 14 — V4: Sophisticated / Optional *(die alte Phase 9, deferred; vormals "Phase 12",
+dann "Phase 13" — umnummeriert 2026-08-11 und erneut 2026-08-18, s. Phase 13 oben)*
 
 > **Status: deferred, gegatet auf Phase 9+11+12 UND reale Outcomes** (unverändert aus der
 > ursprünglichen Phase-9-Formulierung — nur numerisch verschoben, kein Inhalt geändert; Phase 12

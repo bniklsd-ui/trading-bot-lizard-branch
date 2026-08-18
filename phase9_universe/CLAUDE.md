@@ -47,8 +47,11 @@ Details: `../phase12_data_foundation/CLAUDE.md`.
   Fix → `LiveQuoteCache` in den Research-Kontext.
 - **DRAUSSEN (carried to V3/V4):** DB-Reform jenseits Migration 004, No-Trade-Lessons, UI-
   Arbeit (alles V3/Phase 10); Council, Debate-Handover, Reward-Reform, Force-Trigger-Guard,
-  Instinct-ECC (V4/Phase 13, umnummeriert 2026-08-11, war vorher "Phase 12"); eine echte zweite unabhängige Echtzeitquelle (Lock #8 — kein
-  neuer bezahlter/gekeyter Provider); Momentum-VETO-Datenquelle (bleibt P1-IG-Bars, unangetastet).
+  Instinct-ECC (V4/**Phase 14**, umnummeriert 2026-08-11 und erneut 2026-08-18 — war "Phase 12",
+  dann "Phase 13"; Phase 13 ist seit 2026-08-18 das Live-Datenfundament); eine echte zweite unabhängige Echtzeitquelle (Lock #8 — kein
+  neuer bezahlter/gekeyter Provider) — ⟳ **das nimmt Phase 13 jetzt auf** (Stufe S3, mit dem
+  Kostendeckel als bindendem Auswahlkriterium, `docs/concepts/phase13_live_data_plan.md` §6 C1);
+  Momentum-VETO-Datenquelle (bleibt P1-IG-Bars, unangetastet).
 
 ## Build-Reihenfolge (verbindlich, aus dem Plan §1)
 Step 0 (Legacy-Grep + Baseline) → Step 0b (Doku-Reconciliation, **dieser Skeleton ist Teil

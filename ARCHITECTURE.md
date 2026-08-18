@@ -52,6 +52,12 @@ updated: 2026-07-06
 > [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md)).
 > V4 is renumbered again, to **Phase 13** (content unchanged). Every "Phase 11 (V4)" / "Phase 12
 > (V4)" reference below now means Phase 13. `ROADMAP.md`'s Phase 11/12/13 sections.
+>
+> ⟳ **Correction (2026-08-18):** P12.5 failed (IG budget collapse). **Phase 13 is now the
+> Live-Datenfundament** — the structural cut plus a four-stage acquisition ladder with IG
+> Lightstreamer as the live stage
+> ([`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md)).
+> **V4 moves to Phase 14.** Every "Phase 13 (V4)" reference below now means Phase 14.
 
 ---
 
@@ -162,7 +168,7 @@ updated: 2026-07-06
   free-text lesson (language only — no number/score/decision); failures never break the close path
 - **Confidence** (Wilson lower-bound / expectancy-R / N-min) is **observe-only** — it does not
   gate `risk_pct` or anything else in v1. Promotion to an actual VETO ("Instinct→VETO ECC") is
-  deferred to **Phase 13e (V4)**, gated on real outcomes **and** on Phase 9/10 (V2/V3) landing first
+  deferred to **Phase 14e (V4)**, gated on real outcomes **and** on Phase 9/10 (V2/V3) landing first
 - **No VETO touch.** Reward/lessons sit entirely downstream of order execution
 
 ### Scheduler (Phase 8 — ✅ live-verified 2026-07-03, v1.5+v1.6+v1.7 merged)
@@ -221,7 +227,7 @@ updated: 2026-07-06
    on losing days. Recommendation: lock when daily PNL < 0 (root `CLAUDE.md`
    Hard Rule 5). The P2 schema already carries a `force_trigger_locked` flag
    (`persistence/defaults.py`), but no Force Trigger feature exists yet to
-   enforce it against — tracked as Phase 13d (V4), whenever manual override is built.
+   enforce it against — tracked as Phase 14d (V4), whenever manual override is built.
 2. **Score-as-emotion** — addressed by Phase 7: `reward_pts` measures process
    quality (clean exit vs. time-stop, spread tightness, debate signal)
    independently from the outcome component, instead of punishing unlucky
@@ -251,4 +257,5 @@ Per-phase concept + implementation:
 - Phase 10 (V3 — Persistence Reform + No-Trade Lessons + UI, geplant) — no concept doc yet
 - Phase 11 (V3-Fortsetzung — Funnel-/Mess-Fixes aus Datenwoche-2-Review, 🛑 deferred 2026-08-11) — no concept doc, lives in `phase10_v3/`; see [`phase10_v3/PHASE11_DEFERRAL_HANDOVER.md`](./phase10_v3/PHASE11_DEFERRAL_HANDOVER.md)
 - Phase 12 (Datenfundament — Registry + BarService + Bar-Archiv + Recorder, 🆕 geöffnet 2026-08-11) — [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md) · [`phase12_data_foundation/`](./phase12_data_foundation/)
-- Phase 13 (V4 — Sophisticated/Optional, deferred) — no concept doc yet
+- Phase 13 (Live-Datenfundament — 4-stage acquisition, LS live stage, consumers never fetch; opened 2026-08-18) — [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md)
+- Phase 14 (V4 — Sophisticated/Optional, deferred) — no concept doc yet
