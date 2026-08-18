@@ -23,6 +23,7 @@ Phase head / session log: [`CLAUDE.md`](./CLAUDE.md).
 | `run.py` | *(Step 5)* `python -m data_foundation.run` — PID-guarded entrypoint, SIGTERM/SIGINT → graceful stop |
 | `scripts/run_recorder.sh` | *(Step 5)* operator launcher (standalone, or auto-started from `run_scheduler.sh`) |
 | `heartbeat.py` | *(Step 6)* `assess_day` (daily `HealthVerdict`, same-day alarm) + `DivergenceSampler` (IG-vs-yFinance cross-check, D12) |
+| `coverage.py` | `WindowCoverage` + `assess_window` — fensterweite Abdeckungsprüfung (Phase 13 §6 A1, rein, kein I/O) |
 | `scripts/data_health.py` | *(Step 6)* operator script — prints the day's `HealthVerdict` + budget standing + Recorder heartbeat age, exits 1 on `ok=False` |
 
 **Bauprinzip:** zero new AI. `SymbolResolver` (Step 3) is a deterministic price-comparison

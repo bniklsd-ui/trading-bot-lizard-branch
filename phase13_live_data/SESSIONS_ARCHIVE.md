@@ -6,6 +6,98 @@ verbatim when a new one is appended.
 
 ---
 
+## Session stopped — 2026-08-18 (Session 2: Block A0 — Baseline, Gerüst, A0.0-Dateien)
+
+> **Auftrag:** Block A0 der Reihe nach abarbeiten (A0.0 Datei-Bau, A0.1 Ritual — bereits erledigt,
+> A0.2 Baseline, A0.3 Gerüst, A0.4 Nummerierungs-Grep). Danach A1–A7 der Schnitt, streng in
+> Reihenfolge (L4).
+
+### Completed
+
+1. **A0.0 — `scripts/store_minimax_key.py` + `scripts/claude-minimax` geschrieben**, Plan §6
+   verbatim (Wrapper-Skript, Keyring-Namensraum `trading-bot-minimax`), `chmod +x` gesetzt.
+   Fund am Sessionstart: der Commit `1ab208c` ("add Step A0.0") hatte im Commit-Text „Two files,
+   both versioned in the repo" behauptet, aber nur die Plan-/CLAUDE.md-Dokumentation geändert —
+   die Dateien existierten nicht (`find . -iname "*minimax*"` leer). Keine Code-Drift (die
+   Modul-Tabelle stand korrekt auf ⬜), nur eine irreführende Commit-Message. Jetzt gebaut, alle
+   vier Abnahmekriterien sind Operator-Schritte (Key seeden, `ln -s`, curl-Vorabtest, MiniMax-
+   Verbrauchsanzeige) — **Abnahme bleibt beim Nikinger**, s. Next.
+2. **A0.2 — Regression-Baseline, alle 13 Suiten separat** (`phase1_broker_wrapper/.venv`,
+   je `pytest <phase>/tests -q`):
+
+   | Phase | Ergebnis |
+   |---|---|
+   | phase1_broker_wrapper | 87 passed |
+   | phase2_persistence | 77 passed |
+   | phase3_external_data | 104 passed |
+   | phase4_research | 155 passed |
+   | phase5_execution | 173 passed |
+   | phase6_debate | 76 passed |
+   | phase7_reward | 138 passed |
+   | phase8_scheduler | 237 passed, 1 warning (harmlose `httpx`-Deprecation) |
+   | phase9_universe | 80 passed |
+   | phase10_v3 | 160 passed |
+   | phase12_data_foundation | 123 passed |
+   | meta_m1_harness | 28 passed |
+   | root `tests/` | 80 passed (Memory nannte 64 am 2026-07-02 — kein Regress, seither gewachsen) |
+
+   Alle 13 grün — **echte Baseline, vor dem ersten Fix**, nicht nachträglich grün gezogen.
+3. **A0.3 — Phasen-Gerüst** angelegt, Muster = `phase12_data_foundation` (Editable-Install,
+   `own-connection`-Kommentarstil): `phase13_live_data/README.md`, `pyproject.toml`
+   (`name = "live_data"`), `requirements.txt` (`pytest`), `live_data/__init__.py` (leer),
+   `tests/__init__.py` (leer). `scripts/dev_install.sh` um P13 verlängert (Kette jetzt zwölf
+   Pakete). `docs/INDEX.md` bekam drei neue Zeilen (`CLAUDE.md`, `README.md`,
+   `SESSIONS_ARCHIVE.md`) im selben Commit.
+4. **A0.4 — Nummerierungs-Grep** (`grep -rn "Phase 13 (V4)" --include="*.md" .`): 3 Treffer, alle
+   in `ARCHITECTURE.md`, `ROADMAP.md` und diesem Plan selbst — jeder ist die datierte
+   Korrekturnotiz, die die alte Bezeichnung als Zitat erklärt, keine lebende Referenz. Kein
+   Nachbessern nötig.
+5. **Rotation:** Session-1-Block verbatim nach
+   [`SESSIONS_ARCHIVE.md`](./SESSIONS_ARCHIVE.md) verschoben, dieser Kopf trägt jetzt nur
+   Session 2.
+
+### Verified
+
+- `python -c "import live_data"` läuft **nach** `pip install -e phase13_live_data --no-deps
+  --no-build-isolation` (offline, kein Netzzugriff — dieselbe Form wie bei `data_foundation`).
+  `pytest phase13_live_data/tests -q` → „no tests ran" (Verzeichnis ist leer, wie erwartet vor
+  Block A1).
+- `ps aux | grep scheduler.run` vor dem Test-Sweep: leer — kein Parallel-Login-Risiko, Sweep war
+  gefahrlos.
+
+### Next
+
+- **Block A1** (Plan §6, Zeile 569): `phase12_data_foundation/data_foundation/coverage.py` neu —
+  `assess_window` + `WindowCoverage`, reine Funktion, kein I/O. Danach A2 → A7 strikt der Reihe
+  nach (L4).
+- **A0.0 seither live abgenommen (Nikinger, gleicher Tag, außerhalb dieser Session):** die drei
+  Live-Unbekannten lösten sich wie folgt — Basis-URL `.../anthropic` (Claude Code hängt `/v1`
+  selbst an), Header `x-api-key` funktioniert (Wrapper setzt `ANTHROPIC_AUTH_TOKEN`/Bearer, beide
+  gingen durch), Modell-ID **`MiniMax-M3[1m]`** (nicht `MiniMax-M3` — die 1M-Kontext-Variante,
+  Commit `9bf2f0f`). Erster curl-Versuch schlug mit `insufficient_balance_error (1008)` fehl —
+  **kein Wiring-Fehler**, sondern der falsche Key-Typ: der zunächst gespeicherte Key war ein
+  Pay-as-you-go-API-Key (leere Wallet), MiniMax trennt den vom **Subscription Key** des Token
+   Plans (`platform.minimax.io/subscribe/token-plan`). Nach Tausch auf den Subscription Key: curl
+   liefert eine echte Antwort, `claude-minimax` lief live, und **MiniMax' eigener
+   „active day"-Zähler stieg von 1 auf 2** — der Anbieter-Beweis, nicht nur ein sauberer
+   HTTP-Response. Modul-Tabelle jetzt ✅.
+
+### Note
+
+- Root `CLAUDE.md`'s Phase-13 row still says "Bau nicht begonnen" — stale as of this session,
+  left unchanged deliberately: the doc-hygiene rule routes phase-status updates to the phase
+  head, not root.
+
+### Open questions / blockers
+
+- **Kein technischer Blocker für A1.** Bot steht weiterhin, Recorder sammelt kostenlos weiter.
+- **Offen bis Block B0:** ob `CHART:{epic}:1MINUTE` auf diesem Konto liefert (Plan §9.2).
+- **Offen bis Block C1:** welche Fremdquelle S3 wird.
+- **`main` liegt jetzt 5 Commits vor `origin/main`** (inkl. dieser Session) — Push bleibt eine
+  bewusste Einzelfreigabe des Nikinger.
+
+---
+
 ## Session stopped — 2026-08-18 (Session 1: Planungssession — Phase 13 eröffnet, Plan committet, kein Code)
 
 > **Auftrag:** den execution-ready Plan für Phase 13 schreiben, nachdem P12.5 formal gescheitert
