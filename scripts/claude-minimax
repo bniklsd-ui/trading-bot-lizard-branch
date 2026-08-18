@@ -12,10 +12,13 @@ PY
 )"
 export ANTHROPIC_BASE_URL="${MINIMAX_BASE_URL:-https://api.minimax.io/anthropic}"
 export ANTHROPIC_AUTH_TOKEN="$KEY"
-export ANTHROPIC_MODEL="${MINIMAX_MODEL:-MiniMax-M3}"
+export ANTHROPIC_MODEL="${MINIMAX_MODEL:-MiniMax-M3[1m]}"
 # Ohne diese beiden fragt Claude Code seine Hintergrund-Calls weiter unter einem
 # claude-*-Namen an, den MiniMax nicht kennt — s. Stolperstein 2 unten.
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="$ANTHROPIC_MODEL"
 export ANTHROPIC_SMALL_FAST_MODEL="$ANTHROPIC_MODEL"
+# M3[1m] = die 1M-Kontext-Variante (offizielle MiniMax-Doku, Claude-Code-Guide) --
+# ohne diese Zeile compactet Claude Code viel zu früh, weil es 200K annimmt.
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${MINIMAX_AUTO_COMPACT_WINDOW:-1000000}"
 unset ANTHROPIC_API_KEY        # ein vorhandener Anthropic-Key darf nicht still gewinnen
 exec claude "$@"
