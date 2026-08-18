@@ -48,7 +48,17 @@ plausibilisieren" lassen will → **stop**, das ist Code.
   `resolve_paper_trade` selbst (unangetastet, der Guard sitzt davor), Momentum-VETO/Gates/
   Sizing/P6/P7 (L13), B3-Margin-Headroom, Council-Paper-Call, UI, Live-Konto.
 
-## Rahmen (bindend übernommen aus Phase 12)
+## Rahmen
+
+**Welcher Befehl (Nikinger 2026-08-18, Kostengrund):**
+**Ausführungs-Sessions laufen über `claude-minimax`** (Claude Code gegen MiniMax M3, Plan §6
+Step A0.0). **Debugging-Sessions laufen weiterhin über `claude`.** Der normale Befehl bleibt
+unangetastet — der Wechsel ist ein Wrapper-Skript, das nur die Umgebung seines eigenen
+Kindprozesses setzt. ⚠️ Das ändert **nicht**, welches Modell der *Bot* benutzt: P4-Research,
+P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
+`tradingbot`-Keyring-Namensraum.
+
+**Übernommen aus Phase 12:**
 
 - **Werktags-Arbeit erlaubt, auch bot-berührend.** Vorher den Bot stoppen,
   `ps aux | grep scheduler.run` als Gegenprobe (Parallel-Login-Falle). Danach gezielt neu starten.
@@ -61,6 +71,7 @@ plausibilisieren" lassen will → **stop**, das ist Code.
 
 | Datei | Zweck | Status |
 |---|---|---|
+| *(Repo-Wurzel)* `scripts/store_minimax_key.py` · `scripts/claude-minimax` | Harness-Vorstufe: zweiter Claude-Code-Befehl auf MiniMax M3, Key nur im Keyring (`trading-bot-minimax`) | ⬜ Block A0.0 |
 | `live_data/stream.py` | `LSBarRecorder` + `TickAggregator` (S1) | ⬜ Block B2 |
 | `live_data/backfill.py` | `ExternalBackfill` (S3) | ⬜ Block C1 |
 | `live_data/rescue.py` | `GapRescue` (S4, Default AUS) | ⬜ Block C2 |

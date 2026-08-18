@@ -416,6 +416,121 @@ class ExternalBackfill: ...
 
 #### Step A0 — Haushalt, Baseline, Gerüst
 
+**A0.0 — `claude-minimax`: ein zweiter Claude-Code-Befehl auf MiniMax M3.**
+
+> **Nikinger-Entscheidung 2026-08-18, Kostengrund.** **Steht bewusst vor allem anderen**, weil
+> jeder Schritt danach über den neuen Befehl laufen soll. **Kein Phase-13-Scope** — das ist
+> Harness-Arbeit (Meta-Strang-Klasse, vgl. M1), sie steht hier nur, weil sie die Voraussetzung
+> für die Ausführung ist.
+
+**Die Regel, wer worauf läuft** (gehört in den Phasen-Kopf, nicht nur hierher):
+**Ausführungs-Sessions → `claude-minimax`. Debugging-Sessions → weiterhin `claude`.**
+Der normale Befehl wird **nicht angefasst** — keine Änderung an `~/.claude/settings.json`,
+kein Export in einer Dotfile, keine Umgebungsvariable, die eine bestehende Session sieht.
+
+**Drei heute verifizierte Fakten, die den Bau formen:**
+1. `~/.local/bin/claude` ist ein **Symlink auf ein ELF-Binary**
+   (`~/.local/share/claude/versions/2.1.233`). Ein zweiter Symlink wäre also schlicht wieder
+   `claude` — es braucht ein **Wrapper-Skript**, das die Umgebung setzt und dann `exec claude`.
+2. `~/.local/bin` liegt auf `PATH` (Position 2) — der Wrapper ist dort sofort aufrufbar.
+3. 🔴 **`keyring` ist im System-`python3` NICHT importierbar**, nur im Projekt-venv
+   (`phase1_broker_wrapper/.venv/bin/python`, Backend `keyring.backends.SecretService.Keyring`).
+   Ein Wrapper mit nacktem `python3 -c "import keyring"` scheitert sofort. Absoluter
+   Interpreterpfad, nicht `python3`.
+
+**Zwei Dateien, beide im Repo (versioniert und reviewbar), Symlink nur beim Operator:**
+
+*(a) `scripts/store_minimax_key.py`* — Keyring-Seeder, **exakte Kopie des Musters** von
+`meta_m1_harness/bakeoff/store_bakeoff_key.py` (`getpass`, keine Shell-History, keine Datei,
+`--status`/`--delete`, idempotentes Löschen). **Eigener Namensraum**, damit nichts mit den
+Bot-Credentials kollidiert:
+
+```python
+SERVICE_NAME = "trading-bot-minimax"
+USERNAME     = "minimax_api_key"
+```
+
+Das ist der vierte getrennte Keyring-Namensraum im Projekt (`tradingbot` = Live-Bot,
+`trading-bot-bakeoff-runner` = M1, `trading-bot-bakeoff-void` = neutralisierter Fork). Hard
+Rule 1 gilt unverändert: **der Schlüssel landet in keiner Datei, in keiner Dotfile, in keiner
+Shell-History.**
+
+*(b) `scripts/claude-minimax`* — der Wrapper (`chmod +x`), Operator verlinkt ihn:
+`ln -s ~/trading-bot/scripts/claude-minimax ~/.local/bin/claude-minimax`
+
+```bash
+#!/usr/bin/env bash
+# Claude Code gegen MiniMax statt Anthropic. Lässt `claude` unangetastet.
+set -euo pipefail
+VENV_PY="$HOME/trading-bot/phase1_broker_wrapper/.venv/bin/python"   # keyring lebt NUR hier
+KEY="$("$VENV_PY" - <<'PY'
+import sys, keyring
+v = keyring.get_password("trading-bot-minimax", "minimax_api_key")
+if not v:
+    sys.exit("minimax key not in keyring — run: python scripts/store_minimax_key.py")
+print(v)
+PY
+)"
+export ANTHROPIC_BASE_URL="${MINIMAX_BASE_URL:-https://api.minimax.io/anthropic}"
+export ANTHROPIC_AUTH_TOKEN="$KEY"
+export ANTHROPIC_MODEL="${MINIMAX_MODEL:-MiniMax-M3}"
+# Ohne diese beiden fragt Claude Code seine Hintergrund-Calls weiter unter einem
+# claude-*-Namen an, den MiniMax nicht kennt — s. Stolperstein 2 unten.
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="$ANTHROPIC_MODEL"
+export ANTHROPIC_SMALL_FAST_MODEL="$ANTHROPIC_MODEL"
+unset ANTHROPIC_API_KEY        # ein vorhandener Anthropic-Key darf nicht still gewinnen
+exec claude "$@"
+```
+
+**Der Nachweis, dass es wirklich auf MiniMax läuft — nicht optional** (Memory
+`feedback_verify_flags_are_on`: viermal derselbe Fehlermodus, „läuft ohne Fehler" beweist
+nichts). Zwei Stufen, beide vom Nikinger:
+1. **Vor Claude Code**, ein nackter `curl` gegen den Endpunkt mit dem Keyring-Schlüssel und
+   einem Ein-Token-Prompt. Prüft Endpunkt + Auth-Header + Modellname als Tripel, **bevor** ein
+   Agent im Spiel ist. Schlägt er fehl, liegt es nie an Claude Code.
+2. **Nach dem ersten `claude-minimax`-Lauf:** die **Verbrauchsanzeige bei MiniMax** ansehen.
+   Nur der Zähler des Anbieters ist der Beweis — dieselbe Disziplin wie beim
+   IG-`remainingAllowance`. Steht dort 0, lief es woanders.
+
+**Was sich dadurch NICHT ändert** (bitte nicht verwechseln): der **Bot** ruft weiter Anthropic
+auf — P4-Research, P6-Debatte, P7-/Abstain-Lessons nutzen unverändert den Key aus dem
+`tradingbot`-Namensraum und werden in `data/state/llm_usage.json` gemessen. `claude-minimax`
+wechselt, **wer den Coding-Agenten fährt**, nicht **welches Modell der Bot benutzt**.
+
+**Drei Stolpersteine, jeder mit Symptom und erstem Verdächtigen:**
+1. *„Die erste Anfrage geht durch, dann kommt ein 404 auf ein Modell, das ich nie gewählt habe."*
+   → Claude Code macht Hintergrund-Calls (Titel, Zusammenfassung) mit einem Haiku-Klasse-Modell.
+   Ohne `ANTHROPIC_DEFAULT_HAIKU_MODEL`/`ANTHROPIC_SMALL_FAST_MODEL` fragt es dafür weiter einen
+   `claude-*`-Namen an. Deshalb stehen beide im Wrapper.
+2. *„Tool-Calls schlagen sporadisch fehl, mal geht's, mal nicht."* → 🔴 **Bekannt und der
+   ernsteste Einwand gegen diesen Weg:** MiniMax' `/anthropic`-Endpunkt ist ein **Shim über ihre
+   native OpenAI-kompatible API**, und für genau diese Kombination sind sporadische
+   Tool-Calling-Fehler berichtet (der Schlüssel des Wrapper-Objekts wechselt zwischen `result`,
+   `arguments` und dem Tool-Namen). Claude Code **ist** Tool-Calling. Wenn das auftritt: nicht
+   den Plan verdächtigen, den Shim. Ausweichpfad wäre MiniMax' OpenAI-kompatibler Endpunkt über
+   den bereits gebauten, smoke-getesteten `OpenAICompatLLMClient` (M1 Step 10) — aber der fährt
+   den Bot, nicht Claude Code, also ist das **kein** Ersatz, sondern nur ein Beleg, dass die
+   Sprechweise im Projekt schon existiert. Realistischer Ausweg: für die betroffene Session auf
+   `claude` zurück.
+3. *„Der Wrapper findet den Schlüssel nicht, obwohl er gesetzt ist."* → Fakt 3 oben: falscher
+   Interpreter. Gegenprobe:
+   `phase1_broker_wrapper/.venv/bin/python scripts/store_minimax_key.py --status`.
+
+**Bei Ausführung zu verifizieren** (steht auch in §9.18): die exakte Basis-URL (Quellen
+nennen sowohl `.../anthropic` als auch `.../anthropic/v1`; Claude Code hängt seinen Pfad selbst
+an, also entscheidet nur der Live-Test), ob MiniMax den **Bearer**-Header
+(`ANTHROPIC_AUTH_TOKEN`) oder `x-api-key` (`ANTHROPIC_API_KEY`) erwartet, und die genaue
+Modell-ID des M3-Tarifs.
+
+**Rollback ist ein Befehl:** `rm ~/.local/bin/claude-minimax`. `claude` war nie berührt.
+
+**Akzeptanz A0.0:** `claude-minimax --version` läuft · der `curl`-Vorabtest liefert eine
+Antwort mit einem MiniMax-Modellnamen · nach einem echten Lauf zeigt **MiniMax' eigene
+Verbrauchsanzeige** Verbrauch · `claude` ohne Wrapper verhält sich unverändert (Gegenprobe:
+`env | grep ANTHROPIC` in einer normalen Shell ist leer).
+
+---
+
 **A0.1 Legacy-/Turbo-Grep (Ritual) — bereits von dieser Planungssession ausgeführt, Ergebnis
 dokumentiert, NICHT wiederholen:**
 
@@ -1131,7 +1246,16 @@ Täglich `data_health.py` (Exit 0 erwartet). Freitags eine Review-Session nach d
     veröffentlicht**, wie Euronext es tut. Unbestätigt, Tendenz negativ — aber der wertvollste
     verbleibende Unbekannte, weil IBEX 2 von 5 messbaren Epics stellt und von keiner geprüften
     Gratisquelle außer Dukascopy abgedeckt wird.
-18. **Ob die LS-Kerze überhaupt ein Volumen trägt** (L17): `CHART:`-Feldliste kennt `LTV`
+18. **`claude-minimax` (A0.0), drei Punkte — alle nur live entscheidbar:**
+    a. **Die exakte Basis-URL.** Quellen nennen sowohl `https://api.minimax.io/anthropic` als
+       auch `.../anthropic/v1`; Claude Code hängt seinen eigenen Pfad an, also produziert genau
+       eine der beiden ein doppeltes `/v1`. Symptom bei falscher Wahl: 404 auf **jede** Anfrage,
+       nicht nur auf manche.
+    b. **Bearer oder `x-api-key`** — `ANTHROPIC_AUTH_TOKEN` vs. `ANTHROPIC_API_KEY`. Der Wrapper
+       setzt Bearer; schlägt die Auth mit 401 fehl, ist das der erste Tausch, den man probiert.
+    c. **Die genaue Modell-ID des M3-Tarifs** (`MiniMax-M3` ist die dokumentierte Schreibweise,
+       im Tarif des Nikinger aber nicht überprüft).
+19. **Ob die LS-Kerze überhaupt ein Volumen trägt** (L17): `CHART:`-Feldliste kennt `LTV`
     (last traded volume) und `TTV` (total traded volume), aber bei einem CFD auf einen Index
     kann beides strukturell 0 oder leer sein. Teil des B0-Live-Checks — **einfach mit
     abfragen**, es kostet nichts extra. Ergebnis entscheidet, ob die `prefer`-Verdrängung aus
