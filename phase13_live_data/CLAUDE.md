@@ -71,7 +71,7 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
 
 | Datei | Zweck | Status |
 |---|---|---|
-| *(Repo-Wurzel)* `scripts/store_minimax_key.py` · `scripts/claude-minimax` | Harness-Vorstufe: zweiter Claude-Code-Befehl auf MiniMax M3, Key nur im Keyring (`trading-bot-minimax`) | ⬜ Dateien geschrieben, Abnahme offen (Nikinger: Key seeden, symlinken, curl-Vorabtest, MiniMax-Verbrauchsanzeige) |
+| *(Repo-Wurzel)* `scripts/store_minimax_key.py` · `scripts/claude-minimax` | Harness-Vorstufe: zweiter Claude-Code-Befehl auf MiniMax M3, Key nur im Keyring (`trading-bot-minimax`) | ✅ A0.0 live-abgenommen 2026-08-18 (Nikinger) |
 | `live_data/stream.py` | `LSBarRecorder` + `TickAggregator` (S1) | ⬜ Block B2 |
 | `live_data/backfill.py` | `ExternalBackfill` (S3) | ⬜ Block C1 |
 | `live_data/rescue.py` | `GapRescue` (S4, Default AUS) | ⬜ Block C2 |
@@ -146,13 +146,17 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
 - **Block A1** (Plan §6, Zeile 569): `phase12_data_foundation/data_foundation/coverage.py` neu —
   `assess_window` + `WindowCoverage`, reine Funktion, kein I/O. Danach A2 → A7 strikt der Reihe
   nach (L4).
-- **A0.0-Abnahme ist Nikinger-Job**, nicht blockierend für A1: Key seeden
-  (`phase1_broker_wrapper/.venv/bin/python scripts/store_minimax_key.py`), symlinken
-  (`ln -s ~/trading-bot/scripts/claude-minimax ~/.local/bin/claude-minimax`), bare curl gegen den
-  Endpunkt, dann ein echter `claude-minimax`-Lauf + MiniMax-Verbrauchsanzeige prüfen. Die drei
-  offenen Live-Unbekannten (Basis-URL mit/ohne `/v1`, Bearer vs. `x-api-key`, exakte Modell-ID)
-  lösen sich nur im Live-Test — dafür stehen die Env-Var-Overrides (`MINIMAX_BASE_URL`,
-  `MINIMAX_MODEL`) im Wrapper.
+- **A0.0 seither live abgenommen (Nikinger, gleicher Tag, außerhalb dieser Session):** die drei
+  Live-Unbekannten lösten sich wie folgt — Basis-URL `.../anthropic` (Claude Code hängt `/v1`
+  selbst an), Header `x-api-key` funktioniert (Wrapper setzt `ANTHROPIC_AUTH_TOKEN`/Bearer, beide
+  gingen durch), Modell-ID **`MiniMax-M3[1m]`** (nicht `MiniMax-M3` — die 1M-Kontext-Variante,
+  Commit `9bf2f0f`). Erster curl-Versuch schlug mit `insufficient_balance_error (1008)` fehl —
+  **kein Wiring-Fehler**, sondern der falsche Key-Typ: der zunächst gespeicherte Key war ein
+  Pay-as-you-go-API-Key (leere Wallet), MiniMax trennt den vom **Subscription Key** des Token
+  Plans (`platform.minimax.io/subscribe/token-plan`). Nach Tausch auf den Subscription Key: curl
+  liefert eine echte Antwort, `claude-minimax` lief live, und **MiniMax' eigener
+  „active day"-Zähler stieg von 1 auf 2** — der Anbieter-Beweis, nicht nur ein sauberer
+  HTTP-Response. Modul-Tabelle jetzt ✅.
 
 ### Note
 
