@@ -297,14 +297,20 @@ nicht, aber `source_delta.py` und der Coverage-Report lesen dieselben Dicts).
 class PaperTradeTracker:
     def __init__(
         self, ..., 
-        window_ok: Callable[[Sequence[Mapping[str, Any]], str, str], bool] | None = None,
+        window_ok: Callable[[str, Sequence[Mapping[str, Any]], str, str], bool] | None = None,
     ) -> None: ...
 ```
+
+Argumentfolge **verbindlich**: `(epic, bars, created_utc, time_stop_utc)`. Die Epic wird
+explizit durchgereicht und **nicht** aus der ersten Bar geraten — man würde sie aus genau den
+Daten lesen, die man gerade als lückenhaft eingestuft hat.
 
 Default `None` = bit-identisch. Aufruf in `_resolve_group`, **vor** `resolve_paper_trade`:
 
 ```python
-if self.window_ok is not None and not self.window_ok(bars, trade.created_utc, trade.time_stop_utc):
+if self.window_ok is not None and not self.window_ok(
+    trade.epic, bars, trade.created_utc, trade.time_stop_utc
+):
     self._charge_failed_attempt([trade], now)
     continue
 ```
@@ -540,22 +546,18 @@ ist **leer**; `phase12_data_foundation` grün; die Nettobilanz des Diffs ist neg
 Die `window_ok`-Closure in `_build_paper_tracker`:
 
 ```python
-def window_ok(bars, created_utc, time_stop_utc) -> bool:
+def window_ok(epic: str, bars, created_utc: str, time_stop_utc: str) -> bool:
     from data_foundation.coverage import assess_window   # lazy, Phasen-Isolation
     verdict = assess_window([b.get("timestamp", "") for b in bars], created_utc, time_stop_utc, 1)
     if not verdict.covered:
-        _record_event(str(_OBSERVABILITY_PATH), {
-            "event": "window_uncovered", "epic": ..., "reason": verdict.reason,
+        record_event(str(_OBSERVABILITY_PATH), {
+            "event": "window_uncovered", "epic": epic, "reason": verdict.reason,
             "ratio": verdict.ratio, "largest_gap_min": verdict.largest_gap_min,
         })
     return verdict.covered
 ```
 
-⚠ Die Closure sieht die Epic nicht — sie bekommt nur Bars + Fenster. Entweder die Signatur um
-`epic` erweitern (dann §5.4 mitziehen) **oder** die Epic aus der ersten Bar lesen. **Locked:
-Signatur erweitern** auf `(epic, bars, created_utc, time_stop_utc)` — eine Epic aus Daten zu
-raten, die man gerade als lückenhaft eingestuft hat, ist genau die Sorte Trick, die diese
-Phase abschafft.
+Die Signatur ist in §5.4 gelockt: `(epic, bars, created_utc, time_stop_utc)`.
 
 Der **Kommentarblock** `wiring.py:468-487` (über `_PAPER_MAX_FETCH_ATTEMPTS`) beschreibt den
 alten Zustand („BarService.get_window's own budget-aware chain does…") — korrigieren, nicht
@@ -659,8 +661,27 @@ if _age_minutes(ig_bar.ts, self.now_fn()) > self.stale_tolerance_min:
 ```
 
 ⚠ Das ist ein **zweiter** Callback neben `mark_mismatch_fn`. Signatur von `sample_epic` wird
-`sample_epic(epic, mark_mismatch_fn, mark_stale_fn)`. Beide Aufrufer (Test + Closure)
-mitziehen.
+verbindlich:
+
+```python
+def sample_epic(self, epic: str, mark_mismatch_fn: Callable[[str], Any],
+                mark_stale_fn: Callable[[str], Any]) -> None: ...
+```
+
+`DivergenceSampler` bekommt zusätzlich das Feld `stale_tolerance_min: int = 120`.
+⚠ **Das ist ein eigener Knopf, nicht derselbe wie A4s** `BudgetedIGBarProvider.stale_tolerance_min`
+— gleicher Default, getrennt einstellbar. Begründung: der Provider schützt den *Schreibpfad*
+(nichts Totes ins Archiv), der Sampler die *Diagnose* (wann ist eine Quelle als tot zu melden).
+Sie zu koppeln hieße, eine Lockerung am einen Ort still am anderen mitzumachen. `GapRescue`
+(§5.6) trägt aus demselben Grund seinen eigenen.
+
+**Die beiden Aufrufer, die mitziehen müssen — namentlich:**
+1. `phase8_scheduler/scripts/wiring.py:946`, verbatim
+   `                    divergence_sampler.sample_epic(rec.epic, _mark_mismatch)`
+   — braucht eine zweite Closure `_mark_stale` nach dem Muster von `_mark_mismatch`
+   (`wiring.py:920-943`), die `data_source_status=DS_STALE_SOURCE` setzt und `logger.critical`
+   loggt.
+2. `phase12_data_foundation/tests/test_heartbeat.py` — jeder `sample_epic`-Aufruf.
 
 **A6.2 `assess_day` — Abdeckung statt Bar-Zählung.** Anker:
 `    bars_today = archive.bars_written_since(start, end)` (`heartbeat.py:72`).
@@ -849,6 +870,14 @@ Lücken älter als `min_gap_age_min`, holt genau diese Spannen, schreibt mit eig
 ⚠ **`prefer` ist heute `("ig", "ls", "yf")`** (`archive.py:138`). Eine neue Quelle, die nicht
 in `prefer` steht, bekommt `default_rank` und verliert jeden Gleichstand. Das ist ein stiller
 Fehler, der wie „die neue Quelle liefert nichts" aussieht.
+
+**Fold-in-Checkliste, sobald die Quelle gewählt ist** — der Name muss an **allen vier** Stellen
+landen, sonst driftet der Plan gegen den Code:
+- [ ] §0-Stufentabelle: „unabhängige Fremdquelle" → der Name
+- [ ] dieser Step (C1) selbst
+- [ ] `data_foundation/models.py:23` — `KNOWN_SOURCES` erweitern
+- [ ] `data_foundation/archive.py:138` — `prefer`-Default erweitern (**die am leichtesten
+      vergessene**, s. §8)
 
 **Tests** (`phase13_live_data/tests/test_backfill.py`, ≥ 6, **alle gemockt, kein Netz**):
 Lückenerkennung · exakte Spannenanfrage · Zeitzonen-/Format-Normalisierung über
