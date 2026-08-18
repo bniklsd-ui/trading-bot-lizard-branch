@@ -583,7 +583,7 @@ löschen: der Cap gilt jetzt zusätzlich für „Fenster noch nicht gedeckt".
 
 - `models.py`: neuer Status `DS_STALE_SOURCE = "stale_source"` in
   `KNOWN_DATA_SOURCE_STATUSES` (Anker: `KNOWN_DATA_SOURCE_STATUSES: frozenset[str] = frozenset(`,
-  `models.py:29`). Ein Epic mit diesem Status fällt aus `measurable_universe()` (die Abfrage
+  `models.py:30`). Ein Epic mit diesem Status fällt aus `measurable_universe()` (die Abfrage
   filtert auf `data_source_status='ok'`, keine Änderung nötig).
 - `service.py`, `BudgetedIGBarProvider.get_bars`: **nach** dem Bauen der `PriceBar`-Liste
   (Anker: `        self._budget.record_spend(len(bars), self._spend_kind)`, `service.py:139`)
@@ -769,7 +769,7 @@ Scheduler muss dabei **stehen** (`reference_ig_parallel_login_trap`).
 (`:128`) — `self._chart_subs` daneben; `    def stop(self) -> None:` (`:149`) — beide
 Dicts räumen; `@dataclass\nclass PriceTick:` (`base.py:24-25`) — `ChartCandle` daneben.
 
-`StreamClient` (die ABC, `base.py:34`) bleibt **unangetastet** — `subscribe_candles` ist
+`StreamClient` (die ABC, `base.py:35`) bleibt **unangetastet** — `subscribe_candles` ist
 IG-spezifisch und duck-typed, `PollingStreamClient` zieht nicht mit.
 
 `UTM` ist Unix-ms → `_utm_to_iso` (`ig_lightstreamer.py:44`) existiert und wird
@@ -864,7 +864,7 @@ Publikationsverzug bekannt und < 2 h. Eine kleine, gepflegte pip-Abhängigkeit i
 
 **Betriebsmodell:** lückengetrieben, nicht zeitgetrieben. Ein Tages-Pass fragt das Archiv nach
 Lücken älter als `min_gap_age_min`, holt genau diese Spannen, schreibt mit eigenem
-`source`-Tag (⇒ `KNOWN_SOURCES` in `models.py:23` erweitern **und** `BarArchive.window`s
+`source`-Tag (⇒ `KNOWN_SOURCES` in `models.py:22` erweitern **und** `BarArchive.window`s
 `prefer`-Default um die neue Quelle ergänzen — sonst rankt sie stumm hinter yF).
 
 ⚠ **`prefer` ist heute `("ig", "ls", "yf")`** (`archive.py:138`). Eine neue Quelle, die nicht
@@ -875,7 +875,7 @@ Fehler, der wie „die neue Quelle liefert nichts" aussieht.
 landen, sonst driftet der Plan gegen den Code:
 - [ ] §0-Stufentabelle: „unabhängige Fremdquelle" → der Name
 - [ ] dieser Step (C1) selbst
-- [ ] `data_foundation/models.py:23` — `KNOWN_SOURCES` erweitern
+- [ ] `data_foundation/models.py:22` — `KNOWN_SOURCES` erweitern
 - [ ] `data_foundation/archive.py:138` — `prefer`-Default erweitern (**die am leichtesten
       vergessene**, s. §8)
 
