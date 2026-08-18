@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# dev_install.sh — composition root (concept §"Step C", Phase 5 + Phase 6 + Phase 7 + Phase 8 + Phase 9 + Phase 10 + Phase 12).
+# dev_install.sh — composition root (concept §"Step C", Phase 5 + Phase 6 + Phase 7 + Phase 8 + Phase 9 + Phase 10 + Phase 12 + Phase 13).
 #
 # Editable-install every phase package in dependency order (P1 -> P2 -> P3 -> P4
-# -> P5 -> P6 -> P7 -> P8 -> P9 -> P10 -> P12) into the *currently active* virtualenv, so that
-#   import broker_wrapper / persistence / external_data / research / execution / debate / reward / scheduler / universe / abstain_lessons / data_foundation
+# -> P5 -> P6 -> P7 -> P8 -> P9 -> P10 -> P12 -> P13) into the *currently active* virtualenv, so that
+#   import broker_wrapper / persistence / external_data / research / execution / debate / reward / scheduler / universe / abstain_lessons / data_foundation / live_data
 # all resolve at runtime WITHOUT any sys.path manipulation, and `pytest`
 # collects cleanly. Run once per fresh venv. (P6 + P7 import `research`, so they
 # are installed after P4; P7 also reuses the Phase-2 `persistence` Database. P8
@@ -14,7 +14,9 @@
 # dependency order. P10 (`abstain_lessons`) is the same: own-connection store,
 # no cross-phase import at load time. P12 (`data_foundation`) is the same again:
 # own-connection `bars.sqlite` (D4), no cross-phase import at load time — Steps
-# 3/4/6/7 wire it INTO P8/P9/P10 via their own lazy imports, not the reverse.)
+# 3/4/6/7 wire it INTO P8/P9/P10 via their own lazy imports, not the reverse.
+# P13 (`live_data`) is the same again: no cross-phase import at load time, wires
+# INTO P1/P8/P10/P12 via lazy imports as each block lands.)
 #
 # Usage:
 #   source <your-venv>/bin/activate
@@ -26,6 +28,7 @@
 #   pytest phase9_universe/tests -v        # green => Step C proven (P9)
 #   pytest phase10_v3/tests -v             # green => Step C proven (P10)
 #   pytest phase12_data_foundation/tests -v # green => Step C proven (P12)
+#   pytest phase13_live_data/tests -v      # green => Step C proven (P13)
 #
 # Editable installs change only *packaging*, not code dependencies: each phase
 # still imports its siblings only through their defined contracts (cross-phase
@@ -52,10 +55,11 @@ for pkg in \
     phase8_scheduler \
     phase9_universe \
     phase10_v3 \
-    phase12_data_foundation
+    phase12_data_foundation \
+    phase13_live_data
 do
     echo "dev_install: pip install -e $pkg"
     "$PY" -m pip install -e "$ROOT/$pkg"
 done
 
-echo "dev_install: all eleven packages installed editable. Run: pytest phase12_data_foundation/tests -v"
+echo "dev_install: all twelve packages installed editable. Run: pytest phase13_live_data/tests -v"

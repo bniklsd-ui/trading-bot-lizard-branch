@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "live_data"
+version = "0.1.0"
+description = "Phase 13 — Live-Datenfundament: acquisition split from consumption. Four cost/latency-staged sources (S1 Lightstreamer candles, S2 yFinance recorder, S3 independent third source, S4 budgeted IG rescue) write into one archive (data/bars.sqlite, Phase 12); consumers never fetch. Bauprinzip: NULL new AI — gap detection, coverage assessment, source selection are deterministic code."
+requires-python = ">=3.11"
+# Packaging metadata only, enabling an editable install (`pip install -e`) so
+# `import live_data` resolves at runtime without sys.path hacks — same pattern
+# as `phase9_universe` (`universe`), `phase10_v3` (`abstain_lessons`) and
+# `phase12_data_foundation` (`data_foundation`). The sibling `tests`/`scripts`
+# dirs are deliberately excluded from the installed package.
+
+[tool.setuptools.packages.find]
+include = ["live_data*"]
