@@ -77,81 +77,60 @@ Siehe [`README.md`](./README.md).
 
 ---
 
-## Session stopped — 2026-08-18 (Session 8: Step 4/5 live durchgeführt, P12.5 dann formal CLOSED — GESCHEITERT)
+## Session stopped — 2026-08-18 (Session 9: Closeout-Analyse nach dem Scheitern — Root Cause korrigiert, neuer Weg empfohlen)
 
-> **Verlauf:** Step 4 (Neustart mit beiden Flags) lief Nikinger-seitig 2026-08-17 abends.
-> Diese Session verifizierte Step 5 (der vierteilige falsifizierbare Nachweis) über zwei
-> Tage hinweg — und fand dabei einen fünften, ungeplanten Befund, der den ganzen Track
-> stoppte. **Volles Ergebnis:
-> [`PHASE12_5_FAILURE_HANDOVER.md`](./PHASE12_5_FAILURE_HANDOVER.md)** — dieser Block ist
-> die Kurzfassung.
+> **Auftrag:** die abgeschlossene/zurückgestellte Phase gegen den As-Built-Zustand prüfen
+> (selbst nachmessen, nicht aus Handovers übernehmen), SVG + Closeout-Handover + Statuspflege.
+> **Volles Ergebnis:
+> [`PHASE12_5_CLOSEOUT_HANDOVER.md`](./PHASE12_5_CLOSEOUT_HANDOVER.md)** — dieser Block ist die
+> Kurzfassung. Keine Produktionscode-Änderung in dieser Session.
 
 ### Completed
 
-1. **Step 5 verifiziert, in drei Teilen über zwei Tage** (read-only, kein Code-Touch bis
-   zur Intervention):
-   - **(a)/(b)** sofort grün: echte argv zeigten beide Flags (`pid 46390`), Config-Default
-     bestätigt.
-   - **(d-i)** sofort grün: `data_health.py --day 2026-08-17` (ohne `--shadow-enabled`)
-     lieferte exakt den geforderten Beweis — `ok=False`, Exit 1, Problem-String
-     `"measurement arm off"` verbatim, gegen den echten Tag-1-Nulltag.
-   - **(c)** am Vorabend leer (kein Fund, kein Diagnosefall — WINDOW war vor dem Neustart
-     bereits zu), am Folgetag (2026-08-18, erster voller Handelstag mit scharfem Messarm)
-     **real bestätigt**: `pairs_opened: 90`, `pairs_resolved: 66`, `pairs_typed_expired: 4`,
-     `resolution_source` erstmals mit echten Werten (`yf`, `ig`, `ig+yf`).
-2. **Beim Auswerten von (c): der IG-Budget-Befund.** `spent_in_window` sprang von 151 auf
-   4731 Punkte binnen ~4 Handelsstunden. Attribution zweifelsfrei über die
-   Punktzahl-Verteilung erzwungen (10× 5 Punkte reales Research vs. **15× exakt 301
-   Punkte** — Vollfenster-Top-ups des Paper-Trackers, fälschlich unter `spend_kind=
-   "research"` gebucht, `wiring.py:189`). Root Cause: `BarService.get_window`
-   (`service.py:202-228`) fordert bei jedem Coverage-Miss das **komplette** Fenster neu
-   an, nicht die Lücke — ein vorher nie exponierter Pfad, weil der Messarm bis P12.5 nie
-   lief; **U3s Korrektheit** (nicht ein neuer Bug) schaltet ihn erstmals scharf, U2s
-   Retry-Cap verstärkt ihn (bis zu 12 Top-ups je Epic statt einem). Funktionales
-   Restbudget (`reserve_points=1500` unverändert) lag bei Fund-Zeitpunkt nur noch bei
-   ≈ 11–12 weiteren Vollfenster-Fetches — die von `data_health.py` ausgegebenen
-   `predicted_exhaustion_days: 7.5` waren irreführend (mitteln über die lange Ruhephase
-   vor dem Neustart).
-3. **Nikinger-Intervention, sofort:** „Let's intervene now - phase 12.5 is formally over
-   - failed. […] phase 12.5 shouldn't have any more steps apart from testing." Scheduler
-   (`pid 46390`) per `kill` gestoppt, Exit binnen weniger Minuten bestätigt (`ps aux`
-   leer). Recorder (`pid 33151`) bewusst weiterlaufen gelassen — reiner
-   yFinance-Prozess, kein IG-Verbrauch.
-4. **`PHASE12_5_FAILURE_HANDOVER.md`** (neu) — Root Cause, Zahlen, was bleibt gültig
-   (alle fünf Code-Fixes U1/U2/U3/U5/Entscheidung B sind unabhängig korrekt und live
-   bewiesen, **nicht** revertieren), Empfehlung fürs Danach (drei Bausteine, priorisiert:
-   Spend-Kind-Korrektur → Top-up auf die Lücke begrenzen statt Vollfenster → optionale
-   Once-per-Epic-Drossel).
-5. **Doku-Sync** (dieser Commit): Root-`CLAUDE.md` Phase-12-Zeile, `ROADMAP.md`,
-   `docs/INDEX.md` (+ neue Zeile für den Failure-Handover), dieser Kopf inkl. Rotation
-   des Session-7-Blocks nach `SESSIONS_ARCHIVE.md`.
+1. **As-Built selbst nachgemessen** (Code, Tests, Live-DB `mode=ro`): Tests **123 / 160** grün,
+   `main` **4 Commits vor `origin/main` (nicht gepusht)**, Scheduler aus, Recorder (`pid 33151`)
+   läuft kostenlos weiter, IG-Fenster 4731/10 000, IG-eigene Restmeldung 5054 (14:08).
+2. **Neuer, entscheidender Befund:** von **1782 bei IG gekauften 1-Min-Bars trugen 1638 (92 %)
+   Zeitstempel, die bereits als yF-Bar im Archiv lagen** — gekauft wurden ~144 Bars echter neuer
+   Information für 4515 Punkte. Das kippt die Empfehlung von „billiger kaufen" auf „nicht kaufen".
+3. **Zwei Korrekturen an der bisherigen Root-Cause-Erzählung** (Closeout §2, datiert):
+   **K1** — `_covers_tail and coverage_ratio` kurzschließt links; `_covers_tail` verlangt eine
+   Bar ≤ 1 Min alt, yF liefert mit ~15 Min Eigenverzug (15:05er Bar um 15:20 geholt, Recorder-Takt
+   300 s) ⇒ **U3 kann den Refetch nie ausgelöst haben**; Auslöser ist allein das Einschalten des
+   Messarms, der Pfad lag seit Step 4 latent. **K2** — „41 von 90" war falsch: 45 Paare / 90
+   Zeilen, 70 aufgelöst, **54 von 70** mit IG-Beteiligung, 20 blieben OPEN.
+4. **Testlücke benannt:** keine der 123 Zusicherungen prüft *Kosten* — `test_service.py` prüft,
+   **dass** ein Refetch feuert, nie **wie teuer** er ist.
+5. **Neue Dateien:** [`PHASE12_5_CLOSEOUT_HANDOVER.md`](./PHASE12_5_CLOSEOUT_HANDOVER.md) und
+   [`../docs/architecture/phase12_5_failure.svg`](../docs/architecture/phase12_5_failure.svg)
+   (1080×1080: Fehlerbild → Zielbild → was offen bleibt).
+6. **Doku-Sync + Korrekturen** (dieser Commit): Root-`CLAUDE.md`, `ROADMAP.md` (u. a. „P12 117"
+   → **123**), `docs/INDEX.md` (+2 Zeilen), dieser Kopf inkl. Rotation des Session-8-Blocks.
 
 ### Verified
 
-- Alle fünf P12.5-Fixes (U1/U2/U3/U5/Entscheidung B) live gegen echte Produktionsdaten
-  bestätigt korrekt (s. Completed 1) — **keiner** davon ist die Fehlerursache.
-- IG-Spend-Attribution zweifelsfrei über die Punktzahl-Verteilung (5 vs. 301) belegt,
-  nicht nur vermutet.
-- Scheduler-Stop verifiziert (`ps aux` vor/nach dem `kill`, Exit bestätigt).
-- `pytest phase12_data_foundation/tests -q` / `phase10_v3/tests -q` unverändert grün
-  (123 / 160) — diese Session hat keinen Produktionscode geändert.
+- 123 / 160 Tests heute getrennt gelaufen, beide grün.
+- Alle Zahlen dieses Blocks stammen aus eigenen read-only Abfragen gegen `data/bars.sqlite` und
+  `data/trading_bot.sqlite`, nicht aus Vordokumenten.
+- K1 gegen den Quelltext geprüft (`service.py:218-219`, `:229-238`, `_covers_tail` ab `:266`),
+  nicht nur argumentiert.
 
 ### Next
 
-- **P12.5 ist formal geschlossen — keine weiteren Bauschritte unter diesem Label, nur
-  Tests.** Der nächste Fix-Block (Empfehlung: Spend-Kind-Korrektur + Top-up-auf-Lücke-
-  begrenzen, s. Failure-Handover §5) ist ungebaut und unfreigegeben — Nikinger entscheidet
-  Nummerierung/Label, wenn es losgeht.
-- Phase-12-Done-Kriterium (Beweiswoche, Plan §7) weiterhin offen — nach diesem Scheitern
-  weniger denn je erreicht.
-- Push-Entscheidung offen wie üblich (bewusste, separate Freigabe).
+- **Entscheidungen einholen, bevor geplant wird** (Closeout §4/§5/§6): Weg (Empfehlung
+  **Option B** — Auflöse-Pfad kauft nie wieder Daten, Frage wechselt von „reicht das Archiv bis
+  jetzt?" zu „deckt es das Fenster dieses Trades bis `time_stop_utc`?"; Option A/Patch-Leiter
+  explizit abgelehnt), Label (Empfehlung: kein neues Unter-Label), Wiederanlauf-Zeitpunkt
+  (Empfehlung: nicht vor Umsetzung + frischer `remainingAllowance`-Probe; Fenster rollt ~25.08. ab).
+- Erste Akzeptanzbedingung des nächsten Plans soll eine **Kostenzusicherung** sein.
 
 ### Open questions / blockers
 
-- Der eigentliche nächste Schritt (Fetch-auf-Lücke-Design) ist noch nicht durchdacht
-  genug für eine Implementierung — Failure-Handover §5 nennt die Richtung, nicht das Design.
-- Kein technischer Blocker sonst — der Bot steht sicher (Scheduler aus, Recorder läuft
-  kostenlos weiter).
+- **Ungeklärt, bewusst nicht geraten:** warum `IX.D.IBEX.FWM2.IP` als einzige Epic 14/14 Trades
+  rein aus yF auflöste (identische Zeitfenster und yF-Abdeckung wie die anderen vier, dennoch
+  10 `ig`-ok-Events in `research_health.jsonl`). Für Option B unmittelbar relevant — sie ist der
+  Existenzbeweis.
+- Kein technischer Blocker: Bot steht sicher, Recorder sammelt weiter kostenlos.
 
 ---
 

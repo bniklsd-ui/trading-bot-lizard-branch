@@ -472,8 +472,8 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 
 ## Phase 12 — Datenfundament (Registry + BarService + Bar-Archiv + Recorder)
 
-> **Status: 🔄 in Arbeit — Steps 0–8.5 gebaut, getestet (P12 117) und auf `main`; Step 9
-> (Beweiswoche) nicht begonnen, Done-Kriterium offen.** Notbremse aus Phase 11 (oben):
+> **Status: 🔄 in Arbeit — Steps 0–8.5 gebaut, getestet (P12 123, Stand 2026-08-18) und auf
+> `main` (noch nicht gepusht); Step 9 (Beweiswoche) nicht begonnen, Done-Kriterium offen.** Notbremse aus Phase 11 (oben):
 > drei Datenwochen sind an drei Infrastruktur-Ausfällen gescheitert, nie an der Messung — die
 > gemeinsame Wurzel (**eine Tatsache in drei divergenten Speichern**, die Mehrquellen-Kette aus
 > Phase 9 nie eingeschaltet) ist wichtiger als die vorherige Phase. Execution-ready Plan
@@ -496,8 +496,21 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 > bei jedem Coverage-Miss das **komplette** Fenster neu an (≈301 IG-Punkte/Top-up) statt nur die
 > Lücke — 4731/10 000 Wochenpunkte in ~4 Stunden verbrannt, Requirement F (Soll < 1500/Woche) am
 > ersten Tag gerissen. Nikinger-Intervention: Scheduler gestoppt, P12.5 ohne weitere Bauschritte
-> geschlossen. Root Cause, Zahlen, Empfehlung fürs Danach:
+> geschlossen. Sofort-Befund des Interventionstags:
 > [`phase12_data_foundation/PHASE12_5_FAILURE_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_FAILURE_HANDOVER.md).
+>
+> **Closeout-Analyse (2026-08-18, nachgemessen — korrigiert die obige Root-Cause-Erzählung):**
+> Von **1782 bei IG gekauften 1-Min-Bars trugen 1638 (92 %) Zeitstempel, die bereits als
+> yFinance-Bar im Archiv lagen** — gekauft wurde für 4515 Punkte fast nur, was ohnehin schon da war.
+> Ursache ist nicht U3 (die `and`-Bedingung kurzschließt links, U3s Schwelle wurde nie erreicht),
+> sondern `_covers_tail`s Anspruch auf eine ≤ 1 Minute alte Bar gegen yFinances ~15 Minuten
+> Eigenverzug: der teure Zweig war der Normalfall, latent seit Step 4, scharf erst durch das
+> Einschalten des Messarms. **Empfehlung daher kein weiterer Patch, sondern ein struktureller
+> Schnitt** (Auflöse-Pfad kauft nie wieder Daten; die Frage wechselt von „reicht das Archiv bis
+> jetzt?" zu „deckt es das Fenster dieses Trades bis `time_stop_utc`?"). Offene Entscheidungen
+> (Weg / Label / Wiederanlauf) und der volle As-Built-Stand:
+> [`phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md),
+> Bild: [`docs/architecture/phase12_5_failure.svg`](./docs/architecture/phase12_5_failure.svg).
 
 **Goal:** eine echte Beweis-Messwoche läuft durch, ohne dass Infrastruktur die Messung tötet.
 Instrument-Registry wird die eine Wahrheit (abgeleitetes, code-verifiziertes Symbol-Mapping statt

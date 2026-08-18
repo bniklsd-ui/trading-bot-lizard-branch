@@ -4,7 +4,7 @@ purpose: Verbatim session-history archive rotated out of `CLAUDE.md`
 read-when: auditing how a past Phase-12 decision came about — never needed at session start
 detail: L3
 up: ./CLAUDE.md
-updated: 2026-08-17
+updated: 2026-08-18
 ---
 
 # phase12_data_foundation — Session Archive
@@ -13,6 +13,85 @@ updated: 2026-08-17
 > rotation rule ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)). Source order
 > preserved (newest-first). The newest `## Session stopped` block always stays in the source file;
 > at each session end, the previously-newest block rotates here.
+
+## Session stopped — 2026-08-18 (Session 8: Step 4/5 live durchgeführt, P12.5 dann formal CLOSED — GESCHEITERT)
+
+> **Verlauf:** Step 4 (Neustart mit beiden Flags) lief Nikinger-seitig 2026-08-17 abends.
+> Diese Session verifizierte Step 5 (der vierteilige falsifizierbare Nachweis) über zwei
+> Tage hinweg — und fand dabei einen fünften, ungeplanten Befund, der den ganzen Track
+> stoppte. **Volles Ergebnis:
+> [`PHASE12_5_FAILURE_HANDOVER.md`](./PHASE12_5_FAILURE_HANDOVER.md)** — dieser Block ist
+> die Kurzfassung.
+
+### Completed
+
+1. **Step 5 verifiziert, in drei Teilen über zwei Tage** (read-only, kein Code-Touch bis
+   zur Intervention):
+   - **(a)/(b)** sofort grün: echte argv zeigten beide Flags (`pid 46390`), Config-Default
+     bestätigt.
+   - **(d-i)** sofort grün: `data_health.py --day 2026-08-17` (ohne `--shadow-enabled`)
+     lieferte exakt den geforderten Beweis — `ok=False`, Exit 1, Problem-String
+     `"measurement arm off"` verbatim, gegen den echten Tag-1-Nulltag.
+   - **(c)** am Vorabend leer (kein Fund, kein Diagnosefall — WINDOW war vor dem Neustart
+     bereits zu), am Folgetag (2026-08-18, erster voller Handelstag mit scharfem Messarm)
+     **real bestätigt**: `pairs_opened: 90`, `pairs_resolved: 66`, `pairs_typed_expired: 4`,
+     `resolution_source` erstmals mit echten Werten (`yf`, `ig`, `ig+yf`).
+2. **Beim Auswerten von (c): der IG-Budget-Befund.** `spent_in_window` sprang von 151 auf
+   4731 Punkte binnen ~4 Handelsstunden. Attribution zweifelsfrei über die
+   Punktzahl-Verteilung erzwungen (10× 5 Punkte reales Research vs. **15× exakt 301
+   Punkte** — Vollfenster-Top-ups des Paper-Trackers, fälschlich unter `spend_kind=
+   "research"` gebucht, `wiring.py:189`). Root Cause: `BarService.get_window`
+   (`service.py:202-228`) fordert bei jedem Coverage-Miss das **komplette** Fenster neu
+   an, nicht die Lücke — ein vorher nie exponierter Pfad, weil der Messarm bis P12.5 nie
+   lief; **U3s Korrektheit** (nicht ein neuer Bug) schaltet ihn erstmals scharf, U2s
+   Retry-Cap verstärkt ihn (bis zu 12 Top-ups je Epic statt einem). Funktionales
+   Restbudget (`reserve_points=1500` unverändert) lag bei Fund-Zeitpunkt nur noch bei
+   ≈ 11–12 weiteren Vollfenster-Fetches — die von `data_health.py` ausgegebenen
+   `predicted_exhaustion_days: 7.5` waren irreführend (mitteln über die lange Ruhephase
+   vor dem Neustart).
+3. **Nikinger-Intervention, sofort:** „Let's intervene now - phase 12.5 is formally over
+   - failed. […] phase 12.5 shouldn't have any more steps apart from testing." Scheduler
+   (`pid 46390`) per `kill` gestoppt, Exit binnen weniger Minuten bestätigt (`ps aux`
+   leer). Recorder (`pid 33151`) bewusst weiterlaufen gelassen — reiner
+   yFinance-Prozess, kein IG-Verbrauch.
+4. **`PHASE12_5_FAILURE_HANDOVER.md`** (neu) — Root Cause, Zahlen, was bleibt gültig
+   (alle fünf Code-Fixes U1/U2/U3/U5/Entscheidung B sind unabhängig korrekt und live
+   bewiesen, **nicht** revertieren), Empfehlung fürs Danach (drei Bausteine, priorisiert:
+   Spend-Kind-Korrektur → Top-up auf die Lücke begrenzen statt Vollfenster → optionale
+   Once-per-Epic-Drossel).
+5. **Doku-Sync** (dieser Commit): Root-`CLAUDE.md` Phase-12-Zeile, `ROADMAP.md`,
+   `docs/INDEX.md` (+ neue Zeile für den Failure-Handover), dieser Kopf inkl. Rotation
+   des Session-7-Blocks nach `SESSIONS_ARCHIVE.md`.
+
+### Verified
+
+- Alle fünf P12.5-Fixes (U1/U2/U3/U5/Entscheidung B) live gegen echte Produktionsdaten
+  bestätigt korrekt (s. Completed 1) — **keiner** davon ist die Fehlerursache.
+- IG-Spend-Attribution zweifelsfrei über die Punktzahl-Verteilung (5 vs. 301) belegt,
+  nicht nur vermutet.
+- Scheduler-Stop verifiziert (`ps aux` vor/nach dem `kill`, Exit bestätigt).
+- `pytest phase12_data_foundation/tests -q` / `phase10_v3/tests -q` unverändert grün
+  (123 / 160) — diese Session hat keinen Produktionscode geändert.
+
+### Next
+
+- **P12.5 ist formal geschlossen — keine weiteren Bauschritte unter diesem Label, nur
+  Tests.** Der nächste Fix-Block (Empfehlung: Spend-Kind-Korrektur + Top-up-auf-Lücke-
+  begrenzen, s. Failure-Handover §5) ist ungebaut und unfreigegeben — Nikinger entscheidet
+  Nummerierung/Label, wenn es losgeht.
+- Phase-12-Done-Kriterium (Beweiswoche, Plan §7) weiterhin offen — nach diesem Scheitern
+  weniger denn je erreicht.
+- Push-Entscheidung offen wie üblich (bewusste, separate Freigabe).
+
+### Open questions / blockers
+
+- Der eigentliche nächste Schritt (Fetch-auf-Lücke-Design) ist noch nicht durchdacht
+  genug für eine Implementierung — Failure-Handover §5 nennt die Richtung, nicht das Design.
+- Kein technischer Blocker sonst — der Bot steht sicher (Scheduler aus, Recorder läuft
+  kostenlos weiter).
+
+
+---
 
 ## Session stopped — 2026-08-17 (Session 7: P12.5 Steps 1–3 — U1/U3/Entscheidung B + U2/U5, pausiert nach Nikinger-Auftrag)
 

@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" font-family="Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6470"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1e7a4d"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+  </defs>
+
+  <rect width="1080" height="1080" fill="#f7f8fa"/>
+
+  <text x="40" y="46" font-size="25" font-weight="bold" fill="#1b1f24">P12.5 — der Messarm lief, und kaufte sich seine Daten selbst</text>
+  <text x="40" y="70" font-size="13.5" fill="#5b6470">Stand 2026-08-18 · P12.5 formal CLOSED — GESCHEITERT · alle Zahlen read-only nachgemessen (data/bars.sqlite, data/trading_bot.sqlite)</text>
+  <line x1="40" y1="84" x2="1040" y2="84" stroke="#d5d9de" stroke-width="1"/>
+
+  <!-- ================= PANEL 1 — FEHLERBILD ================= -->
+  <rect x="40" y="100" width="1000" height="392" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="100" width="1000" height="30" rx="6" fill="#fdecea"/>
+  <rect x="40" y="120" width="1000" height="10" fill="#fdecea"/>
+  <text x="56" y="121" font-size="15" font-weight="bold" fill="#c0392b">① FEHLERBILD — eine Schleife, die pro Durchlauf 301 IG-Punkte kostet und 92 % davon verschenkt</text>
+
+  <!-- flow boxes -->
+  <rect x="56" y="150" width="196" height="74" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="154" y="174" font-size="12.5" font-weight="bold" fill="#1b1f24" text-anchor="middle">Paper-Tracker, Tick</text>
+  <text x="154" y="193" font-size="11.5" fill="#5b6470" text-anchor="middle">nur für Epics mit fälligem</text>
+  <text x="154" y="209" font-size="11.5" fill="#5b6470" text-anchor="middle">Shadow-Trade → bar_fetch()</text>
+
+  <line x1="252" y1="187" x2="288" y2="187" stroke="#5b6470" stroke-width="1.6" marker-end="url(#a)"/>
+
+  <rect x="290" y="150" width="220" height="74" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="400" y="174" font-size="12.5" font-weight="bold" fill="#1b1f24" text-anchor="middle">BarService.get_window</text>
+  <text x="400" y="193" font-size="11.5" fill="#5b6470" text-anchor="middle">Fenster = jetzt − 300 Min … jetzt</text>
+  <text x="400" y="209" font-size="11.5" fill="#5b6470" text-anchor="middle">(max_hold 240 + 60)</text>
+
+  <line x1="510" y1="187" x2="546" y2="187" stroke="#5b6470" stroke-width="1.6" marker-end="url(#a)"/>
+
+  <rect x="548" y="150" width="220" height="74" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="658" y="174" font-size="12.5" font-weight="bold" fill="#c0392b" text-anchor="middle">_covers_tail ?</text>
+  <text x="658" y="193" font-size="11.5" fill="#5b6470" text-anchor="middle">„jüngste Bar ≤ 1 Minute alt?"</text>
+  <text x="658" y="211" font-size="12" font-weight="bold" fill="#c0392b" text-anchor="middle">strukturell immer NEIN</text>
+
+  <line x1="768" y1="187" x2="804" y2="187" stroke="#c0392b" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <rect x="806" y="150" width="218" height="74" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="915" y="174" font-size="12.5" font-weight="bold" fill="#c0392b" text-anchor="middle">Voll-Refetch bei IG</text>
+  <text x="915" y="193" font-size="11.5" fill="#5b6470" text-anchor="middle">count = 301 Bars</text>
+  <text x="915" y="209" font-size="11.5" fill="#5b6470" text-anchor="middle">= 301 Punkte, jedes Mal</text>
+
+  <!-- why the tail can never be covered -->
+  <rect x="56" y="244" width="968" height="76" rx="5" fill="#fdf6ec" stroke="#c98a1a"/>
+  <text x="72" y="266" font-size="12.5" font-weight="bold" fill="#8a5d0d">Warum „immer NEIN": das Archiv kann die letzte Minute gar nicht enthalten</text>
+  <text x="72" y="286" font-size="11.5" fill="#5b6470">Der Recorder pollt alle 300 s — aber yFinance liefert 1-Minuten-Bars selbst verzögert: am 18.08. war die jüngste Bar <tspan font-weight="bold">15:05</tspan>, geholt um <tspan font-weight="bold">15:20</tspan>.</text>
+  <text x="72" y="304" font-size="11.5" fill="#5b6470">Wer Bars <tspan font-style="italic">bis jetzt</tspan> verlangt, kann von einer ~15 Min verzögerten Quelle nie bedient werden → der teure Zweig ist der Normalfall, nicht die Ausnahme.</text>
+
+  <!-- measured numbers -->
+  <rect x="56" y="334" width="474" height="142" rx="5" fill="#f7f8fa" stroke="#d5d9de"/>
+  <text x="72" y="356" font-size="12.5" font-weight="bold" fill="#1b1f24">Gemessen am 2026-08-18 (~4 Handelsstunden)</text>
+  <text x="72" y="378" font-size="11.5" fill="#5b6470">IG-Verbrauch, 7-Tage-Fenster</text>
+  <text x="514" y="378" font-size="11.5" font-weight="bold" fill="#c0392b" text-anchor="end">4731 / 10 000</text>
+  <text x="72" y="398" font-size="11.5" fill="#5b6470">davon Tracker-Top-ups: 15 × exakt 301 Pkt</text>
+  <text x="514" y="398" font-size="11.5" font-weight="bold" fill="#c0392b" text-anchor="end">4515</text>
+  <text x="72" y="418" font-size="11.5" fill="#5b6470">echtes Research (10 × 5) + Sampler (5 × 3)</text>
+  <text x="514" y="418" font-size="11.5" fill="#1e7a4d" text-anchor="end">50 + 15</text>
+  <text x="72" y="438" font-size="11.5" fill="#5b6470">Anforderung F (Soll &lt; 1500 / Woche)</text>
+  <text x="514" y="438" font-size="11.5" font-weight="bold" fill="#c0392b" text-anchor="end">an Tag 1 gerissen</text>
+  <text x="72" y="460" font-size="11.5" fill="#5b6470">Shadow-Paare 18.08.: 45 Paare / 90 Zeilen, 70 aufgelöst</text>
+  <text x="514" y="460" font-size="11.5" fill="#5b6470" text-anchor="end">20 blieben OPEN</text>
+
+  <rect x="550" y="334" width="474" height="142" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="566" y="356" font-size="12.5" font-weight="bold" fill="#c0392b">Der eigentliche Skandal: 92 % des Gekauften lag schon da</text>
+  <text x="566" y="378" font-size="11.5" fill="#5b6470">bei IG gekaufte 1-Min-Bars (4 Epics)</text>
+  <text x="1008" y="378" font-size="11.5" font-weight="bold" fill="#1b1f24" text-anchor="end">1782</text>
+  <text x="566" y="398" font-size="11.5" fill="#5b6470">davon Zeitstempel, die als yF-Bar bereits im Archiv lagen</text>
+  <text x="1008" y="398" font-size="11.5" font-weight="bold" fill="#c0392b" text-anchor="end">1638 (92 %)</text>
+  <text x="566" y="418" font-size="11.5" fill="#5b6470">tatsächlich neue Information</text>
+  <text x="1008" y="418" font-size="11.5" font-weight="bold" fill="#1b1f24" text-anchor="end">~144 Bars</text>
+  <text x="566" y="440" font-size="11.5" fill="#5b6470">yF-Abdeckung je aktiver Epic am 18.08. (1 Min)</text>
+  <text x="1008" y="440" font-size="11.5" font-weight="bold" fill="#1e7a4d" text-anchor="end">486 Bars, 07:00–15:05</text>
+  <text x="566" y="462" font-size="11.5" fill="#5b6470">Schlussfolgerung: nicht „billiger kaufen" — <tspan font-weight="bold" fill="#c0392b">gar nicht kaufen</tspan>.</text>
+
+  <!-- ================= PANEL 2 — ZIELBILD ================= -->
+  <rect x="40" y="510" width="1000" height="352" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="510" width="1000" height="30" rx="6" fill="#e8f5ee"/>
+  <rect x="40" y="530" width="1000" height="10" fill="#e8f5ee"/>
+  <text x="56" y="531" font-size="15" font-weight="bold" fill="#1e7a4d">② ZIELBILD — Beschaffung und Verbrauch trennen: der Auflöse-Pfad kauft nie wieder Daten</text>
+
+  <!-- acquisition lane -->
+  <rect x="56" y="560" width="300" height="176" rx="5" fill="#f7f8fa" stroke="#1e7a4d"/>
+  <text x="206" y="584" font-size="13" font-weight="bold" fill="#1e7a4d" text-anchor="middle">BESCHAFFUNG (läuft, kostenlos)</text>
+  <text x="206" y="608" font-size="11.5" fill="#5b6470" text-anchor="middle">Recorder — eigener Prozess, yF-only</text>
+  <text x="206" y="626" font-size="11.5" fill="#5b6470" text-anchor="middle">Takt 300 s, unabhängig vom Bot</text>
+  <text x="206" y="650" font-size="11.5" fill="#5b6470" text-anchor="middle">schreibt kontinuierlich, nicht auf Zuruf</text>
+  <rect x="86" y="666" width="240" height="52" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="206" y="688" font-size="12.5" font-weight="bold" fill="#1e7a4d" text-anchor="middle">data/bars.sqlite</text>
+  <text x="206" y="706" font-size="11.5" fill="#5b6470" text-anchor="middle">quellenagnostisch, mit Provenienz</text>
+
+  <line x1="356" y1="692" x2="396" y2="692" stroke="#1e7a4d" stroke-width="1.6" marker-end="url(#ag)"/>
+
+  <!-- consumption lane -->
+  <rect x="398" y="560" width="626" height="176" rx="5" fill="#f7f8fa" stroke="#1e7a4d"/>
+  <text x="711" y="584" font-size="13" font-weight="bold" fill="#1e7a4d" text-anchor="middle">VERBRAUCH (die eine Änderung)</text>
+  <text x="414" y="608" font-size="11.5" fill="#5b6470">Die Frage des Trackers ändert sich — das ist der ganze Umbau:</text>
+  <text x="414" y="630" font-size="11.5" fill="#c0392b">alt:  „Reicht das Archiv bis <tspan font-style="italic">jetzt</tspan>?"  → nein → kaufen</text>
+  <text x="414" y="652" font-size="11.5" font-weight="bold" fill="#1e7a4d">neu: „Deckt das Archiv das Fenster dieses Trades bis time_stop_utc?"</text>
+  <text x="430" y="674" font-size="11.5" fill="#5b6470">ja      → auflösen, resolution_source = yf</text>
+  <text x="430" y="694" font-size="11.5" fill="#5b6470">noch nicht → offen lassen, nächster Tick (Haltedauer 240 Min ≫ 15 Min Verzug)</text>
+  <text x="430" y="714" font-size="11.5" fill="#5b6470">nie     → typisierter Status. Kein Kauf. Nie.</text>
+
+  <rect x="56" y="750" width="484" height="94" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="72" y="772" font-size="12.5" font-weight="bold" fill="#1e7a4d">Was das kostet — per Konstruktion, nicht per Tuning</text>
+  <text x="72" y="794" font-size="11.5" fill="#5b6470">IG-Punkte fließen dann nur noch in Research, Promotion-Probe und</text>
+  <text x="72" y="812" font-size="11.5" fill="#5b6470">Divergenz-Sample — gemessen 65 Punkte/Tag statt 4565. Anforderung F</text>
+  <text x="72" y="830" font-size="11.5" fill="#5b6470">ist damit Entwurfseigenschaft statt Versprechen — sofern der Research-Seam klein bleibt.</text>
+
+  <rect x="556" y="750" width="468" height="94" rx="5" fill="#f7f8fa" stroke="#d5d9de"/>
+  <text x="572" y="772" font-size="12.5" font-weight="bold" fill="#1b1f24">Existenzbeweis, schon gemessen</text>
+  <text x="572" y="794" font-size="11.5" fill="#5b6470"><tspan font-weight="bold">IX.D.IBEX.FWM2.IP</tspan> löste am 18.08. <tspan font-weight="bold" fill="#1e7a4d">14 von 14</tspan> Trades rein aus yF auf —</text>
+  <text x="572" y="812" font-size="11.5" fill="#5b6470">ohne einen einzigen IG-Punkt. Auflösung ohne Kauf ist keine Theorie.</text>
+  <text x="572" y="830" font-size="11.5" fill="#c98a1a">Warum ausgerechnet diese Epic: ungeklärt — Frage der nächsten Session.</text>
+
+  <!-- ================= PANEL 3 — unverändert offen ================= -->
+  <rect x="40" y="880" width="1000" height="160" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="880" width="1000" height="30" rx="6" fill="#eef1f4"/>
+  <rect x="40" y="900" width="1000" height="10" fill="#eef1f4"/>
+  <text x="56" y="901" font-size="15" font-weight="bold" fill="#1b1f24">③ UNVERÄNDERT OFFEN — was auch das Zielbild nicht schon erledigt</text>
+
+  <text x="56" y="932" font-size="11.5" fill="#5b6470">·  <tspan font-weight="bold" fill="#c0392b">Done-Kriterium der Phase 12</tspan> (Plan §7: eine durchlaufende Beweiswoche gegen A–G) — nicht erreicht. Bewiesen ist <tspan font-style="italic">ein</tspan> Handelstag, abgebrochen.</text>
+  <text x="56" y="954" font-size="11.5" fill="#5b6470">·  Von A–G real angefasst: nur <tspan font-weight="bold">E</tspan> (resolution_source erstmals echt befüllt, 70 Zeilen, ein Tag). <tspan font-weight="bold">F</tspan> aktiv gerissen. A–D und G bleiben ungeprüft.</text>
+  <text x="56" y="976" font-size="11.5" fill="#5b6470">·  Nur offline bewiesen: <tspan font-weight="bold">U5</tspan> (Shadow-Deadline-Marge) — Rechnung + AST-Guard, keine Live-Beobachtung. Alles andere aus P12.5 ist live belegt.</text>
+  <text x="56" y="998" font-size="11.5" fill="#5b6470">·  Ungebaut/unentschieden: <tspan font-weight="bold">U4</tspan> (TickerMapper nur beim Start befüllt — zweiter Kostenpfad), Entscheidung C (SUN*-Epics), Step 10 (Lightstreamer).</text>
+  <text x="56" y="1020" font-size="11.5" fill="#5b6470">·  <tspan font-weight="bold">Nicht gepusht:</tspan> main liegt 4 Commits vor origin/main. Push bleibt bewusste Einzelfreigabe des Nikinger.</text>
+</svg>
