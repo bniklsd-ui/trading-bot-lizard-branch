@@ -1,4 +1,4 @@
-"""Tests for ``data_foundation.service`` (Plan §6 Step 4). No network."""
+"""Tests for ``data_foundation.service`` (Plan §6 Step 4 + Phase 13 §6 A2). No network."""
 
 from __future__ import annotations
 
@@ -197,128 +197,97 @@ def test_get_bars_empty_chain_result_returns_none(archive, budget):
     assert svc.get_bars(EPIC, resolution="1m", count=1) is None
 
 
-# -- BarService.get_window (tracker seam) -------------------------------------
+# -- BarService.get_window (tracker seam, Phase 13 §6 A2: pure archive read) --
 
 
-def test_get_window_archive_hit_makes_zero_chain_calls(archive, budget):
-    ts = _iso(NOW - timedelta(seconds=30))  # within the last resolution-minute of "now"
+def test_get_window_returns_archive_rows_only(archive, budget):
+    """A pure archive read: whatever the archive holds, the tracker gets — nothing else."""
     from data_foundation.models import Bar
 
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc=ts, open=1, high=1, low=1, close=1, volume=1, source="ig", fetched_at=ts)])
-    yf, ig = _FakeProvider(), _FakeProvider()
+    ts = _iso(NOW - timedelta(minutes=2))
+    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc=ts, open=1, high=1, low=1, close=1, volume=1, source="yf", fetched_at=ts)])
+    fake = _FakeProvider()  # raises on `get_bars` via getattr default — must never be called
+    svc = BarService(archive, [("yf", fake)], budget, now_fn=lambda: NOW)
+
+    result = svc.get_window(EPIC, "1m", _iso(NOW - timedelta(minutes=5)), _iso(NOW))
+
+    assert fake.calls == []
+    assert len(result) == 1
+    assert result[0]["timestamp"] == ts
+    assert result[0]["source"] == "yf"
+
+
+def test_get_window_empty_archive_returns_empty(archive, budget):
+    """Empty archive ⇒ empty window. No chain call. No fallback."""
+    fake = _FakeProvider()
+    svc = BarService(archive, [("yf", fake)], budget, now_fn=lambda: NOW)
+
+    result = svc.get_window(EPIC, "1m", _iso(NOW - timedelta(minutes=5)), _iso(NOW))
+
+    assert result == []
+    assert fake.calls == []
+
+
+def test_get_window_never_fetches(archive, budget):
+    """L12 — die strukturelle Kostenzusicherung.
+
+    Both providers raise AssertionError on ``get_bars``. ``get_window`` must complete
+    (returning whatever the archive holds, here empty) without ever invoking either
+    provider. This is the test that fails if the IG-top-up or full-window refetch
+    is reintroduced — it doesn't pin a number (which tomorrow's parametrization
+    would invalidate), it pins the structure."""
+    class _ExplodingProvider:
+        def get_bars(self, epic, *, resolution, count):
+            raise AssertionError("no fetch allowed — get_window must read archive only")
+
+    yf = _ExplodingProvider()
+    ig = _ExplodingProvider()
     svc = BarService(archive, [("yf", yf), ("ig", ig)], budget, now_fn=lambda: NOW)
 
-    # Window shrunk to 1 minute (was 5) so one archived bar is full coverage under the
-    # U3 fix's coverage_ratio threshold, not a 1/5-covered short archive (P12.5 §3/U3).
-    result = svc.get_window(EPIC, "1m", _iso(NOW - timedelta(minutes=1)), _iso(NOW))
-
-    assert result and result[0]["source"] == "ig"
-    assert yf.calls == [] and ig.calls == []
+    # Empty archive: nothing to return, must not raise.
+    result = svc.get_window(EPIC, "1m", _iso(NOW - timedelta(minutes=5)), _iso(NOW))
+    assert result == []
 
 
-def test_get_window_ig_topup_fires_when_yf_result_is_short(archive, budget):
-    """The Advisor finding: a short-but-non-None yF result must not silently stop the
-    chain — get_window must top up from IG so the tracker's window still reaches the
-    tail it needs."""
-    start = NOW - timedelta(minutes=10)
-    end = NOW
-    short_ts = _iso(start + timedelta(minutes=1))   # far from the tail
-    full_ts = _iso(end - timedelta(seconds=30))     # within the last resolution-minute
-    yf = _FakeProvider([_pricebar(short_ts)])        # doesn't reach the tail
-    ig = _FakeProvider([_pricebar(short_ts), _pricebar(full_ts)])  # reaches it
-    svc = BarService(archive, [("yf", yf), ("ig", ig)], budget, now_fn=lambda: NOW)
-
-    result = svc.get_window(EPIC, "1m", _iso(start), _iso(end))
-
-    assert ig.calls, "IG top-up must fire when yF's result doesn't cover the tail"
-    sources = {b["source"] for b in result}
-    assert "ig" in sources
-    assert any(b["timestamp"] == full_ts for b in result)
-
-
-def test_get_window_ig_topup_does_not_fire_when_yf_already_covers_tail(archive, budget):
-    start = NOW - timedelta(minutes=10)
-    end = NOW
-    full_ts = _iso(end - timedelta(seconds=30))  # within the last resolution-minute
-    yf = _FakeProvider([_pricebar(full_ts)])
-    ig = _FakeProvider([_pricebar(full_ts)])
-    svc = BarService(archive, [("yf", yf), ("ig", ig)], budget, now_fn=lambda: NOW)
-
-    svc.get_window(EPIC, "1m", _iso(start), _iso(end))
-
-    assert not ig.calls
-
-
-def test_get_window_mixed_source_reports_per_bar_source(archive, budget):
+def test_get_window_passes_through_tick_count(archive, budget):
+    """``tick_count`` rides through ``_bar_to_dict`` so the coverage / source-delta
+    reports can read it; the tracker itself doesn't, but the dict shape stays
+    stable for all readers."""
     from data_foundation.models import Bar
 
-    old_ts = _iso(NOW - timedelta(minutes=8))
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc=old_ts, open=1, high=1, low=1, close=1, volume=1, source="ig", fetched_at=old_ts)])
-    tail_ts = _iso(NOW - timedelta(seconds=30))
-    yf = _FakeProvider([_pricebar(old_ts), _pricebar(tail_ts)])
-    svc = BarService(archive, [("yf", yf), ("ig", _FakeProvider())], budget, now_fn=lambda: NOW)
+    ts = _iso(NOW - timedelta(minutes=1))
+    archive.insert_bars([Bar(
+        epic=EPIC, resolution="1m", ts_utc=ts, open=1, high=1, low=1, close=1, volume=1,
+        source="ls", fetched_at=ts, tick_count=42,
+    )])
+    svc = BarService(archive, [], budget, now_fn=lambda: NOW)
 
-    result = svc.get_window(EPIC, "1m", _iso(NOW - timedelta(minutes=10)), _iso(NOW))
+    result = svc.get_window(EPIC, "1m", _iso(NOW - timedelta(minutes=5)), _iso(NOW))
 
-    by_ts = {b["timestamp"]: b["source"] for b in result}
-    assert by_ts[old_ts] == "ig"   # archive's preferred source wins (BarArchive.window's `prefer`)
-    assert by_ts[tail_ts] == "yf"
+    assert result and result[0]["tick_count"] == 42
 
 
-def test_get_window_refetches_when_archive_window_is_too_short(archive, budget):
-    """U3 (P12.5 plan §3): a fresh-but-short archive (recorder restart, first day, gap)
-    satisfies the tail check but covers almost none of the requested window -- the chain
-    must still fire instead of silently returning a near-empty result."""
+def test_get_window_tick_count_defaults_to_none_for_old_rows(archive, budget):
+    """Rows written before A5's schema migration carry no ``tick_count`` — the dict
+    must expose ``None`` rather than KeyError."""
     from data_foundation.models import Bar
 
-    start = NOW - timedelta(minutes=300)
-    end = NOW
-    archived_bars = [
-        Bar(
-            epic=EPIC, resolution="1m", ts_utc=_iso(end - timedelta(minutes=m)),
-            open=1, high=1, low=1, close=1, volume=1, source="yf", fetched_at=_iso(end),
-        )
-        for m in range(10)  # only the last 10 of 300 requested minutes
-    ]
-    archive.insert_bars(archived_bars)
-    yf = _FakeProvider([_pricebar(_iso(end))])
-    svc = BarService(archive, [("yf", yf), ("ig", _FakeProvider())], budget, now_fn=lambda: NOW)
+    ts = _iso(NOW - timedelta(minutes=1))
+    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc=ts, open=1, high=1, low=1, close=1, volume=1, source="yf", fetched_at=ts)])
+    svc = BarService(archive, [], budget, now_fn=lambda: NOW)
 
-    svc.get_window(EPIC, "1m", _iso(start), _iso(end))
+    result = svc.get_window(EPIC, "1m", _iso(NOW - timedelta(minutes=5)), _iso(NOW))
 
-    assert yf.calls, "a 10/300-minute archive must not short-circuit the chain"
+    assert result and result[0]["tick_count"] is None
 
 
-def test_get_window_uses_archive_when_coverage_is_adequate(archive, budget):
-    """Regression guard for the U3 fix: a genuinely healthy archive (the real 240/300
-    trading-hours case, §3/U3 table) must still short-circuit -- no permanent refetch."""
-    from data_foundation.models import Bar
-
-    start = NOW - timedelta(minutes=300)
-    end = NOW
-    archived_bars = [
-        Bar(
-            epic=EPIC, resolution="1m", ts_utc=_iso(end - timedelta(minutes=m)),
-            open=1, high=1, low=1, close=1, volume=1, source="yf", fetched_at=_iso(end),
-        )
-        for m in range(240)  # 240 of 300 requested minutes, including the tail
-    ]
-    archive.insert_bars(archived_bars)
-    yf = _FakeProvider([_pricebar(_iso(end))])
-    svc = BarService(archive, [("yf", yf), ("ig", _FakeProvider())], budget, now_fn=lambda: NOW)
-
-    svc.get_window(EPIC, "1m", _iso(start), _iso(end))
-
-    assert not yf.calls, "adequate coverage must not trigger a refetch (cost regression)"
-
-
-def test_get_window_no_ig_provider_configured_returns_whatever_archive_has(archive, budget):
-    yf = _FakeProvider([_pricebar(_iso(NOW - timedelta(minutes=5)))])  # doesn't reach tail
-    svc = BarService(archive, [("yf", yf)], budget, now_fn=lambda: NOW)
-
-    result = svc.get_window(EPIC, "1m", _iso(NOW - timedelta(minutes=10)), _iso(NOW))
-
-    assert result  # whatever was archived, no crash from a missing "ig" entry
+def test_bar_service_has_no_ig_provider_attribute(archive, budget):
+    """Structure guard against a silent re-opening of the IG-top-up path. The
+    old ``_ig_provider`` attribute is gone; if anyone re-introduces it, this
+    test fails at instantiation (the attribute is still created) instead of
+    at runtime (the fetch path is still gone)."""
+    svc = BarService(archive, [("yf", _FakeProvider()), ("ig", _FakeProvider())], budget)
+    assert not hasattr(svc, "_ig_provider")
 
 
 # -- BarProvider protocol compliance ------------------------------------------

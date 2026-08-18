@@ -51,6 +51,7 @@ class Bar:
     volume: float | None
     source: str
     fetched_at: str
+    tick_count: int | None = None  # Phase 13 §6 A2/A5: filled by S1 (LS), null for yF/IG-REST
 
 
 def _iso_from_dt(dt: datetime) -> str:

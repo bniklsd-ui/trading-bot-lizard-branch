@@ -53,8 +53,8 @@ def archive(tmp_path) -> BarArchive:
         Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T09:10:00.000Z",
             open=100, high=101, low=79, close=80, volume=10,
             source="yf", fetched_at=f"{DAY}T09:10:01.000Z"),
-        # Tail coverage so BarService.get_window's _covers_tail check is satisfied
-        # (does not affect resolution — both legs already resolved at 09:10).
+        # Tail coverage so the partial window [10:00, 10:05) is non-empty in the
+        # archive (does not affect resolution — both legs already resolved at 09:10).
         Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T10:04:30.000Z",
             open=80, high=80, low=80, close=80, volume=10,
             source="yf", fetched_at=f"{DAY}T10:04:31.000Z"),

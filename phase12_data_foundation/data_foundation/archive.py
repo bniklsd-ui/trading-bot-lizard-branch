@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS bars (
     volume      REAL,
     source      TEXT NOT NULL,
     fetched_at  TEXT NOT NULL,
+    tick_count  INTEGER,
     PRIMARY KEY (epic, resolution, ts_utc, source)
 )
 """
@@ -85,6 +86,11 @@ class BarArchive:
         self.conn.execute(_CREATE_BARS_INDEX)
         self.conn.execute(_CREATE_SOURCE_SPEND)
         self.conn.execute(_CREATE_ALLOWANCE_OBSERVATIONS)
+        # Phase 13 §6 A5: idempotent column add for tick_count. A naked ALTER
+        # would raise on the second run; the PRAGMA check makes it a no-op.
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(bars)").fetchall()}
+        if "tick_count" not in cols:
+            self.conn.execute("ALTER TABLE bars ADD COLUMN tick_count INTEGER")
         self.conn.commit()
 
     # -- writes -----------------------------------------------------------
@@ -114,12 +120,12 @@ class BarArchive:
         for bar in bars:
             cur = self.conn.execute(
                 "INSERT OR IGNORE INTO bars "
-                "(epic, resolution, ts_utc, open, high, low, close, volume, source, fetched_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "(epic, resolution, ts_utc, open, high, low, close, volume, source, fetched_at, tick_count) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     bar.epic, bar.resolution, bar.ts_utc,
                     bar.open, bar.high, bar.low, bar.close, bar.volume,
-                    bar.source, bar.fetched_at,
+                    bar.source, bar.fetched_at, bar.tick_count,
                 ),
             )
             new_count += cur.rowcount
@@ -163,6 +169,7 @@ class BarArchive:
                 epic=row["epic"], resolution=row["resolution"], ts_utc=row["ts_utc"],
                 open=row["open"], high=row["high"], low=row["low"], close=row["close"],
                 volume=row["volume"], source=row["source"], fetched_at=row["fetched_at"],
+                tick_count=row["tick_count"] if "tick_count" in row.keys() else None,
             )
             for row in sorted(by_ts.values(), key=lambda r: r["ts_utc"])
         ]

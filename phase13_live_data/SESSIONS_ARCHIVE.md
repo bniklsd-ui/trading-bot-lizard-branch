@@ -169,3 +169,64 @@ verbatim when a new one is appended.
   die Recherche lief parallel zu dieser Session.
 - **`main` liegt 4 Commits vor `origin/main`** (Stand vor diesem Commit) — Push bleibt eine
   bewusste Einzelfreigabe des Nikinger.
+
+---
+
+## Session stopped — 2026-08-18 (Session 3: Block A1 — assess_window + WindowCoverage)
+
+> **Auftrag:** Step A1 (Plan §6 A1, §5.1). Reine Funktion, kein I/O, kein Cross-Phase-Import.
+
+### Completed
+
+1. **`data_foundation/coverage.py` (NEU, 99 Zeilen)** — `WindowCoverage` (frozen dataclass:
+   `covered`, `present`, `expected`, `ratio`, `largest_gap_min`, `reason`) und
+   `assess_window(timestamps, start_utc, end_utc, resolution_minutes, *, min_ratio, max_gap_min)`
+   strikt nach §5.1-Signatur. Reason-Priorität `empty > gap > sparse` (§5.1).
+   Konstanten `MIN_WINDOW_RATIO=0.90` / `MAX_WINDOW_GAP_MIN=5` sind die gelockten v1-Knöpfe
+   (Plan §9.14: Block A misst die reale Verteilung, justiert danach). `_parse` aus
+   `archive.py:222-227` **lokal** dupliziert (Phasen-Isolation, Plan §6 A1). Ränder fließen in
+   die Gap-Rechnung ein — sonst wären Tests 4/5 (Loch am Fensteranfang/-ende) blind.
+2. **`tests/test_coverage.py` (NEU, 12 Tests)** — die 9 Pflicht-Tests aus §6 A1 wortgleich:
+   volles Fenster, leer, **Mitten-Loch** (F3-Fang, ratio > min_ratio trotzdem reason='gap'),
+   Rand-Lücken, gleichmäßig dünn, `gap` > `sparse`, `expected==0` ohne `ZeroDivisionError`,
+   Duplikate zählen einmal. Plus 3 defensive: Timestamps außerhalb des Fensters ignoriert,
+   Defaults halten die Modul-Konstanten, `WindowCoverage` ist `frozen`.
+3. **`phase12_data_foundation/README.md`** — Modul-Tabelle um `coverage.py` ergänzt (Verweis auf
+   Phase 13 §6 A1). Sonst nichts geändert.
+4. **Rotation:** Session-2-Block verbatim nach `SESSIONS_ARCHIVE.md` verschoben.
+
+### Verified
+
+- `pytest phase12_data_foundation/tests -q` → **135 passed** (Baseline 123 + 12 hinzu, 0 Regressionen).
+  Phase-12-Suite allein, geteiltes Venv `phase1_broker_wrapper/.venv`.
+- Akzeptanz A1 wortgleich erfüllt: *"die neun Tests grün; `assess_window` hat null Aufrufer"*.
+- `grep -n "_covers_tail\|MIN_WINDOW_COVERAGE\|_ig_provider" phase12_data_foundation/`: alle drei
+  noch vorhanden — A1 fasst sie nicht an, **A2** löscht sie (L2).
+- `assess_window` hat 0 Produktions-Aufrufer (gegrept); Verdrahtung kommt in A2
+  (`BarService.get_window`-Body-Ersatz) und A3 (Tracker-Naht in `paper.py`).
+
+### Next
+
+- **Step A2** (Plan §6, Zeile 604): `BarService.get_window` zu einer reinen Archiv-Lesung kürzen
+  (Verbatim-Anker-Tabelle in §6 A2 prüfen, Zeilen können sich verschoben haben). L12-Test
+  `test_get_window_never_fetches` (IG-Provider wirft `AssertionError`) ist die **strukturelle
+  Kostenzusicherung** — der Kernpunkt von L12. **Pause für Nikinger-Bestätigung** vor Cross-
+  Phase-Edits in A3 (das ist die nächste Stufe, die `paper.py` und `wiring.py` berührt).
+
+### Note
+
+- Netto-Diff: +2 neue Dateien + 1 README-Zeile + 1 Session-Block-Tausch. Kein Eingriff in
+  laufende Komponenten. `data_foundation` ist cross-phase-Paket (Phase 12), `live_data`
+  importiert es (L11) — der neue Modul liegt also **in** Phase 12, **benutzt von** Phase 13.
+- Die zwei bisherigen Live-Unbekannten aus A0.0 sind gelöst (Modell-ID `MiniMax-M3[1m]`,
+  Bearer-Header, Subscription-Key-Tausch), siehe Session-2-Block.
+
+### Open questions / blockers
+
+- **Kein technischer Blocker für A2.** Bot steht sicher, Recorder sammelt kostenlos weiter.
+- **A2 ist der Lösch-Step** (L2): danach kauft der Tracker-Pfad **per Konstruktion** keine
+  IG-Punkte mehr — der strukturelle Schnitt, den Closeout §1 empfohlen hat. Genau da, **nicht
+  jetzt**, ist der Moment, das mit dem Nikinger kurz zu bestätigen, bevor A3 (die Cross-
+  Phase-Naht) anläuft.
+- **`main` liegt jetzt 6 Commits vor `origin/main`** (inkl. dieses Commits) — Push bleibt
+  bewusste Einzelfreigabe des Nikinger.

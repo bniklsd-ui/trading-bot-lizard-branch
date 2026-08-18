@@ -82,61 +82,128 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
 
 ---
 
-## Session stopped — 2026-08-18 (Session 3: Block A1 — assess_window + WindowCoverage)
+## Session stopped — 2026-08-18 (Session 4: Block A2 — der Schnitt in BarService.get_window)
 
-> **Auftrag:** Step A1 (Plan §6 A1, §5.1). Reine Funktion, kein I/O, kein Cross-Phase-Import.
+> **Auftrag:** Step A2 (Plan §6, Zeile 604). `BarService.get_window` zu einer reinen
+> Archiv-Lesung kürzen — der strukturelle Schnitt, danach kauft der Tracker-Pfad
+> per Konstruktion **null** IG-Punkte. L12-Test ist die Akzeptanz.
 
 ### Completed
 
-1. **`data_foundation/coverage.py` (NEU, 99 Zeilen)** — `WindowCoverage` (frozen dataclass:
-   `covered`, `present`, `expected`, `ratio`, `largest_gap_min`, `reason`) und
-   `assess_window(timestamps, start_utc, end_utc, resolution_minutes, *, min_ratio, max_gap_min)`
-   strikt nach §5.1-Signatur. Reason-Priorität `empty > gap > sparse` (§5.1).
-   Konstanten `MIN_WINDOW_RATIO=0.90` / `MAX_WINDOW_GAP_MIN=5` sind die gelockten v1-Knöpfe
-   (Plan §9.14: Block A misst die reale Verteilung, justiert danach). `_parse` aus
-   `archive.py:222-227` **lokal** dupliziert (Phasen-Isolation, Plan §6 A1). Ränder fließen in
-   die Gap-Rechnung ein — sonst wären Tests 4/5 (Loch am Fensteranfang/-ende) blind.
-2. **`tests/test_coverage.py` (NEU, 12 Tests)** — die 9 Pflicht-Tests aus §6 A1 wortgleich:
-   volles Fenster, leer, **Mitten-Loch** (F3-Fang, ratio > min_ratio trotzdem reason='gap'),
-   Rand-Lücken, gleichmäßig dünn, `gap` > `sparse`, `expected==0` ohne `ZeroDivisionError`,
-   Duplikate zählen einmal. Plus 3 defensive: Timestamps außerhalb des Fensters ignoriert,
-   Defaults halten die Modul-Konstanten, `WindowCoverage` ist `frozen`.
-3. **`phase12_data_foundation/README.md`** — Modul-Tabelle um `coverage.py` ergänzt (Verweis auf
-   Phase 13 §6 A1). Sonst nichts geändert.
-4. **Rotation:** Session-2-Block verbatim nach `SESSIONS_ARCHIVE.md` verschoben.
+1. **`data_foundation/service.py`** — `get_window` ist jetzt eine **reine Archiv-Lesung**:
+   `return [_bar_to_dict(b) for b in self._archive.window(...)]`. Gelöscht: `_MIN_WINDOW_COVERAGE`
+   (Zeile 38, mit dem `# ponytail:`-Kommentarblock), `_covers_tail` (Funktion + Aufruf),
+   `self._ig_provider` (Attribut + Zuweisung), den Vollfenster-Refetch (`service.py:222-227`)
+   und den IG-Top-up-Zweig (`service.py:229-238`). Ebenfalls gelöscht: `_parse_iso` (nur in
+   `_covers_tail` verwendet, danach unbenutzt — vor der Löschung gegepptet, keine weiteren
+   Aufrufer). `_bar_to_dict` trägt jetzt `"tick_count": getattr(bar, "tick_count", None)`.
+   Modul- und Klassen-Docstrings sind komplett umgeschrieben — der alte Text beschrieb den
+   Fetch-Pfad, den es nicht mehr gibt.
+2. **`data_foundation/models.py`** — `Bar` bekommt `tick_count: int | None = None` **am Ende**
+   der Dataclass. Default `None` ist Pflicht, sonst brechen die 24 bestehenden `Bar(...)`-
+   Konstruktionen (alle mit keyword args, gegepptet).
+3. **`data_foundation/archive.py`** — drei kleine Schema-Anpassungen, damit `tick_count`
+   tatsächlich round-trippt: Spalte `tick_count INTEGER` in `_CREATE_BARS` (für frische DBs),
+   idempotenter `ALTER TABLE bars ADD COLUMN tick_count INTEGER` in `ensure_schema` (für
+   bestehende DBs), Spalte + Platzhalter in `insert_bars`. `Bar(...)`-Projektion in `window()`
+   nutzt `row["tick_count"] if "tick_count" in row.keys() else None` — defensiv, falls eine
+   DB ohne `ensure_schema` gelesen wird.
+4. **`tests/test_service.py`** — umgeschrieben: 6 get_window-Tests, die das gelöschte Verhalten
+   pinnten, gelöscht; 6 neue Tests dafür. **L12-Test** (`test_get_window_never_fetches`):
+   beide Provider werfen `AssertionError` auf `get_bars`, `get_window` über leeres Archiv
+   gibt `[]` zurück und wirft nicht. **`test_get_window_passes_through_tick_count`**:
+   Insert mit `tick_count=42`, Read, Wert stimmt. **`test_get_window_tick_count_defaults_to_none_for_old_rows`**:
+   Bar ohne `tick_count` → `None` im Dict (alte Zeilen). **`test_bar_service_has_no_ig_provider_attribute`**:
+   Struktur-Guard gegen ein stilles Wieder-Aufreißen. **`test_get_window_returns_archive_rows_only`**
+   + **`test_get_window_empty_archive_returns_empty`**: das, was `get_window` jetzt **ist**.
+5. **`tests/test_step7_integration.py`** — die drei `_covers_tail`-Kommentarzeilen aktualisiert
+   (Fenster-Endkapselung statt Schwanz-Check). Der Test selbst war strukturell richtig und
+   ist ohne Änderung grün.
+6. **Rotation:** Session-3-Block verbatim nach `SESSIONS_ARCHIVE.md` verschoben.
 
 ### Verified
 
-- `pytest phase12_data_foundation/tests -q` → **135 passed** (Baseline 123 + 12 hinzu, 0 Regressionen).
-  Phase-12-Suite allein, geteiltes Venv `phase1_broker_wrapper/.venv`.
-- Akzeptanz A1 wortgleich erfüllt: *"die neun Tests grün; `assess_window` hat null Aufrufer"*.
-- `grep -n "_covers_tail\|MIN_WINDOW_COVERAGE\|_ig_provider" phase12_data_foundation/`: alle drei
-  noch vorhanden — A1 fasst sie nicht an, **A2** löscht sie (L2).
-- `assess_window` hat 0 Produktions-Aufrufer (gegrept); Verdrahtung kommt in A2
-  (`BarService.get_window`-Body-Ersatz) und A3 (Tracker-Naht in `paper.py`).
-
-### Next
-
-- **Step A2** (Plan §6, Zeile 604): `BarService.get_window` zu einer reinen Archiv-Lesung kürzen
-  (Verbatim-Anker-Tabelle in §6 A2 prüfen, Zeilen können sich verschoben haben). L12-Test
-  `test_get_window_never_fetches` (IG-Provider wirft `AssertionError`) ist die **strukturelle
-  Kostenzusicherung** — der Kernpunkt von L12. **Pause für Nikinger-Bestätigung** vor Cross-
-  Phase-Edits in A3 (das ist die nächste Stufe, die `paper.py` und `wiring.py` berührt).
+- `pytest phase12_data_foundation/tests -q` → **134 passed** (war 135; −7 gelöschte Tests + 6 neue;
+  die 12 A1-Tests bleiben unangetastet, die 1 zusätzliche Coverage-Differenz rührt vom
+  ersatzlosen Streichen der Refetch-Tests, nicht von A1).
+- Voller Regression-Sweep, **alle 12 Suiten grün**, geteiltes Venv (`phase1_broker_wrapper/.venv`):
+  | Phase | Tests |
+  |---|---|
+  | phase1_broker_wrapper | 87 |
+  | phase2_persistence | 77 |
+  | phase3_external_data | 104 |
+  | phase4_research | 155 |
+  | phase5_execution | 173 |
+  | phase6_debate | 76 |
+  | phase7_execution | 138 |
+  | phase8_scheduler | 237 (+1 Deprecation-Warning, harmlos) |
+  | phase9_universe | 80 |
+  | phase10_v3 | 160 |
+  | phase12_data_foundation | 134 |
+  | meta_m1_harness | 28 |
+- `grep -nE "_covers_tail\|_MIN_WINDOW_COVERAGE|_ig_provider" phase12_data_foundation/data_foundation/`:
+  **leer** — alle drei Symbole wirklich weg. Verbleibende Treffer in `tests/test_service.py:119,133,284,286,290`
+  sind Test-Namen / -Docstrings, die **explizit** vom gelöschten Attribut handeln
+  (`test_ig_provider_*` = `BudgetedIGBarProvider`, `test_bar_service_has_no_ig_provider_attribute`
+  = der Struktur-Guard).
+- `git diff --stat HEAD` → **net −57 Zeilen** (170 Löschungen, 113 Ergänzungen) — der Schnitt
+  ist netto eine Löschung, wie L2 verlangt.
+- `get_window`-Aufrufer in `phase8_scheduler/scripts/wiring.py` (Zeilen 191, 195, 209, 245, 523)
+  bleiben binär-kompatibel: Signatur `get_window(epic, resolution, start_utc, end_utc)` ist
+  unverändert. Die dortigen Kommentare über „BarService.get_window's own budget-aware chain"
+  (Zeilen 478, 480, 483) sind jetzt **stale** — das ist A3s Job (Plan §6 A3, dort verbatim
+  genannt: „Der Kommentarblock über `_PAPER_MAX_FETCH_ATTEMPTS` … beschreibt den alten
+  Zustand — korrigieren, nicht löschen").
 
 ### Note
 
-- Netto-Diff: +2 neue Dateien + 1 README-Zeile + 1 Session-Block-Tausch. Kein Eingriff in
-  laufende Komponenten. `data_foundation` ist cross-phase-Paket (Phase 12), `live_data`
-  importiert es (L11) — der neue Modul liegt also **in** Phase 12, **benutzt von** Phase 13.
-- Die zwei bisherigen Live-Unbekannten aus A0.0 sind gelöst (Modell-ID `MiniMax-M3[1m]`,
-  Bearer-Header, Subscription-Key-Tausch), siehe Session-2-Block.
+- **A5-Teilarbeit in A2:** der `tick_count`-Round-Trip brauchte Spalte + INSERT + Projection.
+  Das ist die **kleinste Ecke** von A5 (Plan §6 A5), ohne die A2s `_bar_to_dict` keinen
+  sinnvollen Test hätte. A5 selbst bleibt offen (drei weitere Dinge: `sources`-Filter,
+  `_CREATE_BARS` ist hier schon dabei, `KNOWN_SOURCES`/`prefer`-Default — kein Bruch, nur
+  Vorgriff auf den reinen Datenträger).
+- Netto-Diff: −57 Zeilen Service-Code (überwiegend Löschungen), 6 Tests umgeschrieben, 1
+  Dataclass-Feld, 5 Schema-Zeilen. Kein Eingriff in laufende Komponenten. Bot steht weiterhin,
+  Recorder sammelt kostenlos weiter.
+- **Was A2 leistet, was A2 nicht leistet:** A2 macht den Tracker-Pfad **strukturell**
+  kauf-unfähig — der IG-Provider wird nicht mehr aufgerufen, egal welche Parametrisierung
+  jemand morgen wählt. Das beantwortet L12 (P1, P7). A2 macht **nicht** aus einem leeren
+  Archiv eine Auflösung — das ist A3s Job (das `window_ok`-Guard vor `resolve_paper_trade`,
+  das genau F3 fängt: Mitten-Loch → erfundene `TIME_STOP`).
+
+### Next
+
+- **Pause für Nikinger-Bestätigung** (geplant war das bereits im Session-3-Block): A2 ist
+  der strukturelle Schnitt, der **per Konstruktion** den IG-Verbrauch auf dem Tracker-Pfad
+  stoppt. A3 fügt die `window_ok`-Naht in `paper.py` und `wiring.py` ein (cross-phase) —
+  danach würde eine `TIME_STOP`-Auflösung aus einem ungedeckten Fenster **nicht mehr**
+  entstehen (F3). Beide Schritte greifen ineinander; A3 ohne A2 ließe den alten Code
+  zynisch weiterleben, A2 ohne A3 ließe weiterhin erfundene `TIME_STOP`-Zeilen zu.
+- **Bestätigungs-Punkt:** Soll A3 jetzt direkt starten, oder erst ein Trockenlauf des
+  Schnitts (z. B. ein kurzer Commit + Smoke auf main, damit vor dem ersten echten
+  Scharfschalten klar ist, dass der Build sauber ist)?
+- **A3 konkret** (Plan §6, Zeile 647): `phase10_v3/abstain_lessons/paper.py` bekommt einen
+  `window_ok`-Param am Konstruktor **und** den Guard in `_resolve_group` **vor**
+  `resolve_paper_trade`. `wiring.py:_build_paper_tracker` baut die Closure, die
+  `assess_window` aufruft, und injiziert sie. Der Mitten-Loch-Test (F3) ist der wichtigste
+  Test des ganzen Blocks.
+- **A4–A7** folgen A3 in der Reihenfolge L4. A4 ist die Stale-History-Assertion in
+  `BudgetedIGBarProvider` (L8, F1). A5 die `sources`-Filter-Erweiterung (L10). A6 die
+  Heartbeat-/Sampler-Reparatur (F1/F2 + Niveau-Vergleich → Rendite-Vergleich, A6.0). A7
+  der Operator-Block mit dem Allowance-Probe und der erwarteten 0-Punkte-Bilanz.
+- **Offen bis Block B0:** ob `CHART:{epic}:1MINUTE` liefert (Plan §9.2). Beide Zweige sind
+  ausgeplant.
+- **Offen bis Block C1:** welche Fremdquelle S3 wird (Plan §6 C1).
+- **`main` liegt jetzt 7 Commits vor `origin/main`** (inkl. dieses Commits) — Push bleibt
+  bewusste Einzelfreigabe des Nikinger.
 
 ### Open questions / blockers
 
-- **Kein technischer Blocker für A2.** Bot steht sicher, Recorder sammelt kostenlos weiter.
-- **A2 ist der Lösch-Step** (L2): danach kauft der Tracker-Pfad **per Konstruktion** keine
-  IG-Punkte mehr — der strukturelle Schnitt, den Closeout §1 empfohlen hat. Genau da, **nicht
-  jetzt**, ist der Moment, das mit dem Nikinger kurz zu bestätigen, bevor A3 (die Cross-
-  Phase-Naht) anläuft.
-- **`main` liegt jetzt 6 Commits vor `origin/main`** (inkl. dieses Commits) — Push bleibt
-  bewusste Einzelfreigabe des Nikinger.
+- **Kein technischer Blocker.** Bot steht sicher, Recorder sammelt kostenlos weiter.
+- **A3 ist cross-phase** (`paper.py` in `phase10_v3`, `wiring.py` in `phase8_scheduler`,
+  `coverage.py` in `phase12_data_foundation`) — Plan §1 hat es freigegeben (Nikinger
+  2026-08-18), aber der Übergang ist der richtige Moment für eine kurze Bestätigung, weil
+  A2 ab jetzt **Produktionswirkung** hat (jeder laufende Tracker sieht ein anderes
+  `get_window`).
+- **Der F2-Anker** (`heartbeat.py:184-193`) ist nach A6 zu reparieren — bewusst **nicht**
+  in A2 mitgenommen, weil A2 ein reiner Lese-Schnitt ist.

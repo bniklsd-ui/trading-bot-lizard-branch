@@ -1,13 +1,15 @@
-"""``BarService`` — the one bar-fetching seam for research and the paper tracker (D8/D9).
+"""``BarService`` — the one bar-reading seam for research and the paper tracker (D8/D9).
 
-Archive-first (``BarArchive``, Step 1), then a budget-aware fallback chain (yFinance
-first — free — IG only on a real gap, Nikinger-decision this session, resolves a
-contradiction between D9's prose and the plan's original chain-order sketch), every
-externally-fetched bar written through with provenance (``source``). Replaces two
-independent, budget-blind IG-bar paths: the research ``enable_ig_bars`` chain
-(``phase8_scheduler/scripts/wiring.py::_build_market_data``, default off, "gebaut, nie
-gelaufen" — the Phase-11 root cause) and the paper tracker's raw
-``broker.get_ohlcv(epic, "MINUTE", 300)`` call with its own ad-hoc allowance guesswork.
+Phase 13 §6 A2 cut: ``get_window`` is a pure archive read. Acquisition is a separate
+subsystem (S1 Lightstreamer, S2 yF-Recorder, S3 external, S4 IG-rescue) that writes
+into the same ``BarArchive``; consumers never fetch. Replaces the two budget-blind
+IG-bar paths of Phase 12 — the research ``enable_ig_bars`` chain and the paper
+tracker's raw ``broker.get_ohlcv(epic, "MINUTE", 300)`` calls — and the chain itself
+only feeds the *research* seam (``get_bars``); the tracker seam never buys.
+
+The structural cost guarantee (L12) is ``test_get_window_never_fetches`` in
+``tests/test_service.py`` — an IG-provider whose ``get_bars`` raises ``AssertionError``
+must never be reached on the tracker path.
 
 ``BudgetedIGBarProvider`` and ``BarService`` both implement the Phase-3
 ``external_data.providers.BarProvider`` Protocol (duck-typed, no import of a base class
@@ -27,15 +29,9 @@ from data_foundation.models import Bar, normalize_bar_ts
 
 logger = logging.getLogger("data_foundation.service")
 
-# Phase-3-side resolution names -> minutes per bar (for count/window-span estimation).
-# Mirrors external_data.providers._IG_RESOLUTION_MAP's key set exactly.
+# Phase-3-side resolution names -> minutes per bar (kept because the research seam
+# uses it to derive the window span from a `count`).
 _RESOLUTION_MINUTES: dict[str, int] = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "1d": 1440}
-
-# ponytail: fixed threshold, calibrated against the observed spread (0.80 healthy vs. 0.03
-# for the short-archive case this guards, P12.5 plan §3/U3). Ceiling: coverage_ratio counts
-# naive wall-clock minutes, so it never reaches 1.0 across a pre-market span. Upgrade path if
-# it ever misfires: a trading-calendar-aware expected-minutes count in BarArchive.
-_MIN_WINDOW_COVERAGE = 0.5
 
 
 def _default_now() -> datetime:
@@ -47,14 +43,6 @@ def _iso(dt: datetime) -> str:
         dt = dt.replace(tzinfo=timezone.utc)
     dt = dt.astimezone(timezone.utc)
     return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
-
-
-def _parse_iso(ts: str) -> datetime:
-    normalized = ts.replace("Z", "+00:00") if ts.endswith("Z") else ts
-    dt = datetime.fromisoformat(normalized)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt
 
 
 class BudgetedIGBarProvider:
@@ -154,15 +142,22 @@ class BudgetedIGBarProvider:
 
 
 class BarService:
-    """Archive-first, budget-aware bar access — implements the ``BarProvider`` Protocol.
+    """Archive-first bar access — implements the ``BarProvider`` Protocol.
 
-    ``providers`` is a ``Sequence[tuple[str, BarProvider]]``, the same shape
-    ``external_data.providers.ChainedBarProvider`` takes — this class builds its own
-    internal ``ChainedBarProvider`` over it, wrapping ``health_sink`` so every event still
-    reaches the caller's sink unchanged *and* the winning provider's name is captured for
-    the write-through ``source`` tag (``ChainedBarProvider`` itself is reused unmodified,
-    not reimplemented — it never exposes which leg won, only whether the overall call
-    succeeded, via its ``health_sink`` events).
+    Two seams:
+
+    - ``get_bars`` (research): archive → chain fallback. The chain is still budgeted
+      and writes through with provenance, so a research call can source fresh data
+      when the archive's coverage is short. This is the seam that legitimately
+      *wants* fresh data — leaving it on the chain is L15.
+    - ``get_window`` (tracker): pure archive read (Phase 13 §6 A2 / L1, L2). No
+      chain. No budget. The tracker resolves paper trades from the archive only;
+      when the trade's window is not yet covered, the guard sits in the caller
+      (the ``window_ok`` closure, Plan §6 A3), not here.
+
+    ``providers`` is a ``Sequence[tuple[str, BarProvider]]`` — the same shape
+    ``external_data.providers.ChainedBarProvider`` takes. The chain is built and
+    used only by ``get_bars``; it is irrelevant to the tracker seam.
     """
 
     def __init__(
@@ -179,7 +174,6 @@ class BarService:
         self._archive = archive
         self._budget = budget
         self._now_fn = now_fn
-        self._ig_provider = dict(providers).get("ig")
         self._last_source: str | None = None
 
         def _capture(event: dict[str, Any]) -> None:
@@ -208,36 +202,16 @@ class BarService:
             self._write_through(epic, resolution, bars, self._last_source)
         return bars
 
-    # -- tracker seam -----------------------------------------------------------
+    # -- tracker seam (Phase 13 A2: pure archive read) ------------------------
 
     def get_window(
         self, epic: str, resolution: str, start_utc: str, end_utc: str
     ) -> list[dict[str, Any]]:
-        minutes = _RESOLUTION_MINUTES.get(resolution, 1)
-        archived = self._archive.window(epic, resolution, start_utc, end_utc)
-        if (_covers_tail(archived, end_utc, minutes)
-                and self._archive.coverage_ratio(epic, resolution, start_utc, end_utc) >= _MIN_WINDOW_COVERAGE):
-            return [_bar_to_dict(b) for b in archived]
-
-        count = max(1, int((_parse_iso(end_utc) - _parse_iso(start_utc)).total_seconds() // 60 // minutes) + 1)
-        self._last_source = None
-        bars = self._chain.get_bars(epic, resolution=resolution, count=count)
-        if bars:
-            self._write_through(epic, resolution, bars, self._last_source)
-            archived = self._archive.window(epic, resolution, start_utc, end_utc)
-
-        if not _covers_tail(archived, end_utc, minutes) and self._ig_provider is not None:
-            # yF alone didn't reach the tail (off-hours/short/empty — known intraday
-            # intermittency, phase3_external_data/CLAUDE.md). Explicit IG top-up,
-            # bypassing chain order — get_window's correctness matters more than its
-            # cost here; the tracker's staleness/attempt caps are the final backstop,
-            # not a substitute for trying IG when yF genuinely came up short.
-            ig_bars = self._ig_provider.get_bars(epic, resolution=resolution, count=count)
-            if ig_bars:
-                self._write_through(epic, resolution, ig_bars, "ig")
-                archived = self._archive.window(epic, resolution, start_utc, end_utc)
-
-        return [_bar_to_dict(b) for b in archived]
+        """Reine Archiv-Lesung. Fetcht nie (L1/L2) — Beschaffung ist ein eigenes Subsystem."""
+        return [
+            _bar_to_dict(b)
+            for b in self._archive.window(epic, resolution, start_utc, end_utc)
+        ]
 
     # -- shared -------------------------------------------------------------
 
@@ -252,6 +226,7 @@ class BarService:
                 epic=epic, resolution=resolution, ts_utc=normalize_bar_ts(b.ts),
                 open=b.open, high=b.high, low=b.low, close=b.close, volume=b.volume,
                 source=source, fetched_at=fetched_at,
+                tick_count=getattr(b, "tick_count", None),
             )
             for b in bars
         ]
@@ -263,20 +238,11 @@ class BarService:
             logger.warning("BarService write-through failed for %s/%s", epic, resolution, exc_info=True)
 
 
-def _covers_tail(bars: Sequence[Any], end_utc: str, resolution_minutes: int) -> bool:
-    """Whether ``bars``' latest timestamp reaches within one bar-interval of ``end_utc``
-    (i.e. the window is current, not just partially populated)."""
-    if not bars:
-        return False
-    latest = bars[-1].ts_utc
-    cutoff = _iso(_parse_iso(end_utc) - timedelta(minutes=resolution_minutes))
-    return latest >= cutoff
-
-
 def _bar_to_dict(bar: Any) -> dict[str, Any]:
     return {
         "timestamp": bar.ts_utc, "open": bar.open, "high": bar.high,
         "low": bar.low, "close": bar.close, "source": bar.source,
+        "tick_count": getattr(bar, "tick_count", None),
     }
 
 
