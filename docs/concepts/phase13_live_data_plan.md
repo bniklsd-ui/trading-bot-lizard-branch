@@ -881,12 +881,56 @@ messbar zurück; **null** zusätzliche IG-Historienpunkte.
 
 **Datei:** `phase13_live_data/live_data/backfill.py` (NEU).
 
-**Auswahlkriterien (bindend, die Quelle selbst wird in diesem Step gewählt):** kostenlos oder
-< 10 €/Monat · 1-Minuten-Granularität · Abdeckung der europäischen Indizes (DAX, CAC, IBEX,
-AEX, FTSE, MIB, STOXX50) · per `requests` erreichbar (Repo-Konvention, **nicht** httpx/urllib) ·
-dokumentierte API oder ausdrücklich erlaubter Bulk-Download, **kein** HTML-Scraping ·
-Publikationsverzug bekannt und < 2 h. Eine kleine, gepflegte pip-Abhängigkeit ist erlaubt
-(Memory `feedback_util_deps_venv`) — Paketname + letztes Release im Session-Block festhalten.
+**Auswahlkriterien (bindend):** kostenlos oder < 10 €/Monat · 1-Minuten-Granularität ·
+Abdeckung der europäischen Indizes (DAX, CAC, **IBEX**, AEX, FTSE, MIB, STOXX50) · per
+`requests` erreichbar (Repo-Konvention, **nicht** httpx/urllib) · dokumentierte API oder
+ausdrücklich erlaubter Bulk-Download, **kein** HTML-Scraping und **nichts**, wofür eine
+Zugangssperre umgangen werden müsste · Publikationsverzug bekannt und < 2 h. Eine kleine,
+gepflegte pip-Abhängigkeit ist erlaubt (Memory `feedback_util_deps_venv`) — Paketname +
+letztes Release im Session-Block festhalten.
+
+#### C1.0 — Marktlage 2026-08-18 (recherchiert, nicht geraten)
+
+**Befund: keine kostenlose Quelle erfüllt alle Kriterien gleichzeitig.** Vier Kandidaten
+geprüft, jeder mit genau einer disqualifizierenden Eigenschaft:
+
+| Kandidat | Abdeckung | Verzug | Aufwand | Was dagegen spricht |
+|---|---|---|---|---|
+| **Dukascopy** Datafeed | ✅ **alle**, inkl. IBEX + MIB (je 1440 Bars am 17.08. verifiziert) | ~90 s nach Stundenschluss (Tick-Dateien) | `requests` + stdlib `lzma`/`struct`, keine neue Abhängigkeit | 🔴 **ToS verbietet den Fall wörtlich:** „The WEBSITE and the information contained therein **may not be used to construct a database of any kind**." Unser Archiv *ist* eine Datenbank. Nikinger-Entscheidung, keine Ingenieursfrage. |
+| **Deriv** WebSocket | DAX, CAC, AEX, FTSE, ESTX50 — ❌ **kein IBEX, kein MIB** | ~1 Min | WebSocket-only, kein REST → bricht die `requests`-Regel (`websockets` v16 liegt bereits im venv; Präzedenzfall Lightstreamer) | IBEX ist **2 von 5** messbaren Epics. Taugt damit nicht zum Lückenfüllen. |
+| **Capital.com** Demo-API | ⚠️ **ungeprüft** — Germany 40 / France 40 / Spain 35 sind handelbare Produkte, aber keine Epic verifiziert | ⚠️ ungeprüft | ✅ reines `requests`/REST, Muster wie der IG-Adapter (API-Key → Session → CST/XST), 10 req/s | Unbewiesen. Und es ist eine **Broker**-API wie IG — ein Auth-Ausfall kann Primärquelle und Gegenprobe gleichzeitig treffen. |
+| **Bezahlt** (DB Non-Display) | ✅ | Echtzeit | Lizenzvertrag | **313 €/Monat** allein für „DAX Indices" (Tier 3, Entry, netto, Preisliste v9_1 gültig ab 2025-01-01); keine Privatpersonen-Ermäßigung; IBEX wäre eine separate BME-Lizenz. |
+
+**Börsen-direkt und offene Behördendaten sind geprüft und tot** — hier vollständig, damit es
+niemand ein zweites Mal recherchiert:
+- **Deutsche-Börse-Public-Data-Set** (1-Min-Xetra-Daten): **offline** — beide S3-Buckets
+  antworten anonym mit `AccessDenied`, das AWS-Registry-YAML trägt `Deprecated: True`,
+  `registered-data.deutsche-boerse.com` löst nicht mehr auf. Zwei weitere Kill-Shots, falls es
+  je zurückkommt: die Lizenz war **Non-Commercial** (nicht CC BY, wie ursprünglich vermutet),
+  und es enthielt nur **Einzelinstrumente, nie Indexstände**.
+- **ETF-Proxy** (DAX-ETF statt DAX): moot, weil genau dieses Datenset die Quelle gewesen wäre —
+  und ohnehin die schwächere Idee: ein ETF bringt eigene Tracking-Differenz, eigenen Spread und
+  eigene Liquiditätslücken **zusätzlich** zur Indexbewegung, die man verifizieren will.
+- **Euronext MiFID-II-Trades-Files** (CAC/AEX/MIB-Handelsplätze): existieren wirklich, sind
+  gratis und lizenzsauber — aber **15 Min verzögert**, **instrumentbezogen ohne Indexstände**,
+  und ohne stabile Download-URL (Web-Download-Dienst, kein `requests`-Vertrag).
+- **BME / IBEX:** kein freies Intraday-Produkt gefunden. ⚠️ Unbestätigt, Tendenz negativ.
+- **Warum die MiFID-II-Gratispflicht das grundsätzlich nicht lösen kann:** sie gilt für
+  **Handelsplatzdaten zu Finanzinstrumenten**, nicht für proprietär *berechnete* Indexstände.
+  DAX, CAC 40 und IBEX 35 sind lizenzierte Indexprodukte ihrer jeweiligen Börse — genau
+  deshalb existiert die 313-€-Position. Den Index aus Konstituenten nachzurechnen bräuchte
+  Konstituentenliste, Free-Float-Faktoren und Divisor, alle selbst lizenzpflichtig. **Nicht.**
+
+**Empfehlung: die Wahl auf nach Block B vertagen, nicht jetzt raten.** Grund: erst Block B
+liefert die **gemessene** Lückenrate. Ist sie mit laufendem LS klein, ist S3s Grenznutzen klein
+und S4 reicht als Rückfallebene; ist sie groß, rechtfertigt sie die Kosten der jeweils
+unangenehmen Eigenschaft. Genau diese Reihenfolge — erst messen, dann entscheiden — ist die
+Lehre aus P12.5. **Wenn jetzt entschieden werden soll:** Capital.com, gegatet auf einen
+kostenlosen Live-Check (liefert die Demo-API `resolution=MINUTE` für Germany 40 / France 40 /
+**Spain 35**, und wie weit zurück?). Es ist die einzige Option ohne ToS-Kollision und ohne neue
+Abhängigkeit — und als Broker-CFD-Preisreihe liegt sie **näher an IGs eigener Reihe** als der
+yF-Kassaindex, was sie zugleich zur besseren Gegenprobe und zum brauchbareren Lückenfüller für
+SL/TP-Auflösung macht.
 
 **Betriebsmodell:** lückengetrieben, nicht zeitgetrieben. Ein Tages-Pass fragt das Archiv nach
 Lücken älter als `min_gap_age_min`, holt genau diese Spannen, schreibt mit eigenem
@@ -1068,7 +1112,15 @@ Täglich `data_health.py` (Exit 0 erwartet). Freitags eine Review-Session nach d
     Recherche vom 2026-08-18 ergab: keine kostenlose Quelle ist zugleich vollständig (IBEX 35
     und MIB eingeschlossen) *und* frisch *und* lizenzrechtlich unbedenklich. Die Wahl ist eine
     Nikinger-Entscheidung, kein Rechercheergebnis — sie steht bis Block C aus und blockiert
-    Block A und B nicht.
+    Block A und B nicht. Marktlage + die vier geprüften Kandidaten: §6 C1.0.
+16. **Capital.com-Abdeckung**, falls dieser Weg gewählt wird: liefert die Demo-API
+    `resolution=MINUTE` für Germany 40 / France 40 / **Spain 35**, und wie weit zurück? Ein
+    kostenloser Operator-Lauf entscheidet das. Bis dahin ist jede Aussage über Capital.com
+    in diesem Plan **unbestätigt**.
+17. **Ob BME ein freies verzögertes MiFID-II-Datenprodukt für den spanischen Markt
+    veröffentlicht**, wie Euronext es tut. Unbestätigt, Tendenz negativ — aber der wertvollste
+    verbleibende Unbekannte, weil IBEX 2 von 5 messbaren Epics stellt und von keiner geprüften
+    Gratisquelle außer Dukascopy abgedeckt wird.
 
 ---
 
