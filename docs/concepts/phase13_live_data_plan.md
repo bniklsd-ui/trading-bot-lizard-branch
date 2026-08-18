@@ -641,6 +641,32 @@ DB **ohne** `tick_count` fügt die Spalte hinzu und ist beim zweiten Lauf ein No
 
 **Datei:** `data_foundation/heartbeat.py` + die Sampler-Closure in `wiring.py:920-948`.
 
+**A6.0 — der latente Niveau-Vergleich (Befund aus der S3-Recherche, 2026-08-18).**
+`check_divergence` (`observability.py:130-140`) und `compute_divergence_pct` (`:123-127`)
+vergleichen **absolute Kursniveaus** mit Schwelle `0.5 %`. Das ist strukturell falsch, sobald
+zwei verschiedene Produkte verglichen werden — und genau das tut der Sampler heute: IGs
+**CFD**-Mid gegen yFinances **Kassa**-Index. Der Abstand zwischen beiden ist eine Basis
+(Finanzierung, Dividenden, Spread), kein Fehler. Empirisch gemessen an einem einzigen Tag über
+drei Quellen: die AEX lag bei einem Anbieter **0,35 %**, bei einem anderen **2,1 %** über dem
+Kassaschluss — beides dauerhafte, instrumentspezifische Offsets.
+
+**Warum das ein latenter Bug ist, kein theoretischer:** überschreitet die Basis eines Epics je
+0,5 %, setzt der Sampler nach zwei Läufen `data_source_status='mismatch'` und wirft das Epic aus
+`measurable_universe()` — eine **selbstverschuldete Quarantäne-Kaskade** an einem Instrument,
+mit dem nichts falsch ist. Dass das bisher nicht passiert ist (0 `quote_divergence`-Events),
+ist eine Eigenschaft der aktuellen Paarungen, keine Garantie.
+
+**Locked:** der Vergleich wechselt von Niveau auf **Veränderung**. `check_divergence`
+(`observability.py:130`) und `compute_divergence_pct` (`:123`) bleiben **unangetastet** — der
+Sampler (`heartbeat.py:195-197`) ist ihr einziger Produktions-Aufrufer (heute gegrept, außer
+Tests kein weiterer), aber es sind Phase-8-Dateien und die Löschung brächte nichts. Der Sampler
+bekommt
+stattdessen `compute_return_divergence(ig_bars, yf_bars) -> float` in `heartbeat.py`: prozentuale
+Bar-zu-Bar-Rendite beider Reihen über dasselbe Fenster, verglichen wird die **Differenz der
+Renditen**. Eine konstante Basis fällt dabei heraus, eine echte Entkopplung nicht.
+⚠ Das braucht ≥ 2 überlappende Bars je Quelle — bei nur einer Bar ist keine Rendite definiert:
+dann typisierter Event `divergence_no_comparator` (s. A6.1), **nicht** stillschweigend 0.
+
 **A6.1 `DivergenceSampler.sample_epic` — zwei Löcher schließen.** Anker:
 
 | Zeile | Verbatim-String | Aktion |
@@ -871,6 +897,22 @@ Lücken älter als `min_gap_age_min`, holt genau diese Spannen, schreibt mit eig
 in `prefer` steht, bekommt `default_rank` und verliert jeden Gleichstand. Das ist ein stiller
 Fehler, der wie „die neue Quelle liefert nichts" aussieht.
 
+**Vier Regeln für jede externe Quelle — quellenunabhängig, aus der Recherche vom 2026-08-18,
+jede empirisch belegt:**
+1. **Antwortfenster nach dem Fetch prüfen.** Mindestens eine untersuchte API beantwortet ein
+   Fenster jenseits ihrer Historientiefe mit **aktuellen** Bars und **ohne** Fehler — ein
+   naiver Lückenfüller archiviert dann falsch datierte Daten und merkt nichts. Jede Antwort:
+   `assert` alle Zeitstempel liegen im angefragten Fenster, sonst verwerfen + typisierter Event.
+2. **Keine synthetischen Bars übernehmen.** Mindestens ein untersuchter Anbieter füllt
+   Nicht-Handelsminuten mit dem letzten Kurs auf (gemessen: ein Samstag lieferte 1440 von 1440
+   Bars mit `O==H==L==C` und Volumen 0). Filter: `O==H==L==C` **und** `volume in (0, None)`
+   **und** Minute außerhalb der Handelszeit ⇒ nicht schreiben.
+3. **Vergleiche nie über absolute Niveaus** (s. A6.0) — jede Fremdquelle ist ein anderes Produkt
+   mit eigener Basis.
+4. **Backoff ist Pflicht, nicht Kür.** Bei den geprüften Gratis-Endpunkten traten `429` und
+   wiederholte `503` innerhalb weniger Dutzend Anfragen auf, auf URLs, die Sekunden vorher `200`
+   lieferten.
+
 **Fold-in-Checkliste, sobald die Quelle gewählt ist** — der Name muss an **allen vier** Stellen
 landen, sonst driftet der Plan gegen den Code:
 - [ ] §0-Stufentabelle: „unabhängige Fremdquelle" → der Name
@@ -967,6 +1009,8 @@ Täglich `data_health.py` (Exit 0 erwartet). Freitags eine Review-Session nach d
 | „LS abonniert, aber es kommen keine Kerzen." | Reihenfolge in `subscribe_candles`: die SDK-`Subscription` muss **nach** `client.connect()` registriert werden, sonst hängt sie im Leeren (`_do_subscribe`s `active`-Prüfung, `ig_lightstreamer.py:169-171`, macht das für Preise bereits richtig — der Kerzenpfad muss dasselbe Muster spiegeln, nicht ein eigenes). Zweiter Verdächtiger: `setDataAdapter` — Preise brauchen `"Pricing"`, für CHART ist der Adapter **unbestätigt** (§9.2). |
 | „LS lief, dann kam stundenlang nichts mehr." | Token-Rotation: `_warm_session` hat re-eingeloggt und der LS-Client hängt an toten CST/XST (B3). Gegenprobe: im Log ein `broker connect` **ohne** ein nachfolgendes Stream-Restart-Log. |
 | „Der Divergenz-Sampler meldet nie etwas, alles ist gut." | Genau das war F2. `if not yf_bars: return` — Abwesenheit von Events ist **kein** Beweis von Übereinstimmung. Nach A6 muss es `divergence_no_comparator`-Events geben, wenn nichts verglichen werden konnte. |
+| „Plötzlich fallen Epics reihenweise auf `mismatch` und verschwinden aus `measurable_universe()`." | Ein **Niveau**-Vergleich statt eines Rendite-Vergleichs (A6.0). Zwei verschiedene Produkte (CFD vs. Kassa vs. Fremdquelle) tragen eine dauerhafte Basis — gemessen bis 2,1 % — die kein Fehler ist. Gegenprobe: ist der gemeldete `pct` über Tage **konstant**, ist es die Basis; schwankt er, ist es echte Entkopplung. |
+| „Die neue Fremdquelle liefert Bars mit Zeitstempeln, die niemand angefragt hat." | Kein Bug bei uns: mindestens eine geprüfte externe API antwortet auf ein Fenster außerhalb ihrer Historientiefe mit **aktuellen** Bars und **ohne** Fehler (C1, empirisch belegt). Deshalb ist die Fensterprüfung nach dem Fetch Pflicht, nicht Kür. |
 | „Die neue S3-Quelle schreibt, aber ihre Bars tauchen nie in einer Auflösung auf." | `prefer` in `BarArchive.window` (`archive.py:138`) kennt sie nicht ⇒ `default_rank` ⇒ sie verliert jeden Gleichstand gegen yF (C1). |
 | „`ensure_schema` wirft `duplicate column name: tick_count`." | Der geführte `PRAGMA table_info`-Check fehlt oder läuft nach dem ALTER (A5). `CREATE TABLE IF NOT EXISTS` schützt nicht vor einem nackten ALTER. |
 | „Nach dem Neustart sind 20 Paper-Zeilen `EXPIRED_UNRESOLVED`." | Erwartet. Die am 18.08. beim Stopp offenen Zeilen (A7.2). Kein Messausfall. |
@@ -1016,6 +1060,15 @@ Täglich `data_health.py` (Exit 0 erwartet). Freitags eine Review-Session nach d
 13. **Ob der `universe_refresher`-Slot der richtige Ort für `resync_epics` ist** — er läuft
     heute in `preflight` und periodisch (`runner.py:285`, `:517-522`). Passt vom Takt, ist
     aber nicht live erprobt.
+14. **Die reale Basis je Epic** (A6.0): wie groß ist der dauerhafte Abstand IG-CFD ↔ yF-Kassa
+    tatsächlich, pro Instrument? Heute unbekannt — 0 `quote_divergence`-Events beweisen nur,
+    dass sie unter 0,5 % liegt, nicht wie weit darunter. Block A misst sie; erst danach ist
+    eine Rendite-Schwelle seriös zu wählen. **Bis dahin keine Schwelle raten.**
+15. **Die S3-Quelle selbst** (§6 C1) — zum Zeitpunkt dieses Plans **nicht entschieden**. Die
+    Recherche vom 2026-08-18 ergab: keine kostenlose Quelle ist zugleich vollständig (IBEX 35
+    und MIB eingeschlossen) *und* frisch *und* lizenzrechtlich unbedenklich. Die Wahl ist eine
+    Nikinger-Entscheidung, kein Rechercheergebnis — sie steht bis Block C aus und blockiert
+    Block A und B nicht.
 
 ---
 
