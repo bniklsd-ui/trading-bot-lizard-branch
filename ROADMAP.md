@@ -488,6 +488,16 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 > diesmal aber an Tag 1 bemerkt. Stand, Befunde und Entscheidungen A–D:
 > [`phase12_data_foundation/PHASE12_PREPROOF_HANDOVER.md`](./phase12_data_foundation/PHASE12_PREPROOF_HANDOVER.md),
 > Bild dazu: [`docs/architecture/phase12_preproof.svg`](./docs/architecture/phase12_preproof.svg).
+>
+> **P12.5 (Messarm-Fixes) — formal CLOSED, GESCHEITERT (2026-08-18):** Steps 1–3 fixten U1/U2/U3/
+> U5 + Entscheidung B, alle live gegen echte Daten bewiesen korrekt (`pairs_opened: 90`,
+> `pairs_resolved: 66`, `resolution_source` erstmals real befüllt). Aber der scharf gestellte
+> Messarm exponierte einen fünften, vorher nie aufgerufenen Pfad: `BarService.get_window` fordert
+> bei jedem Coverage-Miss das **komplette** Fenster neu an (≈301 IG-Punkte/Top-up) statt nur die
+> Lücke — 4731/10 000 Wochenpunkte in ~4 Stunden verbrannt, Requirement F (Soll < 1500/Woche) am
+> ersten Tag gerissen. Nikinger-Intervention: Scheduler gestoppt, P12.5 ohne weitere Bauschritte
+> geschlossen. Root Cause, Zahlen, Empfehlung fürs Danach:
+> [`phase12_data_foundation/PHASE12_5_FAILURE_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_FAILURE_HANDOVER.md).
 
 **Goal:** eine echte Beweis-Messwoche läuft durch, ohne dass Infrastruktur die Messung tötet.
 Instrument-Registry wird die eine Wahrheit (abgeleitetes, code-verifiziertes Symbol-Mapping statt

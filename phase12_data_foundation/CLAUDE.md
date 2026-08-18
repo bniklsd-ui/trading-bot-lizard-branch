@@ -1,18 +1,18 @@
 ---
 status: live
-purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder + Heartbeat. Steps 0-8.5 gebaut, getestet und auf main committed. Session 6 (2026-08-17): Tag-1 live ausgewertet — Pipeline end-to-end bewiesen, ABER Messarm aus (0 Paper-Zeilen) + vier Ultrareview-Befunde U1-U5, ungefixt (Handover §3.0). Session 7 (P12.5, gleicher Tag): U1/U3/Entscheidung B + U2/U5 gefixt + committed (83d5ef3, ff5741c; P12 117→123, P10 159→160), lokal auf main, NICHT gepusht. Pausiert nach Nikinger-Auftrag vor Step 4 (Neustart, Operator-Job). Step 9 (Beweiswoche) weiterhin nicht begonnen.
-read-when: working in phase12_data_foundation/ — read PHASE12_5_MEASUREMENT_ARM_PLAN.md first (aktueller Bauauftrag, E1-E9, §4 Step-Sequenz), dann diesen Kopf + den newest Session-stopped block; PHASE12_PREPROOF_HANDOVER.md ist der Befund-Vorlauf zum Plan; der Mutterplan (docs/concepts/phase12_data_foundation_plan.md) bleibt der §7-PASS-Kriterien-Ausführungsvertrag
+purpose: PHASE-HEAD, Phase 12 (Datenfundament) — Registry + BarService + Bar-Archiv + Recorder + Heartbeat. Steps 0-8.5 gebaut, getestet und auf main committed. P12.5 (Messarm-Fixes, 2026-08-17/18): Steps 1-3 gebaut + live verifiziert (U1/U2/U3/U5 + Entscheidung B, alle korrekt) — ABER P12.5 formal CLOSED, GESCHEITERT (2026-08-18, Nikinger-Intervention): BarService.get_window's Vollfenster-Refetch verbrannte 4731/10000 IG-Wochenpunkte am ersten scharfen Handelstag. Scheduler gestoppt, kein weiterer Verbrauch. Die fünf Code-Fixes bleiben gültig; keine weiteren P12.5-Bauschritte, nur Tests. Step 9 (Beweiswoche) weiterhin nicht begonnen.
+read-when: working in phase12_data_foundation/ — read PHASE12_5_FAILURE_HANDOVER.md first (Root Cause, Zahlen, was bleibt gültig, Empfehlung fürs Danach), dann diesen Kopf + den newest Session-stopped block; PHASE12_5_MEASUREMENT_ARM_PLAN.md ist superseded (unverändert, nicht editiert); der Mutterplan (docs/concepts/phase12_data_foundation_plan.md) bleibt der §7-PASS-Kriterien-Ausführungsvertrag
 detail: L2
 up: ../CLAUDE.md
 down:
-  - ./PHASE12_5_MEASUREMENT_ARM_PLAN.md                 # aktueller Bauauftrag: E1-E9, Steps 1-7 (L3, execution-ready)
+  - ./PHASE12_5_FAILURE_HANDOVER.md                     # P12.5 CLOSED/FAILED: Root Cause, Zahlen, Empfehlung (L3, dated) — READ FIRST
+  - ./PHASE12_5_MEASUREMENT_ARM_PLAN.md                 # superseded Bauauftrag: E1-E9, Steps 1-7 (L3, nicht editiert)
   - ./PHASE12_PREPROOF_HANDOVER.md                      # Befundlage vor P12.5, Tag-1-Ergebnisse (L3, dated)
   - ../docs/concepts/phase12_data_foundation_plan.md   # full execution-ready plan, D1-D20, Steps 0-10, §7 PASS-Kriterien (L3)
   - ../phase10_v3/PHASE11_DEFERRAL_HANDOVER.md          # why this track exists (L3, dated)
-  - ../docs/architecture/phase12_preproof.svg           # Tag-1-Bild: was steht, was fehlt
-  - ../docs/architecture/data_foundation.svg            # Fehlerbild + Zielbild
+  - ../docs/architecture/phase12_preproof.svg · data_foundation.svg  # Tag-1-/Fehlerbild
   - ./SESSIONS_ARCHIVE.md                               # rotierte Session-Blöcke (L3)
-updated: 2026-08-17
+updated: 2026-08-18
 ---
 # CLAUDE.md — Phase 12: Datenfundament (`phase12_data_foundation/`)
 
@@ -77,108 +77,81 @@ Siehe [`README.md`](./README.md).
 
 ---
 
-## Session stopped — 2026-08-17 (Session 7: P12.5 Steps 1–3 — U1/U3/Entscheidung B + U2/U5, pausiert nach Nikinger-Auftrag)
+## Session stopped — 2026-08-18 (Session 8: Step 4/5 live durchgeführt, P12.5 dann formal CLOSED — GESCHEITERT)
 
-> **Auftrag:** `PHASE12_5_MEASUREMENT_ARM_PLAN.md` ausführen (execution-ready, E1–E9
-> gelockt). Umfang dieser Session: Steps 1–3 (Housekeeping, phasen-interne Fixes, die zwei
-> freigabepflichtigen Cross-Phase-Fixes). Steps 4–7 (Neustart, falsifizierbarer Nachweis,
-> Beweiswoche, Handover) sind Nikinger-/Operator-Arbeit und **nicht** Teil dieser Session —
-> Nikinger-Auftrag nach Step-3-Freigabe war explizit „vollständigen Step 3, danach
-> pausieren".
+> **Verlauf:** Step 4 (Neustart mit beiden Flags) lief Nikinger-seitig 2026-08-17 abends.
+> Diese Session verifizierte Step 5 (der vierteilige falsifizierbare Nachweis) über zwei
+> Tage hinweg — und fand dabei einen fünften, ungeplanten Befund, der den ganzen Track
+> stoppte. **Volles Ergebnis:
+> [`PHASE12_5_FAILURE_HANDOVER.md`](./PHASE12_5_FAILURE_HANDOVER.md)** — dieser Block ist
+> die Kurzfassung.
 
 ### Completed
 
-1. **Step 1 (Housekeeping, No-Op):** Legacy-Grep sauber (nur der bekannte, frozen
-   `turbo_candidates.json`-Rest). Fünf Statusdokumente (Root-`CLAUDE.md`, `ROADMAP.md`,
-   `docs/INDEX.md`, dieser Kopf, `README.md`) gegen Code geprüft — **keine Abweichung**,
-   alle sagen korrekt „Steps 0–8.5 fertig, Step 9 nicht begonnen". Regression-Baseline
-   aller Phasen gemessen (s. u.) — deckt sich exakt mit dem Plan-§8.2-Erwartungswert.
-   Kein Commit für diesen Step (reiner No-Op-Befund, keine Datei geändert — „less is
-   sometimes more").
-2. **Step 2 (`data_foundation/`, phasen-intern, Commit `83d5ef3`):**
-   - **U1** (`service.py:119`): `BudgetedIGBarProvider.get_bars` normalisiert jetzt IGs
-     Roh-Timestamp über `normalize_bar_ts`, fängt `ArchiveError` in ein
-     `bad_timestamp`-`bar_fetch`-Event statt es hochzuwerfen zu lassen (E1/E2). Heilt
-     `DivergenceSampler`s lexikalischen Timestamp-Vergleich mit, weil `service.py` die
-     einzige Stelle ist, an der IGs Rohformat einläuft — **end-to-end bewiesen**, nicht
-     nur behauptet: `test_heartbeat.py`s IG-Fake läuft jetzt durch den echten
-     `BudgetedIGBarProvider` mit einem Rohformat-Broker statt eines Stand-ins, der die
-     Normalisierung übersprang.
-   - **U3** (`service.py:207`): `_MIN_WINDOW_COVERAGE = 0.5`-Schwelle neben dem
-     bestehenden `_covers_tail`-Check — ein kurzes-aber-tail-deckendes Archiv
-     kurzschließt nicht mehr. `:217` (IG-Top-up) unangetastet (E4).
-   - **Entscheidung B** (`heartbeat.py`): `assess_day` flaggt `shadow_enabled=False`
-     jetzt unbedingt als Problem + `ok=False` — genau die Tag-1-Situation, die live
-     `ok=True` meldete.
-   - Ein bestehender `assess_day`-Test (`test_assess_day_no_measurable_epic_is_ok_with_problem_note`)
-     musste umgebaut werden (mit `shadow_enabled=True` + einem realen Resolve isoliert),
-     sonst hätte E8 seine eigentliche Aussage (measurable_epics==0 allein ist nur eine
-     Notiz) überdeckt — kommentiert im Testfile.
-   - `phase12_data_foundation` Tests: **117 → 122** (5 neu: 2 Provider, 2 `get_window`,
-     1 `assess_day`).
-3. **Step 3 (Cross-Phase, Nikinger-Freigabe per AskUserQuestion: „Vollständigen step 3,
-   danach pausieren", Commit `ff5741c`):**
-   - **U2** (`phase10_v3/abstain_lessons/paper.py:588`): `resolve_paper_trade`s
-     `outcome is None` bedeutet an **beiden** Return-Stellen „noch nicht genug Bardaten",
-     nie „kein Ergebnis" — `_resolve_group` belastet jetzt den Retry-Cap statt beim ersten
-     Miss sofort abzuschreiben. Docstring-Korrektur (E6) an zwei Stellen:
-     `_charge_failed_attempt` (paper.py) und der zugehörige Kommentar in `wiring.py:468-480`
-     (behauptete fälschlich, der Fall sei bereits abgedeckt).
-   - Ein bestehender Test (`test_tracker_marks_expired_when_unresolvable`) kodierte exakt
-     den Vorher-Bug (sofortiges Expiry bei leeren Bars) — ersetzt durch
-     `test_tick_charges_attempt_instead_of_expiring_on_empty_bars` (bleibt OPEN, Attempt-
-     Zähler 1) + `test_tick_expires_after_the_attempt_cap` (12 leere Ticks ⇒ expiriert
-     trotzdem, Cap-Verhalten unverändert). Den Plan-Vorschlag für einen dritten
-     (Healthy-Path-Regressions-)Test bewusst ausgelassen — deckt sich mit dem bereits
-     bestehenden `test_tracker_resolves_due_trade_and_marks_resolved`.
-     `phase10_v3`: **159 → 160**.
-   - **U5** (`phase8_scheduler/scripts/wiring.py:805`): `shadow_pair_scheduler`s
-     `deadline` zieht jetzt zwei Zyklus-Intervalle von `window_close` ab —
-     `window_close` selbst ließ der letzten Tages-Kohorte (13:30-Öffnung) null
-     Tracker-Ticks (Tracker läuft nur in WINDOW, die Kohorte wird fällig genau beim
-     Phasenwechsel zu POST_WINDOW). **Pflicht-Gegenprobe durchgeführt** (§8.3):
-     `window_close="17:30"` + `cycle_interval_min=5` ⇒ Deadline landet exakt auf **17:20**.
-     `wiring.py` hat keine eigene pytest-Suite (dokumentierte Konvention) — verifiziert
-     via `py_compile` (sauber) + neuer AST-Guard
-     (`phase12_data_foundation/tests/test_shadow_deadline_margin.py`, spiegelt
-     `test_resolver_wiring.py`). `phase12_data_foundation`: **122 → 123**.
-   - Volle Cross-Phase-Regression nach Step 3 grün und **unverändert** außerhalb der
-     beiden berührten Phasen: P1 87 · P2 77 · P3 104 · P4 155 · P5 173 · P6 76 · P7 138 ·
-     P8 237 · P9 80 · meta 28 · root 80 — deckt sich exakt mit Plan-§8.2.
-4. **Bot unangetastet.** Scheduler (`pid 35195`) und Recorder (`pid 33151`) liefen zu
-   Beginn dieser Session unverändert seit dem Pre-Proof-Handover — kein Stop/Restart,
-   keine Live-/Netz-Aktion (Plan §1, unverändert Nikinger-Job).
+1. **Step 5 verifiziert, in drei Teilen über zwei Tage** (read-only, kein Code-Touch bis
+   zur Intervention):
+   - **(a)/(b)** sofort grün: echte argv zeigten beide Flags (`pid 46390`), Config-Default
+     bestätigt.
+   - **(d-i)** sofort grün: `data_health.py --day 2026-08-17` (ohne `--shadow-enabled`)
+     lieferte exakt den geforderten Beweis — `ok=False`, Exit 1, Problem-String
+     `"measurement arm off"` verbatim, gegen den echten Tag-1-Nulltag.
+   - **(c)** am Vorabend leer (kein Fund, kein Diagnosefall — WINDOW war vor dem Neustart
+     bereits zu), am Folgetag (2026-08-18, erster voller Handelstag mit scharfem Messarm)
+     **real bestätigt**: `pairs_opened: 90`, `pairs_resolved: 66`, `pairs_typed_expired: 4`,
+     `resolution_source` erstmals mit echten Werten (`yf`, `ig`, `ig+yf`).
+2. **Beim Auswerten von (c): der IG-Budget-Befund.** `spent_in_window` sprang von 151 auf
+   4731 Punkte binnen ~4 Handelsstunden. Attribution zweifelsfrei über die
+   Punktzahl-Verteilung erzwungen (10× 5 Punkte reales Research vs. **15× exakt 301
+   Punkte** — Vollfenster-Top-ups des Paper-Trackers, fälschlich unter `spend_kind=
+   "research"` gebucht, `wiring.py:189`). Root Cause: `BarService.get_window`
+   (`service.py:202-228`) fordert bei jedem Coverage-Miss das **komplette** Fenster neu
+   an, nicht die Lücke — ein vorher nie exponierter Pfad, weil der Messarm bis P12.5 nie
+   lief; **U3s Korrektheit** (nicht ein neuer Bug) schaltet ihn erstmals scharf, U2s
+   Retry-Cap verstärkt ihn (bis zu 12 Top-ups je Epic statt einem). Funktionales
+   Restbudget (`reserve_points=1500` unverändert) lag bei Fund-Zeitpunkt nur noch bei
+   ≈ 11–12 weiteren Vollfenster-Fetches — die von `data_health.py` ausgegebenen
+   `predicted_exhaustion_days: 7.5` waren irreführend (mitteln über die lange Ruhephase
+   vor dem Neustart).
+3. **Nikinger-Intervention, sofort:** „Let's intervene now - phase 12.5 is formally over
+   - failed. […] phase 12.5 shouldn't have any more steps apart from testing." Scheduler
+   (`pid 46390`) per `kill` gestoppt, Exit binnen weniger Minuten bestätigt (`ps aux`
+   leer). Recorder (`pid 33151`) bewusst weiterlaufen gelassen — reiner
+   yFinance-Prozess, kein IG-Verbrauch.
+4. **`PHASE12_5_FAILURE_HANDOVER.md`** (neu) — Root Cause, Zahlen, was bleibt gültig
+   (alle fünf Code-Fixes U1/U2/U3/U5/Entscheidung B sind unabhängig korrekt und live
+   bewiesen, **nicht** revertieren), Empfehlung fürs Danach (drei Bausteine, priorisiert:
+   Spend-Kind-Korrektur → Top-up auf die Lücke begrenzen statt Vollfenster → optionale
+   Once-per-Epic-Drossel).
+5. **Doku-Sync** (dieser Commit): Root-`CLAUDE.md` Phase-12-Zeile, `ROADMAP.md`,
+   `docs/INDEX.md` (+ neue Zeile für den Failure-Handover), dieser Kopf inkl. Rotation
+   des Session-7-Blocks nach `SESSIONS_ARCHIVE.md`.
 
 ### Verified
 
-- `pytest phase12_data_foundation/tests -q` → **123 passed**.
-- `pytest phase10_v3/tests -q` → **160 passed**.
-- Volle Phasen-Regression (s. o.) — jede Zahl deckt sich mit dem Plan-§8.2-Erwartungswert,
-  außer den beiden bewusst geänderten Phasen.
-- U5-Deadline-Rechnung von Hand nachgerechnet: `17:30 - 2×5min = 17:20` ✓.
+- Alle fünf P12.5-Fixes (U1/U2/U3/U5/Entscheidung B) live gegen echte Produktionsdaten
+  bestätigt korrekt (s. Completed 1) — **keiner** davon ist die Fehlerursache.
+- IG-Spend-Attribution zweifelsfrei über die Punktzahl-Verteilung (5 vs. 301) belegt,
+  nicht nur vermutet.
+- Scheduler-Stop verifiziert (`ps aux` vor/nach dem `kill`, Exit bestätigt).
+- `pytest phase12_data_foundation/tests -q` / `phase10_v3/tests -q` unverändert grün
+  (123 / 160) — diese Session hat keinen Produktionscode geändert.
 
 ### Next
 
-- **Step 4 (Nikinger, live):** laufenden Scheduler **erst stoppen**
-  (`ps aux | grep scheduler.run` als Gegenprobe — Parallel-Login-Falle), dann
-  `bash phase8_scheduler/scripts/run_scheduler.sh --enable-divergence-sampler --enable-shadow-schedule`.
-- **Step 5 (am Starttag, nicht am Freitag):** der vierteilige falsifizierbare Nachweis
-  (echte argv · Config-Default zurückgelesen · eine Zeile Live-Paper-Trades ·
-  zweiteiliger Alarm-Positivtest d-i/d-ii) — Plan §4 Step 5, wörtlich befolgen, nicht
-  paraphrasieren.
-- **Step 6:** Beweiswoche als reiner Watch-Auftrag (5 Handelstage), Freitags-Review gegen
-  Plan §7 A–G + Kern.
-- **Step 7:** Handover ⇒ Phase 12 zu, inkl. Doku-Sync (Root-`CLAUDE.md`, `ROADMAP.md`,
-  `docs/INDEX.md`, `README.md`, Memory-Updates).
-- Diese Session hat **nicht** committet in Richtung `origin/main` gepusht — lokal auf
-  `main`, zwei Commits (`83d5ef3`, `ff5741c`) über dem zuletzt gepushten Stand
-  (`cc3770e`). Push ist wie gehabt eine bewusste, separate Freigabe.
+- **P12.5 ist formal geschlossen — keine weiteren Bauschritte unter diesem Label, nur
+  Tests.** Der nächste Fix-Block (Empfehlung: Spend-Kind-Korrektur + Top-up-auf-Lücke-
+  begrenzen, s. Failure-Handover §5) ist ungebaut und unfreigegeben — Nikinger entscheidet
+  Nummerierung/Label, wenn es losgeht.
+- Phase-12-Done-Kriterium (Beweiswoche, Plan §7) weiterhin offen — nach diesem Scheitern
+  weniger denn je erreicht.
+- Push-Entscheidung offen wie üblich (bewusste, separate Freigabe).
 
 ### Open questions / blockers
 
-- Keine technischen Blocker für Step 4 — beide Cross-Phase-Fixes sind committed + grün.
-- Step 4 selbst ist der Blocker für alles Weitere: ohne den Neustart mit beiden Flags
-  misst nichts.
+- Der eigentliche nächste Schritt (Fetch-auf-Lücke-Design) ist noch nicht durchdacht
+  genug für eine Implementierung — Failure-Handover §5 nennt die Richtung, nicht das Design.
+- Kein technischer Blocker sonst — der Bot steht sicher (Scheduler aus, Recorder läuft
+  kostenlos weiter).
 
 ---
 
