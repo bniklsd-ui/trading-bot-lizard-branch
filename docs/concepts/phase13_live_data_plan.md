@@ -107,6 +107,7 @@ Formsache, aber es bleibt.
 | **L14** | **Die fünf P12.5-Fixes bleiben** (U1, U2, U3, U5, Entscheidung B — Commits `83d5ef3`, `ff5741c`). Kein Revert. | Closeout §8.4: alle live bewiesen korrekt, keiner war die Ursache. **Ausnahme, die kein Revert ist:** `_MIN_WINDOW_COVERAGE`/U3 verschwindet mit `get_window`s Fetch-Zweig, weil der Zweig verschwindet — das ist L2, keine Rücknahme. |
 | **L15** | **Der Research-Seam (`BarService.get_bars`, `service.py:195-209`) wird in Block A NICHT angefasst.** Er trägt dasselbe Muster (`coverage_ratio >= 1.0` gegen ein Fenster, das bei `now` endet, praktisch nie bestehbar), ist heute aber billig: gemessen 10 Calls × 5 Punkte = 50 Punkte am 18.08. Er wird nach Block B **neu gemessen** — mit laufendem LS sollte das Archiv die Prüfung von selbst bestehen. Erst dann wird entschieden. | Closeout §4 „Geltungsbereich": der Research-Seam **will** legitim frische Daten (der Tracker nicht), die Löschung ist dort nicht die richtige Antwort. Explizit als „nicht in diesem Schnitt enthalten" festgehalten statt stillschweigend mitgenommen. |
 | **L16** | **Phase 13 = Live-Datenfundament; das alte „V4" (Council, Handover, Reward-Reform, Force-Trigger, Instinct-ECC) rutscht auf Phase 14.** | Nikinger 2026-08-18. Präzedenzfälle: 2026-08-01 und 2026-08-11. Die Doku-Kaskade (Root-`CLAUDE.md`, `ROADMAP.md`, `README.md`, `ARCHITECTURE.md`, `docs/INDEX.md`) ist in **diesem** Commit mit dem Plan bereits ausgeführt — die ausführende Session findet sie vor und muss sie nicht nachziehen. |
+| **L17** | **Latenzanforderung ist datenklassen-spezifisch, nicht global.** **Die Preisreihe (OHLC) muss live sein** — sie ist das Auflösungssignal für SL/TP und der Grund, warum S1 existiert. **Begleitgrößen (Volumen und Ähnliches) dürfen verspätet oder ganz abwesend sein.** Eine Quelle, die nur Begleitgrößen nachliefert, erfüllt die Anforderung; eine Quelle, die die Preisreihe verspätet liefert, ersetzt S1 **nicht**. | Nikinger 2026-08-18: „solange grundlegende Daten live kommen (z. B. Lightstreamer) und nur z. B. Volumendaten verspätet wären, wäre das zumutbar". Schärft, wofür S2/S3 zuständig sein dürfen: Rumpf, Backfill und Gegenprobe — nie der Auflösungspfad in Echtzeit. Macht zugleich die S3-Wahl unkritischer, weil ihr Verzug per Definition nur Begleitgrößen und nachträgliches Lückenfüllen betrifft. |
 
 ---
 
@@ -921,11 +922,19 @@ niemand ein zweites Mal recherchiert:
   deshalb existiert die 313-€-Position. Den Index aus Konstituenten nachzurechnen bräuchte
   Konstituentenliste, Free-Float-Faktoren und Divisor, alle selbst lizenzpflichtig. **Nicht.**
 
-**Empfehlung: die Wahl auf nach Block B vertagen, nicht jetzt raten.** Grund: erst Block B
-liefert die **gemessene** Lückenrate. Ist sie mit laufendem LS klein, ist S3s Grenznutzen klein
-und S4 reicht als Rückfallebene; ist sie groß, rechtfertigt sie die Kosten der jeweils
+**ENTSCHIEDEN (Nikinger 2026-08-18): die Wahl wird auf nach Block B vertagt.** Grund: erst
+Block B liefert die **gemessene** Lückenrate. Ist sie mit laufendem LS klein, ist S3s Grenznutzen
+klein und S4 reicht als Rückfallebene; ist sie groß, rechtfertigt sie die Kosten der jeweils
 unangenehmen Eigenschaft. Genau diese Reihenfolge — erst messen, dann entscheiden — ist die
-Lehre aus P12.5. **Wenn jetzt entschieden werden soll:** Capital.com, gegatet auf einen
+Lehre aus P12.5.
+
+**L17 entschärft diese Entscheidung zusätzlich:** live sein muss die **Preisreihe**, und die
+liefert S1. Was S3 beisteuert, sind Begleitgrößen und nachträgliches Lückenfüllen — beides darf
+verspätet sein. Damit ist der Publikationsverzug eines Kandidaten **kein** Ausschlusskriterium
+mehr, sondern nur noch Abdeckung, Lizenz und Zugriffsweg. Das ordnet das Feld neu: Dukascopys
+~90 Minuten sind unter L17 unproblematisch, seine ToS-Klausel bleibt der einzige Einwand.
+
+**Wenn doch früher entschieden werden soll:** Capital.com, gegatet auf einen
 kostenlosen Live-Check (liefert die Demo-API `resolution=MINUTE` für Germany 40 / France 40 /
 **Spain 35**, und wie weit zurück?). Es ist die einzige Option ohne ToS-Kollision und ohne neue
 Abhängigkeit — und als Broker-CFD-Preisreihe liegt sie **näher an IGs eigener Reihe** als der
@@ -1055,6 +1064,7 @@ Täglich `data_health.py` (Exit 0 erwartet). Freitags eine Review-Session nach d
 | „Der Divergenz-Sampler meldet nie etwas, alles ist gut." | Genau das war F2. `if not yf_bars: return` — Abwesenheit von Events ist **kein** Beweis von Übereinstimmung. Nach A6 muss es `divergence_no_comparator`-Events geben, wenn nichts verglichen werden konnte. |
 | „Plötzlich fallen Epics reihenweise auf `mismatch` und verschwinden aus `measurable_universe()`." | Ein **Niveau**-Vergleich statt eines Rendite-Vergleichs (A6.0). Zwei verschiedene Produkte (CFD vs. Kassa vs. Fremdquelle) tragen eine dauerhafte Basis — gemessen bis 2,1 % — die kein Fehler ist. Gegenprobe: ist der gemeldete `pct` über Tage **konstant**, ist es die Basis; schwankt er, ist es echte Entkopplung. |
 | „Die neue Fremdquelle liefert Bars mit Zeitstempeln, die niemand angefragt hat." | Kein Bug bei uns: mindestens eine geprüfte externe API antwortet auf ein Fenster außerhalb ihrer Historientiefe mit **aktuellen** Bars und **ohne** Fehler (C1, empirisch belegt). Deshalb ist die Fensterprüfung nach dem Fetch Pflicht, nicht Kür. |
+| „Seit LS läuft, ist das Volumen überall `NULL` — die Volumen-Verarbeitung ist kaputt." | Wahrscheinlich nicht kaputt, sondern **verdrängt**. `BarArchive.window` kollabiert per `prefer` auf **eine** Zeile je `ts_utc`, und `ls` rankt vor `yf` (`archive.py:138`). Trägt die LS-Kerze keinen Volumenwert, verdeckt sie die yF-Zeile derselben Minute, die einen hätte. Das ist die direkte Folge von L17 und **kein** Fehler im Volumenpfad. Gegenprobe: `SELECT source, COUNT(*) FROM bars WHERE ts_utc = '<Minute>'` — liegen beide Zeilen da, ist es die Rangfolge. |
 | „Die neue S3-Quelle schreibt, aber ihre Bars tauchen nie in einer Auflösung auf." | `prefer` in `BarArchive.window` (`archive.py:138`) kennt sie nicht ⇒ `default_rank` ⇒ sie verliert jeden Gleichstand gegen yF (C1). |
 | „`ensure_schema` wirft `duplicate column name: tick_count`." | Der geführte `PRAGMA table_info`-Check fehlt oder läuft nach dem ALTER (A5). `CREATE TABLE IF NOT EXISTS` schützt nicht vor einem nackten ALTER. |
 | „Nach dem Neustart sind 20 Paper-Zeilen `EXPIRED_UNRESOLVED`." | Erwartet. Die am 18.08. beim Stopp offenen Zeilen (A7.2). Kein Messausfall. |
@@ -1121,6 +1131,14 @@ Täglich `data_health.py` (Exit 0 erwartet). Freitags eine Review-Session nach d
     veröffentlicht**, wie Euronext es tut. Unbestätigt, Tendenz negativ — aber der wertvollste
     verbleibende Unbekannte, weil IBEX 2 von 5 messbaren Epics stellt und von keiner geprüften
     Gratisquelle außer Dukascopy abgedeckt wird.
+18. **Ob die LS-Kerze überhaupt ein Volumen trägt** (L17): `CHART:`-Feldliste kennt `LTV`
+    (last traded volume) und `TTV` (total traded volume), aber bei einem CFD auf einen Index
+    kann beides strukturell 0 oder leer sein. Teil des B0-Live-Checks — **einfach mit
+    abfragen**, es kostet nichts extra. Ergebnis entscheidet, ob die `prefer`-Verdrängung aus
+    §8 real wird oder nur theoretisch ist. Falls sie real wird und Volumen je gebraucht wird:
+    die Antwort ist **nicht**, `prefer` umzustellen (das würde den Preis verschlechtern, um
+    eine Begleitgröße zu retten), sondern eine quellenübergreifende Lesung —
+    `BarArchive.window(..., sources=("yf",))` liefert die yF-Zeile weiterhin gezielt (L10).
 
 ---
 
