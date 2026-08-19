@@ -53,6 +53,9 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_EPIC = "IX.D.DAX.IFMM.IP"
+# Phase 13 §6 B0: 11 fields. CHART field list is **unverified** (IG docs
+# paywalled, sources are Drittbibliotheken + IG-Labs-Forum). B0 is the
+# verification — fields that come back are the real ones.
 _CHART_FIELDS = (
     "UTM", "CONS_END", "CONS_TICK_COUNT",
     "BID_OPEN", "BID_HIGH", "BID_LOW", "BID_CLOSE",
@@ -62,10 +65,6 @@ _CHART_FIELDS = (
 
 def _eprint(message: str = "") -> None:
     print(message, file=sys.stderr)
-
-
-def _iso_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{datetime.now().microsecond // 1000:03d}Z"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -98,106 +97,117 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"ok": False, "epic": args.epic, "error": str(connect_env.error)}))
         return 3
 
-    # We do **not** use the live-tested `IGLightstreamerClient` directly — that
-    # class subscribes `PRICE:` (U-line ticks). The CHART subscription is
-    # structurally different (server-side aggregated candles, not ticks),
-    # so we drive the official `lightstreamer-client-lib` once for this probe
-    # only. B1 will refactor `IGLightstreamerClient` to own both subscriptions.
+    # The actual import path is ``lightstreamer.client`` (the pip package
+    # name is ``lightstreamer-client-lib``; the top-level module is
+    # ``lightstreamer``, and the client SDK lives in ``lightstreamer.client``).
+    # Phase 1's ``phase1_broker_wrapper/broker_wrapper/streaming/ig_lightstreamer.py``
+    # imports the same way and is **live-verified**.
     try:
-        from lightstreamer_client_lib.client import LightstreamerClient  # noqa: E402
+        from lightstreamer.client import (  # noqa: E402
+            ClientListener,
+            LightstreamerClient,
+            Subscription,
+            SubscriptionListener,
+        )
     except ImportError as exc:  # pragma: no cover — the SDK is a Phase-1 dep
-        _eprint(f"[probe_chart_stream] lightstreamer-client-lib missing: {exc}")
-        print(json.dumps({"ok": False, "epic": args.epic, "error": "sdk_missing"}))
+        _eprint(f"[probe_chart_stream] lightstreamer SDK import failed: {exc}")
+        print(json.dumps({"ok": False, "epic": args.epic, "error": "sdk_import_failed"}))
         return 1
-
-    received: list[dict[str, str]] = []
-    completed = threading.Event()
-    sub_error: list[str] = []
-    lock = threading.Lock()
-
-    def on_item_update(_update: dict) -> None:  # not used
-        pass
-
-    def _on_update(field_name: str, field_value: str) -> None:
-        # ItemListener callback. The SDK invokes this once per field per update.
-        # We accumulate fields until CONS_END==1 ("candle complete"), then
-        # snapshot.
-        with lock:
-            if not received or received[-1].get("UTM") != field_name and field_name == "UTM":
-                received.append({"UTM": field_value})
-                current = received[-1]
-            else:
-                current = received[-1]
-            current[field_name] = field_value
-            if current.get("CONS_END") == "1" and not completed.is_set():
-                completed.set()
-
-    item_listener = type(
-        "_ItemListener",
-        (),
-        {
-            "onUpdate": lambda self, item, update: _on_update(item, update),
-            "onItemName": lambda self, *args, **kwargs: None,
-        },
-    )()
-
-    sub_listener = type(
-        "_SubListener",
-        (),
-        {
-            "onSubscribe": lambda self, *args, **kwargs: None,
-            "onSubscription": lambda self, *args, **kwargs: None,
-            "onSubscriptionError": lambda self, code, message: (
-                sub_error.append(f"{code}: {message}") or completed.set()
-            ),
-            "onUnsubscription": lambda self, *args, **kwargs: None,
-            "onEnd": lambda self, *args, **kwargs: None,
-        },
-    )()
 
     cst = connect_env.data.get("cst")
     xst = connect_env.data.get("x_security_token")
     account_id = connect_env.data.get("account_id") or connect_env.data.get("current_account_id")
     ls_url = connect_env.data.get("lightstreamer_endpoint") or "https://apd.marketdatasystems.com"
 
-    client = LightstreamerClient(ls_url, f"DEFAULT_{account_id or 'CLIENT'}")
-    client.connectionDetails.setUser(cst)
-    client.connectionDetails.setPassword(xst)
+    # The SDK callback model: ``SubscriptionListener`` is the **single**
+    # listener interface for both subscription events (``onSubscription``,
+    # ``onSubscriptionError``) and item updates (``onItemUpdate``). One
+    # listener class per subscription, with both methods.
+    completed = threading.Event()
+    sub_error: list[str] = []
+    completed_candles: list[dict[str, str]] = []
+    state_lock = threading.Lock()
+
+    class _ChartSubListener(SubscriptionListener):
+        """Aggregates field updates into one candle per CONS_END==1.
+
+        The SDK delivers partial field dicts per update (LS is a stream,
+        not a request/response). We accumulate across updates until
+        ``CONS_END == "1"`` arrives, then snapshot one candle.
+        """
+
+        def onSubscription(self) -> None:
+            _eprint("[probe_chart_stream] SUBOK: candle subscription confirmed")
+
+        def onSubscriptionError(self, code, message) -> None:
+            sub_error.append(f"{code}: {message}")
+            _eprint(f"[probe_chart_stream] subscription error: {code} {message}")
+            completed.set()
+
+        def onItemUpdate(self, update) -> None:
+            utm = update.getValue("UTM") or ""
+            if not utm:
+                return
+            with state_lock:
+                # Find or create the current-minute bucket by UTM.
+                if completed_candles and completed_candles[-1]["UTM"] == utm:
+                    bucket = completed_candles[-1]
+                else:
+                    # New minute — flush the previous if it had CONS_END==1
+                    # (in case we never got a second update), then start a new one.
+                    bucket = {"UTM": utm}
+                    completed_candles.append(bucket)
+                for f in _CHART_FIELDS:
+                    v = update.getValue(f)
+                    if v is not None:
+                        bucket[f] = v
+                if bucket.get("CONS_END") == "1" and not completed.is_set():
+                    completed.set()
+
+    class _ClientL(ClientListener):
+        def onStatusChange(self, status: str) -> None:
+            _eprint(f"[probe_chart_stream] status: {status}")
+
+        def onServerError(self, code, message) -> None:
+            _eprint(f"[probe_chart_stream] server error: {code} {message}")
+
+    _eprint(f"[probe_chart_stream] connecting to {ls_url} as account={account_id!r} ...")
+    client = LightstreamerClient(ls_url, "DEFAULT")
+    client.connectionDetails.setUser(account_id or "")
+    client.connectionDetails.setPassword(f"CST-{cst}|XST-{xst}" if cst and xst else "")
+    client.addListener(_ClientL())
 
     if args.debug:
+        import logging
         logging.basicConfig(level=logging.DEBUG)
 
-    _eprint(f"[probe_chart_stream] connecting to {ls_url} ...")
+    sub = Subscription("MERGE", [f"CHART:{account_id}:{args.epic}:1MINUTE"], list(_CHART_FIELDS))
+    sub.addListener(_ChartSubListener())
     client.connect()
-    # Register a minimal Subscription on the CHART item, with the full field
-    # list. setDataAdapter is the **one** unverified part — we do NOT set it
-    # (the SDK default is usually correct; we'll see from the response).
-    from lightstreamer_client_lib.subscribe import Subscription  # noqa: E402
-    from lightstreamer_client_lib.constants import SubscriptionMode  # noqa: E402
-
-    sub = Subscription(
-        SubscriptionMode.MERGE,
-        f"CHART:{args.epic}:1MINUTE",
-        list(_CHART_FIELDS),
-    )
-    sub.addListener(item_listener)
-    sub.addListener(sub_listener)
     client.subscribe(sub)
     _eprint(f"[probe_chart_stream] subscribed CHART:{args.epic}:1MINUTE, waiting up to {args.timeout}s ...")
 
     completed.wait(timeout=args.timeout)
+    try:
+        client.unsubscribe(sub)
+    except Exception:  # noqa: BLE001
+        pass
     client.disconnect()
 
-    with lock:
-        candles_complete = [r for r in received if r.get("CONS_END") == "1"]
+    with state_lock:
+        candles_complete = [c for c in completed_candles if c.get("CONS_END") == "1"]
+
+    fields_seen: set[str] = set()
+    for c in completed_candles:
+        fields_seen.update(k for k in c if k != "UTM")
 
     payload = {
         "ok": bool(candles_complete),
         "epic": args.epic,
         "candles_received": len(candles_complete),
-        "raw_updates": len(received),
+        "raw_updates": len(completed_candles),
         "sub_error": sub_error[0] if sub_error else None,
-        "fields_seen": sorted({k for r in received for k in r}),
+        "fields_seen": sorted(fields_seen),
     }
 
     if sub_error:
@@ -207,8 +217,8 @@ def main(argv: list[str] | None = None) -> int:
     if not candles_complete:
         _eprint(
             f"[probe_chart_stream] no CONS_END==1 candle in {args.timeout}s "
-            f"(received {len(received)} raw updates). Likely: market closed, or "
-            f"CHART not on this account tier."
+            f"(received {len(completed_candles)} raw updates). Likely: market closed, or "
+            f"CHART not on this account tier. fields_seen={fields_seen}"
         )
         print(json.dumps(payload))
         return 2
