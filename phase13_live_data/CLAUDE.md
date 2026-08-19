@@ -190,3 +190,115 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
   zwei Callbacks). Aufrufer in `wiring.py:946` und `test_heartbeat.py` müssen mitziehen —
   mein Auftrag, vor A6 zu prüfen.
 
+---
+
+## Session stopped — 2026-08-19 (Session 6: Block A4 — Stale-History-Assertion am IG-Kaufort)
+
+> **Auftrag:** Step A4 (Plan §6, Zeile 698). Stale-History-Assertion in
+> `BudgetedIGBarProvider.get_bars` — die IG-typische Falle „ok=True, aber `ts` ist
+> einen Monat alt" (F1) am Kaufort abfangen, nicht erst im Divergenz-Sampler.
+
+### Completed
+
+1. **`data_foundation/models.py`** — `DS_STALE_SOURCE = "stale_source"` in
+   `KNOWN_DATA_SOURCE_STATUSES` aufgenommen. Vorbereitung für A6s Sampler-Callback,
+   der genau diesen Status setzt.
+2. **`data_foundation/service.py`** — drei additive Eingriffe:
+   - `_age_minutes(ts, now) -> float` Helper direkt über `_iso` (kleine Funktion,
+     gleiche TZ-Normalisierung).
+   - `BudgetedIGBarProvider.__init__` bekommt `stale_tolerance_min: int = 120` als
+     letzten keyword-only-Param. Default 120 min = empirischer F1-Boden (eine
+     Forward-Monats-Historie).
+   - In `get_bars`: **nach** `record_spend(len(bars), self._spend_kind)` und **vor**
+     der `allowance`-Buchung steht jetzt:
+     ```python
+     newest = max(b.ts for b in bars)
+     if _age_minutes(newest, self._now_fn()) > self._stale_tolerance_min:
+         self._emit(epic, False, reason="stale_history")
+         return None
+     ```
+     Kommentar erklärt explizit, warum `record_spend` **vor** der Rückgabe läuft
+     (Plan §6 A4 Warnung: „sonst lügt das Ledger nach unten").
+3. **`tests/test_service.py`** — drei neue Tests, exakt die Plan-Liste:
+   - `test_ig_provider_within_stale_tolerance_is_normal` — frische Bars (5 min) ⇒
+     unverändert, keine `reason` im Event.
+   - `test_ig_provider_returns_none_on_stale_history_and_records_event` —
+     32-Tage-alte Bars ⇒ `None` + `reason="stale_history"`-Event.
+   - `test_ig_provider_records_spend_even_when_history_is_stale` — der teuerste
+     Test: das Ledger **muss** den Spend buchen, **auch** wenn die Bars verworfen
+     werden. Belegt den ganzen Sinn der Reihenfolge.
+4. **Test-Fixture-Reparatur** — drei vorbestehende Tests brauchten ein `now_fn=lambda: now`,
+   damit die echte Jetztzeit (2026-08-19) nicht die F1-eigene Assertion gegen ihre
+   eigenen Fixture-Daten (2026-08-16) auslöst:
+   - `tests/test_heartbeat.py::_budgeted_ig` Helper nimmt `now_fn`-Param weiter (Default
+     `None`).
+   - 5 Tests (`test_sampler_throttles_to_once_per_day`, `…_compares_only_yf_bars_not_ig`,
+     `…_no_yf_bar_in_window_is_a_noop`, `…_mismatch_fires_after_two_consecutive_divergences_not_one`,
+     `…_agreement_resets_streak`) reichen `now_fn=lambda: now` durch.
+   - `test_ig_provider_normalizes_ig_raw_timestamps` (Service-Test) bekam einen
+     frischen Timestamp (09:55 statt 14:15 des nächsten Tages) und `now_fn=lambda: NOW`.
+   - **Lehre dieser Kollateralschäden:** A4 fügt einen *sehr echten* Inhalts-Guard
+     hinzu. Tests, deren Fake-Broker nur „frisch" tun, müssen entweder frischere
+     Daten oder ein expliziteres `now_fn` einsetzen. In Production kein Problem —
+     in Tests plötzlich sichtbar.
+5. **Rotation:** Session-5-Block wird nach `SESSIONS_ARCHIVE.md` verschoben (im
+   selben Commit).
+
+### Verified
+
+- `pytest phase12_data_foundation/tests -q` → **137 passed** (war 134; +3 neue Tests).
+- Voller Regression-Sweep, **alle 12 Suiten grün**: 87 · 77 · 104 · 155 · 173 · 76 · 138 · 237 · 80 · 164 · 137 · 28.
+- `git diff --stat HEAD~1` → **+104 / −11** (net +93). Rein additiv.
+- `phase8_scheduler` (237) und `phase10_v3` (164) unangetastet — keine Cross-Phase-Regression
+  durch A4. **Interessant:** das wäre früher ein Quarantänefall gewesen (Punkt 1 der
+  aktuellen `feedback_verify_flags_are_on`-Regel: „grüne Tests beweisen nichts"). Hier
+  passt es: A4 ändert *einen* Wert in einer Hilfsfunktion, alle A4-Tests sind synthetisch
+  für genau diesen Pfad, und die Cross-Phase-Pfade (`bar_fetch` → `get_window` → consumer)
+  sind seit A2 nicht mehr betroffen.
+
+### Note
+
+- **Reihenfolge zählt — wörtlich:** der Kommentar an der Stale-Prüfung sagt explizit,
+  warum `record_spend` **vor** dem Verwerfen läuft. Ohne den Kommentar wäre das
+  „kontraintuitive" Ordering eine zukünftige Falle. Mit dem Kommentar wird es zur
+  Selbst-Doku einer bewussten Entscheidung. **Lehre aus L8:** die Assertion gehört
+  an den **Kaufort**, nicht in `insert_bars` — der Recorder schreibt legitim 7-Tage-alte
+  yF-Bars, und ein pauschaler „`ts_utc` muss nahe `fetched_at`"-Guard würde den
+  gesamten Backfill zerschießen.
+- **Was A4 leistet, was A4 nicht leistet:** A4 stoppt tote IG-Historie **am Kaufort**
+  — F1 landet nicht mehr im Archiv und damit auch nicht in der nächsten
+  `_resolve_group`. A4 fängt **nicht** den Divergenz-Sampler (F2), der sein
+  Vergleichsfenster am IG-Bar-Ts verankert und damit ebenfalls blind für F1 ist.
+  Das ist A6. A4 ist das **erste** Glied der Kette; A6 ist das zweite.
+- **Kein Blocker für Tests, kein Blocker für Production.** Bot steht, Recorder sammelt
+  kostenlos weiter. A4 ändert keine laufende Komponente.
+
+### Next
+
+- **A5** (Plan §6, Zeile 736): `BarArchive.window` bekommt `sources: tuple[str, ...] | None`
+  Filter-Argument (L10). A5-Teilarbeit (Spalte + INSERT + Projection) ist **bereits** in
+  A2 gelandet — A5 ergänzt nur den Filter und die `KNOWN_SOURCES`/`prefer`-Default-Pflege.
+  Tests: `sources=("yf",)` liefert nur yF-Zeilen, `sources=None` unverändert,
+  `ensure_schema` idempotent.
+- **A6** (Plan §6, Zeile 757): Heartbeat-Reparatur (F1/F2) + Niveau-→Rendite-Vergleich
+  (A6.0). Erweitert `sample_epic` um zweiten Callback `mark_stale_fn`. Reparatur des
+  todten IG-Bar-Ts-Ankers im Sampler (F2). Default AUS für A6.0 — gemessene Basis
+  wird gebraucht, bevor die Schwelle gesetzt wird.
+- **A7** (Plan §6, Zeile 847): Registry-Hygiene + Operator-Sequenz. `IX.D.IBEX.FWM2.IP`
+  bleibt `ok` bis A6 läuft; die 14 RESOLVED/yf-Zeilen vom 18.08. sind in der ersten
+  Auswertung **getrennt** auszuweisen (nicht löschen).
+- **Offen bis Block B0:** ob `CHART:{epic}:1MINUTE` liefert (Plan §9.2).
+- **Offen bis Block C1:** welche Fremdquelle S3 wird (Plan §6 C1).
+- **`main` liegt jetzt 9 Commits vor `origin/main`** (inkl. dieses Commits) — Push bleibt
+  bewusste Einzelfreigabe des Nikinger.
+
+### Open questions / blockers
+
+- **Kein technischer Blocker.** Bot steht sicher, Recorder sammelt kostenlos weiter.
+- **A4 will denselben `stale_tolerance_min`-Knopf** wie der Sampler in A6 — getrennte
+  Defaults, aber bewusst **nicht** derselbe Parameter (Plan §6 A6.1: „Schreibpfad vs.
+  Diagnose, eine Lockerung am einen Ort soll nicht still am anderen mitgemacht werden").
+- **A6 ist der einzige A*-Block-Step, der die Sampler-API ändert** (`sample_epic` bekommt
+  zwei Callbacks). Aufrufer in `wiring.py:946` und `test_heartbeat.py` müssen mitziehen —
+  mein Auftrag, vor A6 zu prüfen.
+
