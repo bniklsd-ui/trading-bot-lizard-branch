@@ -12,9 +12,9 @@ Phase head / session log: [`CLAUDE.md`](./CLAUDE.md).
 
 | Module | Responsibility | Status |
 |---|---|---|
-| `stream.py` | `LSBarRecorder` (S1, write-through IG Lightstreamer candles) + `TickAggregator` (L6 fallback) | ⬜ Block B2 |
-| `backfill.py` | `ExternalBackfill` (S3, independent third source) | ⬜ Block C1 |
-| `rescue.py` | `GapRescue` (S4, budgeted IG range rescue, default OFF) | ⬜ Block C2 |
+| `stream.py` | `LSBarRecorder` (CHART-Pfad, dormant seit B0=NO 2026-08-19) + `TickAggregator` + `TickAggregatorRecorder` (S1-Primärpfad: PRICE-Tick-Aggregation → 1-min OHLC → `BarArchive`) | ✅ Block B2 + B0.5, 21 Tests |
+| `backfill.py` | `ExternalBackfill` (S3, independent third source) | ⬜ Block C1 (deferred per Plan §6 C1.0 — Wahl auf nach Beweiswoche) |
+| `rescue.py` | `GapRescue` (S4, budgeted IG range rescue, default OFF) | ✅ Block C2, 11 Tests |
 
 **Bauprinzip:** zero new AI. Gap detection, coverage assessment, source selection, bar
 aggregation and freshness checks are deterministic code — see root `CLAUDE.md`.

@@ -72,12 +72,12 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
 | Datei | Zweck | Status |
 |---|---|---|
 | *(Repo-Wurzel)* `scripts/store_minimax_key.py` · `scripts/claude-minimax` | Harness-Vorstufe: zweiter Claude-Code-Befehl auf MiniMax M3, Key nur im Keyring (`trading-bot-minimax`) | ✅ A0.0 live-abgenommen 2026-08-18 (Nikinger) |
-| `live_data/stream.py` | `LSBarRecorder` + `TickAggregator` (S1) | ✅ B2 — committed, 11 Tests |
+| `live_data/stream.py` | `LSBarRecorder` (CHART-Pfad, dormant) + `TickAggregator` + `TickAggregatorRecorder` (PRICE-Tick-Aggregation, **S1-Primärpfad nach B0=NO**) | ✅ B2 + B0.5 — committed, 21 Tests |
 | `live_data/backfill.py` | `ExternalBackfill` (S3) | ⬜ Block C1 (deferred per Plan §6 C1.0 — Wahl auf nach Beweiswoche) |
 | `live_data/rescue.py` | `GapRescue` (S4, Default AUS) | ✅ C2 — committed, 11 Tests |
-| `scripts/probe_chart_stream.py` | Gating-Live-Check: liefert `CHART:` auf diesem Konto? | ✅ B0 — committed (operator-run) |
+| `scripts/probe_chart_stream.py` | Gating-Live-Check: liefert `CHART:` auf diesem Konto? | ✅ B0 — committed (operator-run, NO 2026-08-19) |
 | `scripts/source_delta.py` | Doppelauflösung je Quelle, Differenz als Messgröße (P6) | ✅ C3 — committed, 7 Tests |
-| `tests/` | gemockt, kein Netz, kein LLM | ✅ 29 Tests grün |
+| `tests/` | gemockt, kein Netz, kein LLM | ✅ 39 Tests grün |
 | *(cross-phase)* `data_foundation/coverage.py` | `assess_window` / `WindowCoverage` | ✅ A1 — committed, 12 Tests grün |
 | *(cross-phase)* `data_foundation/service.py` | `BarService.get_window` als reine Archiv-Lesung + Stale-Assertion | ✅ A2 + A4 — committed |
 | *(cross-phase)* `data_foundation/heartbeat.py` | `DivergenceSampler` rendite-basiert + stale-Check; `assess_day` mit Coverage | ✅ A6 — committed, 143 phase12-Tests |
@@ -91,113 +91,87 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
 
 ---
 
-## Session stopped — 2026-08-19 (Session 9: Block B (B0–B3) + Block C (C2/C3) — Phase 13 CODE-COMPLETE)
+## Session stopped — 2026-08-19 (Session 10: B0.5 — TickAggregatorRecorder-Build + Wire + C1-Vorzug)
 
-> **Auftrag:** Nikinger („going on until I am needed"). Block A war
-> abgeschlossen, also weiter mit Block B (B0–B3) und Block C (C2/C3;
-> C1 nach Plan §6 C1.0 auf nach der Beweiswoche vertagt). Beide Blöcke
-> sind in dieser Session fertig geworden.
+> **Auftrag:** Nikinger („alles was gebaut werden kann, baue jetzt
+> atomar, danach muss die Entscheidung zur Fremd datenquelle fallen").
+> B0-Probe lief 2026-08-19 mit Exit-Code 1 (NO) — `CHART:{epic}:1MINUTE`
+> liefert `-1 Incorrect instrument setup` auf diesem Konto. Plan §6 B0
+> NO-Zweig sagt „TickAggregator wird Primärpfad", aber im Bau klaffte
+> eine Lücke: nur die `TickAggregator`-Klasse existierte, kein
+> Recorder-Wrapper analog zu `LSBarRecorder`. Diese Session schließt
+> die Lücke und zieht danach die C1-Entscheidung vor.
 
 ### Completed
 
-**A7.5 — Tracker-Stale-Mini-Step** (5 Zeilen + 1 Test). `paper.py`
-bekommt einen dritten Stale-Hook (neben A4 Schreibpfad, A6.1 Sampler-
-Diagnose) — der Tracker lehnt einen Trade ab, dessen einzige Archive-Bar
-älter als `_TRACKER_STALE_TOLERANCE_MIN=120` ist. Bewusst NICHT in
-A2/A3/A6 mitgenommen, weil die Test-Fixtures erneut anfasst — jetzt
-vor dem ersten Neustart.
+**B0.5 — TickAggregatorRecorder-Wrapper (NEU).** Schließt die
+Bau-Lücke zwischen Plan und Code:
 
-**Block B (B0 + B1 + B2 + B3)** — die Live-Stream-Kette:
-- **B0** `phase13_live_data/scripts/probe_chart_stream.py` (NEU,
-  ~50 Zeilen, operator-run, kostenlos). Subscribed `CHART:{epic}:1MINUTE`
-  mit 11 Feldern, Exit-Codes YES/NO/PARTIAL/AUTH, beide B0-Zweige
-  ausgeplant.
-- **B1** `phase1_broker_wrapper/broker_wrapper/streaming/ig_lightstreamer.py`
-  erweitert um Kerzen-Abo parallel zum Tick-Abo. `ChartCandle` (frozen
-  dataclass) + `CandleCallback`. `_CandleListener` akkumuliert Felder
-  über LS-Updates, emittiert genau ein ChartCandle bei `CONS_END==1`
-  mit mid = (BID+OFR)/2 (L7). 8 neue Tests (alle gemockt).
-- **B2** `phase13_live_data/live_data/stream.py` (NEU, ~150 Zeilen).
-  `LSBarRecorder` (write-through LS-Kerzen ins Archiv mit `source='ls'`
-  + `tick_count`) + `TickAggregator` (L6-Fallback für PRICE-Ticks,
-  wenn CHART nicht verfügbar). Fail-soft ueberall: ArchiveError geloggt,
-  Callback-Exception isoliert, complete=False ignoriert, in-flight
-  Candle nach stop() gedroppt. 11 neue Tests.
-- **B3** Scheduler-Lebenszyklus + Token-Rotation. Vier Stellen
-  verdrahtet: `bar_stream`-Param in `runner.__init__`, `_start_bar_stream()`
-  in preflight() nach `_run_universe_refresher()`, `_restart_bar_stream()`
-  in `_warm_session()` nach erfolgreichem `connect()` (Token-Rotation,
-  IG rotiert CST/XST bei jedem connect), `_stop_bar_stream()` als
-  eigener guarded Block in shutdown(). `--enable-bar-stream` CLI-Flag
-  in `run.py`, `enable_bar_stream: bool = False` in `config.py`.
-  wiring.py baut nur, wenn Flag an. 7 neue Tests (6 in test_runner
-  + 1 CLI in test_run).
-
-**Block C (C2 + C3; C1 deferred per Plan §6 C1.0):**
-- **C2** `phase13_live_data/live_data/rescue.py` (NEU, ~190 Zeilen).
-  S4-Rettungs-Stufe für gealterte Restlücken. Direkter IG-REST-call
-  (Bereichs-API `from`/`to`) am Chain-Provider vorbei, gedrosselt auf
-  1 Call/Epic/Tag, Stale-Assertion am Kaufort (L8 wiederverwendet,
-  dritter Stale-Hook). `RescueReport` mit `skipped_reason` immer
-  zurück (kein `None`, nie raise). Eigener spend-Knopf `'rescue'`
-  (Ledger-Eintrag auffindbar). 11 Tests.
-- **C3** `phase13_live_data/scripts/source_delta.py` (NEU, ~210 Zeilen).
-  Read-only Diagnostic. Liest paper_trades + bars.sqlite im `mode=ro`,
-  löst jeden resolved Trade je Quelle (yf / ls) ein zweites Mal auf
-  und weist die Differenz aus. CLI: `--day` oder `--days N` (mutually
-  exclusive), `--quiet`. Exit-Codes: 0 OK (immer, auch bei Divergenz
-  — Divergenz ist Daten, kein Fehler), 1 READ ERROR. P6-Kriterium
-  erfüllt: „Anteil der Zeilen, bei denen die Quelle das Ergebnis dreht".
-  7 Tests.
+- `TickAggregator.on_tick` refaktoriert: gibt jetzt das candle-shaped
+  dict für die Minute zurück, die gerade geschlossen wurde (None sonst).
+  `close_minute` bleibt für Tests / externe Caller.
+- Neue Klasse `TickAggregatorRecorder` (~190 Zeilen, Pattern = 
+  `LSBarRecorder`): subscribed `PRICE:{epic}` (Phase-1-live-verified),
+  pro-Epic-`TickAggregator` aggregiert Ticks zu 1-Min-OHLC, schreibt
+  ins `BarArchive` mit `source='ls'` + `tick_count`. Fail-soft überall
+  (ArchiveError geloggt, Bad-Tick gedroppt, in-flight-Tick bei
+  stop/restart gedroppt). Health-Event: `ls_tickagg_candle_written`
+  mit `thin`-Flag für `tick_count <= thin_threshold` (Default 2, per
+  Plan §6 B0 NO).
+- Wiring: `phase8_scheduler/scripts/wiring.py` baut jetzt
+  `TickAggregatorRecorder` statt `LSBarRecorder`. `LSBarRecorder`
+  bleibt importierbar (one-line swap back, falls ein zukünftiges
+  IG-Update / Account-Tier CHART wieder erlaubt).
+- 10 neue Tests (29 → 39 in phase13): 2 on_tick-return-value +
+  8 Recorder-Tests (start subscribes, write on minute close, thin flag,
+  threshold boundary, drop after stop, resync diff, restart idempotent,
+  archive failure survives). `_FakeStream` erweitert um
+  `subscribe`/`unsubscribe` (PRICE-Pfad) — derselbe Fake bedient
+  beide Recorder.
 
 ### Verified
 
-- `pytest phase12_data_foundation/tests -q` → **137 passed** (A0–A6,
-  unverändert seit Session 7).
-- `pytest phase1_broker_wrapper/tests -q` → **95 passed** (war 87, +8 B1).
-- `pytest phase8_scheduler/tests -q` → **244 passed** (war 237, +7 B3).
-- `pytest phase13_live_data/tests -q` → **29 passed** (war 0, +29
-  aus B2 + C2 + C3).
-- `py_compile` clean auf allen geänderten cross-phase-Dateien.
-- **Voller Regression-Sweep**: alle 13 Suiten grün, kein Regress.
+- `pytest phase13_live_data/tests -q` → **39 passed** (war 29, +10).
+- `pytest phase1_broker_wrapper/tests -q` → **95 passed** (unverändert).
+- `pytest phase8_scheduler/tests -q` → **244 passed** (unverändert).
+- `pytest phase12_data_foundation/tests -q` → **143 passed** (unverändert).
+- `pytest phase10_v3/tests -q` → **165 passed** (unverändert).
+- `py_compile` clean auf `stream.py` + `wiring.py` + `test_stream.py`.
 
 ### Note
 
-- **Phase 13 ist CODE-COMPLETE.** Block A (A0–A7 + A7.5), Block B
-  (B0–B3) und Block C (C2 + C3) sind gebaut + committet + getestet.
-  Was bleibt, ist **ausschließlich Live-Arbeit**:
-  - **B0-Probe** (`probe_chart_stream.py`) — der einzige Test, der
-    entscheidet, ob Block B auf S1 (CHART) oder L6-Fallback läuft.
-  - **Beweiswoche** — 5 Handelstage mit scharfem Messarm, gemessen
-    gegen P1–P9 (Plan §7). A7-Operator-Sequenz ist der konkrete
-    Fahrplan; C3 (source_delta.py) ist die laufende Diagnostik.
-- **C1 (S3-Fremdquelle) bleibt bewusst offen** — Plan §6 C1.0 hat die
-  Wahl explizit auf nach der Beweiswoche vertagt: erst messen, dann
-  entscheiden. Heißt nicht „vergessen", heißt „nicht spekulieren".
-- **Drei Stale-Hooks, drei unabhängige Konstanten** (per Design):
-  A4 (Schreibpfad) / A6.1 (Diagnose) / A7.5 (Tracker) — und C2 nutzt
-  den A4-Knopf wiederverwendet (vierte Konstante wäre Drift). Wer
-  einen lockert, lockert ihn explizit.
-- **Vier Commits in dieser Session**, jeder einzelne Schritt
-  unabhängig grün:
-  1. `139f7d6` A7.5 Tracker-Stale
-  2. `6cc43e0` B0 + B1
-  3. `042e969` B2
-  4. `a58a352` B3
-  5. `fd6755f` C2
-  6. `50a417e` C3
+- **Drei Commits in dieser Session**, jeder Schritt unabhängig grün
+  (Nikinger-Auflage „commit after each step"):
+  1. `438dbf0` B0.5 — `TickAggregatorRecorder` Klasse + Tests (437 +/−20)
+  2. `6703573` B0.5 — Wire `TickAggregatorRecorder` in `wiring.py` (12 +/−8)
+  3. *(dieser Docs-Commit)* Session-10-Block + Modul-Tabelle + Rotation
+- **B0-Ergebnis hat keinen Build-Pfad geändert** — Plan §6 B0 hatte
+  beide Zweige ausgeplant, das `TickAggregatorRecorder`-Wrapper fehlte
+  nur als isolierte Komponente. Kein Risiko an A/B/C2/C3.
+- **`LSBarRecorder` ist jetzt dormant** auf diesem Konto, nicht
+  gelöscht: CHART-Pfad bleibt importierbar, falls IG / Account-Tier
+  sich ändert.
+- **`_do_subscribe_chart`-Docstring** (`ig_lightstreamer.py:359-362`)
+  behauptet weiterhin "the SDK's default is correct for CHART
+  (verified in the B0 probe)" — faktisch widerlegt durch B0=NO.
+  Bewusst NICHT in dieser Session editiert (cross-phase-Datei, nicht
+  im B0.5-Scope, und der Laufzeit-Code-Pfad ist ohnehin dormant).
 
 ### Next
 
-- **PAUSE für den Nikinger.** Phase 13 ist fertig gebaut. Was den
-  Nikinger jetzt braucht, ist Operator-Arbeit (B0-Probe, dann
-  A7-Operator-Sequenz) — keine Coding-Sessions.
-- **Erste messbare Aussage** kommt nach 5 Handelstagen Beweiswoche:
-  ``data_health.py`` täglich, ``source_delta.py`` zum Wochenende,
-  Review-Doc nach Block-A-Vorbild.
-- **C1** (S3-Fremdquelle) ist die einzige Code-Frage, die nach der
-  Beweiswoche zu entscheiden ist — basierend auf realen Quoten-/Latenz-
-  Zahlen, die bis dahin vorliegen.
-- **Push** bleibt bewusste Einzelfreigabe des Nikinger. Stand
-  2026-08-19: 15 Commits seit `origin/main`, alle Phase 13, alle
-  Phase-12+13-Suiten grün.
+- **C1 (S3-Fremdquelle)** — Nikinger-Entscheidung jetzt fällig (nicht
+  mehr auf nach der Beweiswoche vertagt — Nikinger-Auflage
+  2026-08-19). Plan §6 C1.0 hält vier Kandidaten + Disqualifizierungen
+  bereit; die **Capital.com Demo-API** ist die einzige Option ohne
+  ToS-Kollision, ohne neue Abhängigkeit, mit IG-naher Preisreihe.
+- **C1.5 (Operator live-check)**: Capital.com Demo-API Probe
+  (~50 Zeilen, gemockt im Test, echt beim Operator) — liefert sie
+  `resolution=MINUTE` für Germany 40 / France 40 / **Spain 35**, und
+  wie weit zurück? Ergebnis entscheidet C1-Code-Pfad
+  (`live_data/backfill.py`, vier Regeln aus §6 C1.0).
+- **Beweiswoche** kann **parallel** zu C1-Code-Bau laufen — Block B
+  (S1/TickAggregatorRecorder) ist jetzt wired, Block A (Schnitt) ist
+  aktiv. Nikinger-Call: `probe_allowance.py` → A7-Operator-Sequenz
+  → 5 Tage `data_health.py` + `source_delta.py`.
+- **Push** bleibt bewusste Einzelfreigabe. Stand jetzt: **23 Commits**
+  seit `origin/main`, alle Phase 13, alle Suiten grün.
