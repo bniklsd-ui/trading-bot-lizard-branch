@@ -18,6 +18,12 @@ paywalled, and the field list (`UTM`, `CONS_END`, `CONS_TICK_COUNT`,
 `BID_*`/`OFR_*`) is from third-party sources (Drittbibliotheken + IG-Labs-Forum).
 This probe is the only way to find out on this account.
 
+The probe reuses **Phase 1's live-verified** ``IGLightstreamerClient`` (the
+PRICE-tick subscription) for the **connect** step (the LS-URL / CST / XST /
+account_id all come from the same warm session), and adds a **parallel**
+CHART-candle subscription on the same SDK connection. One LS session,
+two subscriptions — exactly the architecture B1 commits.
+
 Usage:
     python phase13_live_data/scripts/probe_chart_stream.py
     python phase13_live_data/scripts/probe_chart_stream.py --epic IX.D.DAX.IFMM.IP
@@ -48,7 +54,6 @@ import json
 import sys
 import threading
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -86,7 +91,11 @@ def main(argv: list[str] | None = None) -> int:
 
     sys.path.insert(0, str(_REPO_ROOT))
 
+    # Phase 1's live-verified broker + LS-client factory. The factory
+    # already handles the connect + warm-session flow; we then add a
+    # parallel CHART subscription on the same SDK client.
     from broker_wrapper import get_broker  # noqa: E402
+    from broker_wrapper.factory import get_stream  # noqa: E402
 
     _eprint(f"[probe_chart_stream] broker={args.broker!r} epic={args.epic!r} "
             f"target=CHART:{args.epic}:1MINUTE fields={len(_CHART_FIELDS)}")
@@ -97,32 +106,28 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"ok": False, "epic": args.epic, "error": str(connect_env.error)}))
         return 3
 
-    # The actual import path is ``lightstreamer.client`` (the pip package
-    # name is ``lightstreamer-client-lib``; the top-level module is
-    # ``lightstreamer``, and the client SDK lives in ``lightstreamer.client``).
-    # Phase 1's ``phase1_broker_wrapper/broker_wrapper/streaming/ig_lightstreamer.py``
-    # imports the same way and is **live-verified**.
+    # Phase 1's ``get_stream`` returns an ``IGLightstreamerClient`` already
+    # configured with the same CST/XST/account/endpoint the broker used.
+    # The CLIENT instance is what we hook our parallel CHART subscription
+    # onto — same SDK connection, same auth, **no double login**.
     try:
-        from lightstreamer.client import (  # noqa: E402
-            ClientListener,
-            LightstreamerClient,
-            Subscription,
-            SubscriptionListener,
-        )
-    except ImportError as exc:  # pragma: no cover — the SDK is a Phase-1 dep
+        ls_client = get_stream(broker)
+    except Exception as exc:  # noqa: BLE001
+        _eprint(f"[probe_chart_stream] get_stream failed: {exc}")
+        print(json.dumps({"ok": False, "epic": args.epic, "error": "ls_client_build_failed"}))
+        return 1
+
+    # Phase 1's IGLightstreamerClient is the live-verified path; its
+    # internals already start the SDK connection in ``start()``. We
+    # **add** a CHART-candle subscription to the running client (B1-style:
+    # same connection, parallel subscription).
+    try:
+        from lightstreamer.client import Subscription, SubscriptionListener  # noqa: E402
+    except ImportError as exc:  # pragma: no cover — Phase-1 dep
         _eprint(f"[probe_chart_stream] lightstreamer SDK import failed: {exc}")
         print(json.dumps({"ok": False, "epic": args.epic, "error": "sdk_import_failed"}))
         return 1
 
-    cst = connect_env.data.get("cst")
-    xst = connect_env.data.get("x_security_token")
-    account_id = connect_env.data.get("account_id") or connect_env.data.get("current_account_id")
-    ls_url = connect_env.data.get("lightstreamer_endpoint") or "https://apd.marketdatasystems.com"
-
-    # The SDK callback model: ``SubscriptionListener`` is the **single**
-    # listener interface for both subscription events (``onSubscription``,
-    # ``onSubscriptionError``) and item updates (``onItemUpdate``). One
-    # listener class per subscription, with both methods.
     completed = threading.Event()
     sub_error: list[str] = []
     completed_candles: list[dict[str, str]] = []
@@ -149,12 +154,9 @@ def main(argv: list[str] | None = None) -> int:
             if not utm:
                 return
             with state_lock:
-                # Find or create the current-minute bucket by UTM.
                 if completed_candles and completed_candles[-1]["UTM"] == utm:
                     bucket = completed_candles[-1]
                 else:
-                    # New minute — flush the previous if it had CONS_END==1
-                    # (in case we never got a second update), then start a new one.
                     bucket = {"UTM": utm}
                     completed_candles.append(bucket)
                 for f in _CHART_FIELDS:
@@ -164,35 +166,26 @@ def main(argv: list[str] | None = None) -> int:
                 if bucket.get("CONS_END") == "1" and not completed.is_set():
                     completed.set()
 
-    class _ClientL(ClientListener):
-        def onStatusChange(self, status: str) -> None:
-            _eprint(f"[probe_chart_stream] status: {status}")
-
-        def onServerError(self, code, message) -> None:
-            _eprint(f"[probe_chart_stream] server error: {code} {message}")
-
-    _eprint(f"[probe_chart_stream] connecting to {ls_url} as account={account_id!r} ...")
-    client = LightstreamerClient(ls_url, "DEFAULT")
-    client.connectionDetails.setUser(account_id or "")
-    client.connectionDetails.setPassword(f"CST-{cst}|XST-{xst}" if cst and xst else "")
-    client.addListener(_ClientL())
-
-    if args.debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
+    ls_client.start()
+    account_id = broker._account_id  # same value IGLightstreamerClient used
 
     sub = Subscription("MERGE", [f"CHART:{account_id}:{args.epic}:1MINUTE"], list(_CHART_FIELDS))
     sub.addListener(_ChartSubListener())
-    client.connect()
-    client.subscribe(sub)
+    # B1 is the clean way to add candles; here we drive the SDK directly
+    # because the IGLightstreamerClient doesn't expose ``subscribe_candles``
+    # in *all* versions of the file (B1 was committed in this Phase).
+    # The IGLightstreamerClient carries the same SDK client instance as the
+    # PRICE subscription, so we reach in to attach the CHART subscription.
+    _ls_sdk_client = ls_client._client  # noqa: SLF001 — same SDK instance
+    _ls_sdk_client.subscribe(sub)
     _eprint(f"[probe_chart_stream] subscribed CHART:{args.epic}:1MINUTE, waiting up to {args.timeout}s ...")
 
     completed.wait(timeout=args.timeout)
     try:
-        client.unsubscribe(sub)
+        _ls_sdk_client.unsubscribe(sub)
     except Exception:  # noqa: BLE001
         pass
-    client.disconnect()
+    ls_client.stop()
 
     with state_lock:
         candles_complete = [c for c in completed_candles if c.get("CONS_END") == "1"]
