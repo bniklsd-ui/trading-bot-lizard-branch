@@ -1070,17 +1070,21 @@ def build_scheduler(
                 "Run `python phase2_persistence/scripts/init_db.py` before starting the daemon."
             )
 
-    # Phase 13 §6 B3: build the LSBarRecorder-adjacent stream + recorder only
-    # when the operator has armed the flag. Default ``None`` keeps pre-B3
-    # behaviour (no stream, no recorder — the runner is bit-identical to
-    # before Phase 13). ``enable_bar_stream=False`` is the only sane state
-    # for the first Beweiswoche; flip to True only after the B0 probe has
-    # confirmed CHART delivers on this account.
+    # Phase 13 §6 B0/B3: build the live-bar recorder when the operator has
+    # armed ``enable_bar_stream``. Default ``None`` keeps pre-B3 behaviour
+    # (no stream, no recorder — the runner is bit-identical to before
+    # Phase 13). Verified 2026-08-19 via ``probe_chart_stream.py``:
+    # ``CHART:{epic}:1MINUTE`` returns ``-1 Incorrect instrument setup`` on
+    # this account (Plan §6 B0 NO branch), so the L6 fallback
+    # ``TickAggregatorRecorder`` is the primary S1 path. ``LSBarRecorder``
+    # (the CHART path) remains built and importable — if a future account
+    # tier / IG change re-enables CHART, only this build site needs to
+    # swap back.
     bar_stream = None
     if config.enable_bar_stream:
         try:
             from broker_wrapper.streaming.ig_lightstreamer import IGLightstreamerClient
-            from live_data.stream import LSBarRecorder
+            from live_data.stream import TickAggregatorRecorder
             from universe import UniverseStore
 
             # The LS client shares the broker's CST/XST/endpoint/account_id
@@ -1106,7 +1110,7 @@ def build_scheduler(
                 finally:
                     store.close()
 
-            recorder = LSBarRecorder(
+            recorder = TickAggregatorRecorder(
                 stream=ls_client,
                 archive=bar_archive,
                 epics_fn=_epics_in_measurable,
