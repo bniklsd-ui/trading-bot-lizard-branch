@@ -76,6 +76,16 @@ class PaperExitReason(str, Enum):
     TIME_STOP = "TIME_STOP"
 
 
+# Phase 13 §6 A7.5 (Tracker-Stale-Mini-Step, Session 9): how old a bar may be
+# before we treat the *entire* window as stale. Default 120 min = same floor as
+# A4 (Provider) and A6.1 (Sampler), but **deliberately a separate constant**:
+# A4 protects the *write path* (nichts Totes ins Archiv), A6.1 the *diagnostic*
+# (wann ist eine Quelle als tot zu melden), this one the *tracker entry*
+# (soll ein Trade überhaupt aufgelöst werden, wenn jede Bar stale ist). Whoever
+# loosens one should not silently loosen the others.
+_TRACKER_STALE_TOLERANCE_MIN = 120
+
+
 @dataclass(frozen=True)
 class PaperTrade:
     """One virtual (never-ordered) trade — Both-Sides-Shadow or Council-Paper-Call."""
@@ -594,16 +604,33 @@ class PaperTradeTracker:
         resolved_by_record: dict[str, list[PaperTrade]] = {}
         for trade in trades:
             try:
-                # Phase 13 §6 A3: window_ok-guard sits **before** resolve_paper_trade.
-                # A gap *in the middle* of the trade window would otherwise produce a
-                # fabricated TIME_STOP exit (P12.5 §4 F3): resolve_paper_trade filters
-                # bars by `timestamp >= created_utc` and checks the SL touch
-                # unconditionally before the time-stop bail-out, so a missing SL-touch
-                # bar runs the loop through to the first bar `>= time_stop_utc` and
-                # returns TIME_STOP -- indistinguishable from a clean outcome. The guard
-                # routes the trade through the existing U2 retry cap (counts as a failed
-                # attempt) so it gets another chance on the next tick with more bars in
-                # the archive, instead of writing a fabricated resolution.
+                # Phase 13 §6 A3 + A7.5 (Tracker-Stale-Mini-Step): window_ok-guard
+                # sits **before** resolve_paper_trade. A gap *in the middle* of the trade
+                # window would otherwise produce a fabricated TIME_STOP exit (P12.5 §4
+                # F3): resolve_paper_trade filters bars by `timestamp >= created_utc`
+                # and checks the SL touch unconditionally before the time-stop bail-out,
+                # so a missing SL-touch bar runs the loop through to the first bar
+                # `>= time_stop_utc` and returns TIME_STOP -- indistinguishable from a
+                # clean outcome. The guard routes the trade through the existing U2 retry
+                # cap (counts as a failed attempt) so it gets another chance on the next
+                # tick with more bars in the archive, instead of writing a fabricated
+                # resolution.
+                #
+                # Tracker-Stale check sits *before* window_ok (cheaper, catches a
+                # strictly larger case: even a perfectly-covered window is useless if
+                # every bar is hours old). Knopf getrennt von A4 (Provider) und A6.1
+                # (Sampler) — Schreibpfad / Diagnose / Tracker-Eintritt sind drei
+                # unabhängige Stale-Hooks, die nicht dieselbe Konstante teilen müssen.
+                newest_ts = ""
+                for b in bars:
+                    ts = b.get("timestamp", "") or ""
+                    if ts > newest_ts:
+                        newest_ts = ts
+                if newest_ts:
+                    newest_age_min = (_parse_utc(now) - _parse_utc(newest_ts)).total_seconds() / 60.0
+                    if newest_age_min > _TRACKER_STALE_TOLERANCE_MIN:
+                        self._charge_failed_attempt([trade], now)
+                        continue
                 if self.window_ok is not None and not self.window_ok(
                     trade.epic, bars, trade.created_utc, trade.time_stop_utc
                 ):

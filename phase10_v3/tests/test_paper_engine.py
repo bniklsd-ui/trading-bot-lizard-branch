@@ -743,6 +743,41 @@ def test_window_ok_mitten_loch_blocks_fabricated_time_stop(paper_store):
     assert guarded_tracker._fetch_attempts[trade.paper_id] == 1
 
 
+# --- Phase 13 §6 A7.5: Tracker-Stale-Mini-Step ------------------------------
+
+
+def test_tracker_stale_charges_attempt_and_does_not_call_resolve(paper_store):
+    """A7.5: if the newest bar in the trade window is older than
+    _TRACKER_STALE_TOLERANCE_MIN, the tracker treats the whole window as stale
+    and charges a failed attempt — instead of resolving on a perfectly-shaped
+    but uniformly-outdated bar set. Sits **before** ``window_ok`` (cheaper,
+    catches a strictly larger case)."""
+    trade = PaperTrade.new(
+        abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
+        direction="BUY", entry_level=18000.0, stop_distance=30.0, limit_distance=45.0,
+        time_stop_utc="2026-07-17T10:00:00.000Z",
+    )
+    trade = dataclasses.replace(trade, created_utc="2026-07-17T09:00:00.000Z")
+    paper_store.insert(trade)
+
+    # All bars are 3 hours old relative to `now` — well past the 120-min
+    # tracker-stale tolerance, even though the window itself is perfectly
+    # dense (no gap, no coverage shortfall).
+    now = "2026-07-17T13:00:00.000Z"
+    bars = [
+        _bar(f"2026-07-17T09:0{m}:00.000Z", 18000, 18001, 17995, 18000) for m in range(10)
+    ]
+    tracker = PaperTradeTracker(paper_store, bar_fetch=lambda epic: bars, max_fetch_attempts=12)
+    tracker.tick(now_utc=now)
+
+    row = paper_store.conn.execute(
+        "SELECT status, exit_reason FROM paper_trades WHERE paper_id = ?", (trade.paper_id,)
+    ).fetchone()
+    assert row[0] == "OPEN", "stale-only window must not resolve"
+    assert row[1] is None, "resolve_paper_trade was not called (no exit_reason written)"
+    assert tracker._fetch_attempts[trade.paper_id] == 1
+
+
 def test_tracker_ignores_not_yet_due_trades(paper_store):
     trade = PaperTrade.new(
         abstain_record_id="abs-1", variant=PaperVariant.SHADOW_BUY, epic="X",
