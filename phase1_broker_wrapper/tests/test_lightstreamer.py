@@ -13,8 +13,10 @@ import pytest
 from broker_wrapper.adapters.ig_adapter import IGAdapter
 from broker_wrapper.streaming.ig_lightstreamer import (
     IGLightstreamerClient,
+    _CandleListener,
     _PriceListener,
     _utm_to_iso,
+    _CHART_FIELDS,
 )
 from broker_wrapper.factory import get_stream
 
@@ -52,6 +54,25 @@ def _client(**kwargs) -> IGLightstreamerClient:
 def _fake_update(bid="24615.9", ask="24617.0", ts="1747737000000") -> MagicMock:
     """Mock SDK ItemUpdate whose getValue() returns the given field values."""
     values = {"BIDPRICE1": bid, "ASKPRICE1": ask, "TIMESTAMP": ts}
+    u = MagicMock()
+    u.getValue.side_effect = lambda field: values.get(field)
+    return u
+
+
+def _fake_candle_update(
+    utm: str,
+    *,
+    bid_o: str = "100.0", bid_h: str = "101.0", bid_l: str = "99.5", bid_c: str = "100.5",
+    ofr_o: str = "100.2", ofr_h: str = "101.2", ofr_l: str = "99.7", ofr_c: str = "100.7",
+    cons_end: str = "0",
+    cons_tick_count: str = "5",
+) -> MagicMock:
+    """Mock SDK ItemUpdate for a CHART candle subscription."""
+    values = {
+        "UTM": utm, "CONS_END": cons_end, "CONS_TICK_COUNT": cons_tick_count,
+        "BID_OPEN": bid_o, "BID_HIGH": bid_h, "BID_LOW": bid_l, "BID_CLOSE": bid_c,
+        "OFR_OPEN": ofr_o, "OFR_HIGH": ofr_h, "OFR_LOW": ofr_l, "OFR_CLOSE": ofr_c,
+    }
     u = MagicMock()
     u.getValue.side_effect = lambda field: values.get(field)
     return u
@@ -279,3 +300,153 @@ def test_utm_to_iso_fallback_on_invalid():
     ts = _utm_to_iso("not-a-number")
     assert "T" in ts
     assert ts.endswith("Z")
+
+
+# ---------- Phase 13 §6 B1: CHART candle subscription --------------------------
+
+
+def test_subscribe_candles_uses_chart_item_and_full_field_list():
+    c = _client()
+    fake_client = MagicMock()
+    fake_sub = MagicMock()
+    cb = MagicMock()
+    with patch(
+        "broker_wrapper.streaming.ig_lightstreamer.LightstreamerClient",
+        return_value=fake_client,
+    ), patch(
+        "broker_wrapper.streaming.ig_lightstreamer.Subscription",
+        return_value=fake_sub,
+    ) as sub_ctor:
+        c.start()
+        c.subscribe_candles("IX.D.DAX.IFMM.IP", cb)
+    # Item-String exakt, Field-Liste exakt, MERGE-Modus.
+    sub_ctor.assert_called_once_with(
+        "MERGE",
+        ["CHART:ACC1:IX.D.DAX.IFMM.IP:1MINUTE"],
+        list(_CHART_FIELDS),
+    )
+    # CHART subscription does NOT call setDataAdapter (the SDK default
+    # is correct; if that ever breaks, the B0 probe fails loud, not
+    # silent in production).
+    fake_sub.setDataAdapter.assert_not_called()
+    fake_sub.addListener.assert_called_once()
+    fake_client.subscribe.assert_called_once_with(fake_sub)
+
+
+def test_subscribe_candles_before_start_defers_until_start():
+    c = _client()
+    fake_client = MagicMock()
+    fake_sub = MagicMock()
+    cb = MagicMock()
+    with patch(
+        "broker_wrapper.streaming.ig_lightstreamer.LightstreamerClient",
+        return_value=fake_client,
+    ), patch(
+        "broker_wrapper.streaming.ig_lightstreamer.Subscription",
+        return_value=fake_sub,
+    ):
+        c.subscribe_candles("IX.D.DAX.IFMM.IP", cb)  # no client yet
+        fake_client.subscribe.assert_not_called()
+        c.start()                                       # subscribes the backlog
+    fake_client.subscribe.assert_called_once_with(fake_sub)
+
+
+def test_unsubscribe_candles_removes_and_calls_sdk():
+    c = _client()
+    fake_client = MagicMock()
+    with patch(
+        "broker_wrapper.streaming.ig_lightstreamer.LightstreamerClient",
+        return_value=fake_client,
+    ), patch(
+        "broker_wrapper.streaming.ig_lightstreamer.Subscription",
+        return_value=MagicMock(),
+    ):
+        c.start()
+        c.subscribe_candles("EPIC", lambda c: None)
+        c.unsubscribe_candles("EPIC")
+    assert "EPIC" not in c._candle_subs
+    assert "EPIC" not in c._chart_subs
+    fake_client.unsubscribe.assert_called_once()
+    # idempotent
+    c.unsubscribe_candles("EPIC")
+
+
+def test_stop_clears_both_price_and_candle_subscriptions():
+    c = _client()
+    fake_client = MagicMock()
+    with patch(
+        "broker_wrapper.streaming.ig_lightstreamer.LightstreamerClient",
+        return_value=fake_client,
+    ), patch(
+        "broker_wrapper.streaming.ig_lightstreamer.Subscription",
+        return_value=MagicMock(),
+    ):
+        c.start()
+        c.subscribe("EPIC", lambda t: None)
+        c.subscribe_candles("EPIC", lambda c: None)
+        c.stop()
+    # stop() must unsubscribe BOTH the price and candle subs.
+    assert fake_client.unsubscribe.call_count == 2
+    assert c._subs == {}
+    assert c._chart_subs == {}
+
+
+def test_candle_listener_emits_on_cons_end_1_with_mid_ohlc():
+    """CONS_END == "1" fires the callback exactly once, with bid/ofr mid OHLC."""
+    cb = MagicMock()
+    lis = _CandleListener("IX.D.DAX.IFMM.IP", cb)
+    # Partial update #1: no CONS_END yet → no callback.
+    lis.onItemUpdate(_fake_candle_update(
+        utm="1747737000000", bid_o="100.0", ofr_o="100.2", cons_end="0",
+    ))
+    cb.assert_not_called()
+    # Partial update #2: bid_high + bid_low + ofr_high + ofr_low arrive, still no CONS_END.
+    lis.onItemUpdate(_fake_candle_update(
+        utm="1747737000000", bid_h="101.0", bid_l="99.5", ofr_h="101.2", ofr_l="99.7", cons_end="0",
+    ))
+    cb.assert_not_called()
+    # Final update: CONS_END == "1" + bid_close + ofr_close → one callback.
+    lis.onItemUpdate(_fake_candle_update(
+        utm="1747737000000", bid_c="100.5", ofr_c="100.7", cons_end="1",
+    ))
+    cb.assert_called_once()
+    candle = cb.call_args[0][0]
+    assert candle.epic == "IX.D.DAX.IFMM.IP"
+    assert candle.complete is True
+    # Mid: open = (100.0 + 100.2) / 2 = 100.1
+    assert candle.open == pytest.approx(100.1)
+    assert candle.high == pytest.approx(101.1)   # (101.0 + 101.2)/2
+    assert candle.low == pytest.approx(99.6)    # (99.5 + 99.7)/2
+    assert candle.close == pytest.approx(100.6)  # (100.5 + 100.7)/2
+    assert candle.tick_count == 5
+    assert "T" in candle.ts_utc and candle.ts_utc.endswith("Z")
+
+
+def test_candle_listener_does_not_emit_on_cons_end_0():
+    cb = MagicMock()
+    lis = _CandleListener("EPIC", cb)
+    # Every field delivered, but CONS_END stays 0 → no callback (candle not final).
+    lis.onItemUpdate(_fake_candle_update(utm="1747737000000", cons_end="0"))
+    lis.onItemUpdate(_fake_candle_update(utm="1747737000000", cons_end="0"))
+    cb.assert_not_called()
+
+
+def test_candle_listener_swallows_missing_or_non_numeric_field():
+    """A missing/non-numeric field must not crash the recorder for the rest of
+    the day; the listener logs and skips the candle."""
+    cb = MagicMock()
+    lis = _CandleListener("EPIC", cb)
+    # Cons_end=1, but BID_OPEN missing → KeyError caught, no callback.
+    lis.onItemUpdate(_fake_candle_update(utm="1747737000000", cons_end="1", bid_o=""))
+    cb.assert_not_called()
+    # Cons_end=1, but BID_HIGH non-numeric → ValueError caught, no callback.
+    lis.onItemUpdate(_fake_candle_update(utm="1747737000000", cons_end="1", bid_h="oops"))
+    cb.assert_not_called()
+
+
+def test_candle_listener_callback_exception_isolated():
+    cb = MagicMock(side_effect=RuntimeError("boom"))
+    lis = _CandleListener("EPIC", cb)
+    # must not raise — exception is logged, the listener survives
+    lis.onItemUpdate(_fake_candle_update(utm="1747737000000", cons_end="1"))
+    cb.assert_called_once()

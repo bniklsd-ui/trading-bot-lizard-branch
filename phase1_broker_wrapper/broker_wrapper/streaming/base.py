@@ -32,6 +32,27 @@ class PriceTick:
 PriceCallback = Callable[[PriceTick], None]
 
 
+# Phase 13 §6 B1: server-side aggregated 1-min candle from IG's
+# CHART:{epic}:{scale} subscription. ``complete`` flips to True exactly when
+# ``CONS_END == "1"`` arrives — the field is the IG server's signal that
+# the minute has closed and no further updates for this bar will follow.
+# ``tick_count`` (from CONS_TICK_COUNT) is the per-bar tick density: a
+# candle with tick_count==1 is not a real OHLC, it is one tick dressed up.
+@dataclass
+class ChartCandle:
+    epic: str
+    ts_utc: str  # ISO 8601 UTC, candle **open** time
+    open: float
+    high: float
+    low: float
+    close: float
+    tick_count: int | None
+    complete: bool
+
+
+CandleCallback = Callable[[ChartCandle], None]
+
+
 class StreamClient(ABC):
     """Abstract real-time price feed."""
 
