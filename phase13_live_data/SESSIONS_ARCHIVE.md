@@ -6,6 +6,93 @@ verbatim when a new one is appended.
 
 ---
 
+## Session stopped — 2026-08-19 (Session 10: B0.5 — TickAggregatorRecorder-Build + Wire + C1-Vorzug)
+
+> **Auftrag:** Nikinger („alles was gebaut werden kann, baue jetzt
+> atomar, danach muss die Entscheidung zur Fremd datenquelle fallen").
+> B0-Probe lief 2026-08-19 mit Exit-Code 1 (NO) — `CHART:{epic}:1MINUTE`
+> liefert `-1 Incorrect instrument setup` auf diesem Konto. Plan §6 B0
+> NO-Zweig sagt „TickAggregator wird Primärpfad", aber im Bau klaffte
+> eine Lücke: nur die `TickAggregator`-Klasse existierte, kein
+> Recorder-Wrapper analog zu `LSBarRecorder`. Diese Session schließt
+> die Lücke und zieht danach die C1-Entscheidung vor.
+
+### Completed
+
+**B0.5 — TickAggregatorRecorder-Wrapper (NEU).** Schließt die
+Bau-Lücke zwischen Plan und Code:
+
+- `TickAggregator.on_tick` refaktoriert: gibt jetzt das candle-shaped
+  dict für die Minute zurück, die gerade geschlossen wurde (None sonst).
+  `close_minute` bleibt für Tests / externe Caller.
+- Neue Klasse `TickAggregatorRecorder` (~190 Zeilen, Pattern = 
+  `LSBarRecorder`): subscribed `PRICE:{epic}` (Phase-1-live-verified),
+  pro-Epic-`TickAggregator` aggregiert Ticks zu 1-Min-OHLC, schreibt
+  ins `BarArchive` mit `source='ls'` + `tick_count`. Fail-soft überall
+  (ArchiveError geloggt, Bad-Tick gedroppt, in-flight-Tick bei
+  stop/restart gedroppt). Health-Event: `ls_tickagg_candle_written`
+  mit `thin`-Flag für `tick_count <= thin_threshold` (Default 2, per
+  Plan §6 B0 NO).
+- Wiring: `phase8_scheduler/scripts/wiring.py` baut jetzt
+  `TickAggregatorRecorder` statt `LSBarRecorder`. `LSBarRecorder`
+  bleibt importierbar (one-line swap back, falls ein zukünftiges
+  IG-Update / Account-Tier CHART wieder erlaubt).
+- 10 neue Tests (29 → 39 in phase13): 2 on_tick-return-value +
+  8 Recorder-Tests (start subscribes, write on minute close, thin flag,
+  threshold boundary, drop after stop, resync diff, restart idempotent,
+  archive failure survives). `_FakeStream` erweitert um
+  `subscribe`/`unsubscribe` (PRICE-Pfad) — derselbe Fake bedient
+  beide Recorder.
+
+### Verified
+
+- `pytest phase13_live_data/tests -q` → **39 passed** (war 29, +10).
+- `pytest phase1_broker_wrapper/tests -q` → **95 passed** (unverändert).
+- `pytest phase8_scheduler/tests -q` → **244 passed** (unverändert).
+- `pytest phase12_data_foundation/tests -q` → **143 passed** (unverändert).
+- `pytest phase10_v3/tests -q` → **165 passed** (unverändert).
+- `py_compile` clean auf `stream.py` + `wiring.py` + `test_stream.py`.
+
+### Note
+
+- **Drei Commits in dieser Session**, jeder Schritt unabhängig grün
+  (Nikinger-Auflage „commit after each step"):
+  1. `438dbf0` B0.5 — `TickAggregatorRecorder` Klasse + Tests (437 +/−20)
+  2. `6703573` B0.5 — Wire `TickAggregatorRecorder` in `wiring.py` (12 +/−8)
+  3. *(dieser Docs-Commit)* Session-10-Block + Modul-Tabelle + Rotation
+- **B0-Ergebnis hat keinen Build-Pfad geändert** — Plan §6 B0 hatte
+  beide Zweige ausgeplant, das `TickAggregatorRecorder`-Wrapper fehlte
+  nur als isolierte Komponente. Kein Risiko an A/B/C2/C3.
+- **`LSBarRecorder` ist jetzt dormant** auf diesem Konto, nicht
+  gelöscht: CHART-Pfad bleibt importierbar, falls IG / Account-Tier
+  sich ändert.
+- **`_do_subscribe_chart`-Docstring** (`ig_lightstreamer.py:359-362`)
+  behauptet weiterhin "the SDK's default is correct for CHART
+  (verified in the B0 probe)" — faktisch widerlegt durch B0=NO.
+  Bewusst NICHT in dieser Session editiert (cross-phase-Datei, nicht
+  im B0.5-Scope, und der Laufzeit-Code-Pfad ist ohnehin dormant).
+
+### Next
+
+- **C1 (S3-Fremdquelle)** — Nikinger-Entscheidung jetzt fällig (nicht
+  mehr auf nach der Beweiswoche vertagt — Nikinger-Auflage
+  2026-08-19). Plan §6 C1.0 hält vier Kandidaten + Disqualifizierungen
+  bereit; die **Capital.com Demo-API** ist die einzige Option ohne
+  ToS-Kollision, ohne neue Abhängigkeit, mit IG-naher Preisreihe.
+- **C1.5 (Operator live-check)**: Capital.com Demo-API Probe
+  (~50 Zeilen, gemockt im Test, echt beim Operator) — liefert sie
+  `resolution=MINUTE` für Germany 40 / France 40 / **Spain 35**, und
+  wie weit zurück? Ergebnis entscheidet C1-Code-Pfad
+  (`live_data/backfill.py`, vier Regeln aus §6 C1.0).
+- **Beweiswoche** kann **parallel** zu C1-Code-Bau laufen — Block B
+  (S1/TickAggregatorRecorder) ist jetzt wired, Block A (Schnitt) ist
+  aktiv. Nikinger-Call: `probe_allowance.py` → A7-Operator-Sequenz
+  → 5 Tage `data_health.py` + `source_delta.py`.
+- **Push** bleibt bewusste Einzelfreigabe. Stand jetzt: **23 Commits**
+  seit `origin/main`, alle Phase 13, alle Suiten grün.
+
+---
+
 ## Session stopped — 2026-08-19 (Session 9: Block B (B0–B3) + Block C (C2/C3) — Phase 13 CODE-COMPLETE)
 
 > **Auftrag:** Nikinger („going on until I am needed"). Block A war
