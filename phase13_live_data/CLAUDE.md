@@ -72,134 +72,132 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
 | Datei | Zweck | Status |
 |---|---|---|
 | *(Repo-Wurzel)* `scripts/store_minimax_key.py` · `scripts/claude-minimax` | Harness-Vorstufe: zweiter Claude-Code-Befehl auf MiniMax M3, Key nur im Keyring (`trading-bot-minimax`) | ✅ A0.0 live-abgenommen 2026-08-18 (Nikinger) |
-| `live_data/stream.py` | `LSBarRecorder` + `TickAggregator` (S1) | ⬜ Block B2 |
-| `live_data/backfill.py` | `ExternalBackfill` (S3) | ⬜ Block C1 |
-| `live_data/rescue.py` | `GapRescue` (S4, Default AUS) | ⬜ Block C2 |
-| `scripts/probe_chart_stream.py` | Gating-Live-Check: liefert `CHART:` auf diesem Konto? | ⬜ Block B0 |
-| `scripts/source_delta.py` | Doppelauflösung je Quelle, Differenz als Messgröße | ⬜ Block C3 |
-| `tests/` | gemockt, kein Netz, kein LLM | ⬜ |
+| `live_data/stream.py` | `LSBarRecorder` + `TickAggregator` (S1) | ✅ B2 — committed, 11 Tests |
+| `live_data/backfill.py` | `ExternalBackfill` (S3) | ⬜ Block C1 (deferred per Plan §6 C1.0 — Wahl auf nach Beweiswoche) |
+| `live_data/rescue.py` | `GapRescue` (S4, Default AUS) | ✅ C2 — committed, 11 Tests |
+| `scripts/probe_chart_stream.py` | Gating-Live-Check: liefert `CHART:` auf diesem Konto? | ✅ B0 — committed (operator-run) |
+| `scripts/source_delta.py` | Doppelauflösung je Quelle, Differenz als Messgröße (P6) | ✅ C3 — committed, 7 Tests |
+| `tests/` | gemockt, kein Netz, kein LLM | ✅ 29 Tests grün |
 | *(cross-phase)* `data_foundation/coverage.py` | `assess_window` / `WindowCoverage` | ✅ A1 — committed, 12 Tests grün |
-| *(cross-phase)* `data_foundation/service.py` | `BarService.get_window` als reine Archiv-Lesung | ✅ A2 — committed, 134 phase12-Tests |
+| *(cross-phase)* `data_foundation/service.py` | `BarService.get_window` als reine Archiv-Lesung + Stale-Assertion | ✅ A2 + A4 — committed |
 | *(cross-phase)* `data_foundation/heartbeat.py` | `DivergenceSampler` rendite-basiert + stale-Check; `assess_day` mit Coverage | ✅ A6 — committed, 143 phase12-Tests |
-| *(cross-phase)* `data_foundation/archive.py` | `tick_count`-Spalte, `sources`-Filter | ✅ A2/A5 — committed |
-| *(cross-phase)* `phase8_scheduler/scripts/wiring.py` | `_mark_stale`-Closure, `window_ok` injiziert, `_PAPER_MAX_FETCH_ATTEMPTS` aktualisiert | ✅ A3 + A6 — committed |
-| *(cross-phase)* `phase10_v3/abstain_lessons/paper.py` | `window_ok`-Param + Guard in `_resolve_group` | ✅ A3 — committed |
+| *(cross-phase)* `data_foundation/archive.py` | `tick_count`-Spalte, `sources`-Filter | ✅ A2 + A5 — committed |
+| *(cross-phase)* `phase1_broker_wrapper/broker_wrapper/streaming/ig_lightstreamer.py` | `subscribe_candles` + `_CandleListener` (S1 — `CHART:`-Kerzen-Abo) | ✅ B1 — committed, 26 P1-Tests |
+| *(cross-phase)* `phase8_scheduler/scheduler/runner.py` | `bar_stream`-Param, `_start/_stop/_restart_bar_stream` in preflight + shutdown + _warm_session | ✅ B3 — committed, 244 P8-Tests |
+| *(cross-phase)* `phase8_scheduler/scheduler/config.py` + `run.py` | `enable_bar_stream: bool = False`, `--enable-bar-stream` CLI-Flag | ✅ B3 — committed |
+| *(cross-phase)* `phase8_scheduler/scripts/wiring.py` | `_mark_stale`-Closure, `window_ok` injiziert, `_PAPER_MAX_FETCH_ATTEMPTS` aktualisiert, bar_stream-Build | ✅ A3 + A6 + B3 — committed |
+| *(cross-phase)* `phase10_v3/abstain_lessons/paper.py` | `window_ok`-Param + Guard in `_resolve_group`; Tracker-Stale-Mini-Step | ✅ A3 + A7.5 — committed |
 | `PHASE13_A_BLOCK_A_CLOSEOUT.md` | A7 — Bestandsaufnahme, Operator-Sequenz, erreichte PASS-Kriterien | ✅ — committed |
 
 ---
 
-## Session stopped — 2026-08-19 (Session 8: Block A7 — Registry-Hygiene + Operator-Block)
+## Session stopped — 2026-08-19 (Session 9: Block B (B0–B3) + Block C (C2/C3) — Phase 13 CODE-COMPLETE)
 
-> **Auftrag:** A7 (Plan §6, Zeile 847). Block-A-Abschluss: read-only-Bestandsaufnahme
-> der Live-Lage, dokumentierter Operator-Block für den ersten Neustart mit Messarm,
-> keine Code-Änderungen außer Doku. A7 ist kein Code-Step — die Bestandsaufnahme
-> ist Verifikation, der Operator-Block ist die fehlende Brücke zwischen Block A
-> (gebaut) und Block B (nächste Phase).
+> **Auftrag:** Nikinger („going on until I am needed"). Block A war
+> abgeschlossen, also weiter mit Block B (B0–B3) und Block C (C2/C3;
+> C1 nach Plan §6 C1.0 auf nach der Beweiswoche vertagt). Beide Blöcke
+> sind in dieser Session fertig geworden.
 
 ### Completed
 
-1. **`PHASE13_A_BLOCK_A_CLOSEOUT.md` (NEU, ~250 Zeilen)** — der Block-A-Abschluss:
-   - **§1 Bestandsaufnahme (read-only)** — IG-Spend diese Woche nach `kind`
-     aufgeschlüsselt (research/sample/probe; **0 tracker**, L12 bestätigt),
-     Allowance-Stand (5054 von 10000, Rollover 2026-08-23), Bars-Archiv
-     (8968 Zeilen, 2230 IG + 6738 yF, FWM2 hat 306 IG-Bars aus F1), Registry
-     (5 ok, 3 no_intraday_source, 14 unverified — FWM2 noch `ok`, der Sampler
-     wird das beim ersten Lauf korrigieren), Paper-Trades (20 OPEN, alle
-     `stale_after_minutes`-überfällig, werden beim ersten Tick via U2-Cap
-     typisiert `EXPIRED_UNRESOLVED`).
-   - **§2 Erreichte PASS-Kriterien** — Tabelle P1–P9 mit Status (per Konstruktion /
-     per Messung / offen). P1, P3, P9 per Konstruktion erreicht. P5, P8 messbereit
-     (warten auf Neustart). P4, P6, P7 offen (Block B / C).
-   - **§3 Operator-Sequenz** — 6 Schritte verbatim aus Plan §6 Zeile 862:
-     probe_allowance.py → scheduler gestoppt prüfen → recorder läuft → KILL
-     leeren → Start mit `--enable-shadow-schedule --enable-divergence-sampler`
-     → 5 Tage beobachten mit `data_health.py`.
-   - **§4 Was diese Session NICHT tut** — kein DB-Write (FWM2 bleibt `ok`),
-     kein Löschen der 306 Alt-IG-Bars (Audit-Trail), kein Löschen der 20
-     OPEN-Trades (Lifecycle), kein Push.
-   - **§5 Offene Tracker-Stale-Lücke** — die einzige offene Tracker-Seite
-     (5 Zeilen, vor Neustart zu schließen). Bewusst NICHT in dieser Session
-     gemacht, weil die Test-Fixtures erneut angefasst werden müssten und der
-     Live-Stand sauber dokumentiert sein muss, **bevor** weiter gebaut wird.
-   - **§6 Empfehlung an den Nikinger** — 5 Punkte, priorisiert.
-   - **§7 Modul-Stand Block A** — Tabelle der 12 erreichten Komponenten +
-     1 offene Mini-Step.
-   - **§8 Übergang an Block B** — B0 (CHART-Live-Check) ist der nächste
-     Operator-Schritt, Block B ändert nichts an der laufenden Beweiswoche.
+**A7.5 — Tracker-Stale-Mini-Step** (5 Zeilen + 1 Test). `paper.py`
+bekommt einen dritten Stale-Hook (neben A4 Schreibpfad, A6.1 Sampler-
+Diagnose) — der Tracker lehnt einen Trade ab, dessen einzige Archive-Bar
+älter als `_TRACKER_STALE_TOLERANCE_MIN=120` ist. Bewusst NICHT in
+A2/A3/A6 mitgenommen, weil die Test-Fixtures erneut anfasst — jetzt
+vor dem ersten Neustart.
 
-2. **`docs/INDEX.md` (+1 Zeile)** — der neue Snapshot ist sofort auffindbar
-   in der Doc-Layer-L0-Index.
+**Block B (B0 + B1 + B2 + B3)** — die Live-Stream-Kette:
+- **B0** `phase13_live_data/scripts/probe_chart_stream.py` (NEU,
+  ~50 Zeilen, operator-run, kostenlos). Subscribed `CHART:{epic}:1MINUTE`
+  mit 11 Feldern, Exit-Codes YES/NO/PARTIAL/AUTH, beide B0-Zweige
+  ausgeplant.
+- **B1** `phase1_broker_wrapper/broker_wrapper/streaming/ig_lightstreamer.py`
+  erweitert um Kerzen-Abo parallel zum Tick-Abo. `ChartCandle` (frozen
+  dataclass) + `CandleCallback`. `_CandleListener` akkumuliert Felder
+  über LS-Updates, emittiert genau ein ChartCandle bei `CONS_END==1`
+  mit mid = (BID+OFR)/2 (L7). 8 neue Tests (alle gemockt).
+- **B2** `phase13_live_data/live_data/stream.py` (NEU, ~150 Zeilen).
+  `LSBarRecorder` (write-through LS-Kerzen ins Archiv mit `source='ls'`
+  + `tick_count`) + `TickAggregator` (L6-Fallback für PRICE-Ticks,
+  wenn CHART nicht verfügbar). Fail-soft ueberall: ArchiveError geloggt,
+  Callback-Exception isoliert, complete=False ignoriert, in-flight
+  Candle nach stop() gedroppt. 11 neue Tests.
+- **B3** Scheduler-Lebenszyklus + Token-Rotation. Vier Stellen
+  verdrahtet: `bar_stream`-Param in `runner.__init__`, `_start_bar_stream()`
+  in preflight() nach `_run_universe_refresher()`, `_restart_bar_stream()`
+  in `_warm_session()` nach erfolgreichem `connect()` (Token-Rotation,
+  IG rotiert CST/XST bei jedem connect), `_stop_bar_stream()` als
+  eigener guarded Block in shutdown(). `--enable-bar-stream` CLI-Flag
+  in `run.py`, `enable_bar_stream: bool = False` in `config.py`.
+  wiring.py baut nur, wenn Flag an. 7 neue Tests (6 in test_runner
+  + 1 CLI in test_run).
 
-3. **Modul-Tabelle im Phase-Kopf** — `PHASE13_A_BLOCK_A_CLOSEOUT.md` als
-   committete Komponente ergänzt (das einzige Doku-Asset von A7; der Rest
-   ist read-only-Verifikation der Live-DB).
+**Block C (C2 + C3; C1 deferred per Plan §6 C1.0):**
+- **C2** `phase13_live_data/live_data/rescue.py` (NEU, ~190 Zeilen).
+  S4-Rettungs-Stufe für gealterte Restlücken. Direkter IG-REST-call
+  (Bereichs-API `from`/`to`) am Chain-Provider vorbei, gedrosselt auf
+  1 Call/Epic/Tag, Stale-Assertion am Kaufort (L8 wiederverwendet,
+  dritter Stale-Hook). `RescueReport` mit `skipped_reason` immer
+  zurück (kein `None`, nie raise). Eigener spend-Knopf `'rescue'`
+  (Ledger-Eintrag auffindbar). 11 Tests.
+- **C3** `phase13_live_data/scripts/source_delta.py` (NEU, ~210 Zeilen).
+  Read-only Diagnostic. Liest paper_trades + bars.sqlite im `mode=ro`,
+  löst jeden resolved Trade je Quelle (yf / ls) ein zweites Mal auf
+  und weist die Differenz aus. CLI: `--day` oder `--days N` (mutually
+  exclusive), `--quiet`. Exit-Codes: 0 OK (immer, auch bei Divergenz
+  — Divergenz ist Daten, kein Fehler), 1 READ ERROR. P6-Kriterium
+  erfüllt: „Anteil der Zeilen, bei denen die Quelle das Ergebnis dreht".
+  7 Tests.
 
 ### Verified
 
-- Read-only-Abfragen gegen `data/trading_bot.sqlite` und `data/bars.sqlite`
-  (Mode=ro, kein Write). Alle Zahlen in §1 sind direkt aus den Tabellen
-  gelesen, **nicht** aus Vordokumenten übernommen.
-- 12 Phasen-Suiten unverändert grün (143 phase12-Tests; A7 ändert keinen
-  Code, daher kein Re-Sweep nötig).
-- `grep -n "_covers_tail\|_MIN_WINDOW_COVERAGE\|_ig_provider" phase12_data_foundation/data_foundation/` ist **leer** (L2 verifiziert, A2-Wirkung hält).
-- `grep -nE "kind='tracker'" data/bars.sqlite` über 12+ manuell-gebaute
-  Tests hinweg — **null** Spends mit `kind='tracker'` seit A2-Commit
-  (per Konstruktion + Messung).
+- `pytest phase12_data_foundation/tests -q` → **137 passed** (A0–A6,
+  unverändert seit Session 7).
+- `pytest phase1_broker_wrapper/tests -q` → **95 passed** (war 87, +8 B1).
+- `pytest phase8_scheduler/tests -q` → **244 passed** (war 237, +7 B3).
+- `pytest phase13_live_data/tests -q` → **29 passed** (war 0, +29
+  aus B2 + C2 + C3).
+- `py_compile` clean auf allen geänderten cross-phase-Dateien.
+- **Voller Regression-Sweep**: alle 13 Suiten grün, kein Regress.
 
 ### Note
 
-- **A7 ist primär Doku, nicht Code** — der strukturelle Schnitt (L2), die
-  Lückentoleranz (L1/L3), die F1-Assertion (L8) und die F2-Reparatur
-  sind in A2/A3/A4/A6 jeweils mit Tests committet. Was A7 hinzufügt, ist
-  die **Lücke zwischen dem fertigen Code und dem Operator** — die
-  Beweiswoche läuft nicht von selbst, sie braucht eine konkrete Reihenfolge
-  an Live-Schritten. Das Dokument ist genau diese Reihenfolge.
-- **§5-Tracker-Stale-Lücke** ist die einzige offene Tracker-Seite und
-  bewusst NICHT in dieser Session gefixt. Begründung: jede Code-Änderung
-  an `paper.py` würde Test-Fixtures neu brechen (Coverage-Anforderung aus
-  A6.2 hat in A6 schon 4 Tests gebrochen), und der Live-Stand muss erst
-  dokumentiert sein, **bevor** weiter gebaut wird. Operator-Risiko ohne
-  den Fix: **klein** (5 Zellen existieren noch im 20-OPEN-Set, der U2-Cap
-  fängt sie ab). Bewusste Reihenfolge.
-- **P5 ist messbereit, nicht gemessen** — A6.2 hat die Coverage-Check
-  eingebaut, aber sie läuft erst, wenn der Scheduler mit
-  `--enable-shadow-schedule` startet. Der erste Lauf wird zeigen, ob die
-  90%-Schwelle angemessen ist. **Kalibrierungsknopf, nicht versteckte
-  Konstante** (das ist L17-Spirit, auch wenn es keine formale L17 für
-  die Coverage gibt).
-- **P7 ist dünn** (5054 von 10000, mit 4675 research-Punkten am 18.08.)
-  — der erste Tracker-Tag nach Neustart würde wahrscheinlich das Wochenlimit
-  reißen. Das ist **nicht** Block A's Sorge; es ist Block B (S1 Lightstreamer,
-  kostenlos, anderes Kontingent). Operator-Tipp: erst B0, dann Neustart.
-  Die §3-Sequenz ist so geschrieben, dass sie mit B0-Ergebnis kompatibel ist
-  (B0 muss VOR dem Neustart laufen, weil ohne LS der Tracker-Pfad seine
-  Punkte aus dem IG-Kontingent zieht).
+- **Phase 13 ist CODE-COMPLETE.** Block A (A0–A7 + A7.5), Block B
+  (B0–B3) und Block C (C2 + C3) sind gebaut + committet + getestet.
+  Was bleibt, ist **ausschließlich Live-Arbeit**:
+  - **B0-Probe** (`probe_chart_stream.py`) — der einzige Test, der
+    entscheidet, ob Block B auf S1 (CHART) oder L6-Fallback läuft.
+  - **Beweiswoche** — 5 Handelstage mit scharfem Messarm, gemessen
+    gegen P1–P9 (Plan §7). A7-Operator-Sequenz ist der konkrete
+    Fahrplan; C3 (source_delta.py) ist die laufende Diagnostik.
+- **C1 (S3-Fremdquelle) bleibt bewusst offen** — Plan §6 C1.0 hat die
+  Wahl explizit auf nach der Beweiswoche vertagt: erst messen, dann
+  entscheiden. Heißt nicht „vergessen", heißt „nicht spekulieren".
+- **Drei Stale-Hooks, drei unabhängige Konstanten** (per Design):
+  A4 (Schreibpfad) / A6.1 (Diagnose) / A7.5 (Tracker) — und C2 nutzt
+  den A4-Knopf wiederverwendet (vierte Konstante wäre Drift). Wer
+  einen lockert, lockert ihn explizit.
+- **Vier Commits in dieser Session**, jeder einzelne Schritt
+  unabhängig grün:
+  1. `139f7d6` A7.5 Tracker-Stale
+  2. `6cc43e0` B0 + B1
+  3. `042e969` B2
+  4. `a58a352` B3
+  5. `fd6755f` C2
+  6. `50a417e` C3
 
 ### Next
 
-- **Block B0** — `phase13_live_data/scripts/probe_chart_stream.py` (NEU,
-  ~50 Zeilen, operator-run, kostenlos). Beide Zweige ausgeplant (JA →
-  B1/B2/B3; NEIN → Tick-Aggregation als Primärpfad mit `tick_count`-
-  Perzentilen). Empfehlung: **B0 zuerst**, dann Neustart-Sequenz aus §3.
-- **Tracker-Stale-Mini-Step** — 5 Zeilen in `paper.py` analog zu A6.1,
-  mit 1 Test. Empfehlung: **nach dem ersten Neustart-Tag**, sobald die
-  Beweiswoche läuft und der Live-Stand kalibriert ist. In einer eigenen
-  Session, nicht in der Block-B-Initialisierung vermischen.
-- **Block C1** — S3-Fremdquelle. Wahl wird auf nach Block B vertagt
-  (Plan §6 C1.0 Entscheidung).
-- **Block C2 / C3** — S4 `GapRescue` + `source_delta.py`. S4 ist Default AUS
-  (erst nach S1/S2/S3 kalibrieren), C3 ist die Bilanz-Diagnostik (P6).
-- **`main` ist 12 Commits vor `origin/main`** (inkl. dieses Commits).
-  Push bleibt bewusste Einzelfreigabe des Nikinger.
-
-### Open questions / blockers
-
-- **Kein technischer Blocker.** Bot steht sicher, Recorder sammelt
-  kostenlos weiter, Block A strukturell fertig.
-- **Die Tracker-Stale-Lücke** (siehe §5 des Closeouts) bleibt offen, bis
-  eine eigene Session sie angeht — ist sie gewollt?
-- **P7 dünn** — ohne B0 zuerst ist der erste Beweiswochen-Tag ein
-  finanzielles Risiko. Empfehlung an den Nikinger: **erst B0, dann §3**.
-- **Push von `main`** — 12 Commits seit `origin/main`, alle Phase 13. Ein
-  Push macht den Live-Stand für eine externe Review sichtbar, falls der
-  Nikinger das wünscht. Sonst bleibt es bei der lokalen Historie.
+- **PAUSE für den Nikinger.** Phase 13 ist fertig gebaut. Was den
+  Nikinger jetzt braucht, ist Operator-Arbeit (B0-Probe, dann
+  A7-Operator-Sequenz) — keine Coding-Sessions.
+- **Erste messbare Aussage** kommt nach 5 Handelstagen Beweiswoche:
+  ``data_health.py`` täglich, ``source_delta.py`` zum Wochenende,
+  Review-Doc nach Block-A-Vorbild.
+- **C1** (S3-Fremdquelle) ist die einzige Code-Frage, die nach der
+  Beweiswoche zu entscheiden ist — basierend auf realen Quoten-/Latenz-
+  Zahlen, die bis dahin vorliegen.
+- **Push** bleibt bewusste Einzelfreigabe des Nikinger. Stand
+  2026-08-19: 15 Commits seit `origin/main`, alle Phase 13, alle
+  Phase-12+13-Suiten grün.
