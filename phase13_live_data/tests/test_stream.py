@@ -16,7 +16,7 @@ import pytest
 from data_foundation.archive import BarArchive
 from data_foundation.models import Bar
 
-from live_data.stream import LSBarRecorder, TickAggregator, _iso_utc_minute
+from live_data.stream import LSBarRecorder, TickAggregator, TickAggregatorRecorder, _iso_utc_minute
 
 
 # ---------- fakes ----------------------------------------------------------
@@ -24,12 +24,18 @@ from live_data.stream import LSBarRecorder, TickAggregator, _iso_utc_minute
 
 class _FakeStream:
     """Records every subscription/unsubscription. A minimal stand-in for
-    ``IGLightstreamerClient`` (which is a heavier mock target in B1)."""
+    ``IGLightstreamerClient`` (which is a heavier mock target in B1).
+
+    Carries both ``subscribe_candles``/``unsubscribe_candles`` (CHART
+    path) and ``subscribe``/``unsubscribe`` (PRICE path) so the same
+    fake serves both recorders in different tests.
+    """
 
     def __init__(self) -> None:
         self.started = False
         self.stopped = False
         self.subs: dict[str, object] = {}
+        self.price_subs: dict[str, Callable[[Any], None]] = {}
 
     def start(self) -> None:
         self.started = True
@@ -42,6 +48,14 @@ class _FakeStream:
 
     def unsubscribe_candles(self, epic) -> None:
         self.subs.pop(epic, None)
+
+    # PRICE path (used by TickAggregatorRecorder, the L6 fallback when
+    # CHART is unavailable — Plan §6 B0 NO branch).
+    def subscribe(self, epic, callback) -> None:
+        self.price_subs[epic] = callback
+
+    def unsubscribe(self, epic) -> None:
+        self.price_subs.pop(epic, None)
 
 
 def _epics(*names) -> callable:
@@ -241,3 +255,176 @@ def test_tick_aggregator_separates_minutes():
 def test_iso_utc_minute_truncates_to_minute():
     dt = datetime(2026, 8, 19, 9, 0, 37, 123_000, tzinfo=timezone.utc)
     assert _iso_utc_minute(dt) == "2026-08-19T09:00:00.123Z"
+
+
+# ---------- TickAggregator.on_tick return value (B0.5 refactor) -----------
+
+
+def test_tick_aggregator_on_tick_returns_none_on_same_minute():
+    """Within a minute, no candle has closed yet — return None."""
+    from broker_wrapper.streaming.base import PriceTick
+    agg = TickAggregator()
+    assert agg.on_tick(PriceTick(epic="X", bid=100, ask=100, timestamp="2026-08-19T09:00:30Z")) is None
+    assert agg.on_tick(PriceTick(epic="X", bid=101, ask=101, timestamp="2026-08-19T09:00:55Z")) is None
+
+
+def test_tick_aggregator_on_tick_returns_closed_candle_on_rollover():
+    """The first tick of a new minute returns the OLD minute's candle
+    (with the OLD minute's tick_count and OHLC). The recorder uses this
+    to write the closed candle without an explicit close_minute call."""
+    from broker_wrapper.streaming.base import PriceTick
+    agg = TickAggregator()
+    agg.on_tick(PriceTick(epic="X", bid=100, ask=100, timestamp="2026-08-19T09:00:30Z"))
+    agg.on_tick(PriceTick(epic="X", bid=101, ask=101, timestamp="2026-08-19T09:00:55Z"))
+    # First tick of 09:01 — should return the 09:00 candle.
+    closed = agg.on_tick(PriceTick(epic="X", bid=200, ask=200, timestamp="2026-08-19T09:01:10Z"))
+    assert closed is not None
+    assert closed["ts_utc"] == "2026-08-19T09:00:00.000Z"
+    assert closed["open"] == pytest.approx(100.0)
+    assert closed["close"] == pytest.approx(101.0)
+    assert closed["tick_count"] == 2
+    assert closed["complete"] is True
+    assert closed["epic"] is None  # filled by the caller
+
+
+# ---------- TickAggregatorRecorder ---------------------------------------
+
+
+def _price_tick(epic: str, bid: float, ask: float, ts: str):
+    """Mimics the SDK's PriceTick (frozen dataclass from P1)."""
+    from broker_wrapper.streaming.base import PriceTick
+    return PriceTick(epic=epic, bid=bid, ask=ask, timestamp=ts)
+
+
+def test_recorder_start_subscribes_to_all_measurable_epics(archive, tmp_path):
+    stream = _FakeStream()
+    epics = _epics("IX.D.DAX.IFMM.IP", "IX.D.CAC.IFE.IP")
+    rec = TickAggregatorRecorder(stream, archive, epics)
+    rec.start()
+    assert stream.started
+    assert set(stream.price_subs.keys()) == {"IX.D.DAX.IFMM.IP", "IX.D.CAC.IFE.IP"}
+
+
+def test_recorder_writes_archive_row_on_minute_close(archive, tmp_path):
+    """Ticks within a minute don't write; the FIRST tick of the next
+    minute triggers the write of the previous minute's candle."""
+    stream = _FakeStream()
+    rec = TickAggregatorRecorder(stream, archive, _epics("IX.D.DAX.IFMM.IP"))
+    rec.start()
+    cb = stream.price_subs["IX.D.DAX.IFMM.IP"]
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 100.0, 100.0, "2026-08-19T09:00:30Z"))
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 101.0, 101.0, "2026-08-19T09:00:55Z"))
+    # No write yet — same minute.
+    rows_mid = archive.window("IX.D.DAX.IFMM.IP", "1m",
+                              "2026-08-19T00:00:00.000Z", "2026-08-19T23:59:00.000Z",
+                              sources=("ls",))
+    assert rows_mid == []
+    # Roll-over tick at 09:01 — writes the 09:00 candle.
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 200.0, 200.0, "2026-08-19T09:01:10Z"))
+    rows = archive.window("IX.D.DAX.IFMM.IP", "1m",
+                          "2026-08-19T00:00:00.000Z", "2026-08-19T23:59:00.000Z",
+                          sources=("ls",))
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.source == "ls"
+    assert row.tick_count == 2
+    assert row.ts_utc == "2026-08-19T09:00:00.000Z"
+    assert row.open == pytest.approx(100.0)
+    assert row.close == pytest.approx(101.0)
+    assert row.high == pytest.approx(101.0)
+    assert row.low == pytest.approx(100.0)
+
+
+def test_recorder_thin_candle_flagged_in_health_sink(archive, tmp_path):
+    """A candle with tick_count <= 2 must be tagged ``thin=True`` in the
+    health event (Plan §6 B0 NO: "Ein LS-Bar mit tick_count <= 2 gilt in
+    source_delta.py als „dünn" und wird getrennt ausgewiesen")."""
+    events: list[dict] = []
+    stream = _FakeStream()
+    rec = TickAggregatorRecorder(stream, archive, _epics("IX.D.DAX.IFMM.IP"),
+                                  health_sink=events.append)
+    rec.start()
+    cb = stream.price_subs["IX.D.DAX.IFMM.IP"]
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 100, 100, "2026-08-19T09:00:30Z"))
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 200, 200, "2026-08-19T09:01:10Z"))  # close 09:00 (1 tick) → thin=True
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 300, 300, "2026-08-19T09:01:30Z"))
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 400, 400, "2026-08-19T09:02:10Z"))  # close 09:01 (2 ticks) → thin=True
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 500, 500, "2026-08-19T09:03:10Z"))  # close 09:02 (1 tick) → thin=True
+    assert len(events) == 3
+    assert all(e["thin"] is True for e in events), "all <=2-tick candles must be thin"
+    assert all(e["event"] == "ls_tickagg_candle_written" for e in events)
+    # The middle event is the 2-tick one — still thin at threshold=2.
+    assert events[1]["tick_count"] == 2
+
+
+def test_recorder_three_tick_candle_is_not_thin(archive, tmp_path):
+    """The threshold is configurable; default 2. A 3-tick candle is NOT thin."""
+    events: list[dict] = []
+    stream = _FakeStream()
+    rec = TickAggregatorRecorder(stream, archive, _epics("IX.D.DAX.IFMM.IP"),
+                                  health_sink=events.append)
+    rec.start()
+    cb = stream.price_subs["IX.D.DAX.IFMM.IP"]
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 100, 100, "2026-08-19T09:00:30Z"))
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 101, 101, "2026-08-19T09:00:45Z"))
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 102, 102, "2026-08-19T09:00:55Z"))
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 200, 200, "2026-08-19T09:01:10Z"))  # close 09:00
+    assert len(events) == 1
+    assert events[0]["tick_count"] == 3
+    assert events[0]["thin"] is False
+
+
+def test_recorder_on_tick_after_stop_is_dropped(archive, tmp_path):
+    """Tick during stopped state (e.g. token rotation in-flight) must
+    not write — the recorder is in a transition state."""
+    stream = _FakeStream()
+    rec = TickAggregatorRecorder(stream, archive, _epics("IX.D.DAX.IFMM.IP"))
+    rec.start()
+    cb = stream.price_subs["IX.D.DAX.IFMM.IP"]
+    rec.stop()
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 100, 100, "2026-08-19T09:00:30Z"))
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 200, 200, "2026-08-19T09:01:10Z"))
+    rows = archive.window("IX.D.DAX.IFMM.IP", "1m",
+                          "2026-08-19T00:00:00.000Z", "2026-08-19T23:59:00.000Z",
+                          sources=("ls",))
+    assert rows == []
+
+
+def test_recorder_resync_epics_diffs_universe(archive, tmp_path):
+    """universe_refresher triggers resync_epics after a SymbolResolver
+    pass; new epics must subscribe, dropped ones must unsubscribe."""
+    stream = _FakeStream()
+    epics = _epics("IX.D.DAX.IFMM.IP")
+    rec = TickAggregatorRecorder(stream, archive, epics)
+    rec.start()
+    assert set(stream.price_subs.keys()) == {"IX.D.DAX.IFMM.IP"}
+    epics.set(["IX.D.CAC.IFE.IP", "IX.D.IBEX.FWM2.IP"])
+    rec.resync_epics()
+    assert set(stream.price_subs.keys()) == {"IX.D.CAC.IFE.IP", "IX.D.IBEX.FWM2.IP"}
+
+
+def test_recorder_restart_resubscribes_after_token_rotation(archive, tmp_path):
+    """Token rotation (B3) needs a recorder that tears down and re-subscribes."""
+    stream = _FakeStream()
+    rec = TickAggregatorRecorder(stream, archive, _epics("IX.D.DAX.IFMM.IP"))
+    rec.start()
+    rec.restart()
+    assert stream.started and stream.stopped
+    assert "IX.D.DAX.IFMM.IP" in stream.price_subs
+    # Idempotent: a second restart is a no-op + re-subscribe, not a crash.
+    rec.restart()
+    assert "IX.D.DAX.IFMM.IP" in stream.price_subs
+
+
+def test_recorder_archive_write_failure_does_not_kill_recorder(archive, tmp_path):
+    """If ``insert_bars`` raises, the recorder must log and survive —
+    the next candle must still land."""
+    stream = _FakeStream()
+    rec = TickAggregatorRecorder(stream, archive, _epics("IX.D.DAX.IFMM.IP"))
+    rec.start()
+    cb = stream.price_subs["IX.D.DAX.IFMM.IP"]
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 100, 100, "2026-08-19T09:00:30Z"))
+    # Close archive mid-flight — subsequent writes must be caught, not raised.
+    archive.close()
+    # must not raise:
+    cb(_price_tick("IX.D.DAX.IFMM.IP", 200, 200, "2026-08-19T09:01:10Z"))
