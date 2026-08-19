@@ -76,6 +76,8 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
 | `live_data/backfill.py` | `ExternalBackfill` (S3) | 🔄 **Hybrid-Entscheidung 2026-08-19** (Nikinger): B (Capital.com) zuerst, C (Dukascopy) als Fallback wenn B definitiv nicht geht. Probe ausstehend. |
 | `live_data/rescue.py` | `GapRescue` (S4, Default AUS) | ✅ C2 — committed, 11 Tests |
 | `scripts/probe_chart_stream.py` | Gating-Live-Check: liefert `CHART:` auf diesem Konto? | ✅ B0 — committed (operator-run, NO 2026-08-19) |
+| `scripts/probe_capital.py` | Gating-Live-Check für Hybrid-Pfad B: liefert die Capital.com Demo-API `resolution=MINUTE` für Germany 40 / France 40 / Spain 35? | ✅ Session 11 — committed (operator-run, Probe ausstehend) |
+| *(Repo-Wurzel)* `scripts/store_capital_key.py` | Keyring-Seeder für Capital.com Demo-Creds (Service `trading-bot-capital`, drei Felder) | ✅ Session 11 — committed |
 | `scripts/source_delta.py` | Doppelauflösung je Quelle, Differenz als Messgröße (P6) | ✅ C3 — committed, 7 Tests |
 | `tests/` | gemockt, kein Netz, kein LLM | ✅ 39 Tests grün |
 | *(cross-phase)* `data_foundation/coverage.py` | `assess_window` / `WindowCoverage` | ✅ A1 — committed, 12 Tests grün |
@@ -149,7 +151,17 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
 - **Output:** stderr = menschliche Erzählung, stdout = JSON-`Envelope`-
   ähnliches Objekt (maschinenlesbar). Repo-Konvention
   (siehe `scripts/probe_chart_stream.py`).
-- **Nicht in dieser Session gebaut** — siehe „Next".
+- **In Session 11 Step 2 gebaut** (zwei Commits): `scripts/probe_capital.py`
+  (~190 Zeilen) und Repo-Wurzel `scripts/store_capital_key.py`
+  (~75 Zeilen). Auth: POST `/api/v1/session` mit `identifier` +
+  `password` + `apiKey` (alle drei aus Keyring-Namensraum
+  `trading-bot-capital`). Suche per `GET /api/v1/markets?searchTerm=`,
+  bevorzugt CFD-Instrumente. Test-Fetch `GET /api/v1/prices/{epic}?
+  resolution=MINUTE&from=&to=&max=1000`. Exit-Codes 0/1/2/3 analog
+  `probe_chart_stream.py`. Output-JSON enthält
+  `next_step_hint`-Empfehlung je nach Ergebnis. Operator-Run, **kein
+  Test-Coverage** (Repo-Konvention: operator-run-Scripts sind nicht
+  pytest-gesammelt, siehe `probe_chart_stream.py`).
 
 ### Was diese Session **nicht** tut (bewusst)
 
