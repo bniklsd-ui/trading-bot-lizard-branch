@@ -206,15 +206,20 @@ class _FakeIGBroker:
         return SimpleNamespace(ok=True, data={"bars": [bar]})
 
 
-def _budgeted_ig(tmp_path, close: float) -> tuple[_FakeIGBroker, BudgetedIGBarProvider]:
+def _budgeted_ig(tmp_path, close: float, *, now_fn=None) -> tuple[_FakeIGBroker, BudgetedIGBarProvider]:
     broker = _FakeIGBroker(close)
     budget = SourceBudget(tmp_path / "ig_budget.sqlite", IG_QUOTA_V1)
-    return broker, BudgetedIGBarProvider(broker, budget, spend_kind="sample")
+    # Phase 13 §6 A4: BudgetedIGBarProvider now gates fresh-history-stale. The
+    # heartbeat tests bump a fake `now` (2026-08-16) but the broker's `_default_now`
+    # is real time; without forwarding `now_fn` here every test would be rejected
+    # by the staleness guard with reason="stale_history" — which is the very bug
+    # F1 / A4 exist to catch, but only against real data, not against fixed test data.
+    return broker, BudgetedIGBarProvider(broker, budget, spend_kind="sample", now_fn=now_fn)
 
 
 def test_sampler_throttles_to_once_per_day(archive, tmp_path):
-    broker, ig = _budgeted_ig(tmp_path, 100.0)
     now = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
+    broker, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: now)
     sampler = DivergenceSampler(ig, archive, now_fn=lambda: now)
     archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T09:00:00.000Z",
                               open=100, high=100, low=100, close=100.0, volume=1, source="yf",
@@ -228,8 +233,8 @@ def test_sampler_throttles_to_once_per_day(archive, tmp_path):
 def test_sampler_compares_only_yf_bars_not_ig(archive, tmp_path):
     """The regression this exists to catch: an IG bar at the same minute must never be
     picked as the yFinance comparator (it would always agree with itself)."""
-    _, ig = _budgeted_ig(tmp_path, 100.0)
     now = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
+    _, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: now)
     # an IG bar at the exact probed minute, wildly different from the IG probe's own
     # close would still "agree" if picked as the comparator by mistake — plant a yF bar
     # that genuinely diverges to prove the *yf* row (not the ig row) drives the check.
@@ -249,8 +254,8 @@ def test_sampler_compares_only_yf_bars_not_ig(archive, tmp_path):
 
 
 def test_sampler_no_yf_bar_in_window_is_a_noop(archive, tmp_path):
-    _, ig = _budgeted_ig(tmp_path, 100.0)
     now = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
+    _, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: now)
     events = []
     sampler = DivergenceSampler(ig, archive, health_sink=events.append, now_fn=lambda: now)
     # archive has no bars at all for this window
@@ -259,9 +264,9 @@ def test_sampler_no_yf_bar_in_window_is_a_noop(archive, tmp_path):
 
 
 def test_sampler_mismatch_fires_after_two_consecutive_divergences_not_one(archive, tmp_path):
-    broker, ig = _budgeted_ig(tmp_path, 100.0)
     day1 = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
     day2 = datetime(2026, 8, 17, 9, 5, tzinfo=timezone.utc)
+    broker, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: day1)
     marked = []
     sampler = DivergenceSampler(ig, archive, now_fn=lambda: day1)
 
@@ -282,10 +287,10 @@ def test_sampler_mismatch_fires_after_two_consecutive_divergences_not_one(archiv
 
 
 def test_sampler_agreement_resets_streak(archive, tmp_path):
-    broker, ig = _budgeted_ig(tmp_path, 100.0)
     day1 = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
     day2 = datetime(2026, 8, 17, 9, 5, tzinfo=timezone.utc)
     day3 = datetime(2026, 8, 18, 9, 5, tzinfo=timezone.utc)
+    broker, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: day1)
     marked = []
     sampler = DivergenceSampler(ig, archive, now_fn=lambda: day1)
 
@@ -310,6 +315,7 @@ def test_sampler_agreement_resets_streak(archive, tmp_path):
     sampler.sample_epic(EPIC, marked.append)  # divergence 1 again (not 3rd consecutive)
 
     assert marked == []
+
 
 
 def test_sampler_budget_veto_is_a_noop(archive):

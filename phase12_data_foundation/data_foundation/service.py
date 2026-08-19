@@ -45,6 +45,16 @@ def _iso(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
 
 
+def _age_minutes(ts: str, now: datetime) -> float:
+    """Minutes between ``ts`` (ISO 8601 UTC) and ``now``. Used by the A4 stale-tolerance
+    check. Returns float minutes; .tzaware on both sides via ``_parse_iso``."""
+    normalized = ts.replace("Z", "+00:00") if ts.endswith("Z") else ts
+    dt = datetime.fromisoformat(normalized)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return (now - dt).total_seconds() / 60.0
+
+
 class BudgetedIGBarProvider:
     """IG real-time bars, gated on :class:`~data_foundation.budget.SourceBudget` (D10).
 
@@ -65,12 +75,18 @@ class BudgetedIGBarProvider:
         spend_kind: str = "research",
         health_sink: Callable[[dict], None] | None = None,
         now_fn: Callable[[], datetime] = _default_now,
+        stale_tolerance_min: int = 120,
     ) -> None:
         self._broker = broker
         self._budget = budget
         self._spend_kind = spend_kind
         self._health_sink = health_sink
         self._now_fn = now_fn
+        # Phase 13 §6 A4 (L8): how old a bar's `ts` may be before we treat the bundle
+        # as stale. 120 min was the empirical floor for F1 (one-month-old IG Forward
+        # history with `ok=True`). Default; the sampler in A6 has its own knob — see
+        # Plan §6 A6.1 for the deliberate non-sharing.
+        self._stale_tolerance_min = stale_tolerance_min
 
     def _emit(self, epic: str, ok: bool, *, reason: str | None = None) -> None:
         if self._health_sink is None:
@@ -125,6 +141,15 @@ class BudgetedIGBarProvider:
             self._emit(epic, False, reason="bad_timestamp")
             return None
         self._budget.record_spend(len(bars), self._spend_kind)
+        # Phase 13 §6 A4 (L8): IG may return a bundle whose newest bar is hours or days
+        # old while the envelope still says ok=True (F1 — IX.D.IBEX.FWM2.IP, 301 bars
+        # with ts 2026-07-17 + fetched_at 2026-08-18). Reject such bundles; the call
+        # has already been billed by IG, so the spend above is correct — do NOT move
+        # this check before record_spend, or the ledger under-reports.
+        newest = max(b.ts for b in bars)
+        if _age_minutes(newest, self._now_fn()) > self._stale_tolerance_min:
+            self._emit(epic, False, reason="stale_history")
+            return None
         allowance = data.get("allowance") or {}
         if allowance:
             expiry_seconds = allowance.get("allowanceExpiry")

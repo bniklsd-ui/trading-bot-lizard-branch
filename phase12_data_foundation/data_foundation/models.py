@@ -27,8 +27,9 @@ DS_UNVERIFIED = "unverified"
 DS_NO_SOURCE = "no_source"
 DS_NO_INTRADAY = "no_intraday_source"
 DS_MISMATCH = "mismatch"
+DS_STALE_SOURCE = "stale_source"  # Phase 13 §6 A4: IG returned ok=True but `ts` is too old (F1)
 KNOWN_DATA_SOURCE_STATUSES: frozenset[str] = frozenset(
-    {DS_OK, DS_UNVERIFIED, DS_NO_SOURCE, DS_NO_INTRADAY, DS_MISMATCH}
+    {DS_OK, DS_UNVERIFIED, DS_NO_SOURCE, DS_NO_INTRADAY, DS_MISMATCH, DS_STALE_SOURCE}
 )
 
 

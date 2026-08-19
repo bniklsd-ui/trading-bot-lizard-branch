@@ -119,15 +119,18 @@ def test_budgeted_ig_unmapped_resolution_returns_none(archive, budget):
 def test_ig_provider_normalizes_ig_raw_timestamps(archive, budget):
     """U1 (P12.5 plan §3): IG's real ``get_ohlcv`` shape is ``"yyyy/MM/dd HH:mm:ss"``,
     never ISO -- the provider must normalize it, not pass it through raw."""
+    # Timestamp chosen within the 120-min stale tolerance of the test's NOW (2026-08-16T10:00)
+    # so the A4 stale-history guard (L8) doesn't reject the bundle -- this test is about
+    # *normalization*, not freshness.
     broker = _FakeBroker(bars=[
-        {"timestamp": "2026/08/17 14:15:00", "open": 1, "high": 2, "low": 0.5, "close": 1.5, "volume": 9}
+        {"timestamp": "2026/08/16 09:55:00", "open": 1, "high": 2, "low": 0.5, "close": 1.5, "volume": 9}
     ])
-    provider = BudgetedIGBarProvider(broker, budget)
+    provider = BudgetedIGBarProvider(broker, budget, now_fn=lambda: NOW)
 
     bars = provider.get_bars(EPIC, resolution="1m", count=1)
 
     assert bars is not None
-    assert bars[0].ts == "2026-08-17T14:15:00.000Z"
+    assert bars[0].ts == "2026-08-16T09:55:00.000Z"
 
 
 def test_ig_provider_returns_none_on_unparseable_timestamp(archive, budget):
@@ -139,6 +142,64 @@ def test_ig_provider_returns_none_on_unparseable_timestamp(archive, budget):
 
     assert provider.get_bars(EPIC, resolution="1m", count=1) is None
     assert events[-1]["reason"] == "bad_timestamp"
+
+
+# -- Phase 13 §6 A4: stale-history assertion (L8, F1) -------------------------
+
+
+def test_ig_provider_within_stale_tolerance_is_normal(archive, budget):
+    """A bundle whose newest bar is minutes (not hours) old must be returned like any
+    other — the assertion is a content guard, not a freshness requirement."""
+    recent_ts = _iso(NOW - timedelta(minutes=5))
+    broker = _FakeBroker(bars=[
+        {"timestamp": recent_ts, "open": 1, "high": 2, "low": 0.5, "close": 1.5, "volume": 9}
+    ])
+    events = []
+    provider = BudgetedIGBarProvider(
+        broker, budget, health_sink=events.append, now_fn=lambda: NOW,
+        stale_tolerance_min=120,
+    )
+
+    bars = provider.get_bars(EPIC, resolution="1m", count=1)
+
+    assert bars is not None and len(bars) == 1
+    assert events[-1]["ok"] is True     # no reason key on success
+    assert "reason" not in events[-1]
+
+
+def test_ig_provider_returns_none_on_stale_history_and_records_event(archive, budget):
+    """F1 — IX.D.IBEX.FWM2.IP-shaped case: 301 bars with ts one month ago, envelope
+    ok=True. The newest bar is older than the tolerance ⇒ ``None`` + a
+    ``stale_history`` event."""
+    ancient_ts = "2026-07-17T14:00:00.000Z"        # ~32 days before NOW
+    broker = _FakeBroker(bars=[
+        {"timestamp": ancient_ts, "open": 1, "high": 2, "low": 0.5, "close": 1.5, "volume": 9}
+    ])
+    events = []
+    provider = BudgetedIGBarProvider(
+        broker, budget, health_sink=events.append, now_fn=lambda: NOW,
+        stale_tolerance_min=120,
+    )
+
+    assert provider.get_bars(EPIC, resolution="1m", count=1) is None
+    assert events[-1]["ok"] is False
+    assert events[-1]["reason"] == "stale_history"
+
+
+def test_ig_provider_records_spend_even_when_history_is_stale(archive, budget):
+    """The plan's warning (L8): IG has already billed the call, so the spend MUST be
+    recorded even when the bundle is rejected. Otherwise the ledger under-reports and
+    the next caller has no idea how close the budget is."""
+    ancient_ts = "2026-07-17T14:00:00.000Z"        # ~32 days before NOW
+    broker = _FakeBroker(bars=[
+        {"timestamp": ancient_ts, "open": 1, "high": 2, "low": 0.5, "close": 1.5, "volume": 9}
+    ])
+    provider = BudgetedIGBarProvider(
+        broker, budget, now_fn=lambda: NOW, stale_tolerance_min=120,
+    )
+
+    assert provider.get_bars(EPIC, resolution="1m", count=1) is None
+    assert budget.spent_in_window() == 1, "stale-rejected bundles still spend the budget"
 
 
 # -- BarService.get_bars (research seam) --------------------------------------
