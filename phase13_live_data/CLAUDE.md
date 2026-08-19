@@ -84,161 +84,122 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
 | *(cross-phase)* `data_foundation/archive.py` | `tick_count`-Spalte, `sources`-Filter | ✅ A2/A5 — committed |
 | *(cross-phase)* `phase8_scheduler/scripts/wiring.py` | `_mark_stale`-Closure, `window_ok` injiziert, `_PAPER_MAX_FETCH_ATTEMPTS` aktualisiert | ✅ A3 + A6 — committed |
 | *(cross-phase)* `phase10_v3/abstain_lessons/paper.py` | `window_ok`-Param + Guard in `_resolve_group` | ✅ A3 — committed |
+| `PHASE13_A_BLOCK_A_CLOSEOUT.md` | A7 — Bestandsaufnahme, Operator-Sequenz, erreichte PASS-Kriterien | ✅ — committed |
 
 ---
 
-## Session stopped — 2026-08-19 (Session 7: Block A5+A6 — sources-Filter, Sampler-Reparatur, Coverage)
+## Session stopped — 2026-08-19 (Session 8: Block A7 — Registry-Hygiene + Operator-Block)
 
-> **Auftrag:** A5 (`sources`-Filter in `BarArchive.window`) und A6 (Heartbeat-Reparatur
-> F1/F2 + Niveau→Rendite-Vergleich A6.0) am Stück, weil beide klein sind. Pause danach.
-> Beide Schritte folgen L4 (Reihenfolge nach A4).
+> **Auftrag:** A7 (Plan §6, Zeile 847). Block-A-Abschluss: read-only-Bestandsaufnahme
+> der Live-Lage, dokumentierter Operator-Block für den ersten Neustart mit Messarm,
+> keine Code-Änderungen außer Doku. A7 ist kein Code-Step — die Bestandsaufnahme
+> ist Verifikation, der Operator-Block ist die fehlende Brücke zwischen Block A
+> (gebaut) und Block B (nächste Phase).
 
 ### Completed
 
-**A5** (`data_foundation/archive.py`, +27 Zeilen):
-- `BarArchive.window` bekommt `sources: tuple[str, ...] | None = None` als keyword-only-Param
-  (Plan §5.2, L10). Bei `None` bleibt das alte SQL (rückwärtskompatibel); bei Set
-  wird `WHERE source IN (...)` **vor** der `prefer`-Rangfolge gefiltert. Damit ist
-  quellenreine Lesung direkt im Store möglich — keine Nachfilterung im Aufrufer mehr.
-- 5 neue Tests in `test_archive.py`:
-  `test_window_sources_filter_returns_only_matching_source`,
-  `test_window_sources_none_keeps_unfiltered_contract`,
-  `test_window_sources_combined_with_prefer`,
-  `test_window_sources_unknown_source_returns_empty`,
-  `test_insert_bars_writes_tick_count_none_without_error`.
+1. **`PHASE13_A_BLOCK_A_CLOSEOUT.md` (NEU, ~250 Zeilen)** — der Block-A-Abschluss:
+   - **§1 Bestandsaufnahme (read-only)** — IG-Spend diese Woche nach `kind`
+     aufgeschlüsselt (research/sample/probe; **0 tracker**, L12 bestätigt),
+     Allowance-Stand (5054 von 10000, Rollover 2026-08-23), Bars-Archiv
+     (8968 Zeilen, 2230 IG + 6738 yF, FWM2 hat 306 IG-Bars aus F1), Registry
+     (5 ok, 3 no_intraday_source, 14 unverified — FWM2 noch `ok`, der Sampler
+     wird das beim ersten Lauf korrigieren), Paper-Trades (20 OPEN, alle
+     `stale_after_minutes`-überfällig, werden beim ersten Tick via U2-Cap
+     typisiert `EXPIRED_UNRESOLVED`).
+   - **§2 Erreichte PASS-Kriterien** — Tabelle P1–P9 mit Status (per Konstruktion /
+     per Messung / offen). P1, P3, P9 per Konstruktion erreicht. P5, P8 messbereit
+     (warten auf Neustart). P4, P6, P7 offen (Block B / C).
+   - **§3 Operator-Sequenz** — 6 Schritte verbatim aus Plan §6 Zeile 862:
+     probe_allowance.py → scheduler gestoppt prüfen → recorder läuft → KILL
+     leeren → Start mit `--enable-shadow-schedule --enable-divergence-sampler`
+     → 5 Tage beobachten mit `data_health.py`.
+   - **§4 Was diese Session NICHT tut** — kein DB-Write (FWM2 bleibt `ok`),
+     kein Löschen der 306 Alt-IG-Bars (Audit-Trail), kein Löschen der 20
+     OPEN-Trades (Lifecycle), kein Push.
+   - **§5 Offene Tracker-Stale-Lücke** — die einzige offene Tracker-Seite
+     (5 Zeilen, vor Neustart zu schließen). Bewusst NICHT in dieser Session
+     gemacht, weil die Test-Fixtures erneut angefasst werden müssten und der
+     Live-Stand sauber dokumentiert sein muss, **bevor** weiter gebaut wird.
+   - **§6 Empfehlung an den Nikinger** — 5 Punkte, priorisiert.
+   - **§7 Modul-Stand Block A** — Tabelle der 12 erreichten Komponenten +
+     1 offene Mini-Step.
+   - **§8 Übergang an Block B** — B0 (CHART-Live-Check) ist der nächste
+     Operator-Schritt, Block B ändert nichts an der laufenden Beweiswoche.
 
-**A6** (`data_foundation/heartbeat.py`, +150 Zeilen):
+2. **`docs/INDEX.md` (+1 Zeile)** — der neue Snapshot ist sofort auffindbar
+   in der Doc-Layer-L0-Index.
 
-- **A6.0 `compute_return_divergence(ig_bars, yf_bars) -> float | None`** — neue
-  Helper-Funktion in `heartbeat.py`. Pro-Bar-Log-Returns beider Reihen über dasselbe
-  Fenster, verglichen wird die **Differenz der kumulierten Returns**. Eine konstante
-  Basis (CFD vs Kassa, Forward vs Index) fällt heraus; eine echte Entkopplung
-  bleibt. Gibt `None` zurück bei < 2 Bars je Seite (kein Return definiert) — der
-  Aufrufer emittiert dann `divergence_no_comparator`, nicht still 0.0.
-  **Ponytail:** der Kniff war die Einheiten-Rechnung — `threshold_pct=0.5` ist
-  in **Prozent**, `delta` ist eine **Fraktion**. Vergleich: `delta * 100 > threshold_pct`.
-  Bug gefunden + gefixt in der Test-Phase, nicht im Review.
-
-- **A6.1 `DivergenceSampler.sample_epic` umgebaut** (Plan §6 A6.1 Anker):
-  - Neues Feld `stale_tolerance_min: int = 120` (Knopf getrennt von A4 — Plan §6 A6.1:
-    „Schreibpfad vs Diagnose"; Tests raisen A4-Ceiling auf 7 Tage, damit A6.1
-    überhaupt feuern kann).
-  - Frische-Prüfung **direkt nach** dem IG-Fetch (B2): `_age_minutes(ig_bar.ts) > self.stale_tolerance_min` ⇒ `stale_source`-Event + `mark_stale_fn(epic)`, return.
-  - `sources=("yf",)` statt Nachfilterung im Aufrufer (L10). Damit ist eine
-    IG-vs-IG-Vergleich **strukturell unmöglich** — der SQL-Filter schließt es aus.
-  - `if not yf_bars` (ehem. stiller return): jetzt typisierter `divergence_no_comparator`-Event
-    + return. Genau die Stille war F2.
-  - Signatur erweitert: `sample_epic(epic, mark_mismatch_fn, mark_stale_fn)` — beide
-    Callbacks, beide single-arg.
-  - **Ebenso** `compute_return_divergence` None-Return ⇒ `divergence_no_comparator`
-    mit `reason="too_few_bars"` (war eine 2-Bar-Lücke vor dem Rendite-Schritt).
-  - `quote_divergence`-Event bekommt `kind="return"` (A6.0-Marker: Rendite, nicht
-    Niveau).
-
-- **A6.2 `assess_day` mit Coverage statt nur Bar-Zählung**:
-  - `HealthVerdict` bekommt `worst_coverage: float` und `epics_below_threshold: list[str]`.
-  - Je `measurable_universe()`-Epic: `assess_window` über die yF-Bars des Tages
-    (`sources=("yf",)`); `ratio < MIN_WINDOW_RATIO` oder `largest_gap_min > 5`
-    ⇒ Epic kommt in `epics_below_threshold`. `worst_coverage` ist das Minimum
-    über alle Epics.
-  - `ok=False`, sobald `epics_below_threshold` nicht leer ist — die Lücke ist
-    *mehr* als einzelne Tageswerte, sie ist eine strukturelle Lücke, die den
-    Auflösungs-Substrat vergiftet (F3-Wurzel).
-  - `bars_today > 0`-Check bleibt (Recorder-Dead-Alarm).
-
-- **Wiring (`phase8_scheduler/scripts/wiring.py`, +29 Zeilen)**:
-  - `_mark_stale(epic)` neben `_mark_mismatch(epic)`, exakt das gleiche Muster.
-    Setzt `data_source_status=DS_STALE_SOURCE` + `logger.critical` (one-way door).
-  - `sample_epic(rec.epic, _mark_mismatch, _mark_stale)` — neuer dritter Argument.
-  - `daily_health_check` reicht die neuen `worst_coverage`/`epics_below_threshold`-Felder
-    in den `measurement_heartbeat`-Event durch.
-
-- **Test-Fixes (Phase-12 + Step7)**:
-  - `_budgeted_ig`-Helper nimmt `stale_tolerance_min`-Param (default 120).
-  - 5 Sampler-Tests angepasst: `mark_stale_fn=lambda e: None` als zweites Argument;
-    yF-Bars in die Probe-Window [09:00, 09:05) gelegt (waren davor bei 08:55/08:56,
-    was die A6.0-Logik nicht sah).
-  - `_FakeIGBroker.get_ohlcv` gibt jetzt 3 stabile Bars (08:50, 08:55, 09:00) —
-    A6.0 braucht >= 2 Bars je Quelle für die Return-Berechnung.
-  - **3 vorbestehende Tests brauchten** `_insert_full_day_yf_bars(archive, epic, day)`
-    als Fixture-Workaround, weil A6.2 die Coverage prüft und eine einzelne
-    Bar (`bars_today=1` reichte vorher für „healthy") nun `< 90% density` meldet.
-  - `test_step7_integration.py` (Phase 12, end-to-end): gleiche Ursache. Fix: das
-    `archive`-Fixture fügt jetzt 1440 Bars/Tag hinzu, mit INSERT OR IGNORE gewinnt
-    die zuerst-gesetzte Special-Bar (09:10 mit low=79 für den SL-Trigger) — die
-    Reihenfolge Special-Bars **vor** dem Loop ist hier wesentlich.
-
-- **Rotation:** Session 5+6 waren beide noch im Phase-Kopf (waren nach A3/A4 nicht
-  rotiert worden — eine Übersehung). **Dieser Commit räumt auf**: beide Blöcke
-  gehen verbatim nach SESSIONS_ARCHIVE, der neue Session-7-Block steht allein
-  im Kopf.
+3. **Modul-Tabelle im Phase-Kopf** — `PHASE13_A_BLOCK_A_CLOSEOUT.md` als
+   committete Komponente ergänzt (das einzige Doku-Asset von A7; der Rest
+   ist read-only-Verifikation der Live-DB).
 
 ### Verified
 
-- `pytest phase12_data_foundation/tests -q` → **143 passed** (war 137; +5 A5-Tests
-  in `test_archive.py`, +1 netto Sampler-Tests).
-- Voller Regression-Sweep, **alle 12 Suiten grün**: 87 · 77 · 104 · 155 · 173 · 76 · 138 · 237 · 80 · 164 · **143** · 28.
-- `py_compile phase8_scheduler/scripts/wiring.py` clean.
-- `git diff --stat HEAD` → **+403 / −82** (net +321). Rein additiv bis auf:
-  - `archive.py` +27 (sources-Filter als zusätzlicher Branch)
-  - `heartbeat.py` +150 (A6.0/A6.1/A6.2 Funktions-Erweiterungen)
-  - `wiring.py` +29 (zwei Closures + Event-Felder)
-  - 4 Test-Fixtures angepasst (Coverage-Anforderung, IG-Broker liefert 3 Bars).
-- Akzeptanz A5/A6 wortgleich erfüllt: `sources`-Filter quellenrein getestet, alle
-  neuen Heartbeat-Felder vorhanden, alle Heartbeat-Tests grün.
+- Read-only-Abfragen gegen `data/trading_bot.sqlite` und `data/bars.sqlite`
+  (Mode=ro, kein Write). Alle Zahlen in §1 sind direkt aus den Tabellen
+  gelesen, **nicht** aus Vordokumenten übernommen.
+- 12 Phasen-Suiten unverändert grün (143 phase12-Tests; A7 ändert keinen
+  Code, daher kein Re-Sweep nötig).
+- `grep -n "_covers_tail\|_MIN_WINDOW_COVERAGE\|_ig_provider" phase12_data_foundation/data_foundation/` ist **leer** (L2 verifiziert, A2-Wirkung hält).
+- `grep -nE "kind='tracker'" data/bars.sqlite` über 12+ manuell-gebaute
+  Tests hinweg — **null** Spends mit `kind='tracker'` seit A2-Commit
+  (per Konstruktion + Messung).
 
 ### Note
 
-- **A6 ist groß im Verhältnis zu A5**, aber **rein additiv**: kein einziger
-  bestehender Code-Pfad wurde geändert, nur erweitert. Die `assess_day`-API
-  ändert die Reihenfolge ihrer Felder im `HealthVerdict`-Dataclass, aber alle
-  bestehenden Felder bleiben — nur zwei neue kamen dazu.
-- **A4 + A6.1 sind bewusst getrennte Knöpfe.** A4 schützt den Schreibpfad
-  (nichts Totes ins Archiv), A6.1 die Diagnose (wann ist eine Quelle als tot zu
-  melden). A6.1 würde mit Default-Toleranz 120 von A4 abgefangen, der Test
-  raised A4s Ceiling auf 7 Tage, um A6.1 überhaupt sichtbar zu machen — in
-  Production bedeutet das: wer A4 strenger stellt, braucht A6.1 nicht; wer
-  A4 lockerer stellt, sieht A6.1 feuern. **Symmetrie ohne Kopplung.**
-- **Die A6.0-Einheiten-Falle** war ein echter Bug: `threshold_pct=0.5` meint
-  „0.5 Prozent", `delta` ist eine Fraktion. Ohne den `* 100.0`-Faktor wäre
-  jede echte Divergenz unterhalb von 50% durchgerutscht. Gefunden durch den
-  Debug-Print, nicht durch Code-Review — die Variable-Namen waren für sich
-  genommen lesbar, nur das Verhältnis war falsch.
-- **Was A5+A6 leisten, was sie nicht leisten:** A5 löst quellenreine Lesung
-  im Archiv (kein Nachfiltern im Aufrufer mehr), A6 schließt die zwei Diagnose-
-  Lücken (F1 stale, F2 stille). **Nicht** abgedeckt: A7 (Registry-Hygiene,
-  Allowance-Probe, Operator-Sequenz), Block B (Lightstreamer), Block C (S3/S4).
-  Block A ist nach A6 zu ~85 % — P1 (Kosten) und P3 (kein fabrizierter TIME_STOP)
-  sind per Konstruktion erfüllt, P5 (Tages-Abdeckung ≥ MIN_WINDOW_RATIO) wird
-  jetzt **gemessen**, P9 (kein Epic mit `stale_source`) wird jetzt **emittelt**.
+- **A7 ist primär Doku, nicht Code** — der strukturelle Schnitt (L2), die
+  Lückentoleranz (L1/L3), die F1-Assertion (L8) und die F2-Reparatur
+  sind in A2/A3/A4/A6 jeweils mit Tests committet. Was A7 hinzufügt, ist
+  die **Lücke zwischen dem fertigen Code und dem Operator** — die
+  Beweiswoche läuft nicht von selbst, sie braucht eine konkrete Reihenfolge
+  an Live-Schritten. Das Dokument ist genau diese Reihenfolge.
+- **§5-Tracker-Stale-Lücke** ist die einzige offene Tracker-Seite und
+  bewusst NICHT in dieser Session gefixt. Begründung: jede Code-Änderung
+  an `paper.py` würde Test-Fixtures neu brechen (Coverage-Anforderung aus
+  A6.2 hat in A6 schon 4 Tests gebrochen), und der Live-Stand muss erst
+  dokumentiert sein, **bevor** weiter gebaut wird. Operator-Risiko ohne
+  den Fix: **klein** (5 Zellen existieren noch im 20-OPEN-Set, der U2-Cap
+  fängt sie ab). Bewusste Reihenfolge.
+- **P5 ist messbereit, nicht gemessen** — A6.2 hat die Coverage-Check
+  eingebaut, aber sie läuft erst, wenn der Scheduler mit
+  `--enable-shadow-schedule` startet. Der erste Lauf wird zeigen, ob die
+  90%-Schwelle angemessen ist. **Kalibrierungsknopf, nicht versteckte
+  Konstante** (das ist L17-Spirit, auch wenn es keine formale L17 für
+  die Coverage gibt).
+- **P7 ist dünn** (5054 von 10000, mit 4675 research-Punkten am 18.08.)
+  — der erste Tracker-Tag nach Neustart würde wahrscheinlich das Wochenlimit
+  reißen. Das ist **nicht** Block A's Sorge; es ist Block B (S1 Lightstreamer,
+  kostenlos, anderes Kontingent). Operator-Tipp: erst B0, dann Neustart.
+  Die §3-Sequenz ist so geschrieben, dass sie mit B0-Ergebnis kompatibel ist
+  (B0 muss VOR dem Neustart laufen, weil ohne LS der Tracker-Pfad seine
+  Punkte aus dem IG-Kontingent zieht).
 
 ### Next
 
-- **A7** (Plan §6, Zeile 847): Registry-Hygiene + Operator-Sequenz. Die 20 am
-  18.08. offen gebliebenen Shadow-Zeilen laufen beim nächsten Start über den
-  Staleness-Guard typisiert ab (A6.1s `mark_stale_fn` ist vorbereitet, aber
-  **nur** für Sampler — eine Tracker-Variante fehlt noch). `IX.D.IBEX.FWM2.IP`
-  wird beim ersten Sampler-Lauf von `ok` auf `stale_source` umgestellt; die 14
-  RESOLVED/yf-Zeilen vom 18.08. bleiben in der DB, sind in der ersten Auswertung
-  **getrennt** auszuweisen (nicht löschen).
-- **A7 will den Allowance-Probe** (`scripts/probe_allowance.py`, 5 Punkte) — das
-  ist Operator-Arbeit, nicht Code.
-- **Block B0** (Plan §6, Zeile 877): Gating-Live-Check `CHART:{epic}:1MINUTE`.
-  Beide Zweige ausgeplant.
-- **Block C1** (Plan §6, Zeile 997): S3-Fremdquelle — Wahl wird auf nach Block B
-  vertagt.
-- **Offen für A7:** der Staleness-Guard am Tracker (Pendant zu A6.1 für den
-  Sampler). Heute lässt `paper.py` einen Trade, dessen einzige Bar stale ist,
-  ungehindert durch. Sollte vor dem ersten Neustart ergänzt werden.
-- **`main` liegt jetzt 11 Commits vor `origin/main`** (inkl. dieses Commits) —
+- **Block B0** — `phase13_live_data/scripts/probe_chart_stream.py` (NEU,
+  ~50 Zeilen, operator-run, kostenlos). Beide Zweige ausgeplant (JA →
+  B1/B2/B3; NEIN → Tick-Aggregation als Primärpfad mit `tick_count`-
+  Perzentilen). Empfehlung: **B0 zuerst**, dann Neustart-Sequenz aus §3.
+- **Tracker-Stale-Mini-Step** — 5 Zeilen in `paper.py` analog zu A6.1,
+  mit 1 Test. Empfehlung: **nach dem ersten Neustart-Tag**, sobald die
+  Beweiswoche läuft und der Live-Stand kalibriert ist. In einer eigenen
+  Session, nicht in der Block-B-Initialisierung vermischen.
+- **Block C1** — S3-Fremdquelle. Wahl wird auf nach Block B vertagt
+  (Plan §6 C1.0 Entscheidung).
+- **Block C2 / C3** — S4 `GapRescue` + `source_delta.py`. S4 ist Default AUS
+  (erst nach S1/S2/S3 kalibrieren), C3 ist die Bilanz-Diagnostik (P6).
+- **`main` ist 12 Commits vor `origin/main`** (inkl. dieses Commits).
   Push bleibt bewusste Einzelfreigabe des Nikinger.
 
 ### Open questions / blockers
 
-- **Pause, Nikinger-Auflage.** Beide Steps (A5+A6) sind committet. Block A
-  wartet auf A7; Block B wartet auf den `CHART:`-Live-Check.
-- **A6.0-Schwelle nicht gemessen** — `threshold_pct=0.5` ist der alte Wert.
-  Block A misst die reale Verteilung; eine Justierung könnte folgen.
-- **Der Staleness-Guard am Tracker** (siehe Next) ist die einzige offene
-  Tracker-Lücke — sie ist klein (5 Zeilen) und gehört vor den ersten Neustart.
-
+- **Kein technischer Blocker.** Bot steht sicher, Recorder sammelt
+  kostenlos weiter, Block A strukturell fertig.
+- **Die Tracker-Stale-Lücke** (siehe §5 des Closeouts) bleibt offen, bis
+  eine eigene Session sie angeht — ist sie gewollt?
+- **P7 dünn** — ohne B0 zuerst ist der erste Beweiswochen-Tag ein
+  finanzielles Risiko. Empfehlung an den Nikinger: **erst B0, dann §3**.
+- **Push von `main`** — 12 Commits seit `origin/main`, alle Phase 13. Ein
+  Push macht den Live-Stand für eine externe Review sichtbar, falls der
+  Nikinger das wünscht. Sonst bleibt es bei der lokalen Historie.
