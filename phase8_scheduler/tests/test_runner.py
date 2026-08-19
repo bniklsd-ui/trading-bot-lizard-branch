@@ -232,6 +232,7 @@ def _make_runner(
     shadow_pair_scheduler=None,
     daily_health_check=None,
     max_iterations: int | None = 1,
+    bar_stream=None,
 ):
     cfg = config or _config(tmp_path)
     sleep = _RecordingSleep()
@@ -253,6 +254,7 @@ def _make_runner(
         shadow_pair_scheduler=shadow_pair_scheduler,
         daily_health_check=daily_health_check,
         max_iterations=max_iterations,
+        bar_stream=bar_stream,
     )
     return runner, sleep, store, cfg
 
@@ -910,6 +912,159 @@ def test_reconcile_throttle(tmp_path) -> None:
 
 def test_exported_from_package_root() -> None:
     assert ExportedSchedulerRunner is SchedulerRunner
+
+
+# --- Phase 13 §6 B3: bar-stream lifecycle ---------------------------------
+
+
+class _FakeBarStream:
+    """Duck-typed stand-in for ``LSBarRecorder``. Records start/stop/restart."""
+
+    def __init__(
+        self, *, start_raises: bool = False, stop_raises: bool = False,
+        restart_raises: bool = False,
+    ) -> None:
+        self.start_calls = 0
+        self.stop_calls = 0
+        self.restart_calls = 0
+        self._start_raises = start_raises
+        self._stop_raises = stop_raises
+        self._restart_raises = restart_raises
+
+    def start(self) -> None:
+        self.start_calls += 1
+        if self._start_raises:
+            raise RuntimeError("boom")
+
+    def stop(self) -> None:
+        self.stop_calls += 1
+        if self._stop_raises:
+            raise RuntimeError("boom")
+
+    def restart(self) -> None:
+        self.restart_calls += 1
+        if self._restart_raises:
+            raise RuntimeError("boom")
+
+
+def test_bar_stream_none_default_is_bit_identical(tmp_path) -> None:
+    """The default ``bar_stream=None`` keeps pre-B3 behaviour: no start call,
+    no restart, no shutdown attempt. A scheduler that doesn't pass a stream
+    must not even look at one."""
+    stream = _FakeBarStream()
+    broker = _FakeBroker()
+    runner, _, _, _ = _make_runner(
+        tmp_path,
+        times=[_WINDOW_T],
+        broker=broker,
+        preflight_fn=lambda: None,
+        bar_stream=None,
+    )
+    runner.preflight()
+    assert stream.start_calls == 0
+    assert stream.stop_calls == 0
+    assert stream.restart_calls == 0
+
+
+def test_bar_stream_starts_in_preflight_after_universe_refresher(tmp_path) -> None:
+    """preflight() must call ``bar_stream.start()`` exactly once, after the
+    universe-refresh pass (so the recorder subscribes to the fresh epics,
+    not the boot-time empty set)."""
+    stream = _FakeBarStream()
+    broker = _FakeBroker()
+    call_order: list[str] = []
+    def _refresh() -> None:
+        call_order.append("refresh")
+    runner, _, _, _ = _make_runner(
+        tmp_path,
+        times=[_WINDOW_T],
+        broker=broker,
+        universe_refresher=_refresh,
+        preflight_fn=lambda: None,
+        bar_stream=stream,
+    )
+    runner.preflight()
+    assert stream.start_calls == 1
+    assert call_order == ["refresh"]  # refresh came first
+
+
+def test_bar_stream_restart_on_token_rotation(tmp_path) -> None:
+    """A successful ``broker.connect()`` inside ``_warm_session`` (the
+    token-rotation path) triggers exactly one ``bar_stream.restart()`` —
+    the old LS subscription is on a stale CST/XST and would be auth-rejected
+    on its next keepalive."""
+    stream = _FakeBarStream()
+    broker = _FakeBroker()  # starts disconnected → connect() runs
+    runner, _, _, _ = _make_runner(
+        tmp_path,
+        times=[_WINDOW_T],
+        broker=broker,
+        preflight_fn=lambda: None,
+        bar_stream=stream,
+    )
+    runner._warm_session()
+    assert broker.connect_calls == 1
+    assert stream.restart_calls == 1
+
+
+def test_bar_stream_no_restart_when_already_connected(tmp_path) -> None:
+    """If the broker is **already** connected (``is_connected()`` returns
+    True), ``_warm_session`` is a no-op and so is the restart hook —
+    a no-op connect must not trigger a needless LS teardown/rebuild."""
+    stream = _FakeBarStream()
+    broker = _FakeBroker(connected=True)  # already connected
+    runner, _, _, _ = _make_runner(
+        tmp_path,
+        times=[_WINDOW_T],
+        broker=broker,
+        preflight_fn=lambda: None,
+        bar_stream=stream,
+    )
+    runner._warm_session()
+    assert broker.connect_calls == 0
+    assert stream.restart_calls == 0
+
+
+def test_bar_stream_stops_during_shutdown_even_if_reconcile_raised(tmp_path) -> None:
+    """A reconcile that threw during ``shutdown()`` must not skip the
+    bar-stream stop — both are guarded separately, both must run."""
+    stream = _FakeBarStream()
+    class _RaisingReconciler:
+        def tick(self, _state) -> None:
+            raise RuntimeError("reconcile boom")
+    broker = _FakeBroker(connected=True)
+    runner, _, _, _ = _make_runner(
+        tmp_path,
+        times=[_WINDOW_T],
+        broker=broker,
+        reconciler=_RaisingReconciler(),
+        preflight_fn=lambda: None,
+        bar_stream=stream,
+    )
+    state = SchedulerState(date="2026-08-19")
+    runner.shutdown(state)
+    assert stream.stop_calls == 1, "stream.stop must run even if reconcile raised"
+
+
+def test_bar_stream_start_raises_does_not_kill_daemon(tmp_path) -> None:
+    """A failed ``stream.start()`` (e.g. IG rate-limit) logs critical but
+    does NOT crash the daemon. Same fail-soft contract as
+    ``_run_universe_refresher`` and ``daily_health_check`` — measurement
+    arm failures never bring down the safety arm."""
+    stream = _FakeBarStream(start_raises=True)
+    broker = _FakeBroker()
+    runner, _, _, _ = _make_runner(
+        tmp_path,
+        times=[_WINDOW_T],
+        broker=broker,
+        preflight_fn=lambda: None,
+        bar_stream=stream,
+    )
+    # Must not raise (preflight is fail-closed only for pref-light,
+    # not for measurement-arm startup).
+    with caplog_at(logging.CRITICAL):
+        runner.preflight()
+    assert stream.start_calls == 1
 
 
 # --- helper ----------------------------------------------------------------

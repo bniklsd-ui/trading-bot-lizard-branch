@@ -234,6 +234,7 @@ class SchedulerRunner:
         shadow_pair_scheduler: Callable[[], Any] | None = None,
         daily_health_check: Callable[[], Any] | None = None,
         max_iterations: int | None = None,
+        bar_stream: Any | None = None,
     ) -> None:
         self._clock = clock
         self._state_store = state_store
@@ -250,6 +251,11 @@ class SchedulerRunner:
         self._shadow_pair_scheduler = shadow_pair_scheduler
         self._daily_health_check = daily_health_check
         self._max_iterations = max_iterations
+        # Phase 13 §6 B3: optional LSBarRecorder-adjacent stream client. ``None``
+        # is the default and means the runner is bit-identical to pre-B3.
+        # ``enable_bar_stream=False`` keeps the keyword arg unused but the
+        # attribute set, so wiring code doesn't have to branch.
+        self._bar_stream = bar_stream
         # Non-sticky graceful-stop flag (set by request_stop(), checked at the loop top).
         # Deliberately NOT the kill-switch file: a SIGTERM-driven stop must not persist a
         # halt that would block the next restart (the KILL file is for genuine, sticky halts).
@@ -283,6 +289,12 @@ class SchedulerRunner:
             raise PreflightError(f"broker connect failed: {env.error}")
 
         self._run_universe_refresher()
+        # Phase 13 §6 B3: bar-stream start sits **after** the universe-refresh
+        # pass so the recorder subscribes to the freshly-resolved epics, not
+        # the boot-time empty set. Best-effort: a failed start logs critical
+        # but does not block the daemon — the recorder is a measurement arm,
+        # not a safety input.
+        self._start_bar_stream()
 
     # --- graceful stop -----------------------------------------------------
 
@@ -422,6 +434,11 @@ class SchedulerRunner:
             self._reconciler.tick(state)
         except Exception:  # noqa: BLE001 — a failed final reconcile must not crash the shutdown
             logger.critical("shutdown reconcile failed", exc_info=True)
+        # Phase 13 §6 B3: bar-stream stop is its own guarded block — a final
+        # reconcile that raised must not skip the stream stop. (We do NOT
+        # need the broker session to stop the stream: the stream owns its
+        # own LS connection.)
+        self._stop_bar_stream()
         try:
             self._broker.disconnect()
         except Exception:  # noqa: BLE001 — a failed disconnect must not crash the shutdown
@@ -441,6 +458,58 @@ class SchedulerRunner:
         env = self._broker.connect()
         if not env.ok:  # Envelope is a dataclass (.ok / .error), NOT a mapping — see _EnvelopeLike
             raise SchedulerError(f"broker connect failed: {env.error}")
+        # Phase 13 §6 B3: token rotation. IG returns a new CST/XST on every
+        # successful ``connect()`` — the LS subscription built on the old
+        # auth header is now stale, so we tear it down and re-subscribe
+        # (the recorder does this in ``LSBarRecorder.restart``).
+        self._restart_bar_stream()
+
+    # --- Phase 13 §6 B3: bar stream lifecycle -----------------------------
+
+    def _start_bar_stream(self) -> None:
+        """Start the LSBarRecorder-adjacent stream. Fail-soft, never raises.
+
+        Best-effort by design: the recorder is a **measurement** arm, not
+        a safety input. A failed start logs critical but lets the daemon
+        continue. ``None`` (pre-B3, or operator didn't pass one) is a no-op.
+        """
+        if self._bar_stream is None:
+            return
+        try:
+            self._bar_stream.start()
+            logger.info("bar stream started (Phase 13 S1)")
+        except Exception:  # noqa: BLE001 — never crash the daemon on stream failure
+            logger.critical("bar stream start failed (daemon continues)", exc_info=True)
+
+    def _stop_bar_stream(self) -> None:
+        """Stop the bar stream. Idempotent. Fail-soft."""
+        if self._bar_stream is None:
+            return
+        try:
+            self._bar_stream.stop()
+        except Exception:  # noqa: BLE001
+            logger.critical("bar stream stop failed", exc_info=True)
+
+    def _restart_bar_stream(self) -> None:
+        """Hook for the token-rotation path (``_warm_session``). If the
+        recorder exposes ``restart()`` (e.g. ``LSBarRecorder.restart``), call
+        it; otherwise fall back to stop+start. ``None`` is a no-op.
+
+        Critically: this is called from ``_warm_session`` **after** a
+        successful ``broker.connect()`` — the new CST/XST is now active,
+        and the LS subscription built on the old one would be auth-rejected
+        on its next keepalive.
+        """
+        if self._bar_stream is None:
+            return
+        try:
+            if hasattr(self._bar_stream, "restart"):
+                self._bar_stream.restart()
+            else:
+                self._bar_stream.stop()
+                self._bar_stream.start()
+        except Exception:  # noqa: BLE001
+            logger.critical("bar stream restart failed", exc_info=True)
 
     def _maybe_reconcile(
         self, state: SchedulerState, now: datetime, *, force: bool = False

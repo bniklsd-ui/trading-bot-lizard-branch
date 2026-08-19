@@ -121,6 +121,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "Default OFF (der Nikinger scharfschaltet bewusst).",
     )
     parser.add_argument(
+        "--enable-bar-stream",
+        action="store_true",
+        help="enable Phase 13 §6 B3 LSBarRecorder — the Lightstreamer candle "
+        "subscription (CHART:{epic}:1MINUTE) that writes S1 candles to "
+        "``data/bars.sqlite`` with source='ls' + tick_count. Costs **0** IG "
+        "points (Lightstreamer-Kontingent, not the historical-data-allowance). "
+        "Default OFF (der Nikinger scharfschaltet bewusst).",
+    )
+    parser.add_argument(
         "--no-measurement-heartbeat",
         action="store_true",
         help="disable the Phase 12 (Datenfundament, Step 6 / D13) daily measurement "
@@ -155,6 +164,7 @@ def config_from_args(args: argparse.Namespace) -> SchedulerConfig:
         enable_paper_debate=args.enable_paper_debate,
         enable_shadow_schedule=args.enable_shadow_schedule,
         enable_divergence_sampler=args.enable_divergence_sampler,
+        enable_bar_stream=args.enable_bar_stream,
         enable_measurement_heartbeat=not args.no_measurement_heartbeat,
     )
 

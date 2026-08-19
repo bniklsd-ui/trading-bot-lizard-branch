@@ -1070,6 +1070,57 @@ def build_scheduler(
                 "Run `python phase2_persistence/scripts/init_db.py` before starting the daemon."
             )
 
+    # Phase 13 §6 B3: build the LSBarRecorder-adjacent stream + recorder only
+    # when the operator has armed the flag. Default ``None`` keeps pre-B3
+    # behaviour (no stream, no recorder — the runner is bit-identical to
+    # before Phase 13). ``enable_bar_stream=False`` is the only sane state
+    # for the first Beweiswoche; flip to True only after the B0 probe has
+    # confirmed CHART delivers on this account.
+    bar_stream = None
+    if config.enable_bar_stream:
+        try:
+            from broker_wrapper.streaming.ig_lightstreamer import IGLightstreamerClient
+            from live_data.stream import LSBarRecorder
+            from universe import UniverseStore
+
+            # The LS client shares the broker's CST/XST/endpoint/account_id
+            # (the broker ``connect()`` ran in preflight — the same token
+            # is reused; IG's ``account_id`` is part of the LS user field,
+            # not a second auth).
+            ls_client = IGLightstreamerClient(
+                cst=broker._cst,
+                security_token=broker._security_token,
+                account_id=broker._account_id,
+                lightstreamer_endpoint=broker._lightstreamer_endpoint,
+            )
+
+            def _epics_in_measurable() -> list[str]:
+                """Own connection: UniverseStore reads from the shared DB on
+                every call. Cheap (single short transaction), and avoids
+                holding a long-lived store open in a closure that runs
+                for days.
+                """
+                store = UniverseStore(_DB_PATH)
+                try:
+                    return [r.epic for r in store.measurable_universe()]
+                finally:
+                    store.close()
+
+            recorder = LSBarRecorder(
+                stream=ls_client,
+                archive=bar_archive,
+                epics_fn=_epics_in_measurable,
+                resolution="1m",
+                health_sink=lambda ev: record_event(
+                    config.observability_path, ev,
+                ),
+            )
+            # The runner expects an object with ``start`` / ``stop`` (and
+            # optionally ``restart``); the recorder is exactly that.
+            bar_stream = recorder
+        except Exception as exc:  # noqa: BLE001 — best-effort, log and continue
+            logger.critical("bar stream build failed (daemon continues without it): %s", exc)
+
     return SchedulerRunner(
         clock=clock,
         state_store=state_store,
@@ -1086,4 +1137,5 @@ def build_scheduler(
         shadow_pair_scheduler=shadow_pair_scheduler,
         daily_health_check=daily_health_check,
         max_iterations=max_iterations,
+        bar_stream=bar_stream,
     )

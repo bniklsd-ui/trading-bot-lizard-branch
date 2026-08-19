@@ -206,6 +206,14 @@ class SchedulerConfig:
     # Nikinger arms it consciously rather than it turning on silently under a Step-6 commit.
     enable_divergence_sampler: bool = False
 
+    # Phase 13 §6 B3: `enable_bar_stream` arms the LSBarRecorder-adjacent
+    # Lightstreamer candle subscription. Same discipline as
+    # `enable_shadow_schedule`: default OFF, the operator arms it consciously
+    # rather than it turning on silently. The recorder is a **measurement**
+    # arm (writes candles to ``data/bars.sqlite``); the daemon is fully usable
+    # without it.
+    enable_bar_stream: bool = False
+
     # --- paths (gitignored data/ tree) ---
     live_db_path: str = "data/trading_bot.sqlite"          # the real P2 DB
     state_path: str = "data/state/scheduler_state.json"

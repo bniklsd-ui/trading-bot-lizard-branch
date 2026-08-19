@@ -81,6 +81,18 @@ def test_enable_divergence_sampler_flag_threads_through() -> None:
     )
 
 
+def test_enable_bar_stream_flag_threads_through() -> None:
+    """Phase 13 §6 B3: --enable-bar-stream is the operator-side arm for
+    the LSBarRecorder-adjacent Lightstreamer candle subscription. Default
+    OFF (same discipline as --enable-shadow-schedule, --enable-divergence-sampler).
+    """
+    assert config_from_args(parse_args([])).enable_bar_stream is False
+    assert (
+        config_from_args(parse_args(["--enable-bar-stream"])).enable_bar_stream
+        is True
+    )
+
+
 def test_no_measurement_heartbeat_flag_threads_through() -> None:
     assert config_from_args(parse_args([])).enable_measurement_heartbeat is True
     assert (
