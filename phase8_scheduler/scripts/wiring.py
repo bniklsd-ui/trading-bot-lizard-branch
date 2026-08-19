@@ -972,7 +972,7 @@ def build_scheduler(
                 # bestehenden universe_refresher-Slot im selben Pass") — no new runner seam.
                 # DivergenceSampler throttles itself to once/epic/day internally, so this
                 # running several times/day (universe_refresh_interval_min) is harmless.
-                from data_foundation.models import DS_MISMATCH
+                from data_foundation.models import DS_MISMATCH, DS_STALE_SOURCE
 
                 def _mark_mismatch(epic: str) -> None:
                     rec = universe_store.get(epic)
@@ -992,8 +992,28 @@ def build_scheduler(
                         epic,
                     )
 
+                def _mark_stale(epic: str) -> None:
+                    # Phase 13 §6 A6.1: F1 — IG liefert eine Bar, die älter als
+                    # stale_tolerance_min ist (z.B. IX.D.IBEX.FWM2.IP mit 32-Tage-alter
+                    # Historie und ok=True). Der Sampler meldet das; wir setzen den
+                    # Registry-Status, damit measurable_universe() den Epic fallen lässt,
+                    # bis ein Operator den Resolver neu laufen lässt.
+                    rec = universe_store.get(epic)
+                    if rec is None:
+                        return
+                    universe_store.set_symbol(
+                        epic, rec.yf_ticker, symbol_source=rec.symbol_source, status=DS_STALE_SOURCE
+                    )
+                    logger.critical(
+                        "divergence sampler: %s marked data_source_status=stale_source — "
+                        "IG returned a bar older than the configured tolerance (likely F1: "
+                        "tote Forward-Historie mit ok=True). Dropped from "
+                        "measurable_universe() until operator re-runs the SymbolResolver.",
+                        epic,
+                    )
+
                 for rec in universe_store.measurable_universe():
-                    divergence_sampler.sample_epic(rec.epic, _mark_mismatch)
+                    divergence_sampler.sample_epic(rec.epic, _mark_mismatch, _mark_stale)
         finally:
             universe_store.close()
 
@@ -1022,6 +1042,11 @@ def build_scheduler(
                 "pairs_resolved": verdict.pairs_resolved,
                 "pairs_typed_expired": verdict.pairs_typed_expired,
                 "measurable_epics": verdict.measurable_epics,
+                # Phase 13 §6 A6.2: coverage-Felder (worst + below-list) — Alarm
+                # wenn ein ok-Epic unter MIN_WINDOW_RATIO liegt (F3: 496 Bars pro
+                # Epic, trotzdem löchrige Fenster).
+                "worst_coverage": verdict.worst_coverage,
+                "epics_below_threshold": verdict.epics_below_threshold,
                 "ok": verdict.ok,
                 "problems": verdict.problems,
             })

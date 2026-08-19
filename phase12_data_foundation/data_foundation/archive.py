@@ -142,6 +142,7 @@ class BarArchive:
         end_utc: str,
         *,
         prefer: tuple[str, ...] = ("ig", "ls", "yf"),
+        sources: tuple[str, ...] | None = None,
     ) -> list[Bar]:
         """Return one ``Bar`` per distinct ``ts_utc`` in ``[start_utc, end_utc)``
         (start inclusive, end exclusive — avoids double-counting at adjacent-window
@@ -149,12 +150,28 @@ class BarArchive:
 
         When multiple sources cover the same minute, the first source in ``prefer``
         wins (default: IG real-time beats a Lightstreamer mitschrieb beats yFinance).
+
+        ``sources`` (Phase 13 §6 A5, L10): when set, the SQL ``WHERE`` is filtered
+        to that source *before* the ``prefer`` ranking — so a quellenrein (single-
+        source) read is possible without callers having to re-filter the result.
+        Sample use: ``archive.window(epic, "1m", start, end, sources=("yf",))``
+        feeds the source-delta report + the (repaired) divergence sampler without
+        leakage from IG rows.
         """
-        rows = self.conn.execute(
-            "SELECT * FROM bars WHERE epic = ? AND resolution = ? "
-            "AND ts_utc >= ? AND ts_utc < ? ORDER BY ts_utc ASC",
-            (epic, resolution, start_utc, end_utc),
-        ).fetchall()
+        if sources is not None:
+            placeholders = ",".join("?" for _ in sources)
+            rows = self.conn.execute(
+                f"SELECT * FROM bars WHERE epic = ? AND resolution = ? "
+                f"AND ts_utc >= ? AND ts_utc < ? AND source IN ({placeholders}) "
+                f"ORDER BY ts_utc ASC",
+                (epic, resolution, start_utc, end_utc, *sources),
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM bars WHERE epic = ? AND resolution = ? "
+                "AND ts_utc >= ? AND ts_utc < ? ORDER BY ts_utc ASC",
+                (epic, resolution, start_utc, end_utc),
+            ).fetchall()
         by_ts: dict[str, sqlite3.Row] = {}
         rank = {src: i for i, src in enumerate(prefer)}
         default_rank = len(prefer)

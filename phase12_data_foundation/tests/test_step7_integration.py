@@ -45,20 +45,34 @@ class _RaisingProvider:
 def archive(tmp_path) -> BarArchive:
     a = BarArchive(tmp_path / "bars.sqlite")
     a.ensure_schema()
-    a.insert_bars([
+    # Phase 13 §6 A6.2: assess_day now checks coverage (MIN_WINDOW_RATIO=0.9) per
+    # measurable epic over the full day. This test isn't about coverage — it's about
+    # the resolution flow — so we insert a dense baseline of 1-min bars covering
+    # the day, then override the SL/TP bar at 09:10 with the low that triggers
+    # both legs. INSERT OR IGNORE keeps the FIRST insertion at a given (ts, source)
+    # — the special bars must be inserted *before* the loop's generic ones, or
+    # the loop's 09:10 (low=100) wins and the SL trigger never fires.
+    from datetime import datetime, timedelta, timezone
+    day_start = datetime.strptime(DAY, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    bars = [
+        # 09:05: the entry bar (BUY trigger condition met later)
         Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T09:05:00.000Z",
             open=100, high=101, low=99, close=100, volume=10,
             source="yf", fetched_at=f"{DAY}T09:05:01.000Z"),
-        # SL for the BUY leg (low <= 90.5) and TP for the SELL leg (low <= 80) in one bar.
+        # 09:10: SL for BUY (low <= 90.5) and TP for SELL (low <= 80) in one bar.
         Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T09:10:00.000Z",
             open=100, high=101, low=79, close=80, volume=10,
             source="yf", fetched_at=f"{DAY}T09:10:01.000Z"),
-        # Tail coverage so the partial window [10:00, 10:05) is non-empty in the
-        # archive (does not affect resolution — both legs already resolved at 09:10).
-        Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T10:04:30.000Z",
-            open=80, high=80, low=80, close=80, volume=10,
-            source="yf", fetched_at=f"{DAY}T10:04:31.000Z"),
-    ])
+    ]
+    bars.extend(
+        Bar(epic=EPIC, resolution="1m",
+            ts_utc=(day_start + timedelta(minutes=m)).strftime("%Y-%m-%dT%H:%M:00.000Z"),
+            open=100, high=100, low=100, close=100, volume=10,
+            source="yf", fetched_at=f"{DAY}T08:55:01.000Z")
+        for m in range(24 * 60)
+        if m not in (65, 70)  # 65=09:05, 70=09:10 — keep the special bars
+    )
+    a.insert_bars(bars)
     yield a
     a.close()
 

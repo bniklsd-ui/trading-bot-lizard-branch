@@ -163,6 +163,82 @@ def test_bars_written_since_counts_distinct_minute_not_per_source(archive):
     assert archive.bars_written_since("2026-08-11T00:00:00.000Z") == 2
 
 
+# -- Phase 13 §6 A5: sources filter (L10) --------------------------------------
+
+
+def test_window_sources_filter_returns_only_matching_source(archive):
+    """``sources=("yf",)`` returns only yF rows — even when IG rows for the same
+    minutes exist in the archive."""
+    archive.insert_bars([
+        _bar(ts="2026-08-11T09:00:00.000Z", source=SOURCE_YF),
+        _bar(ts="2026-08-11T09:00:00.000Z", source=SOURCE_IG),
+        _bar(ts="2026-08-11T09:01:00.000Z", source=SOURCE_YF),
+    ])
+    rows = archive.window(
+        "IX.D.DAX.IFMM.IP", "1m",
+        "2026-08-11T00:00:00.000Z", "2026-08-11T10:00:00.000Z",
+        sources=("yf",),
+    )
+    assert len(rows) == 2
+    assert all(b.source == "yf" for b in rows)
+
+
+def test_window_sources_none_keeps_unfiltered_contract(archive):
+    """``sources=None`` is the default — bit-identical to pre-A5."""
+    archive.insert_bars([
+        _bar(ts="2026-08-11T09:00:00.000Z", source=SOURCE_YF),
+        _bar(ts="2026-08-11T09:00:00.000Z", source=SOURCE_IG),
+    ])
+    rows = archive.window(
+        "IX.D.DAX.IFMM.IP", "1m",
+        "2026-08-11T00:00:00.000Z", "2026-08-11T10:00:00.000Z",
+    )
+    # Without `sources`, the prefer-ranking collapses to one row per ts_utc.
+    # Default prefer=("ig","ls","yf") so IG wins.
+    assert len(rows) == 1
+    assert rows[0].source == "ig"
+
+
+def test_window_sources_combined_with_prefer(archive):
+    """``sources`` filters first, ``prefer`` ranks within the surviving set."""
+    archive.insert_bars([
+        _bar(ts="2026-08-11T09:00:00.000Z", source=SOURCE_YF),
+        _bar(ts="2026-08-11T09:00:00.000Z", source=SOURCE_IG),
+    ])
+    rows = archive.window(
+        "IX.D.DAX.IFMM.IP", "1m",
+        "2026-08-11T00:00:00.000Z", "2026-08-11T10:00:00.000Z",
+        sources=("yf", "ig"),  # both pass the filter
+        prefer=("yf", "ig"),   # but yF wins within them
+    )
+    assert len(rows) == 1
+    assert rows[0].source == "yf"
+
+
+def test_window_sources_unknown_source_returns_empty(archive):
+    """A sources tuple that doesn't match any row is a no-op, not an error."""
+    archive.insert_bars([_bar(ts="2026-08-11T09:00:00.000Z", source=SOURCE_YF)])
+    rows = archive.window(
+        "IX.D.DAX.IFMM.IP", "1m",
+        "2026-08-11T00:00:00.000Z", "2026-08-11T10:00:00.000Z",
+        sources=("nonexistent",),
+    )
+    assert rows == []
+
+
+def test_insert_bars_writes_tick_count_none_without_error(archive):
+    """A2 added the ``tick_count`` column; A5 pins that ``None`` round-trips for
+    callers that don't care about the new field (the yF recorder, the legacy
+    test fixtures)."""
+    bar = _bar(ts="2026-08-11T09:00:00.000Z", source=SOURCE_YF)
+    assert archive.insert_bars([bar]) == 1
+    rows = archive.window("IX.D.DAX.IFMM.IP", "1m",
+                          "2026-08-11T00:00:00.000Z", "2026-08-11T10:00:00.000Z",
+                          sources=("yf",))
+    assert len(rows) == 1
+    assert rows[0].tick_count is None
+
+
 class TestNormalizeBarTs:
     def test_ig_classic_format(self):
         assert normalize_bar_ts("2026/08/11 09:00:00") == "2026-08-11T09:00:00.000Z"

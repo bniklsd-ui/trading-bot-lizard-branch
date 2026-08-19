@@ -27,6 +27,8 @@ class HealthVerdict:
     pairs_resolved: int
     pairs_typed_expired: int
     measurable_epics: int
+    worst_coverage: float
+    epics_below_threshold: list[str]
     ok: bool
     problems: list[str]
 
@@ -92,9 +94,35 @@ def assess_day(
 
     store = UniverseStore(universe_db_path)
     try:
-        measurable_epics = len(store.measurable_universe())
+        measurable_epics_records = store.measurable_universe()
+        measurable_epics = len(measurable_epics_records)
     finally:
         store.close()
+
+    # Phase 13 §6 A6.2: coverage statt Bar-Zählung. F3 hat gezeigt, dass 496 yF-Bars
+    # pro Epic ≠ "Fenster ist dicht" — eine Mitten-Lücke kann das Mess-Substrat
+    # unbrauchbar machen, ohne dass die Zählung das anzeigt. assess_window über das
+    # Tages-Fenster ist die einzige preiswerte Operation, die beides misst (Dichte
+    # und größte zusammenhängende Lücke).
+    from data_foundation.coverage import MIN_WINDOW_RATIO, assess_window
+
+    worst_coverage = 1.0
+    epics_below_threshold: list[str] = []
+    if measurable_epics > 0:
+        for epic_record in measurable_epics_records:
+            epic = epic_record.get("epic") if isinstance(epic_record, dict) else getattr(epic_record, "epic", None)
+            if not epic:
+                continue
+            timestamps = [
+                b.ts_utc for b in archive.window(
+                    epic, "1m", start, end, sources=("yf",),
+                )
+            ]
+            verdict = assess_window(timestamps, start, end, 1)
+            if verdict.ratio < worst_coverage:
+                worst_coverage = verdict.ratio
+            if verdict.largest_gap_min > 5:  # MAX_WINDOW_GAP_MIN — same threshold as A1
+                epics_below_threshold.append(epic)
 
     problems: list[str] = []
     ok = True
@@ -115,6 +143,12 @@ def assess_day(
     if shadow_enabled and pairs_resolved == 0 and pairs_typed_expired == 0:
         problems.append("shadow pairs enabled but zero resolved/expired paper trades today")
         ok = False
+    if epics_below_threshold:
+        problems.append(
+            f"{len(epics_below_threshold)} measurable epic(s) below the coverage threshold "
+            f"({MIN_WINDOW_RATIO:.0%} density or 5-min gap): {epics_below_threshold}"
+        )
+        ok = False
 
     return HealthVerdict(
         day=day_utc,
@@ -123,6 +157,8 @@ def assess_day(
         pairs_resolved=pairs_resolved,
         pairs_typed_expired=pairs_typed_expired,
         measurable_epics=measurable_epics,
+        worst_coverage=worst_coverage,
+        epics_below_threshold=epics_below_threshold,
         ok=ok,
         problems=problems,
     )
@@ -130,6 +166,33 @@ def assess_day(
 
 def _default_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def compute_return_divergence(ig_bars: list[Any], yf_bars: list[Any]) -> float | None:
+    """Phase 13 §6 A6.0: per-bar log return over both series, return the **difference
+    of returns**. A constant basis (CFD vs Kassa, Forward vs Index) cancels out; a
+    genuine decoupling shows up as a non-zero delta.
+
+    Returns ``None`` if fewer than two bars per series (no return defined) — the
+    caller should emit ``divergence_no_comparator`` rather than silently 0.0, which
+    is the bug Phase 12.5 had (a stuck "no divergence" answer on one-row windows).
+    """
+    if len(ig_bars) < 2 or len(yf_bars) < 2:
+        return None
+    def _returns(bars: list[Any]) -> list[float]:
+        out: list[float] = []
+        for i in range(1, len(bars)):
+            prev, cur = bars[i - 1].close, bars[i].close
+            if prev == 0:
+                continue
+            out.append((cur - prev) / abs(prev))
+        return out
+    ig_r = _returns(ig_bars)
+    yf_r = _returns(yf_bars)
+    if not ig_r or not yf_r:
+        return None
+    n = min(len(ig_r), len(yf_r))
+    return abs(sum(ig_r[:n]) - sum(yf_r[:n]))
 
 
 @dataclass
@@ -146,6 +209,15 @@ class DivergenceSampler:
     Per-epic throttle and mismatch-streak state are held in memory (``dict``s) — reset
     on daemon restart, acceptable for a once-daily sample (Plan §6 Step 6, no test
     requires persistence across restarts).
+
+    Phase 13 §6 A6:
+    - **A6.0 rendite** statt Niveau — siehe :func:`compute_return_divergence`.
+    - **A6.1 stale** — wenn der IG-Bar schon älter als ``stale_tolerance_min`` ist,
+      wird ``mark_stale_fn(epic)`` gerufen statt eines Vergleichs. Knopf getrennt
+      von A4 (Schreibpfad vs Diagnose).
+    - **A6.1 quellenrein** — die yF-Seite kommt aus ``sources=("yf",)`` (L10), nicht
+      aus einer Nachfilterung im Aufrufer.
+    - **A6.1 ehrlich** — kein yF-Komparator ⇒ typisierter Event statt Stille.
     """
 
     budgeted_ig: Any
@@ -153,6 +225,7 @@ class DivergenceSampler:
     threshold_pct: float = 0.5
     health_sink: Callable[[dict], None] | None = None
     now_fn: Callable[[], datetime] = _default_now
+    stale_tolerance_min: int = 120
     _last_sample_date: dict[str, str] = field(default_factory=dict)
     _mismatch_streak: dict[str, int] = field(default_factory=dict)
 
@@ -164,13 +237,20 @@ class DivergenceSampler:
         except Exception:  # noqa: BLE001 — a health sink must never break the sample
             pass
 
-    def sample_epic(self, epic: str, mark_mismatch_fn: Callable[[str], Any]) -> None:
-        """Sample ``epic`` at most once per calendar day; ``mark_mismatch_fn(epic)`` is
-        called after the **second** consecutive divergence, not the first (Plan §6 Step
-        6 test bullet). Deliberately a single-arg callback rather than calling
-        ``UniverseStore.set_symbol`` directly — that call needs the record's existing
-        ``yf_ticker``/``symbol_source`` (a read-then-write the caller already has to do
-        for its own registry access), not something this sampler should know about."""
+    def sample_epic(
+        self, epic: str,
+        mark_mismatch_fn: Callable[[str], Any],
+        mark_stale_fn: Callable[[str], Any],
+    ) -> None:
+        """Sample ``epic`` at most once per calendar day. Two callbacks now:
+
+        * ``mark_mismatch_fn(epic)`` — after the **second** consecutive divergence.
+        * ``mark_stale_fn(epic)`` — when the IG bar is already older than
+          ``stale_tolerance_min``. Sets ``data_source_status=DS_STALE_SOURCE`` (the
+          caller maps the call to the registry).
+
+        Both are single-arg rather than calling the registry directly — same shape
+        as the original callback, just one extra parameter."""
         today = self.now_fn().strftime("%Y-%m-%d")
         if self._last_sample_date.get(epic) == today:
             return
@@ -181,25 +261,55 @@ class DivergenceSampler:
             return  # budget veto or fetch failure — fail-soft, try again tomorrow
         ig_bar = ig_bars[-1]
 
+        # A6.1: Frische-Prüfung. Knopf getrennt von A4 (Plan §6 A6.1: Schreibpfad vs
+        # Diagnose). Bei F1 (tote IG-Historie) wäre der Vergleich gegen yF eine
+        # Fata Morgana — beide Reihen „stimmen überein", weil die IG-Reihe selbst
+        # schon wochenalt ist.
+        ig_age_min = (_parse(self.now_fn().isoformat()) - _parse(ig_bar.ts)).total_seconds() / 60.0
+        if ig_age_min > self.stale_tolerance_min:
+            self._emit({
+                "event": "stale_source", "epic": epic, "provider": "ig",
+                "bar_ts": ig_bar.ts, "age_min": ig_age_min,
+            })
+            mark_stale_fn(epic)
+            return
+
         window_start = ig_bar.ts
         window_end = _iso(_parse(ig_bar.ts) + timedelta(minutes=5))
-        archived = self.archive.window(epic, "1m", window_start, window_end, prefer=("yf",))
-        # `window`'s `prefer` only *ranks* sources when several cover the same minute —
-        # it does not exclude an IG-sourced row from the result. Filtering explicitly is
-        # the only way to guarantee an IG-vs-IG comparison never happens (it would
-        # always agree, silently defeating this whole check).
-        yf_bars = [b for b in archived if b.source == "yf"]
+        # A6.1 + L10: sources-filter macht die yF-Quellenrein-Lesung direkt im Store;
+        # kein Nachfiltern im Aufrufer mehr nötig.
+        archived = self.archive.window(epic, "1m", window_start, window_end, sources=("yf",))
+        yf_bars = list(archived)
         if not yf_bars:
-            return  # Recorder hasn't covered this window yet — nothing to compare
+            # A6.1: ehrlich — kein Komparator ist ein typisierter Event, kein stiller
+            # return. Genau die Stille war F2.
+            self._emit({
+                "event": "divergence_no_comparator", "epic": epic,
+                "ig_bar_ts": ig_bar.ts, "ig_close": ig_bar.close,
+            })
+            return
 
-        from scheduler.observability import check_divergence
-
-        event = check_divergence(epic, ig_bar.close, yf_bars[-1].close, threshold_pct=self.threshold_pct)
-        if event is None:
+        # A6.0: Rendite-Differenz statt Niveau-Differenz. Eine konstante Basis (CFD
+        # vs Kassa, Forward vs Index) fällt heraus, eine echte Entkopplung nicht.
+        delta = compute_return_divergence(ig_bars, yf_bars)
+        if delta is None:
+            # Weniger als 2 Bars je Seite — keine Rendite definiert.
+            self._emit({
+                "event": "divergence_no_comparator", "epic": epic,
+                "ig_bar_ts": ig_bar.ts, "reason": "too_few_bars",
+            })
+            return
+        # ``threshold_pct`` ist in **Prozent** (Default 0.5 = 0.5 %), ``delta`` ist die
+        # Fraktion der kumulierten Return-Differenz. Vergleich in einer Einheit:
+        # delta*100 > threshold_pct ⇔ delta > threshold_pct/100.
+        if delta * 100.0 <= self.threshold_pct:
             self._mismatch_streak[epic] = 0
             return
         self._mismatch_streak[epic] = self._mismatch_streak.get(epic, 0) + 1
-        self._emit(event)
+        self._emit({
+            "event": "quote_divergence", "epic": epic, "delta": delta,
+            "kind": "return",  # A6.0 marker: this is a return-divergence, not level
+        })
         if self._mismatch_streak[epic] >= 2:
             mark_mismatch_fn(epic)
 

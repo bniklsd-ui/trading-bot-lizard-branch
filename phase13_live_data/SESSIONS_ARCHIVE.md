@@ -426,3 +426,47 @@ verbatim when a new one is appended.
 - **Offen bis Block C1:** welche Fremdquelle S3 wird (Plan §6 C1).
 - **`main` liegt jetzt 8 Commits vor `origin/main`** (inkl. dieses Commits) — Push bleibt
   bewusste Einzelfreigabe des Nikinger.
+
+---
+
+## Session stopped — 2026-08-19 (Session 6: Block A4 — Stale-History-Assertion am IG-Kaufort)
+
+> **Auftrag:** Step A4 (Plan §6, Zeile 698). Stale-History-Assertion in
+> `BudgetedIGBarProvider.get_bars` — die IG-typische Falle „ok=True, aber `ts` ist
+> einen Monat alt" (F1) am Kaufort abfangen, nicht erst im Divergenz-Sampler.
+
+### Completed
+
+1. **`data_foundation/models.py`** — `DS_STALE_SOURCE = "stale_source"` in
+   `KNOWN_DATA_SOURCE_STATUSES` aufgenommen. Vorbereitung für A6s Sampler-Callback,
+   der genau diesen Status setzt.
+2. **`data_foundation/service.py`** — drei additive Eingriffe:
+   - `_age_minutes(ts, now) -> float` Helper direkt über `_iso` (kleine Funktion,
+     gleiche TZ-Normalisierung).
+   - `BudgetedIGBarProvider.__init__` bekommt `stale_tolerance_min: int = 120` als
+     letzten keyword-only-Param.
+   - In `get_bars`: **nach** `record_spend(len(bars), self._spend_kind)` und **vor**
+     der `allowance`-Buchung steht jetzt die Frische-Prüfung mit
+     `return None` + `reason="stale_history"`-Event. Kommentar erklärt explizit,
+     warum `record_spend` **vor** dem Verwerfen läuft.
+3. **`tests/test_service.py`** — drei neue Tests + ein bestehender mit
+   `now_fn=lambda: NOW` und frischem Timestamp.
+4. **`tests/test_heartbeat.py`** — `_budgeted_ig`-Helper nimmt `now_fn`-Param
+   weiter; 5 Sampler-Tests reichen `now_fn=lambda: now` durch.
+5. **Rotation:** Session-5-Block wurde **nicht** nach SESSIONS_ARCHIVE rotiert
+   (eine Übersehung). Korrektur im Session-7-Commit (s. dort).
+
+### Verified
+
+- `pytest phase12_data_foundation/tests -q` → **137 passed** (war 134; +3).
+- Voller Regression-Sweep, **alle 12 Suiten grün**.
+- `git diff --stat HEAD~1` → **+104 / −11**.
+
+### Note
+
+- **Was A4 leistet, was A4 nicht leistet:** A4 stoppt tote IG-Historie **am Kaufort**
+  — F1 landet nicht mehr im Archiv. A4 fängt **nicht** den Divergenz-Sampler (F2) —
+  das ist A6.
+- **Test-Fixture-Konsequenz:** sechs bestehende Tests brauchten `now_fn` — ein
+  Frühindikator dafür, dass der A4-Guard in Produktion **auch** andere Pfade
+  empfindlich treffen kann.
