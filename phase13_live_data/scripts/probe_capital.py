@@ -180,6 +180,14 @@ def main(argv: list[str] | None = None) -> int:
     if auth_resp.status_code != 200:
         snippet = (auth_resp.text or "")[:300]
         _eprint(f"[probe_capital] auth HTTP {auth_resp.status_code}: {snippet}")
+        # Capture full response headers + body for diagnostics — the
+        # errorCode alone is often ambiguous (e.g. error.null.accountId
+        # can mean "live key against demo URL" OR "no demo accounts").
+        full_body: dict | str = snippet
+        try:
+            full_body = auth_resp.json()
+        except ValueError:
+            pass
         # Differentiated hint per common error code.
         hint = ""
         if auth_resp.status_code == 429:
@@ -189,6 +197,21 @@ def main(argv: list[str] | None = None) -> int:
         elif "invalid.api.key" in snippet or "invalid.api_key" in snippet:
             hint = ("API key rejected — verify the key is active in "
                     "Settings > API integrations and not paused/expired")
+        elif "null.accountId" in snippet:
+            hint = (
+                "401 + error.null.accountId — credentials are accepted "
+                "but no account is bound to this API key. Two likely "
+                "causes (Capital.com docs FAQ §8.5 explicit, Swagger "
+                "§Generate-API-key): "
+                "(1) the API key was generated on the LIVE platform and "
+                "you're calling the DEMO URL — Capital.com issues separate "
+                "API keys per account type; login to your DEMO account at "
+                "https://demo.capital.com/, navigate to Settings > API "
+                "integrations, generate a separate demo API key with its "
+                "OWN custom password, and re-seed; "
+                "(2) the account's status is SUSPENDED or BLOCKED — check "
+                "your account dashboard"
+            )
         elif "credentials.invalid" in snippet or "error.invalid" in snippet:
             hint = ("Credentials rejected — verify (a) identifier is your "
                     "login EMAIL (not username), (b) password is the "
@@ -200,6 +223,8 @@ def main(argv: list[str] | None = None) -> int:
             "ok": False,
             "error": f"auth_failed_{auth_resp.status_code}",
             "response_snippet": snippet,
+            "response_body": full_body,
+            "response_headers": dict(auth_resp.headers),
             "hint": hint,
         }))
         return 3
