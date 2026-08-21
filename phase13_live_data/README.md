@@ -13,7 +13,7 @@ Phase head / session log: [`CLAUDE.md`](./CLAUDE.md).
 | Module | Responsibility | Status |
 |---|---|---|
 | `stream.py` | `LSBarRecorder` (CHART-Pfad, dormant seit B0=NO 2026-08-19) + `TickAggregator` + `TickAggregatorRecorder` (S1-Primärpfad: PRICE-Tick-Aggregation → 1-min OHLC → `BarArchive`) | ✅ Block B2 + B0.5, 21 Tests |
-| `backfill.py` | `ExternalBackfill` (S3, independent third source) | ⬜ Block C1 (deferred per Plan §6 C1.0 — Wahl auf nach Beweiswoche) |
+| `backfill.py` | `CapitalSource` (S3 PARTIAL — Capital.com für DE40/FR40) + `run_capital_backfill()` (vier quellenunabhängige Regeln aus Plan §6 C1.0) | ✅ Session 12 Step 1, 11 Tests. SP35/AEX/MIB bleiben Path-C-Territorium (Dukascopy, deferred). |
 | `rescue.py` | `GapRescue` (S4, budgeted IG range rescue, default OFF) | ✅ Block C2, 11 Tests |
 
 **Bauprinzip:** zero new AI. Gap detection, coverage assessment, source selection, bar
