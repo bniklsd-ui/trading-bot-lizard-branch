@@ -117,56 +117,72 @@ def main(argv: list[str] | None = None) -> int:
 
     import requests
 
-    # Capital.com's documented session-auth payload uses snake_case
-    # field names — confirmed empirically 2026-08-19: the error code
-    # ``error.null.api.key`` (note the dotted form) is returned when the
-    # ``apiKey`` (camelCase) variant is sent. Snake_case ``api_key``
-    # is the one Capital.com's parser recognises.
-    auth_payload = {
-        "identifier": identifier,
-        "password": password,
-        "api_key": api_key,
-    }
+    # Capital.com's auth accepts one of three common key-name casings;
+    # the demo API's contract is not in any public spec we have access
+    # to (Plan §6 C1.0: IG-Doku-Paywall, vergleichbares gilt für
+    # Capital.com), and the server's error code uses a dotted form
+    # (``api.key``) that doesn't disambiguate which casing the parser
+    # expects. We try them in order — first success wins.
+    auth_attempts = [
+        ("api_key", {"identifier": identifier, "password": password, "api_key": api_key}),
+        ("apiKey",  {"identifier": identifier, "password": password, "apiKey":  api_key}),
+        ("apikey",  {"identifier": identifier, "password": password, "apikey":  api_key}),
+    ]
 
-    if args.debug:
-        # Redact secrets in the debug line — show field names + lengths
-        # so an operator can verify the read was non-empty without
-        # leaking values into a stderr line that might end up in a log.
-        _eprint(
-            f"[probe_capital] debug payload fields: "
-            f"identifier={len(identifier)}c, "
-            f"password={len(password)}c, "
-            f"api_key={len(api_key)}c"
-        )
+    auth_resp = None
+    auth_chosen_field = None
+    for label, payload in auth_attempts:
+        if args.debug:
+            # Redact secret values, keep structure + lengths visible
+            redacted = {
+                "identifier": f"***({len(identifier)}c)",
+                "password":   f"***({len(password)}c)",
+                label:        f"***({len(api_key)}c)",
+            }
+            _eprint(f"[probe_capital] debug auth body (variant={label!r}): "
+                     f"{json.dumps(redacted)}")
 
-    # ---------- auth ----------
-    _eprint(f"[probe_capital] auth POST {args.base}/api/v1/session")
-    try:
-        auth_resp = requests.post(
-            f"{args.base}/api/v1/session",
-            json=auth_payload,
-            timeout=args.timeout,
-        )
-    except requests.RequestException as exc:
-        _eprint(f"[probe_capital] auth request failed: {exc}")
-        print(json.dumps({"ok": False, "error": f"connection_failed: {exc}"}))
-        return 1
+        _eprint(f"[probe_capital] auth POST {args.base}/api/v1/session (variant={label!r})")
+        try:
+            auth_resp = requests.post(
+                f"{args.base}/api/v1/session",
+                json=payload,
+                timeout=args.timeout,
+            )
+        except requests.RequestException as exc:
+            _eprint(f"[probe_capital] auth request failed ({label}): {exc}")
+            print(json.dumps({"ok": False, "error": f"connection_failed: {exc}"}))
+            return 1
 
-    if auth_resp.status_code != 200:
+        if auth_resp.status_code == 200:
+            auth_chosen_field = label
+            break
+
         snippet = (auth_resp.text or "")[:300]
-        _eprint(f"[probe_capital] auth HTTP {auth_resp.status_code}: {snippet}")
-        # If the error code points at "api.key" being null while the
-        # identifier/password were accepted, the field-name casing was
-        # wrong — emit a hint so the operator doesn't have to dig.
-        hint = ""
-        if "api.key" in snippet or "api_key" in snippet:
-            hint = " (looks like Capital.com expects snake_case 'api_key' — already used; check key value)"
+        _eprint(f"[probe_capital] auth HTTP {auth_resp.status_code} ({label}): {snippet}")
+        # If this attempt is the null-api-key error AND we still have
+        # candidates, try the next variant. Other errors stop the loop
+        # immediately (no point in retrying with a different name).
+        if "api.key" not in snippet and "api_key" not in snippet:
+            break
+
+    if auth_resp is None or auth_resp.status_code != 200:
+        snippet = (auth_resp.text or "")[:300] if auth_resp is not None else ""
+        # Last hint reflects the loop outcome
+        hint = (
+            "all three key-name variants failed with 'api.key' null — "
+            "Capital.com's auth contract is undocumented in this repo; "
+            "either consult Capital.com docs directly or fall back to "
+            "Dukascopy (path C, Nikinger ToS-confirmation required)"
+        )
         print(json.dumps({
-            "ok": False, "error": f"auth_failed_{auth_resp.status_code}",
+            "ok": False, "error": f"auth_failed_{auth_resp.status_code if auth_resp else 'unknown'}",
             "response_snippet": snippet,
-            "hint": hint.strip(),
+            "hint": hint,
         }))
         return 3
+
+    _eprint(f"[probe_capital] auth OK with variant={auth_chosen_field!r}")
 
     cst = auth_resp.headers.get("CST", "")
     sec_token = auth_resp.headers.get("X-SECURITY-TOKEN", "")
@@ -193,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
         if acct.get("preferred"):
             account_type = acct.get("accountType", "?")
             break
-    _eprint(f"[probe_capital] auth OK, account_type={account_type}")
+    _eprint(f"[probe_capital] account_type={account_type}")
 
     # ---------- per-index probe ----------
     indices = [s.strip() for s in args.indices.split(",") if s.strip()]
