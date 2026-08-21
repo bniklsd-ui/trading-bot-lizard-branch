@@ -190,3 +190,19 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
   `TickAggregatorRecorder` aktiv), kein Konflikt mit C1.
 - **Push:** weiterhin bewusste Einzelfreigabe. Stand jetzt: **23 Commits**
   vor `origin/main`, alle Phase 13, alle Suiten grün.
+
+### Offene Findings (für Folge-Sessions, nicht in diesem Build-Scope)
+
+- **`phase13_live_data/tests/test_source_delta.py::test_multiple_days_window`**
+  ist seit 2026-08-20 rot. Harte Test-Daten „2026-08-18" / „2026-08-19"
+  liegen außerhalb des `--days 2`-Fensters, sobald `today > 2026-08-19`.
+  Wurde 2026-08-19 in Session 9 (C3, Commit `50a417e`) committet, ist
+  in keinem Phase-13-Code-Pfad erreicht. **Empfohlener Fix:** Test auf
+  `datetime.now()`-relative Daten oder `freezegun` umstellen. ~5 Zeilen.
+- **`probe_capital.py` Capital.com Feld-Naming**: das Auth-POST-Body
+  verwendet snake_case (`identifier`, `password`, **`api_key`** —
+  nicht `apiKey`). Empirisch bestätigt 2026-08-19 durch Nikinger-Live-Run
+  (HTTP 400, `error.null.api.key`). Probe ist gefixt, aber falls eine
+  zweite externe Broker-API mit ähnlichem Auth-Pattern hinzukommt, **ist
+  die Capital.com-Doku im Repo unbekannt** — Fehl-Iterations sind
+  weiterhin Operator-Aufwand, nicht Claude-Aufwand.

@@ -117,16 +117,34 @@ def main(argv: list[str] | None = None) -> int:
 
     import requests
 
+    # Capital.com's documented session-auth payload uses snake_case
+    # field names — confirmed empirically 2026-08-19: the error code
+    # ``error.null.api.key`` (note the dotted form) is returned when the
+    # ``apiKey`` (camelCase) variant is sent. Snake_case ``api_key``
+    # is the one Capital.com's parser recognises.
+    auth_payload = {
+        "identifier": identifier,
+        "password": password,
+        "api_key": api_key,
+    }
+
+    if args.debug:
+        # Redact secrets in the debug line — show field names + lengths
+        # so an operator can verify the read was non-empty without
+        # leaking values into a stderr line that might end up in a log.
+        _eprint(
+            f"[probe_capital] debug payload fields: "
+            f"identifier={len(identifier)}c, "
+            f"password={len(password)}c, "
+            f"api_key={len(api_key)}c"
+        )
+
     # ---------- auth ----------
     _eprint(f"[probe_capital] auth POST {args.base}/api/v1/session")
     try:
         auth_resp = requests.post(
             f"{args.base}/api/v1/session",
-            json={
-                "identifier": identifier,
-                "password": password,
-                "apiKey": api_key,
-            },
+            json=auth_payload,
             timeout=args.timeout,
         )
     except requests.RequestException as exc:
@@ -137,9 +155,16 @@ def main(argv: list[str] | None = None) -> int:
     if auth_resp.status_code != 200:
         snippet = (auth_resp.text or "")[:300]
         _eprint(f"[probe_capital] auth HTTP {auth_resp.status_code}: {snippet}")
+        # If the error code points at "api.key" being null while the
+        # identifier/password were accepted, the field-name casing was
+        # wrong — emit a hint so the operator doesn't have to dig.
+        hint = ""
+        if "api.key" in snippet or "api_key" in snippet:
+            hint = " (looks like Capital.com expects snake_case 'api_key' — already used; check key value)"
         print(json.dumps({
             "ok": False, "error": f"auth_failed_{auth_resp.status_code}",
             "response_snippet": snippet,
+            "hint": hint.strip(),
         }))
         return 3
 
