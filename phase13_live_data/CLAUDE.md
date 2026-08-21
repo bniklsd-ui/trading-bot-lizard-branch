@@ -199,10 +199,14 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
   Wurde 2026-08-19 in Session 9 (C3, Commit `50a417e`) committet, ist
   in keinem Phase-13-Code-Pfad erreicht. **Empfohlener Fix:** Test auf
   `datetime.now()`-relative Daten oder `freezegun` umstellen. ~5 Zeilen.
-- **`probe_capital.py` Capital.com Feld-Naming**: das Auth-POST-Body
-  verwendet snake_case (`identifier`, `password`, **`api_key`** —
-  nicht `apiKey`). Empirisch bestätigt 2026-08-19 durch Nikinger-Live-Run
-  (HTTP 400, `error.null.api.key`). Probe ist gefixt, aber falls eine
-  zweite externe Broker-API mit ähnlichem Auth-Pattern hinzukommt, **ist
-  die Capital.com-Doku im Repo unbekannt** — Fehl-Iterations sind
-  weiterhin Operator-Aufwand, nicht Claude-Aufwand.
+- **`probe_capital.py` Capital.com Auth-Contract** (gelöst 2026-08-19,
+  Session 11 Step 2-research): die korrekte Auth ist
+  `POST {base}/api/v1/session` mit
+  `Header X-CAP-API-KEY: <api_key>` +
+  `Body {"identifier": <email>, "password": <API_KEY_CUSTOM_PASSWORD>, "encryptedPassword": false}`.
+  Der `password` ist NICHT das Account-Login-Passwort, sondern das
+  Custom-Passwort aus der API-Key-Generierung (FAQ §8.8.7 der
+  Capital.com-Doku). Demo-URL ist `demo-api-capital.backend-capital.com`
+  (NICHT `api-capital.backend-capital.com`). Endpoint-Rate-Limit:
+  1 req/s. Quelle: https://capital.com/api (Swagger, gefetcht via
+  webfetch 2026-08-19).
