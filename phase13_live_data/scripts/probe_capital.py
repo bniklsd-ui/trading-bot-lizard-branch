@@ -53,19 +53,34 @@ def _eprint(message: str = "") -> None:
     print(message, file=sys.stderr)
 
 
-def _read_creds() -> tuple[str, str, str]:
-    """Read (identifier, password, api_key) from the project keyring.
+def _read_field(field: str) -> str:
+    """Read one Capital.com credential field from the project keyring.
 
-    Uses ``broker_wrapper.credentials`` (the same path the bot uses for
-    IG creds) with a service-namespace prefix so nothing collides with
-    ``tradingbot`` (live), ``trading-bot-bakeoff-runner`` (M1) or
-    ``trading-bot-minimax`` (A0.0).
+    Uses raw ``keyring`` (not ``broker_wrapper.credentials``) because
+    that helper is hardcoded to ``SERVICE_NAME='tradingbot'`` for the
+    live-bot IG namespace. Capital.com needs its own service prefix,
+    same pattern as ``store_minimax_key.py`` (which uses raw keyring
+    for the same reason).
     """
-    from broker_wrapper.credentials import get_credential
-    identifier = get_credential(f"{_KEYRING_SERVICE}.identifier", fallback_env=False)
-    password = get_credential(f"{_KEYRING_SERVICE}.password", fallback_env=False)
-    api_key = get_credential(f"{_KEYRING_SERVICE}.api_key", fallback_env=False)
-    return identifier, password, api_key
+    import keyring
+    from keyring.errors import KeyringError
+    value = keyring.get_password(_KEYRING_SERVICE, field)
+    if not value:
+        from broker_wrapper.exceptions import CredentialNotFoundError
+        raise CredentialNotFoundError(
+            f"Capital.com credential '{_KEYRING_SERVICE}/{field}' not in keyring — "
+            f"run `python scripts/store_capital_key.py` first"
+        )
+    return value
+
+
+def _read_creds() -> tuple[str, str, str]:
+    """Read (identifier, password, api_key) from the project keyring."""
+    return (
+        _read_field("identifier"),
+        _read_field("password"),
+        _read_field("api_key"),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
