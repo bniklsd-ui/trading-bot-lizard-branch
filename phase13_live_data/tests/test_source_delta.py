@@ -10,7 +10,7 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -264,16 +264,19 @@ def test_multiple_days_window(dbs):
     """``--days N`` covers the trailing N UTC days inclusive. Trades
     on different days count separately."""
     db_path, bars_path = dbs
-    # Trade on 2026-08-18
+    # Use today-relative dates so the test stays inside the
+    # ``--days 2`` window (= [today-1, today]) regardless of when it's run.
+    today = datetime.now(timezone.utc).date()
+    d1 = (today - timedelta(days=1)).isoformat()  # yesterday
+    d2 = today.isoformat()                       # today
     _insert_paper_trade(db_path, paper_id="p-d1",
-                        created_utc="2026-08-18T09:00:00.000Z",
-                        time_stop_utc="2026-08-18T13:00:00.000Z",
-                        resolved_utc="2026-08-18T09:10:00.000Z")
-    # Trade on 2026-08-19
+                        created_utc=f"{d1}T09:00:00.000Z",
+                        time_stop_utc=f"{d1}T13:00:00.000Z",
+                        resolved_utc=f"{d1}T09:10:00.000Z")
     _insert_paper_trade(db_path, paper_id="p-d2",
-                        created_utc="2026-08-19T09:00:00.000Z",
-                        time_stop_utc="2026-08-19T13:00:00.000Z",
-                        resolved_utc="2026-08-19T09:10:00.000Z")
+                        created_utc=f"{d2}T09:00:00.000Z",
+                        time_stop_utc=f"{d2}T13:00:00.000Z",
+                        resolved_utc=f"{d2}T09:10:00.000Z")
     rc, payload = _run(["--days", "2"], db_path, bars_path)
     assert rc == 0
     assert payload["trades_total"] == 2
