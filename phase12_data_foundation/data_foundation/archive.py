@@ -141,7 +141,7 @@ class BarArchive:
         start_utc: str,
         end_utc: str,
         *,
-        prefer: tuple[str, ...] = ("ig", "ls", "yf"),
+        prefer: tuple[str, ...] = ("ig", "capital", "ls", "yf"),
         sources: tuple[str, ...] | None = None,
     ) -> list[Bar]:
         """Return one ``Bar`` per distinct ``ts_utc`` in ``[start_utc, end_utc)``

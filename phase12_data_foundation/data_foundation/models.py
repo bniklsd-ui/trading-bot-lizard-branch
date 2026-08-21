@@ -19,7 +19,10 @@ from data_foundation.exceptions import ArchiveError
 SOURCE_IG = "ig"
 SOURCE_YF = "yf"
 SOURCE_LS = "ls"
-KNOWN_SOURCES: frozenset[str] = frozenset({SOURCE_IG, SOURCE_YF, SOURCE_LS})
+SOURCE_CAPITAL = "capital"  # Phase 13 §6 C1 (Session 12): S3 partial backfill source
+KNOWN_SOURCES: frozenset[str] = frozenset(
+    {SOURCE_IG, SOURCE_YF, SOURCE_LS, SOURCE_CAPITAL}
+)
 
 # Registry `data_source_status` vocabulary (D7, Migration 006 default 'unverified').
 DS_OK = "ok"
