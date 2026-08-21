@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" font-family="Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6470"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1e7a4d"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+  </defs>
+
+  <rect width="1080" height="1080" fill="#f7f8fa"/>
+
+  <text x="40" y="46" font-size="25" font-weight="bold" fill="#1b1f24">Phase 13 — Beschaffung ≠ Verbrauch: vier Stufen, ein Archiv, kein Konsumenten-Kauf</text>
+  <text x="40" y="70" font-size="13.5" fill="#5b6470">Stand 2026-08-22 · Code-complete + live-verifiziert für DE40/FR40 (962 capital-Bars) · Beweiswoche läuft als separater Validierungstrack</text>
+  <line x1="40" y1="84" x2="1040" y2="84" stroke="#d5d9de" stroke-width="1"/>
+
+  <!-- ================= PANEL 1 — FEHLERBILD (kurz) ================= -->
+  <rect x="40" y="100" width="1000" height="200" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="100" width="1000" height="30" rx="6" fill="#fdecea"/>
+  <rect x="40" y="120" width="1000" height="10" fill="#fdecea"/>
+  <text x="56" y="121" font-size="15" font-weight="bold" fill="#c0392b">① FEHLERBILD (kurz) — was Phase 13 auflöst; die ganze Geschichte steht in P12.5 (4515 Pkt / 92 % verschwendet)</text>
+
+  <rect x="56" y="150" width="184" height="50" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="148" y="173" font-size="12" font-weight="bold" fill="#1b1f24" text-anchor="middle">Auflöse-Pfad</text>
+  <text x="148" y="190" font-size="11" fill="#5b6470" text-anchor="middle">bar_fetch()</text>
+
+  <line x1="240" y1="175" x2="276" y2="175" stroke="#c0392b" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <rect x="278" y="150" width="184" height="50" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="370" y="173" font-size="12" font-weight="bold" fill="#1b1f24" text-anchor="middle">BarService.get_window</text>
+  <text x="370" y="190" font-size="11" fill="#5b6470" text-anchor="middle">Voll-Refetch bei jedem Tick</text>
+
+  <line x1="462" y1="175" x2="498" y2="175" stroke="#c0392b" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <rect x="500" y="150" width="184" height="50" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="592" y="173" font-size="12" font-weight="bold" fill="#c0392b" text-anchor="middle">IG-REST /prices</text>
+  <text x="592" y="190" font-size="11" fill="#c0392b" text-anchor="middle">301 Pkt / Call</text>
+
+  <line x1="684" y1="175" x2="720" y2="175" stroke="#c0392b" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <rect x="722" y="150" width="302" height="50" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="873" y="173" font-size="12" font-weight="bold" fill="#c0392b" text-anchor="middle">1638 von 1782 Bars lagen schon im Archiv</text>
+  <text x="873" y="190" font-size="11" fill="#c0392b" text-anchor="middle">92 % verschwendet · F1/F2 strukturell blind</text>
+
+  <rect x="56" y="218" width="968" height="68" rx="5" fill="#fdf6ec" stroke="#c98a1a"/>
+  <text x="72" y="240" font-size="12" font-weight="bold" fill="#8a5d0d">F3 — die zweite Lehre, die Phase 13 direkt trägt</text>
+  <text x="72" y="260" font-size="11" fill="#5b6470">Eine Mitten-Lücke im Trade-Fenster erzeugte eine <tspan font-weight="bold" fill="#c0392b">erfundene</tspan> TIME_STOP-Auflösung — DB und Heartbeat konnten nicht zwischen „echt gestoppt"</text>
+  <text x="72" y="276" font-size="11" fill="#5b6470">und „Lücke, SL-Treffer fehlt" unterscheiden. Lösung: Coverage-Check <tspan font-weight="bold">vor</tspan> resolve_paper_trade (L3, A3).</text>
+
+  <!-- ================= PANEL 2 — ZIELBILD ================= -->
+  <rect x="40" y="320" width="1000" height="400" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="320" width="1000" height="30" rx="6" fill="#e8f5ee"/>
+  <rect x="40" y="340" width="1000" height="10" fill="#e8f5ee"/>
+  <text x="56" y="341" font-size="15" font-weight="bold" fill="#1e7a4d">② ZIELBILD — vier Stufen Beschaffung, eine Naht Verbrauch; der Auflöse-Pfad kauft nie wieder</text>
+
+  <!-- S1 -->
+  <rect x="56" y="370" width="220" height="60" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="166" y="392" font-size="12" font-weight="bold" fill="#1e7a4d" text-anchor="middle">S1 — Lightstreamer</text>
+  <text x="166" y="409" font-size="10.5" fill="#5b6470" text-anchor="middle">CHART:{epic}:1MINUTE (dormant)</text>
+  <text x="166" y="423" font-size="10.5" fill="#5b6470" text-anchor="middle">TickAggregator aktiv (B0=NO)</text>
+
+  <!-- S2 -->
+  <rect x="56" y="438" width="220" height="60" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="166" y="460" font-size="12" font-weight="bold" fill="#1e7a4d" text-anchor="middle">S2 — yFinance-Recorder</text>
+  <text x="166" y="477" font-size="10.5" fill="#5b6470" text-anchor="middle">eigener Prozess · Takt 300 s</text>
+  <text x="166" y="491" font-size="10.5" fill="#5b6470" text-anchor="middle">~15 Min Verzug · kostenlos</text>
+
+  <!-- S3 -->
+  <rect x="56" y="506" width="220" height="60" rx="5" fill="#fdf6ec" stroke="#c98a1a"/>
+  <text x="166" y="528" font-size="12" font-weight="bold" fill="#8a5d0d" text-anchor="middle">S3 — Capital.com (PARTIAL)</text>
+  <text x="166" y="545" font-size="10.5" fill="#5b6470" text-anchor="middle">DE40 + FR40 live-verifiziert</text>
+  <text x="166" y="559" font-size="10.5" fill="#5b6470" text-anchor="middle">SP35 → Phase 14</text>
+
+  <!-- S4 -->
+  <rect x="56" y="574" width="220" height="60" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="166" y="596" font-size="12" font-weight="bold" fill="#1b1f24" text-anchor="middle">S4 — GapRescue (AUS)</text>
+  <text x="166" y="613" font-size="10.5" fill="#5b6470" text-anchor="middle">IG /prices Bereichs-API</text>
+  <text x="166" y="627" font-size="10.5" fill="#5b6470" text-anchor="middle">gedrosselt, eigenes spend_kind</text>
+
+  <!-- arrows to BarArchive -->
+  <line x1="276" y1="400" x2="346" y2="500" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <line x1="276" y1="468" x2="346" y2="500" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <line x1="276" y1="536" x2="346" y2="540" stroke="#c98a1a" stroke-width="1.4" marker-end="url(#a)"/>
+  <line x1="276" y1="604" x2="346" y2="560" stroke="#5b6470" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- BarArchive center box -->
+  <rect x="350" y="464" width="280" height="76" rx="6" fill="#1e7a4d" stroke="#1e7a4d"/>
+  <text x="490" y="492" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">BarArchive</text>
+  <text x="490" y="510" font-size="11" fill="#e8f5ee" text-anchor="middle">data/bars.sqlite</text>
+  <text x="490" y="527" font-size="10.5" fill="#e8f5ee" text-anchor="middle">quellenagnostisch · mit tick_count</text>
+
+  <!-- arrows to Verbrauch -->
+  <line x1="630" y1="500" x2="700" y2="400" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <line x1="630" y1="510" x2="700" y2="468" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <line x1="630" y1="520" x2="700" y2="536" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <line x1="630" y1="530" x2="700" y2="604" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+
+  <!-- Tracker -->
+  <rect x="702" y="370" width="322" height="60" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="863" y="392" font-size="12" font-weight="bold" fill="#1e7a4d" text-anchor="middle">Paper-Tracker</text>
+  <text x="863" y="409" font-size="10.5" fill="#5b6470" text-anchor="middle">window_ok → assess_window</text>
+  <text x="863" y="423" font-size="10.5" fill="#5b6470" text-anchor="middle">gedeckt | offen | typisiert</text>
+
+  <!-- Research -->
+  <rect x="702" y="438" width="322" height="60" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="863" y="460" font-size="12" font-weight="bold" fill="#1e7a4d" text-anchor="middle">Research (P4)</text>
+  <text x="863" y="477" font-size="10.5" fill="#5b6470" text-anchor="middle">BarService.get_bars (L15)</text>
+  <text x="863" y="491" font-size="10.5" fill="#5b6470" text-anchor="middle">eigener Research-Seam, klein</text>
+
+  <!-- DivergenceSampler -->
+  <rect x="702" y="506" width="322" height="60" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="863" y="528" font-size="12" font-weight="bold" fill="#1e7a4d" text-anchor="middle">DivergenceSampler</text>
+  <text x="863" y="545" font-size="10.5" fill="#5b6470" text-anchor="middle">rendite-basiert, stale-check</text>
+  <text x="863" y="559" font-size="10.5" fill="#5b6470" text-anchor="middle">F1/F2-A6-Reparatur</text>
+
+  <!-- Heartbeat -->
+  <rect x="702" y="574" width="322" height="60" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="863" y="596" font-size="12" font-weight="bold" fill="#1e7a4d" text-anchor="middle">measurement_heartbeat</text>
+  <text x="863" y="613" font-size="10.5" fill="#5b6470" text-anchor="middle">assess_day mit Coverage</text>
+  <text x="863" y="627" font-size="10.5" fill="#5b6470" text-anchor="middle">5/5-Tage-Sichtbarkeit</text>
+
+  <!-- principle callout -->
+  <rect x="56" y="652" width="968" height="56" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="72" y="675" font-size="12.5" font-weight="bold" fill="#1e7a4d">L1 (gelockt): ein Konsument, der Daten braucht, die er nicht hat, bekommt einen typisierten Status — nie einen Kauf.</text>
+  <text x="72" y="696" font-size="11" fill="#5b6470">Strukturelle Kostenzusicherung: <tspan font-weight="bold">test_get_window_never_fetches</tspan> (L12) — IG-Provider wirft AssertionError, get_window gibt [] zurück. Grüner Test garantiert, dass der Tracker-Pfad nie kaufen kann.</text>
+
+  <!-- ================= PANEL 3 — STATUS & WAS BLEIBT ================= -->
+  <rect x="40" y="740" width="1000" height="280" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="740" width="1000" height="30" rx="6" fill="#eef1f4"/>
+  <rect x="40" y="760" width="1000" height="10" fill="#eef1f4"/>
+  <text x="56" y="761" font-size="15" font-weight="bold" fill="#1b1f24">③ STATUS &amp; WAS BLEIBT — was Phase 13 leistet, was Phase 14/15 erben, was bewusst aufgeschoben ist</text>
+
+  <!-- Status block -->
+  <rect x="56" y="790" width="464" height="210" rx="5" fill="#f7f8fa" stroke="#d5d9de"/>
+  <text x="72" y="812" font-size="12.5" font-weight="bold" fill="#1b1f24">Status heute (2026-08-22)</text>
+  <text x="72" y="836" font-size="11" fill="#1e7a4d">✓  Blöcke A + B + C code-complete · 40 Commits auf main</text>
+  <text x="72" y="856" font-size="11" fill="#1e7a4d">✓  962 capital-Bars live-verifiziert (DE40 + FR40)</text>
+  <text x="72" y="876" font-size="11" fill="#1e7a4d">✓  50 Phase-13-Tests + 1508 repo-weit grün</text>
+  <text x="72" y="896" font-size="11" fill="#1e7a4d">✓  main synchron mit origin/main (Push erteilt)</text>
+  <text x="72" y="920" font-size="11" fill="#c98a1a">→  Beweiswoche (Plan §7 P1–P9): operator-getrieben, separater Track</text>
+  <text x="72" y="940" font-size="11" fill="#c98a1a">→  Block C C1 SP35 (IBEX): PARTIAL by design, wartet auf Phase 14</text>
+  <text x="72" y="960" font-size="11" fill="#c98a1a">→  Phase 14 (Discovery): Concept, execution-ready Plan ausstehend</text>
+  <text x="72" y="980" font-size="11" fill="#c98a1a">→  Phase 15 (V4): deferred, gegatet auf P9+11+12+13+14</text>
+
+  <!-- Was bleibt block -->
+  <rect x="540" y="790" width="484" height="210" rx="5" fill="#f7f8fa" stroke="#d5d9de"/>
+  <text x="556" y="812" font-size="12.5" font-weight="bold" fill="#1b1f24">Was die nächste Session erbt (3 Schnittstellen)</text>
+  <text x="556" y="836" font-size="11" fill="#5b6470">·  <tspan font-weight="bold">EPIC_MAP</tspan> hardcoded in backfill.py:67-72</text>
+  <text x="556" y="852" font-size="10.5" fill="#5b6470">    → Phase 14: instrument_source_availability-Tabelle, Map verschwindet</text>
+  <text x="556" y="876" font-size="11" fill="#5b6470">·  <tspan font-weight="bold">Path C Dukascopy</tspan> (für SP35 / IBEX)</text>
+  <text x="556" y="892" font-size="10.5" fill="#5b6470">    → Phase 14: dukascopy.Source() als Quell-Registry-Zeile, kein Backfill-Code</text>
+  <text x="556" y="916" font-size="11" fill="#5b6470">·  <tspan font-weight="bold">Auto-Gap-Fill-Scheduler</tspan> (Cron-Logik)</text>
+  <text x="556" y="932" font-size="10.5" fill="#5b6470">    → Phase 14: Operator-Trigger, nicht in Phase 13 nachholen</text>
+  <text x="556" y="956" font-size="11" fill="#8a5d0d">·  Was diese Session bewusst aufgeschoben hat:</text>
+  <text x="556" y="972" font-size="10.5" fill="#5b6470">    Modul-Tabelle (39→50 Tests) + Root-Status + Session-15-Block — eigene Status-Commits</text>
+  <text x="556" y="988" font-size="10.5" fill="#5b6470">    (nicht im aktuellen Handover-Commit, weil der User-Scope „nur die Doku-Files" war)</text>
+</svg>
