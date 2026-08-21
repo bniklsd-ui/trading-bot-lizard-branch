@@ -68,10 +68,23 @@ def main() -> int:
         print(f"deleted: {SERVICE_NAME}/{{{', '.join(FIELDS)}}}")
         return 0
 
-    # Seed each field. Prompt three times; abort on any empty input.
+    # Seed each field. The "password" field is the **API key's custom
+    # password** (set during key generation in Settings > API
+    # integrations) — NOT the user's account login password. This is
+    # the field the Capital.com /session endpoint expects as
+    # ``password`` in the request body. Distinguished clearly in the
+    # prompt to avoid the most common mis-entry.
+    field_prompts = {
+        "identifier": "Capital.com login EMAIL (the address you log in with)",
+        "password":   "Capital.com API-key CUSTOM password (set during key "
+                      "generation in Settings > API integrations — NOT your "
+                      "account login password)",
+        "api_key":    "Capital.com API key (shown once after generation; the "
+                      "long token, NOT the custom password)",
+    }
     for f in FIELDS:
         existing = "✓ set" if _is_set(f) else "✗ not set"
-        prompt = f"Enter Capital.com {f} ({existing}, input hidden): "
+        prompt = f"Enter {field_prompts[f]} ({existing}, input hidden): "
         value = getpass.getpass(prompt)
         if not value:
             print(f"empty {f} — aborting (no partial writes)")

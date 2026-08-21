@@ -44,7 +44,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_DEFAULT_BASE = "https://api-capital.backend-capital.com"
+# Default to the DEMO base URL — Capital.com maintains a separate
+# demo endpoint (``demo-api-capital.backend-capital.com``) that does
+# NOT accept live-URL credentials and vice versa. Operators with a
+# live API key must pass --base explicitly.
+_DEFAULT_BASE = "https://demo-api-capital.backend-capital.com"
 _DEFAULT_INDICES = ["Germany 40", "France 40", "Spain 35"]
 _KEYRING_SERVICE = "trading-bot-capital"
 
@@ -117,72 +121,88 @@ def main(argv: list[str] | None = None) -> int:
 
     import requests
 
-    # Capital.com's auth accepts one of three common key-name casings;
-    # the demo API's contract is not in any public spec we have access
-    # to (Plan §6 C1.0: IG-Doku-Paywall, vergleichbares gilt für
-    # Capital.com), and the server's error code uses a dotted form
-    # (``api.key``) that doesn't disambiguate which casing the parser
-    # expects. We try them in order — first success wins.
-    auth_attempts = [
-        ("api_key", {"identifier": identifier, "password": password, "api_key": api_key}),
-        ("apiKey",  {"identifier": identifier, "password": password, "apiKey":  api_key}),
-        ("apikey",  {"identifier": identifier, "password": password, "apikey":  api_key}),
-    ]
+    # Capital.com's documented session-auth contract (verified against
+    # the official Swagger spec at https://capital.com/api, fetched
+    # 2026-08-19):
+    #
+    #   POST /api/v1/session
+    #   Header: X-CAP-API-KEY: <api_key>
+    #   Body:   { "identifier":      <login_email>,
+    #             "password":        <API_KEY_CUSTOM_PASSWORD>,
+    #             "encryptedPassword": false }
+    #
+    # Two non-obvious facts the docs spell out but the obvious guessing
+    # did not find:
+    #   (a) The API key goes in the X-CAP-API-KEY HEADER, not the JSON
+    #       body — the error code "error.null.api.key" refers to the
+    #       header being absent, not to a JSON body field.
+    #   (b) The "password" body field is the **API key's custom password**
+    #       (set during key generation in Settings > API integrations),
+    #       NOT the user's account password. Distinct values, distinct
+    #       semantics — confirmed by the docs' own FAQ section.
+    # Endpoint rate limit: 1 request per second per API key.
+    auth_headers = {
+        "X-CAP-API-KEY": api_key,
+        "Content-Type": "application/json",
+    }
+    auth_body = {
+        "identifier": identifier,
+        "password": password,
+        "encryptedPassword": False,
+    }
 
-    auth_resp = None
-    auth_chosen_field = None
-    for label, payload in auth_attempts:
-        if args.debug:
-            # Redact secret values, keep structure + lengths visible
-            redacted = {
-                "identifier": f"***({len(identifier)}c)",
-                "password":   f"***({len(password)}c)",
-                label:        f"***({len(api_key)}c)",
-            }
-            _eprint(f"[probe_capital] debug auth body (variant={label!r}): "
-                     f"{json.dumps(redacted)}")
+    if args.debug:
+        redacted_headers = {
+            "X-CAP-API-KEY": f"***({len(api_key)}c)",
+            "Content-Type": "application/json",
+        }
+        redacted_body = {
+            "identifier": f"***({len(identifier)}c)",
+            "password":   f"***({len(password)}c)",
+            "encryptedPassword": False,
+        }
+        _eprint(f"[probe_capital] debug auth headers: {json.dumps(redacted_headers)}")
+        _eprint(f"[probe_capital] debug auth body: {json.dumps(redacted_body)}")
 
-        _eprint(f"[probe_capital] auth POST {args.base}/api/v1/session (variant={label!r})")
-        try:
-            auth_resp = requests.post(
-                f"{args.base}/api/v1/session",
-                json=payload,
-                timeout=args.timeout,
-            )
-        except requests.RequestException as exc:
-            _eprint(f"[probe_capital] auth request failed ({label}): {exc}")
-            print(json.dumps({"ok": False, "error": f"connection_failed: {exc}"}))
-            return 1
-
-        if auth_resp.status_code == 200:
-            auth_chosen_field = label
-            break
-
-        snippet = (auth_resp.text or "")[:300]
-        _eprint(f"[probe_capital] auth HTTP {auth_resp.status_code} ({label}): {snippet}")
-        # If this attempt is the null-api-key error AND we still have
-        # candidates, try the next variant. Other errors stop the loop
-        # immediately (no point in retrying with a different name).
-        if "api.key" not in snippet and "api_key" not in snippet:
-            break
-
-    if auth_resp is None or auth_resp.status_code != 200:
-        snippet = (auth_resp.text or "")[:300] if auth_resp is not None else ""
-        # Last hint reflects the loop outcome
-        hint = (
-            "all three key-name variants failed with 'api.key' null — "
-            "Capital.com's auth contract is undocumented in this repo; "
-            "either consult Capital.com docs directly or fall back to "
-            "Dukascopy (path C, Nikinger ToS-confirmation required)"
+    _eprint(f"[probe_capital] auth POST {args.base}/api/v1/session")
+    try:
+        auth_resp = requests.post(
+            f"{args.base}/api/v1/session",
+            json=auth_body,
+            headers=auth_headers,
+            timeout=args.timeout,
         )
+    except requests.RequestException as exc:
+        _eprint(f"[probe_capital] auth request failed: {exc}")
+        print(json.dumps({"ok": False, "error": f"connection_failed: {exc}"}))
+        return 1
+
+    if auth_resp.status_code != 200:
+        snippet = (auth_resp.text or "")[:300]
+        _eprint(f"[probe_capital] auth HTTP {auth_resp.status_code}: {snippet}")
+        # Differentiated hint per common error code.
+        hint = ""
+        if auth_resp.status_code == 429:
+            hint = ("429 Too Many Requests — Capital.com's /session endpoint "
+                    "is rate-limited to 1 request per second per API key; "
+                    "wait ~5 s and re-run")
+        elif "invalid.api.key" in snippet or "invalid.api_key" in snippet:
+            hint = ("API key rejected — verify the key is active in "
+                    "Settings > API integrations and not paused/expired")
+        elif "credentials.invalid" in snippet or "error.invalid" in snippet:
+            hint = ("Credentials rejected — verify (a) identifier is your "
+                    "login EMAIL (not username), (b) password is the "
+                    "**API-key CUSTOM password** set during key generation "
+                    "(NOT your account login password)")
+        else:
+            hint = "see Capital.com Swagger docs at https://capital.com/api"
         print(json.dumps({
-            "ok": False, "error": f"auth_failed_{auth_resp.status_code if auth_resp else 'unknown'}",
+            "ok": False,
+            "error": f"auth_failed_{auth_resp.status_code}",
             "response_snippet": snippet,
             "hint": hint,
         }))
         return 3
-
-    _eprint(f"[probe_capital] auth OK with variant={auth_chosen_field!r}")
 
     cst = auth_resp.headers.get("CST", "")
     sec_token = auth_resp.headers.get("X-SECURITY-TOKEN", "")
@@ -192,7 +212,10 @@ def main(argv: list[str] | None = None) -> int:
                           "headers_seen": list(auth_resp.headers.keys())}))
         return 3
 
-    auth_headers = {
+    # Refresh the auth headers with the session tokens for subsequent
+    # requests — X-CAP-API-KEY is for the initial auth only; everything
+    # after uses CST + X-SECURITY-TOKEN.
+    session_headers = {
         "CST": cst,
         "X-SECURITY-TOKEN": sec_token,
         "Content-Type": "application/json",
@@ -209,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
         if acct.get("preferred"):
             account_type = acct.get("accountType", "?")
             break
-    _eprint(f"[probe_capital] account_type={account_type}")
+    _eprint(f"[probe_capital] auth OK, account_type={account_type}")
 
     # ---------- per-index probe ----------
     indices = [s.strip() for s in args.indices.split(",") if s.strip()]
@@ -225,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
             search_resp = requests.get(
                 f"{args.base}/api/v1/markets",
                 params={"searchTerm": index_name},
-                headers=auth_headers,
+                headers=session_headers,
                 timeout=args.timeout,
             )
         except requests.RequestException as exc:
@@ -271,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
             price_resp = requests.get(
                 f"{args.base}/api/v1/prices/{epic}",
                 params={"resolution": "MINUTE", "from": from_dt, "to": to_dt, "max": 1000},
-                headers=auth_headers,
+                headers=session_headers,
                 timeout=args.timeout,
             )
         except requests.RequestException as exc:
