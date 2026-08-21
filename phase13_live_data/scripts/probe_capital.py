@@ -261,9 +261,15 @@ def main(argv: list[str] | None = None) -> int:
 
     # ---------- per-index probe ----------
     indices = [s.strip() for s in args.indices.split(",") if s.strip()]
+    # Capital.com's documented price-endpoint date format is
+    # ``YYYY-MM-DDTHH:MM:SS`` — NO 'Z' suffix, NO milliseconds (per the
+    # Swagger example for the activity-history endpoint, same convention
+    # applied to the prices endpoint as confirmed empirically 2026-08-19:
+    # ``error.invalid.from`` is returned when 'Z' is present). Their
+    # parser is strict.
     now = datetime.now(timezone.utc)
-    from_dt = (now - timedelta(hours=args.history_hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    to_dt = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    from_dt = (now - timedelta(hours=args.history_hours)).strftime("%Y-%m-%dT%H:%M:%S")
+    to_dt = now.strftime("%Y-%m-%dT%H:%M:%S")
     _eprint(f"[probe_capital] probing {len(indices)} indices, window {from_dt} → {to_dt}")
 
     results: dict[str, dict] = {}
