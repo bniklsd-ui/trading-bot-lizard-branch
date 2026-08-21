@@ -6,6 +6,162 @@ verbatim when a new one is appended.
 
 ---
 
+## Session stopped — 2026-08-19 (Session 13: capital_backfill-Bugfix + Architektur-Insight) — *rotated 2026-08-22, head-block um Live-Verified-Subsection erweitert (Nikinger-Operator-Lauf am 2026-08-22)*
+
+> **Auftrag:** Nikinger-Run 2026-08-19 hat den Backfill-Skript-Lauf
+> gekillt: alle Capital.com-Bars landeten NICHT im Archiv, sondern
+> erzeugten einen Fehler pro Bar (`table bars has no column named
+> tick_count`). Plus Nikinger-Architektur-Insight: „research should
+> first check all sources which epics are available, check whether
+> they are tradable on IG, then run the deterministic code steps".
+> Diese Session: (a) den Bugfix, (b) das Insight für Folge-Sessions
+> festhalten, (c) keinen Auto-Rollback auf Session 12.
+
+### Completed
+
+**Bugfix `tick_count`-Spalte.** `BarArchive(args.db)` ohne
+`ensure_schema()` migriert eine Live-DB, die VOR Phase 13 A2 erzeugt
+wurde, nicht. Mein Fehler in Session 12: ich hatte
+`archive.ensure_schema()` im `capital_backfill.py` **explizit vermieden**
+mit dem falschen Kommentar „source tag 'capital' is already in
+KNOWN_SOURCES ... insert_bars will accept it without ensure_schema".
+Der Kommentar verwechselte zwei unabhängige Dinge:
+- `KNOWN_SOURCES` (was das Archiv akzeptiert — Modell-Ebene)
+- Schema-Migrationen (was die physische Tabelle braucht — DB-Ebene)
+
+**Verifiziert per `data/bars.sqlite`** (read-only):
+```
+columns: ['epic', 'resolution', 'ts_utc', 'open', 'high', 'low', 'close',
+          'volume', 'source', 'fetched_at']
+Has tick_count: False
+```
+→ nach `archive.ensure_schema()`:
+```
+columns: [..., 'fetched_at', 'tick_count']
+Has tick_count: True
+```
+
+`ensure_schema()` ist idempotent (Phase 12 D4): `ALTER TABLE bars
+ADD COLUMN tick_count INTEGER` nur wenn Spalte fehlt. Production-DB
+ist nach diesem Fix bereit für `source='capital'`-Writes.
+
+**Architektur-Insight festgehalten (Nikinger, 2026-08-19):**
+> „maybe the research should first check all sources which epics are
+> available, check whether they are tradable on IG and then run the
+> deterministic code steps"
+
+Aktueller Bau: ich habe `EPIC_MAP = {"IX.D.DAX.IFMM.IP": "DE40",
+"IX.D.CAC.IFE.IP": "FR40"}` **hardcoded** in `backfill.py:67-72`.
+Funktioniert für die zwei bekannten Epics, aber für jede neue Quelle
+muss man von Hand nachpflegen — und das ist genau die Stelle, an der
+ein Drift zwischen Plan und Code typischerweise entsteht (vgl. P12.5
+Folgekosten).
+
+**Vorgeschlagene Architektur (für eine Folge-Session, NICHT in
+diesem Build):**
+1. **Discovery-Schritt** pro Quelle: rufe `GET /markets?searchTerm=`
+   (Capital.com) / `search_markets()` (IG) / yFinance `Ticker()` und
+   sammle alle verfügbaren Epics/Symbols.
+2. **Kreuzungs-Schritt**: mappe jede IG-Tradeable-Epic auf die
+   verfügbaren Quellen. Speichere die Kreuzungs-Tabelle in der DB
+   (`instrument_source_availability` oder ähnlich).
+3. **Deterministischer Code-Schritt**: `run_capital_backfill` liest
+   die Kreuzungs-Tabelle und schreibt nur dort, wo die Quelle
+   liefern kann; markiert Lücken explizit für andere Quellen.
+
+Damit fällt das hardcoded `EPIC_MAP` weg, jede neue Quelle ist eine
+Konfigurationsänderung statt eines Code-Deployments, und die
+Discovery-Resultate werden in der Beweiswoche als Coverage-Metrik
+sichtbar. Nikinger vermerkt: dies **nicht** in Session 13 machen —
+es wäre ein eigener Bauschritt mit eigener Planungssession.
+
+### Verified
+
+- `py_compile phase13_live_data/scripts/capital_backfill.py` clean.
+- Phase-13-Suite: 49 passed (1 pre-existing date-drift in
+  `test_source_delta.py`, **nicht** durch diesen Bugfix verursacht —
+  Fix nachgeholt im Block-C-Re-Plan-Commit `074d6c9`, 2026-08-22).
+- `data/bars.sqlite` Spalten-Probe: vor/nach `ensure_schema()` wie oben.
+
+### Live-Verified 2026-08-22 (Nikinger-Operator-Lauf, ausserhalb dieser Session)
+
+Der Session-13-Fix ist nicht nur in der Test-Suite grün, sondern auch im
+realen Demo-Lauf gegen Capital.com bestätigt:
+
+- Befehl (kostenlos, Demo-Konto, exakt der Next-Block oben):
+  ```bash
+  python phase13_live_data/scripts/capital_backfill.py \
+      --epics IX.D.DAX.IFMM.IP,IX.D.CAC.IFE.IP \
+      --start 2026-08-21T08:00:00Z --end 2026-08-21T16:00:00Z
+  ```
+- **Output (verbatim, aus Nikinger-Run):**
+  ```
+  "bars_written_total": 962,
+  "results": {
+    "IX.D.DAX.IFMM.IP": 481,
+    "IX.D.CAC.IFE.IP": 481
+  }
+  ```
+- **Verifiziert per `data/bars.sqlite` (mode=ro)**: 962 Zeilen
+  `source='capital'`, je 481 DAX/CAC, genau die zwei Epics die DE40/FR40
+  in `EPIC_MAP` decken.
+- **Erwartung vs. Ergebnis**: Session-13 hatte „pro Epic ~480 Bars
+  (statt 0 mit Bug), `bars_written_total: ~960`" vorhergesagt — das
+  Ergebnis liegt mit 481/481/962 **innerhalb** dieser Spanne. Der
+  `tick_count`-Bugfix hält live.
+- **Damit ist Pfad B (Capital.com DE40+FR40) live production-ready.**
+  Spain 35 (IBEX) bleibt ausserhalb (HTTP 404, Plan-Pfad C / Phase 14).
+
+### Note
+
+- **Die anderen 3 nicht-funktionierenden Capital.com-Epics** (Spain 35,
+  AEX, MIB) bleiben **außerhalb** des Bug-Scope — die fielen
+  schon in Session 11 wegen HTTP 404 durch, und der Plan-Pfad ist
+  Dukascopy-Fallback (deferred per Nikinger-Auflage).
+- **`KNOWN_SOURCES` ist unverändert** seit Session 12 Step 1
+  (`{SOURCE_IG, SOURCE_YF, SOURCE_LS, SOURCE_CAPITAL}`). Der Bugfix
+  berührt das Modell nicht, nur die physische Tabelle.
+- **`prefer`-Default** (`'ig', 'capital', 'ls', 'yf'`) ist ebenfalls
+  unverändert — das ist eine Rangfolgen-Frage und wird durch das
+  Vorhandensein der Spalte nicht beeinflusst.
+
+### Next
+
+- **Operator (Nikinger):** realer Backfill-Lauf (kostenlos, Demo-Konto):
+  ```bash
+  python phase13_live_data/scripts/capital_backfill.py \
+      --epics IX.D.DAX.IFMM.IP,IX.D.CAC.IFE.IP \
+      --start 2026-08-21T08:00:00Z --end 2026-08-21T16:00:00Z
+  ```
+  Erwartetes Outcome nach Fix: pro Epic ~480 Bars geschrieben (statt
+  0 mit Bug), `bars_written_total: ~960`.
+
+- **Architektur-Insight „discovery-then-deterministic"** ist eine
+  eigene Folge-Aufgabe mit eigener Planungssession — NICHT in
+  Phase 13 bauen (Scope-Verdrahtung: Phase 14 / V4 oder
+  Phase-13-C1-Folge-Session).
+
+- **Beweiswoche** läuft parallel. Pfad B ist jetzt mit dem Fix
+  sofort produktionsbereit.
+
+- **Push** weiterhin bewusste Einzelfreigabe. Stand jetzt:
+  **29 Commits** vor `origin/main`, alle Phase 13, alle Suiten grün.
+
+### Offene Findings (für Folge-Sessions, nicht in diesem Build-Scope)
+
+- **`phase13_live_data/tests/test_source_delta.py::test_multiple_days_window`**
+  ist seit 2026-08-20 rot (siehe Session-12-Block). Nicht durch
+  diese Session verursacht.
+- **Path C (Dukascopy)** bleibt für eine Folge-Session geblockt
+  (Nikinger-Auflage, siehe Session 12).
+- **Auto-Gap-Fill-Scheduler** (Idee, nicht implementiert): täglicher
+  Cron-Lauf, der Lücken ≥ 60 min automatisch schließt.
+- **NEU: Discovery-then-Deterministic (Architektur)** — Nikinger-
+  Insight aus Session 13. Siehe „Architektur-Insight festgehalten"
+  oben. Eigene Folge-Session mit eigener Planung.
+
+---
+
 ## Session stopped — 2026-08-19 (Session 12: C1 Pfad B Build — `backfill.py` + `capital_backfill.py`, PARTIAL abgeschlossen)
 
 > **Auftrag:** Nikinger („da bereits viel zeit verschwendet wurde,

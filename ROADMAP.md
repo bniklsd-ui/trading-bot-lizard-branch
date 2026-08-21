@@ -533,55 +533,114 @@ Phase-11-Wiederaufnahme, nicht Teil dieser Phase.
 
 ## Phase 13 — Live-Datenfundament *(eröffnet 2026-08-18 nach dem Scheitern von P12.5)*
 
-> **Status: 🔄 geplant, execution-ready — Bau noch nicht begonnen.**
+> **Status: 🔄 Blöcke A + B + C code-complete (Stand 2026-08-22) — Block C re-planned &
+> live-verifiziert für DE40/FR40, Block A + B Done-Kriterien ausstehend (Beweiswoche).**
 > **Plan:** [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md)
 > (gelockte Entscheidungen L1–L16, Blöcke A/B/C, §9-Drift-Liste).
+> **Block-C-Closeout + Phase-14-Handoff (2026-08-22):**
+> [`docs/concepts/phase13_c_block_c_replan.md`](./docs/concepts/phase13_c_block_c_replan.md).
 > **Vorgeschichte:** [`phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md).
 
 **Goal:** Beschaffung und Verbrauch von Kursdaten endgültig trennen. Kein Konsumentenpfad löst
 je einen externen Fetch aus; Beschaffung ist ein vierstufiges, nach Kosten/Latenz gestaffeltes
 System in *ein* Archiv (S1 LS-Kerzen → S2 yF-Recorder → S3 Fremdquelle → S4 budgetierte
-IG-Rettung, Default AUS). Die Abdeckungsfrage gilt dem **ganzen Trade-Fenster** statt dem
+IG-Rettung, Default AUS). Die Abdeckungsfrage gilt dem **ganzen** Trade-Fenster statt dem
 Schwanz. Drei nachgemessene Befunde tragen die Phase (Plan §4): tote IG-Historie mit `ok=True`,
 ein dagegen blinder Divergenz-Sampler, und eine **erfundene** `TIME_STOP`-Auflösung bei einer
 Lücke mitten im Fenster.
 
+**Block-Stand 2026-08-22:**
+
+- **Block A** (Schnitt + `assess_window` + Tracker-Guard + Stale-Assertion + Sampler-Reparatur
+  + Registry-Hygiene) — ✅ committed, `git log` zeigt 13+ Commits zwischen A0 und A7+A7.5.
+- **Block B** (Lightstreamer + TickAggregator-Fallback + Scheduler-Lebenszyklus +
+  Token-Rotation) — ✅ committed, B0=NO → L6-Fallback aktiv. B0-Probe-Ergebnis im
+  `phase13_live_data/CLAUDE.md` Kopf.
+- **Block C** (Capital.com Pfad B + `GapRescue` S4 + `source_delta.py`) — ✅ **PARTIAL by
+  design**: Pfad B live-verifiziert 2026-08-22 (962 `source='capital'`-Bars, DAX + CAC);
+  Spain 35 (IBEX) wartet auf Phase 14 (Dukascopy wird dort eine Quell-Registry-Zeile, kein
+  Backfill-Code mehr). Vollständiger Block-C-Stand im Re-Plan-Handover.
+- **Beweiswoche** (Plan §7 P1–P9) — offen, operator-getrieben.
+
 **Done-Kriterium:** Beweiswoche gegen P1–P9 (Plan §7); erste Akzeptanzbedingung ist eine
 strukturelle Kostenzusicherung, kein Zählwert.
 
-**Directory:** [`phase13_live_data/`](./phase13_live_data/) (Kopf angelegt, Paket folgt in Block A).
+**Directory:** [`phase13_live_data/`](./phase13_live_data/) (Kopf + Modul-Tabelle in
+`phase13_live_data/CLAUDE.md`).
 
 ---
 
-## Phase 14 — V4: Sophisticated / Optional *(die alte Phase 9, deferred; vormals "Phase 12",
-dann "Phase 13" — umnummeriert 2026-08-11 und erneut 2026-08-18, s. Phase 13 oben)*
+## Phase 14 — Discovery-Then-Deterministic *(eröffnet 2026-08-22 aus dem Session-13-Architektur-Insight)*
 
-> **Status: deferred, gegatet auf Phase 9+11+12 UND reale Outcomes** (unverändert aus der
-> ursprünglichen Phase-9-Formulierung — nur numerisch verschoben, kein Inhalt geändert; Phase 12
-> als zusätzliches Gate ergänzt, 2026-08-11 — dieselbe Notbremsen-Logik wie Phase 11: kein
-> weiterer AI-Sophistication-Ausbau auf einem unzuverlässigen Datenfundament).
+> **Status: 🔄 Concept vorhanden — execution-ready Plan in eigener Planungssession.**
+> **Concept-Skizze:** [`docs/concepts/phase14_discovery_concept.md`](./docs/concepts/phase14_discovery_concept.md)
+> (drei Bausteine: Quell-Profil + Kreuzungs-Tabelle + Konsumenten-Umstellung; sieben offene
+> Fragen für die Plan-Session).
+> **Block-C-Handoff:** [`docs/concepts/phase13_c_block_c_replan.md`](./docs/concepts/phase13_c_block_c_replan.md)
+> §3 + §5 (warum die Architektur eine eigene Phase rechtfertigt; was Phase 14 implizit
+> absorbiert: hardcoded `EPIC_MAP`, Path C Dukascopy).
+
+**Goal:** jede Quelle (IG, yFinance, LS, Capital.com, später Dukascopy) **exponiert selbst**,
+was sie liefern kann. Eine DB-Tabelle (`instrument_source_availability`) hält die Kreuzung
+zwischen IG-Tradeable-Epics und verfügbaren Quellen. Konsumenten lesen die Tabelle, nicht den
+Code. Hinzufügen einer Quelle ist eine Konfiguration, kein Code-Deploy.
+
+**Why this is its own phase (Nikinger 2026-08-22):** die "discovery-then-deterministic"-
+Architektur ist umfangreich genug (neues Schema, neue Schnittstelle pro Quelle, drei
+Konsumenten-Migrationen, ToS-Tracking via `notes`-Spalte, Profile-Cache-TTL), dass sie den
+Block-C-Closure sprengen würde. Phase 14 ist die **Brücke** zwischen dem
+Datenfundament (Phase 13) und der AI-Sophistication (Phase 15): V4 setzt voraus, dass die
+Daten-Infrastruktur **konfigurierbar** ist, nicht nur vorhanden.
+
+**Scope-Skizze** (Concept, kein Plan):
+
+- Quell-Profil-Schnittstelle (`SourceProfile` + `Source.discover()`), implementiert für
+  Capital.com, yFinance, IG; LS bleibt Sonderfall (kein Discovery-API, Profil statisch).
+- Phase-2-Migration `007_instrument_source_availability.sql` (Nummer in Plan-Session zu
+  bestätigen).
+- `run_capital_backfill` liest die Tabelle statt `EPIC_MAP`; `BarArchive.window(sources=…)`
+  wird tabellenbewusst statt rang-bewusst; `source_delta.py` P6 trennt „nicht abrufbar" von
+  „abrufbar und divergiert".
+- Path C Dukascopy wird eine Quell-Registry-Zeile, **kein** Code-Touch in `live_data/`.
+
+**Done-Kriterium** (Concept, zu schärfen in der Plan-Session): eine neue Quelle (Dukascopy
+als Test-Kandidat) ist mit ≤ 50 Zeilen Commit angebunden, ohne dass ein Konsument
+angefasst wird. `grep -n "EPIC_MAP" phase13_live_data/` ist leer.
+
+**Directory:** noch nicht angelegt — entsteht in der Plan-Session.
+
+---
+
+## Phase 15 — V4: Sophisticated / Optional *(die alte Phase 9, deferred; vormals "Phase 12",
+dann "Phase 13", dann "Phase 14" — umnummeriert 2026-08-11, 2026-08-18 und 2026-08-22)*
+
+> **Status: deferred, gegatet auf Phase 9 + 11 + 12 + 13 + 14 UND reale Outcomes** (unverändert
+> aus der ursprünglichen Phase-9-Formulierung — nur numerisch verschoben, kein Inhalt geändert;
+> Phase 12 als zusätzliches Gate ergänzt 2026-08-11, Phase 14 als zusätzliches Gate ergänzt
+> 2026-08-22 — dieselbe Notbremsen-Logik wie Phase 11 und 12.5: kein weiterer
+> AI-Sophistication-Ausbau auf einem unzuverlässigen oder nicht-konfigurierbarem Datenfundament).
 
 **Goal:** Implement the V2 improvements identified in the Council analysis.
 
-### 13a — Council Skill Integration *(vormals 9a / 11a / 12a)*
+### 14a — Council Skill Integration *(vormals 9a / 11a / 12a / 13a)*
 - [ ] Integrate `verbesserungsvorschlaege` as structured input to pipeline
 - [ ] Trigger detection for ad-hoc strategy evaluation
 
-### 13b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b / 11b / 12b)*
+### 14b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b / 11b / 12b / 13b)*
 - [ ] Context-window monitoring during debate (~60–70 %)
 - [ ] Compression of Bull/Bear/Judge state into summary
 - [ ] New session continuation
 
-### 13c — Reward/Punishment Reform *(vormals 9d / 11c / 12c)*
+### 14c — Reward/Punishment Reform *(vormals 9d / 11c / 12c / 13c)*
 - [ ] `+ process_quality_score` (VETOs, confidence, debate quality, gate path)
 - [ ] Anti-emotionality: separate process score from outcome score
 
-### 13d — Force Trigger Safeguard *(vormals 9e / 11d / 12d)*
+### 14d — Force Trigger Safeguard *(vormals 9e / 11d / 12d / 13d)*
 - [ ] Lock force trigger when daily PNL < 0 — das P2-Schema-Feld `force_trigger_locked` existiert
   bereits seit Phase 2, wird aber von keiner Funktion durchgesetzt (kein Force-Trigger existiert
   bisher überhaupt)
 
-### 13e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f / 11e / 12e, aus Phase 7 hierher verschoben)*
+### 14e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f / 11e / 12e / 13e, aus Phase 7 hierher verschoben)*
 - [ ] AI extrahiert strukturierte Instincts (`trigger` / `domain` / `confidence` / `evidence_trade_ids`) aus P7 `trade_lessons` + `reward_pts`
 - [ ] Code **validiert** Instincts gegen reale Outcomes; bewährte werden zu **deterministischen Regeln promotet** (`longterm_pre_trade_check()` VETO), mit Prune→Archiv der widerlegten
 - [ ] **Harte Leitplanke:** Promotion in die VETO-Schicht **nur** über einen deterministischen / menschlich gegateten Schritt — eine promotete Regel wird deterministischer Code, die AI sitzt nie in der VETO-Auswertung. Gegatet auf reale Outcomes (≫ `n_min`)
@@ -589,7 +648,7 @@ dann "Phase 13" — umnummeriert 2026-08-11 und erneut 2026-08-18, s. Phase 13 o
 **Done when:** All V4 changes operational, bot demonstrates improved learning signal (process-score
 divergence from outcome-score on bad-market days).
 
-**Directory:** `phase12_v4/` *(to be created)*
+**Directory:** `phase15_v4/` *(to be created)*
 
 ---
 
