@@ -158,9 +158,19 @@ def main(argv: list[str] | None = None) -> int:
 
     archive = BarArchive(args.db)
     try:
-        # Don't open the archive in any schema-mutating way; the new
-        # source tag 'capital' is already in KNOWN_SOURCES post-Session-12
-        # Step 1 — insert_bars will accept it without ensure_schema.
+        # ensure_schema() is idempotent (Phase-12 D4): adds columns
+        # that are missing on older DBs (NOTABLY the ``tick_count``
+        # column added by Phase-13 A2 — see commit e8c5b94), leaves
+        # existing columns alone. Critical for live-DB backfills where
+        # the bars.sqlite may pre-date Phase 13: without this call,
+        # ``insert_bars`` raises ``OperationalError: table bars has no
+        # column named tick_count`` (Nikinger-Run 2026-08-19, Session
+        # 13). Without it, every Capital.com bar would silently fail
+        # to write and the operator gets the misleading "0 bars
+        # written" hint.
+        archive.ensure_schema()
+        # KNOWN_SOURCES has been extended with 'capital' (Session-12
+        # Step 1); insert_bars now accepts the new tag.
         source = CapitalSource(
             identifier=identifier,
             custom_password=password,
