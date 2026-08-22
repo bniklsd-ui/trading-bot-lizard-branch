@@ -2,20 +2,26 @@
 """Phase 13 §6 C1 — Operator script for the Capital.com backfill (Pfad B).
 
 Lückengetriebenes Befüllen des Bar-Archivs mit Capital.com-S3-Bars
-für die Epics, die der Probe-Test 2026-08-19 als funktionierend
-gemeldet hat (DE40 = Germany 40, FR40 = France 40). Epics ausserhalb
-dieser Liste (Spain 35 = IBEX, AEX, MIB) sind Path-C-Territorium
-(Dukascopy) und werden vom Script stillschweigend übersprungen —
-der Caller kann sie später durch einen Dukascopy-Backfill abdecken.
+für die Epics, für die ``SourceAvailabilityStore.symbol_for(epic,
+"capital")`` einen Wert liefert. Epics ohne Eintrag in
+``instrument_source_availability`` werden stillschweigend übersprungen
+(``fetch_window`` gibt ``[]`` zurück, kein HTTP).
+
+Phase-14 B2 (2026-08-22): das frühere hartkodierte Epic→Kürzel-Mapping
+in ``live_data/backfill.py`` ist weg — das Script baut den Lookup hier
+aus ``SourceAvailabilityStore`` (Migration 007). Discover hat vorher
+die Zeilen geschrieben; ohne sie liefert der Lookup ``None`` für alle
+Epics und der Lauf ist ein No-Op. Das ist Absicht: ein Discovery, das
+noch nie gelaufen ist, darf nicht aus Versehen Daten holen.
 
 Usage:
-    # Single-day fill for two confirmed epics
+    # Single-day fill for epics the lookup resolves
     python phase13_live_data/scripts/capital_backfill.py \\
         --epics IX.D.DAX.IFMM.IP,IX.D.CAC.IFE.IP \\
         --start 2026-08-21T08:00:00Z \\
         --end   2026-08-21T16:00:00Z
 
-    # All measurable-universe epics (auto-skip unmapped)
+    # All measurable-universe epics (auto-skip what the lookup rejects)
     python phase13_live_data/scripts/capital_backfill.py \\
         --auto \\
         --start 2026-08-21T08:00:00Z \\
@@ -119,6 +125,48 @@ def _resolve_epics(args: argparse.Namespace) -> list[str]:
     return [s.strip() for s in (args.epics or "").split(",") if s.strip()]
 
 
+def _build_symbol_lookup(universe_db_path: str):
+    """Build the IG-Epic → Capital-Kürzel lookup from
+    ``instrument_source_availability`` (Phase-14 B2).
+
+    Returns ``(lookup, store)``: the lookup is a closure that calls
+    ``SourceAvailabilityStore.symbol_for(epic, "capital")`` for each
+    epic; ``store`` is the underlying connection the caller MUST close.
+
+    Fail-soft on missing migration 007: an older ``trading_bot.sqlite``
+    without the Phase-14 table returns a lookup that always returns
+    ``None`` — the backfill then becomes a no-op for every epic (the
+    same safe-by-default behaviour as a ``CapitalSource`` constructed
+    without a lookup). The store is still returned so the caller can
+    close it.
+    """
+    from source_registry.store import SourceAvailabilityStore
+
+    store = SourceAvailabilityStore(universe_db_path)
+    try:
+        # Probe the table — if it doesn't exist (Phase-14 migration not
+        # applied yet), every ``symbol_for`` call raises ``OperationalError``.
+        # We catch it here and hand back a null-lookup so the script
+        # can still run, just with zero resolved epics.
+        store.for_epic("__probe__")  # cheap existence check
+        avail = True
+    except Exception:  # noqa: BLE001 — fail-soft per Phase-14 B2 spec
+        avail = False
+
+    if not avail:
+        def _null_lookup(_epic: str) -> str | None:
+            return None
+        return _null_lookup, store
+
+    def _lookup(epic: str) -> str | None:
+        try:
+            return store.symbol_for(epic, "capital", "1m")
+        except Exception:  # noqa: BLE001 — per-row fail-soft
+            return None
+
+    return _lookup, store
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args()
 
@@ -162,6 +210,20 @@ def main(argv: list[str] | None = None) -> int:
     from data_foundation.archive import BarArchive
     from live_data.backfill import CapitalSource, run_capital_backfill
 
+    # Phase-14 B2: build the symbol lookup from the discovery table.
+    # Done BEFORE BarArchive so a missing migration 007 surfaces as a
+    # no-op backfill (every epic → None → []) rather than as a bar-archive
+    # error. The store is closed at the very end (after the backfill).
+    symbol_lookup, avail_store = _build_symbol_lookup(args.universe_db)
+    # Phase-14 B2 spec: warn loud when no availability rows exist, so the
+    # operator notices the discovery daemon has never run on this DB.
+    if symbol_lookup("IX.D.DAX.IFMM.IP") is None:
+        _eprint(
+            "[capital_backfill] WARNING: no 'capital' rows in "
+            "instrument_source_availability — backfill will be a no-op "
+            "until the Discovery daemon (Phase-14 C) writes availability rows"
+        )
+
     archive = BarArchive(args.db)
     try:
         # ensure_schema() is idempotent (Phase-12 D4): adds columns
@@ -185,6 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     except Exception as exc:
         _eprint(f"[capital_backfill] setup failed: {exc}")
+        avail_store.close()
         print(json.dumps({"ok": False, "error": f"setup_failed: {exc}"}))
         return 1
 
@@ -194,12 +257,21 @@ def main(argv: list[str] | None = None) -> int:
     # is always present, default empty).
     results: dict[str, int] = {}
     try:
-        results = run_capital_backfill(source, archive, epics, start, end)
+        results = run_capital_backfill(
+            source, archive, epics, start, end,
+            symbol_lookup=symbol_lookup,
+        )
     except Exception as exc:  # noqa: BLE001 — top-level safety net
         _eprint(f"[capital_backfill] backfill raised: {exc}")
+        avail_store.close()
         print(json.dumps({"ok": False, "error": f"backfill_raised: {exc}",
                           "partial_results": results}))
         return 1
+    finally:
+        try:
+            avail_store.close()
+        except Exception:  # noqa: BLE001 — close is best-effort
+            pass
 
     written_total = sum(results.values())
     payload = {

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,6 +45,15 @@ from live_data.backfill import (  # noqa: E402
     CapitalSource,
     run_capital_backfill,
 )
+
+
+# Phase-14 B2: the symbol_lookup is the new source of truth for the
+# IG-Epic → Capital-Kürzel mapping. The script's test supplies a
+# minimal lookup so the test is independent of any DB state.
+_TEST_LOOKUP = lambda e: {
+    "IX.D.DAX.IFMM.IP": "DE40",
+    "IX.D.CAC.IFE.IP": "FR40",
+}.get(e)
 
 
 # ---------- shared helpers --------------------------------------------------
@@ -83,7 +93,10 @@ def _patch_requests(responses: list[_Resp]):
 
 
 def _make_source() -> CapitalSource:
-    return CapitalSource("u@example.com", "custom-pwd", "abcdef0123456789")
+    return CapitalSource(
+        "u@example.com", "custom-pwd", "abcdef0123456789",
+        symbol_lookup=_TEST_LOOKUP,
+    )
 
 
 @pytest.fixture
@@ -246,3 +259,54 @@ def test_main_except_path_emits_valid_json_with_empty_partial_results(
     # The whole point of B4: partial_results is a pre-bound empty dict, not
     # a NameError that swallows the original exception.
     assert payload["partial_results"] == {}
+
+
+# ---------- B2: script builds the symbol lookup from the DB -----------------
+
+
+def test_build_symbol_lookup_returns_null_when_migration_007_missing(tmp_path):
+    """An older ``trading_bot.sqlite`` without the Phase-14 table
+    surfaces as a null-lookup — the backfill becomes a no-op rather than
+    crashing on the first ``symbol_for`` call. Phase-14 B2 fail-soft."""
+    # A fresh empty SQLite — no migration 007.
+    db_path = tmp_path / "trading_bot.sqlite"
+    sqlite3.connect(str(db_path)).close()
+
+    lookup, store = cb._build_symbol_lookup(str(db_path))
+    try:
+        # Null lookup: every epic returns None.
+        assert lookup("IX.D.DAX.IFMM.IP") is None
+        assert lookup("IX.D.CAC.IFE.IP") is None
+    finally:
+        store.close()
+
+
+def test_build_symbol_lookup_queries_the_availability_table(tmp_path):
+    """With the table present (mocked SourceAvailabilityStore), the
+    lookup calls ``symbol_for(epic, 'capital', '1m')`` and returns its
+    result. This pins the B2 contract on the script side without
+    needing a live DB."""
+    from unittest.mock import MagicMock
+    fake_store = MagicMock()
+    fake_store.symbol_for.side_effect = lambda epic, source, res: {
+        ("IX.D.DAX.IFMM.IP", "capital", "1m"): "DE40",
+    }.get((epic, source, res))
+    fake_store.close = MagicMock()
+
+    # Patch SourceAvailabilityStore to return our fake.
+    import source_registry.store as srstore_mod
+    real_cls = srstore_mod.SourceAvailabilityStore
+    srstore_mod.SourceAvailabilityStore = lambda path: fake_store
+    try:
+        lookup, store = cb._build_symbol_lookup(str(tmp_path / "any.sqlite"))
+    finally:
+        srstore_mod.SourceAvailabilityStore = real_cls
+
+    # The lookup resolves DAX to DE40 and rejects anything else.
+    assert lookup("IX.D.DAX.IFMM.IP") == "DE40"
+    assert lookup("IX.D.CAC.IFE.IP") is None
+    # And the underlying store saw exactly one call per request (the
+    # probe + the real lookup; we don't count the probe here because
+    # we mocked it).
+    fake_store.symbol_for.assert_any_call("IX.D.DAX.IFMM.IP", "capital", "1m")
+    fake_store.symbol_for.assert_any_call("IX.D.CAC.IFE.IP", "capital", "1m")
