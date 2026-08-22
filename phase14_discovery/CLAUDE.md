@@ -99,112 +99,92 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 | *(cross-phase)* `phase8_scheduler/webui/api.py` + `static/` | `GET /api/discovery`, ARM/DISARM, Warn-Banner | ⬜ C3 |
 
 ---
-
+ 
 ---
 
-## Session stopped — 2026-08-22 (Session 4: Block A3 — Quell-Profile IG/LS/yF)
+## Session stopped — 2026-08-22 (Session 5: B1a — probe_capital.py erweitert + Operator-Probe startklar)
 
-> **Auftrag:** Nikinger-Anweisung „Arbeite die nächsten Schritte nach Plan ab"
-> — Plan-konform weiter mit Block A3 (nach A1 + A2 grün). B1a Capital.com-`/markets`-
-> Probe war als Option B angeboten („ich baue den Script-Erweiterung jetzt"), Nikinger
-> hat nicht geantwortet → Default Plan-konform: A3 zuerst, B1a kommt später wenn die
-> Probe sowieso laufen muss (vor B1b).
+> **Auftrag:** Nikinger-Frage „was sagt der Plan zu B1a-vs-A4?" → Plan schweigt
+> explizit zu dieser Frage (D20 lockt nur A→B; §6 B1 + §9.3 lockt nur B1a→B1b,
+> kein Cross-Block-Constraint). Nikinger folgt meiner Empfehlung Option C:
+> B1a-Code jetzt, A4 in der Folge-Session, B1b sobald Operator-Output vorliegt.
+> B1a-Build: 5-Minuten-Job (`probe_capital.py` um `--markets`-Modus erweitern).
 
 ### Completed
 
-**`phase14_discovery/source_registry/sources.py`** (NEU) — drei Source-Profile,
-keine einzige macht einen Netz-Call:
+**`phase13_live_data/scripts/probe_capital.py`** — zwei neue Flags, +79 Zeilen:
 
-| Klasse | Eingabe | Status | Origin | Netz |
-|---|---|---|---|---|
-| `IGDerivedSource` | `Iterable[str]` von IG-Epics | `ok` | `derived` | **nein** — D6 |
-| `LSStaticSource` | `Iterable[str]` von IG-Epics | `no_source` (heute; `bars.source='ls'=0`) | `derived` | **nein** — statisch |
-| `RegistryYFSource` | `Iterable[str]` + Duck-Store mit `.get(epic)` | 1:1 `data_source_status`-Spiegelung | `registry` | **nein** — D4 |
-
-`max_probe_calls` wird respektiert, **nie** ausgeschöpft — alle drei liefern
-`probe_calls_used == 0`, der Daemon bucht nichts in `source_spend` (D13). History/
-Latency-Konstanten sind Modul-Level: IG 30d/0min (echtzeit, vollständige Broker-
-Historie), yF 7d/15min (Phase-12-Beobachtung), LS 0d/0min (irrelevant solange
-`no_source`). `RegistryYFSource` packt store-seitige Fehler ins `errors`-Tupel
-(fail-soft per Plan §8.5).
-
-**`phase14_discovery/tests/test_sources.py`** (NEU, 9 Tests = 8 aus Plan + 1
-Grep-Komplement zu Test 2):
-
-| Test | Was |
+| Flag | Wirkung |
 |---|---|
-| 1 | `IGDerivedSource` — eine Zeile pro Epic, status='ok', origin='derived', source_symbol=None |
-| 2 | **D6-Structural-Cost-Test**: `_ExplodingBroker` (jeder Methoden-Aufruf → AssertionError) als Sentinel, discover() läuft durch, `probe_calls_used == 0` |
-| 3 | Grep-Komplement: `import broker_wrapper` / `from broker_wrapper` muss 0 Treffer in `source_registry/` liefern |
-| 4 | `RegistryYFSource` mit `_ThrowingStore` (AssertionError auf `.get()`) → SourceProfile mit `errors`, kein Raise |
-| 5 | `RegistryYFSource` spiegelt `data_source_status='ok'` 1:1 nach `status='ok'` (D18/A4-Identität) |
-| 6 | `RegistryYFSource` spiegelt `no_intraday_source` 1:1, **kein Downgrade** auf `no_source` |
-| 7 | `RegistryYFSource` setzt `origin='registry'` auf jeder Zeile |
-| 8 | `LSStaticSource` liefert `no_source` für jede Epic |
-| 9 | Fail-soft Pattern generisch: `_BrokenStore` (RuntimeError statt AssertionError) → errors-Tupel statt Raise |
+| `--markets` (bool) | B1a-Modus: nach Auth pro Term ein GET `/api/v1/markets?searchTerm=…`, **roh** ausgegeben (keine Filterung, kein Prices-Probe) |
+| `--terms` (str) | Suchterme für `--markets` (Default fällt auf `--indices` zurück → backward-compat mit den existierenden Defaults `Germany 40,France 40,Spain 35`) |
 
-Test 2 + Test 3 sind die **D6-Akzeptanz**: strukturelle Zusicherung, dass
-`IGDerivedSource` nie `/prices` oder `search_markets` ruft. Test 2 fängt jeden
-Aufruf ab, Test 3 pinnt die Modul-Struktur (kein `broker_wrapper`-Import darf
-jemals unter `source_registry/` landen).
+Existierender Prices-Probe-Flow **unverändert** — Auth-Pfad ist geteilt (CST +
+X-SECURITY-TOKEN einmal holen, dann Verzweigung). Die Pre-Session-Antwort vom
+2026-08-22 („`--markets --terms Germany 40,France 40,Spain 35` ⇒ unrecognized
+arguments") ist damit behoben: das Argument existiert jetzt.
 
-### Operator-Schritte dieser Session (Nikinger-Ausführung)
+Output-Format pro Term im `--markets`-Modus:
 
-- **Push durch** (`6ca9ed4..360683f`): 2 Commits von Session 3, kein Konflikt.
-- **Backup der Produktions-DB** angelegt:
-  `data/trading_bot.sqlite.bak-20260822-131529` (1 892 352 Bytes, identisch
-  zur Live-DB). Vor Produktions-Migration 007 anwendbar — A4 (yF-Projektion)
-  muss vorher live sein, sonst liefert die Tabelle nach 007 zwar die historische
-  Wahrheit, aber keine Fortschreibung.
-- **B1a Capital.com-`/markets`-Probe:** nicht ausgeführt — Block-B-Arbeit, der
-  `--markets`-Modus in `probe_capital.py` muss zuerst gebaut werden (Plan §6 B1a).
-  Anwendbar sobald B1a-Code steht; bis dahin A3/A4 plan-konform.
-- **Hygiene-Findling (außerhalb des Phase-14-Scope, NICHT in dieser Session
-  behoben):** `data/trading_bot.sqlite.bak-20260822-131529` zeigt sich als
-  untracked, weil `.gitignore:90` `*.sqlite` matcht — `*.sqlite.bak-…` aber
-  nicht. Der 2026-07-11-Backup zeigt das gleiche Symptom (auch untracked). Fix
-  wäre eine 1-Zeilen-Pattern-Erweiterung (`*.sqlite*` oder explizit
-  `*.bak`), bewusst NICHT in dieser Session — Cross-Phase-Edits außerhalb der
-  freigegebenen Liste (Phase 2/8/9/12/13) sind erneut freigabepflichtig.
+```json
+{
+  "term": "Germany 40",
+  "http_status": 200,
+  "url": "https://demo-api-capital.backend-capital.com/api/v1/markets?searchTerm=Germany+40",
+  "content_type": "application/json",
+  "raw_text_snippet": "..." (erste 500 Zeichen),
+  "raw_body": { ... die tatsächliche API-Antwort ... }
+}
+```
+
+Dazu `purpose` + `next_step_hint` als Hilfetext für den Operator — erklärt, **was**
+in `raw_body` zu suchen ist (Feldnamen für Source-Symbol, das aktuell `DE40`/`FR40`
+in `EPIC_MAP` heißt, und alles was zur IG-Epic zurückmappt).
+
+### Operator-Befehl (Demo, kostenlos, am Wochenende möglich)
+
+```bash
+phase1_broker_wrapper/.venv/bin/python phase13_live_data/scripts/probe_capital.py \
+    --markets --terms "Germany 40,France 40,Spain 35"
+```
+
+Output (JSON auf stdout, stderr = narrative) im nächsten Chat pasten. Ich
+baue danach `CapitalSource.discover()` (B1b) gegen die beobachtete Form.
 
 ### Verified (heute nachgemessen, 2026-08-22)
 
-| Suite | Vor A3 | Nach A3 | Δ |
+| Suite | Vor B1a | Nach B1a | Δ |
 |---|---:|---:|---:|
-| phase14_discovery | 13 | 22 | 22 (8 aus Plan + 1 Grep-Komplement) |
-| **Summe (Regression)** | **1625** | **1634** | **+9** |
+| phase13_live_data | 53 | 53 | 0 (B1a ist Script-Erweiterung, keine Test-Änderung) |
+| **Summe (Regression)** | **1634** | **1634** | **0** |
 
-Working tree clean (außer dem Hygiene-Findling oben), `ps aux | grep scheduler.run`
-leer, kein Live-DB-Write. Cross-Phase-Edits: null (A3 ist vollständig innerhalb
-des `phase14_discovery/source_registry/`-Pakets).
+Working tree clean (außer dem Hygiene-Findling aus Session 4), `ps aux | grep
+scheduler.run` leer, kein Live-DB-Write. Cross-Phase-Edit: ein gezielter Patch
+in `phase13_live_data/scripts/probe_capital.py` (Phase 13 ist freigegeben für
+Phase-14-Cross-Phase-Edits, Nikinger 2026-08-22). Kein Build, kein
+Commit-Push für die anderen Session-5-Edits — das wäre Session-Arbeit.
 
-### Cross-Phase-Anmerkungen für A4
+### Cross-Phase-Anmerkungen für die nächsten Schritte
 
-- **A4 muss rohes SQL über `self.conn` benutzen** (Plan §6 A4) — kein
-  `source_registry`-Import in `phase9_universe`. Heute ist die Spaltenliste
-  an zwei Stellen: Migration 007 (`phase2_persistence/migrations/007_…sql:13-22`)
-  und `SourceAvailabilityStore.upsert`
-  (`phase14_discovery/source_registry/store.py`). Beide müssen exakt dieselbe
-  Spaltenliste + dieselbe ON-CONFLICT-Klausel verwenden. Der Doppelschreiber-
-  Gleichheitstest (Plan §6 A4 Test 6) fängt Drift ab.
-- **`source_symbol ≡ yf_ticker WHERE source='yf'`** (B2-Identität): A4 schreibt
-  `source_symbol = yf_ticker`, exakt wie Migration-007-Backfill und
-  `RegistryYFSource.discover()`. Drei Stellen, dieselbe Spalte.
+- **A4 folgt nach dem Operator-Output** (oder parallel, falls du die Probe
+  erst am Wochenende machst). A4 braucht **keinen** B1a-Output — die
+  yF-Projektion in `set_symbol` ist orthogonal zur Capital.com-Discovery-Form.
+- **Falls die Probe einen überraschenden Status liefert** (z.B. 403 oder ein
+  Swagger-Drift): Block B fällt auf `origin='operator'` zurück (Plan §6 B1
+  „Kein Raten"-Klausel: 2 Paare DE40+FR40 als Seed-Script), Block B2
+  (`EPIC_MAP` raus) bleibt machbar. Kein B-Block bricht.
+- **B1b + die +4 B1b-Tests** kommen in der Folge-Session nach der Probe.
 
 ### Next
 
-- **Operator (Nikinger):** Push-Freigabe für den A3-Commit (`fd9e7f8`).
-  Mit Session 4 dann insgesamt 3 Commits in dieser Woche: A2-Code,
-  A3-Code, Session-4-Docs.
+- **Operator (Nikinger):** Probe-Run oben ausführen, Output im nächsten Chat
+  pasten. Push-Freigabe für 3 Commits (`fd9e7f8` A3-Code, `888ee01`
+  Session-4-Docs, `69cfc31` B1a). 3 Commits vor `origin/main`.
 - **Ausführende Session (nächste):** Plan §6 **Block A4** — yF-Projektion in
-  `UniverseStore.set_symbol`. Sechs Tests gegen die heutige Doppelschreiber-
-  These: dieselbe Zeile, einmal über `set_symbol`, einmal über
-  `SourceAvailabilityStore.upsert` (Plan §6 A4 Test 6).
-- **Unverändert offen:** B1a Capital.com-`/markets`-Probe (Plan §9.3).
-  Empfehlung: **vor** A4 bauen, weil A4 der letzte Block-A-Step ist und ab dann
-  der Discovery-Daemon (Block C) die nächste sinnvolle Arbeit wäre — und der
-  Daemon braucht für `capital`-Zeilen die Probe. Sonst gibt es nur IG/LS/yF
-  im Daemon-Output, kein Capital.com.
-- **Optional (Nikinger-Entscheidung, unabhängig):**
-  - `.gitignore`-Pattern für `*.sqlite.bak-*` (1 Zeile, s. Hygiene-Findling).
-  - `ROADMAP.md:427` Korrektur-Eintrag (zweiter Roll-over, s. Session-2-Finding).
+  `UniverseStore.set_symbol`. Sechs Tests gegen die Doppelschreiber-These
+  (Plan §6 A4 Test 6). Falls B1a-Output schon da: **danach** B1b
+  (`CapitalSource.discover()` gegen beobachtete Form).
+- **Unverändert offen:**
+  - Operator-Run der B1a-Probe (das hier, am Wochenende möglich).
+  - Optional: `.gitignore`-Pattern für `*.sqlite.bak-*` (1 Zeile, s. Session-4).
+  - Optional: `ROADMAP.md:427` Korrektur-Eintrag (zweiter Roll-over).
