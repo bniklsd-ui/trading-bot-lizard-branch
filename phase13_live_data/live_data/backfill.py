@@ -375,8 +375,12 @@ def run_capital_backfill(
 ) -> dict[str, int]:
     """Fetch Capital.com bars and write them to the archive.
 
-    Returns ``{epic: bars_written}``. Epics not in :data:`EPIC_MAP`
-    return 0 (script-level fallback to path C is the caller's job).
+    Returns ``{epic: bars_written}`` where the count is the number of
+    **genuinely new rows** that ``BarArchive.insert_bars`` actually wrote
+    (returns the ``cur.rowcount`` over ``INSERT OR IGNORE`` — duplicates
+    are NOT counted; re-running on the same window returns 0 per epic).
+    Epics not in :data:`EPIC_MAP` return 0 (script-level fallback to
+    path C is the caller's job).
     """
     # Lazy import to keep this module importable in tests that mock
     # ``data_foundation.models``.
@@ -412,8 +416,11 @@ def run_capital_backfill(
                 tick_count=None,  # Capital.com REST prices don't carry it
             )
             try:
-                archive.insert_bars([archive_bar])
-                written += 1
+                # insert_bars returns the number of *genuinely new* rows
+                # (cur.rowcount over INSERT OR IGNORE). Duplicates don't
+                # count; that's what the script-level "bars_written" metric
+                # is supposed to mean (Phase-14 finding B5).
+                written += archive.insert_bars([archive_bar])
             except Exception as exc:  # noqa: BLE001 — fail-soft per Plan §6 C1.0
                 logger.warning(
                     f"CapitalSource: insert_bars failed for {epic} "

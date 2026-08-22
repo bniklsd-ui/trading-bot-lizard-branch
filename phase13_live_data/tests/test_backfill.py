@@ -10,8 +10,7 @@ All mocked: no network, no live DB. ``CapitalSource`` exercises real
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -275,9 +274,16 @@ def test_fetch_window_non_retriable_error_propagates():
     assert len(price_calls) == 1
 
 
-def test_run_capital_backfill_writes_to_archive():
+def test_run_capital_backfill_writes_to_archive(tmp_path):
     """End-to-end: fetch + write + verify archive has the bar with
-    ``source='capital'``."""
+    ``source='capital'``.
+
+    Uses ``tmp_path`` (Phase-14 finding B5): a per-test fresh archive so the
+    ``written += archive.insert_bars(...)`` counter reflects *genuinely new*
+    rows, not duplicates against a leftover ``/tmp/test_capital_backfill_e2e/``
+    from a prior session — which is what the previous hardcoded-path version
+    silently did, and what the old ``written += 1`` hid.
+    """
     p1, p2, _ = _patch_requests([
         _Resp(200, headers={"CST": "c", "X-SECURITY-TOKEN": "s"}),
         _Resp(200, json_body={
@@ -289,9 +295,7 @@ def test_run_capital_backfill_writes_to_archive():
             ],
         }),
     ])
-    tmp = Path("/tmp/test_capital_backfill_e2e")
-    tmp.mkdir(parents=True, exist_ok=True)
-    archive = BarArchive(tmp / "bars.sqlite")
+    archive = BarArchive(tmp_path / "bars.sqlite")
     archive.ensure_schema()
     try:
         with p1, p2:
@@ -321,15 +325,13 @@ def test_run_capital_backfill_writes_to_archive():
         archive.close()
 
 
-def test_run_capital_backfill_records_zero_for_unmapped_epics():
+def test_run_capital_backfill_records_zero_for_unmapped_epics(tmp_path):
     """Spain 35 + AEX + MIB are not in EPIC_MAP — run_capital_backfill
     returns 0 for each, leaves archive untouched. Script-level fallback
     to Path C (Dukascopy) is the caller's job (deferred to a future
     session per Nikinger-Auflage 2026-08-19)."""
     p1, p2, _ = _patch_requests([])
-    tmp = Path("/tmp/test_capital_backfill_unmapped")
-    tmp.mkdir(parents=True, exist_ok=True)
-    archive = BarArchive(tmp / "bars.sqlite")
+    archive = BarArchive(tmp_path / "bars.sqlite")
     archive.ensure_schema()
     try:
         with p1, p2:

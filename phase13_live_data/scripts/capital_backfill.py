@@ -45,6 +45,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _KEYRING_SERVICE = "trading-bot-capital"
 _DEFAULT_DB_PATH = _REPO_ROOT / "data" / "bars.sqlite"
+_DEFAULT_UNIVERSE_DB_PATH = _REPO_ROOT / "data" / "trading_bot.sqlite"
 
 
 def _eprint(message: str = "") -> None:
@@ -89,6 +90,11 @@ def _parse_args() -> argparse.Namespace:
         help=f"path to bars.sqlite (default: {_DEFAULT_DB_PATH})",
     )
     parser.add_argument(
+        "--universe-db", default=str(_DEFAULT_UNIVERSE_DB_PATH),
+        help=f"path to trading_bot.sqlite holding instrument_universe "
+             f"(default: {_DEFAULT_UNIVERSE_DB_PATH}). Used by --auto only.",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="skip auth + skip writes; just print the plan",
     )
@@ -104,7 +110,7 @@ def _resolve_epics(args: argparse.Namespace) -> list[str]:
     if args.auto:
         sys.path.insert(0, str(_REPO_ROOT))
         from universe import UniverseStore
-        store = UniverseStore(args.db)
+        store = UniverseStore(args.universe_db)
         try:
             epics = [r.epic for r in store.measurable_universe()]
         finally:
@@ -182,6 +188,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"ok": False, "error": f"setup_failed: {exc}"}))
         return 1
 
+    # Pre-bind results so the top-level safety net can emit a valid envelope
+    # even when ``run_capital_backfill`` raises before assigning it (Phase-14
+    # finding B4: NameError swallowed the original exception; now partial_results
+    # is always present, default empty).
+    results: dict[str, int] = {}
     try:
         results = run_capital_backfill(source, archive, epics, start, end)
     except Exception as exc:  # noqa: BLE001 — top-level safety net
