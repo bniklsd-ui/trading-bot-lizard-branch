@@ -350,9 +350,10 @@ def main(argv: list[str] | None = None) -> int:
                         "GET /api/v1/markets?searchTerm=... before building "
                         "CapitalSource.discover() (B1b). Inspect raw_body per "
                         "term for the field names that carry (a) the source's "
-                        "own symbol — what EPIC_MAP currently calls 'DE40' / "
-                        "'FR40' — and (b) anything that maps back to the IG "
-                        "epic we already have on the universe side."),
+                        "own symbol — what `instrument_source_availability"
+                        ".source_symbol` stores as 'DE40' / 'FR40' — and (b) "
+                        "anything that maps back to the IG epic we already "
+                        "have on the universe side."),
             "next_step_hint": ("Copy one or two raw_body entries into the "
                                "Phase-14-Ausführende-Session conversation so "
                                "the discover() implementation can be written "

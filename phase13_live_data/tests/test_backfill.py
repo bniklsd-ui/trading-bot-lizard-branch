@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from typing import Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,13 +20,25 @@ from data_foundation.archive import BarArchive
 from live_data import backfill as backfill_mod
 from live_data.backfill import (
     CapitalSource,
-    EPIC_MAP,
     SOURCE_TAG,
     run_capital_backfill,
 )
 
 
 # ---------- helpers --------------------------------------------------------
+
+
+# Phase-14 B2: the symbol lookup is the new source of truth for the
+# IG-Epic → Capital-Kürzel mapping. The default lookup below resolves
+# DAX/CAC (the two confirmed working indices from the 2026-08-19 probe).
+# Spain 35 / AEX / MIB are intentionally absent — they are Path-C territory
+# (Dukascopy, deferred) and Phase-14 D15 keeps them out of the live
+# backfill pipeline. Tests that exercise the "unknown epic" path
+# explicitly pass ``symbol_lookup=lambda _e: None``.
+_DEFAULT_TEST_LOOKUP: Callable[[str], str | None] = lambda e: {
+    "IX.D.DAX.IFMM.IP": "DE40",   # Germany 40
+    "IX.D.CAC.IFE.IP":  "FR40",   # France 40
+}.get(e)
 
 
 class _Resp:
@@ -66,8 +79,14 @@ def _patch_requests(responses: list[_Resp]):
 
 def _make_source(identifier: str = "u@example.com",
                  password: str = "custom-pwd",
-                 api_key: str = "abcdef0123456789") -> CapitalSource:
-    return CapitalSource(identifier, password, api_key)
+                 api_key: str = "abcdef0123456789",
+                 symbol_lookup: Callable[[str], str | None] | None = None) -> CapitalSource:
+    """Build a ``CapitalSource`` with the test-default lookup unless
+    ``symbol_lookup`` is given explicitly. Tests that probe "unmapped"
+    epics pass ``symbol_lookup=lambda _e: None``."""
+    if symbol_lookup is None:
+        symbol_lookup = _DEFAULT_TEST_LOOKUP
+    return CapitalSource(identifier, password, api_key, symbol_lookup=symbol_lookup)
 
 
 @pytest.fixture
@@ -115,10 +134,11 @@ def test_authenticate_401_raises():
 
 
 def test_fetch_window_returns_empty_for_unknown_epic():
-    """Spain 35 is not in EPIC_MAP — fetch_window returns [] without any HTTP call."""
+    """Spain 35 is not in the symbol lookup — fetch_window returns []
+    without any HTTP call. The lookup is the source of truth."""
     p1, p2, calls = _patch_requests([])
     with p1, p2:
-        src = _make_source()
+        src = _make_source(symbol_lookup=lambda _e: None)
         bars = src.fetch_window(
             "IX.D.IBEX.FWM2.IP",
             datetime(2026, 8, 21, 18, 0, tzinfo=timezone.utc),
@@ -126,6 +146,25 @@ def test_fetch_window_returns_empty_for_unknown_epic():
         )
     assert bars == []
     assert calls == [], "no HTTP call expected for unmapped epic"
+
+
+def test_fetch_window_returns_empty_when_no_lookup_was_supplied():
+    """A ``CapitalSource`` constructed without a ``symbol_lookup``
+    resolves no epics — ``fetch_window`` returns ``[]`` for every
+    input without an HTTP call. This is the safe-by-default behaviour
+    Phase-14 B2 requires: an unbonded source does not silently fetch."""
+    p1, p2, calls = _patch_requests([])
+    with p1, p2:
+        src = CapitalSource("u@example.com", "custom-pwd", "abcdef0123456789")
+        for epic in ("IX.D.DAX.IFMM.IP", "IX.D.IBEX.FWM2.IP",
+                     "IX.D.AEX.IFM.IP", "IX.D.MIB.MFM.IP"):
+            bars = src.fetch_window(
+                epic,
+                datetime(2026, 8, 21, 18, 0, tzinfo=timezone.utc),
+                datetime(2026, 8, 21, 19, 0, tzinfo=timezone.utc),
+            )
+            assert bars == []
+    assert calls == [], "no HTTP call expected when no symbol_lookup was supplied"
 
 
 def test_fetch_window_parses_local_timestamps_to_utc():
@@ -262,7 +301,7 @@ def test_fetch_window_non_retriable_error_propagates():
         src = _make_source()
         # Use a MAPPED epic (DE40) so the HTTP /prices/ call actually
         # happens — Spain 35 / IX.D.IBEX.FWM2.IP would short-circuit
-        # at the EPIC_MAP check before any HTTP.
+        # at the symbol_lookup check before any HTTP.
         with pytest.raises(RuntimeError, match="HTTP 404"):
             src.fetch_window(
                 "IX.D.DAX.IFMM.IP",
@@ -326,16 +365,16 @@ def test_run_capital_backfill_writes_to_archive(tmp_path):
 
 
 def test_run_capital_backfill_records_zero_for_unmapped_epics(tmp_path):
-    """Spain 35 + AEX + MIB are not in EPIC_MAP — run_capital_backfill
-    returns 0 for each, leaves archive untouched. Script-level fallback
-    to Path C (Dukascopy) is the caller's job (deferred to a future
-    session per Nikinger-Auflage 2026-08-19)."""
+    """Spain 35 + AEX + MIB are not in the symbol lookup —
+    ``run_capital_backfill`` returns 0 for each, leaves archive
+    untouched. Phase-14 B2 + D15: no implicit Dukascopy fallback;
+    the consumer decides."""
     p1, p2, _ = _patch_requests([])
     archive = BarArchive(tmp_path / "bars.sqlite")
     archive.ensure_schema()
     try:
         with p1, p2:
-            src = _make_source()
+            src = _make_source(symbol_lookup=lambda _e: None)
             results = run_capital_backfill(
                 src, archive,
                 epics=["IX.D.IBEX.FWM2.IP", "IX.D.AEX.IFM.IP", "IX.D.MIB.MFM.IP"],
@@ -351,11 +390,59 @@ def test_run_capital_backfill_records_zero_for_unmapped_epics(tmp_path):
         archive.close()
 
 
-def test_epic_map_does_not_contain_path_c_territory():
-    """Phase-13 Hybrid-Entscheidung: Spain 35 (IBEX), AEX (Netherlands),
-    MIB (Italy) are Path C territory (Dukascopy), not Path B.
-    Lock this in via test — if anyone later adds them to EPIC_MAP,
-    the test fails loud."""
-    assert "IX.D.IBEX.FWM2.IP" not in EPIC_MAP
-    assert "IX.D.AEX.IFM.IP" not in EPIC_MAP
-    assert not any("IX.D.MIB" in k for k in EPIC_MAP.keys())
+def test_symbol_lookup_default_omits_path_c_territory():
+    """Phase-13 Hybrid-Entscheidung (lock-in): Spain 35 (IBEX), AEX
+    (Netherlands), MIB (Italy) are Path C territory (Dukascopy), not
+    Path B. This test pins the lock-in on the *default* test lookup:
+    an unbonded backfill that does NOT explicitly include these epics
+    must still skip them. If anyone later extends the default lookup
+    with SP35, AEX, or MIB, the test fails loud.
+
+    The production lookup (``SourceAvailabilityStore.symbol_for`` in
+    ``scripts/capital_backfill.py``) is governed by
+    ``instrument_source_availability`` — Phase-14 D15 + B1a probe
+    confirmed Spain 35 (``SP35``) IS available on Capital.com, but
+    activating it is a deliberate operator step (the discovery daemon
+    must write the row, not the script guess)."""
+    assert _DEFAULT_TEST_LOOKUP("IX.D.IBEX.FWM2.IP") is None
+    assert _DEFAULT_TEST_LOOKUP("IX.D.AEX.IFM.IP") is None
+    assert _DEFAULT_TEST_LOOKUP("IX.D.MIB.MFM.IP") is None
+    # The two confirmed working indices still resolve.
+    assert _DEFAULT_TEST_LOOKUP("IX.D.DAX.IFMM.IP") == "DE40"
+    assert _DEFAULT_TEST_LOOKUP("IX.D.CAC.IFE.IP") == "FR40"
+
+
+def test_run_capital_backfill_symbol_lookup_kwarg_overrides_source(tmp_path):
+    """``run_capital_backfill``'s ``symbol_lookup`` kwarg overrides
+    whatever was passed to ``CapitalSource.__init__`` — the script
+    owns the lookup (it owns the DB connection), the source is a
+    dumb adapter."""
+    p1, p2, calls = _patch_requests([
+        _Resp(200, headers={"CST": "c", "X-SECURITY-TOKEN": "s"}),
+        _Resp(200, json_body={
+            "prices": [
+                {"snapshotTime": "2026-08-21T20:00:00", "openPrice": 100.0,
+                 "highPrice": 101.0, "lowPrice": 99.0, "closePrice": 100.5,
+                 "volume": 42},
+            ],
+        }),
+    ])
+    archive = BarArchive(tmp_path / "bars.sqlite")
+    archive.ensure_schema()
+    try:
+        with p1, p2:
+            # Source constructed with NO lookup (would normally reject everything).
+            src = CapitalSource("u@example.com", "custom-pwd", "abcdef0123456789")
+            # The kwarg attaches a real lookup at call time.
+            results = run_capital_backfill(
+                src, archive,
+                epics=["IX.D.DAX.IFMM.IP"],
+                start_utc=datetime(2026, 8, 21, 18, 0, tzinfo=timezone.utc),
+                end_utc=datetime(2026, 8, 21, 21, 0, tzinfo=timezone.utc),
+                symbol_lookup=_DEFAULT_TEST_LOOKUP,
+            )
+        assert results == {"IX.D.DAX.IFMM.IP": 1}
+        # And the lookup is sticky on the source for any subsequent call.
+        assert src._symbol_lookup is _DEFAULT_TEST_LOOKUP
+    finally:
+        archive.close()

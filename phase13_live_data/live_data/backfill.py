@@ -42,9 +42,15 @@ Quellen-spezifische Erkenntnisse (empirisch, Session 11):
   UTC-Anfrage: **+2 h im Sommer** (CEST/UTC+2). ``CAPITAL_TZ`` unten
   ist ``Europe/Madrid`` (UTC+2 Sommer / +1 Winter), DST-aware via
   ``zoneinfo``.
-- Epic-Mapping: ``IX.D.DAX.IFMM.IP`` → ``DE40``, ``IX.D.CAC.IFE.IP``
-  → ``FR40``. ``IX.D.IBEX.FWM2.IP`` (Spain 35) → nicht in ``SUPPORTED_EPICS``,
-  fällt auf Path C.
+- **Epic-Mapping: kommt jetzt vom Caller über ``symbol_lookup``** (Phase 14 B2).
+  ``CapitalSource`` öffnet **keine** DB (Phasen-Isolation) — der Aufrufer
+  reicht eine ``Callable[[str], str | None]`` herein, die zu jedem
+  IG-Epic das Capital.com-Kürzel (oder ``None`` für „nicht verfügbar")
+  liefert. ``scripts/capital_backfill.py`` baut den Lookup aus
+  ``SourceAvailabilityStore.symbol_for(epic, "capital")`` — der
+  Cross-Product-Tabelle ``instrument_source_availability`` (Migration
+  007). Epics ohne Eintrag in dieser Tabelle → ``fetch_window`` gibt
+  ``[]`` zurück, **kein** HTTP, **keine** Dukascopy-Fallback-Annahme.
 
 Langlebigkeit: ``KNOWN_SOURCES`` (``data_foundation/models.py:22``)
 muss ``'capital'`` enthalten, sonst weigert sich ``BarArchive.insert_bars``
@@ -60,7 +66,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 from zoneinfo import ZoneInfo
 
 import requests
@@ -86,22 +92,16 @@ REQUEST_TIMEOUT_SEC = 30
 MAX_RETRIES = 3
 BACKOFF_BASE_SEC = 2.0
 
-# Map our internal IG-style epics to Capital.com's short epic codes
-# (per the probe result 2026-08-19). Spain 35 = IBEX is intentionally
-# absent — falls back to Dukascopy (Path C, deferred).
-EPIC_MAP: dict[str, str] = {
-    "IX.D.DAX.IFMM.IP": "DE40",   # Germany 40
-    "IX.D.CAC.IFE.IP":  "FR40",   # France 40
-}
-
 # Phase-14 B1b (2026-08-22): each Capital.com ``/markets?searchTerm=…``
 # call needs the *human-readable* index name. The B1a operator probe
 # observed what each IG epic maps to — see
 # ``phase14_discovery/PHASE14_B1A_PROBE_OUTPUT_2026-08-22.md`` §5.
-# Today this is the same three pairs that ``EPIC_MAP`` covers; B2 will
-# replace ``EPIC_MAP`` with a runtime DB lookup (``SourceAvailabilityStore
-# .symbol_for``) but the search-term dict remains here — the source
-# itself opens no DB (Plan §5.2).
+# This dict is consumed by ``CapitalSource.discover()`` (Discovery
+# emits ``SourceAvailability`` rows). It is NOT consumed by
+# ``fetch_window`` — the IG-Epic → Capital-Kürzel mapping lives in
+# the ``symbol_lookup`` callable passed at construction time, which
+# ``scripts/capital_backfill.py`` builds from
+# ``SourceAvailabilityStore.symbol_for``.
 _DISPLAY_NAME_BY_EPIC: dict[str, str] = {
     "IX.D.DAX.IFMM.IP":  "Germany 40",
     "IX.D.CAC.IFE.IP":   "France 40",
@@ -149,11 +149,19 @@ class CapitalSource:
         custom_password: str,
         api_key: str,
         base_url: str = "https://demo-api-capital.backend-capital.com",
+        symbol_lookup: Callable[[str], str | None] | None = None,
     ) -> None:
         self._identifier = identifier
         self._custom_password = custom_password
         self._api_key = api_key
         self._base_url = base_url
+        # ``None`` means "no resolution" — every epic returns ``[]`` from
+        # ``fetch_window``. A callable is the only way to enable fetches.
+        # The callable is supplied by the caller (typically
+        # ``scripts/capital_backfill.py``, building it from
+        # ``SourceAvailabilityStore.symbol_for``), keeping ``CapitalSource``
+        # itself DB-connection-free for phase isolation.
+        self._symbol_lookup: Callable[[str], str | None] | None = symbol_lookup
         self._cst: str | None = None
         self._security_token: str | None = None
 
@@ -207,15 +215,23 @@ class CapitalSource:
     ) -> list[PriceBar]:
         """Fetch bars for ``epic`` between ``[start_utc, end_utc)``.
 
-        Returns an empty list (not an error) for epics not in
-        :data:`EPIC_MAP` — the script-level gap-fill will then fall
-        back to Path C (Dukascopy) for those.
+        Returns an empty list (not an error) for epics whose
+        ``symbol_lookup`` resolves to ``None`` — i.e. no
+        ``(epic, 'capital')`` row in ``instrument_source_availability``
+        (the Discovery daemon has not confirmed this source for this
+        epic). The lookup is the new source of truth for the
+        IG-Epic → Capital-Kürzel mapping. When no ``symbol_lookup`` was
+        supplied to the constructor, every epic falls through this
+        branch and no HTTP is made.
         """
-        capital_epic = EPIC_MAP.get(epic)
+        capital_epic = (
+            self._symbol_lookup(epic) if self._symbol_lookup is not None else None
+        )
         if capital_epic is None:
             logger.warning(
-                f"CapitalSource: epic {epic!r} not in EPIC_MAP — "
-                f"caller should fall back to path C (Dukascopy)"
+                f"CapitalSource: no 'capital' row in "
+                f"instrument_source_availability for {epic!r} — "
+                f"Discovery has not confirmed this source for this epic"
             )
             return []
 
@@ -569,6 +585,7 @@ def run_capital_backfill(
     epics: list[str],
     start_utc: datetime,
     end_utc: datetime,
+    symbol_lookup: Callable[[str], str | None] | None = None,
 ) -> dict[str, int]:
     """Fetch Capital.com bars and write them to the archive.
 
@@ -576,9 +593,21 @@ def run_capital_backfill(
     **genuinely new rows** that ``BarArchive.insert_bars`` actually wrote
     (returns the ``cur.rowcount`` over ``INSERT OR IGNORE`` — duplicates
     are NOT counted; re-running on the same window returns 0 per epic).
-    Epics not in :data:`EPIC_MAP` return 0 (script-level fallback to
-    path C is the caller's job).
+    Epics whose ``symbol_lookup`` resolves to ``None`` return 0
+    (the consumer decides the fallback — Phase-14 D15: no implicit
+    Dukascopy / path C, the discovery table is the truth).
+
+    ``symbol_lookup`` is the seam through which the caller injects
+    the IG-Epic → Capital-Kürzel mapping. When supplied here, it
+    **overrides** whatever lookup ``source`` was constructed with —
+    production callers (``scripts/capital_backfill.py``) build the
+    lookup from ``SourceAvailabilityStore.symbol_for(epic, "capital")``
+    and pass it here, regardless of whether ``CapitalSource.__init__``
+    was given one. The intent is that the script owns the lookup (it
+    owns the DB connection); the source is a dumb adapter.
     """
+    if symbol_lookup is not None:
+        source._symbol_lookup = symbol_lookup
     # Lazy import to keep this module importable in tests that mock
     # ``data_foundation.models``.
     from data_foundation.models import Bar
