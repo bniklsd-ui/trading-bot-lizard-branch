@@ -80,36 +80,160 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 
 ## Modul-Tabelle
 
-> Stand: **nichts gebaut.** Diese Tabelle wird in Block D gegen den As-Built-Stand gefüllt
-> (Testzahlen aus dem finalen Sweep, nicht geschätzt).
+> Stand: **2026-08-22 — Session 7.** Diese Tabelle wird in Block D gegen den
+> As-Built-Stand gefüllt (Testzahlen aus dem finalen Sweep, nicht geschätzt).
 
 | Datei | Zweck | Status |
 |---|---|---|
-| `source_registry/models.py` | `SourceAvailability`, `SourceProfile`, `Source`-Protocol, `origin`-Vokabular | ⬜ A2/A3 |
-| `source_registry/store.py` | `SourceAvailabilityStore` — der einzige Zugriff auf Migration 007 | ⬜ A2 |
-| `source_registry/sources.py` | `IGDerivedSource`, `LSStaticSource`, `RegistryYFSource` — alle drei ohne Netz | ⬜ A3 |
+| `source_registry/models.py` | `SourceAvailability`, `SourceProfile`, `Source`-Protocol, `origin`-Vokabular | ✅ A2/A3 (gelockt in Phase-13-Session 4) |
+| `source_registry/store.py` | `SourceAvailabilityStore` — der einzige Zugriff auf Migration 007 | ✅ A2 |
+| `source_registry/sources.py` | `IGDerivedSource`, `LSStaticSource`, `RegistryYFSource` — alle drei ohne Netz | ✅ A3 |
 | `source_registry/arm.py` | Scharf-Flag `data/state/DISCOVERY_ARMED` (Muster `killswitch.py`, sichere Richtung umgedreht) | ⬜ C1 |
 | `source_registry/run.py` | Der Daemon (Muster `data_foundation/run.py`: PID-File, graceful SIGTERM, `--once`) | ⬜ C2 |
 | `scripts/run_discovery.sh` | Start-Wrapper (Muster `run_recorder.sh`) | ⬜ C4 |
-| *(cross-phase)* `phase2_persistence/migrations/007_phase14_source_availability.sql` | die Kreuzungs-Tabelle **+ der einmalige yF-Backfill aus `instrument_universe`** (der Grundbestand kommt aus der Migration, nicht aus einem Resolver-Lauf — `resolve_epic` ruft `set_symbol` in sechs von acht Pfaden nicht) | ⬜ A2 |
-| *(cross-phase)* `phase9_universe/universe/models.py` | `DS_STALE_SOURCE` ins Vokabular (Live-Blocker B1) | ⬜ A1 |
-| *(cross-phase)* `phase9_universe/universe/store.py` | yF-Projektion in `set_symbol`, nicht-fatal | ⬜ A4 |
-| *(cross-phase)* `phase13_live_data/live_data/backfill.py` | `EPIC_MAP` raus, Symbol-Lookup rein; `CapitalSource.discover()` | ⬜ B1/B2 |
+| *(cross-phase)* `phase2_persistence/migrations/007_phase14_source_availability.sql` | die Kreuzungs-Tabelle **+ der einmalige yF-Backfill aus `instrument_universe`** (der Grundbestand kommt aus der Migration, nicht aus einem Resolver-Lauf — `resolve_epic` ruft `set_symbol` in sechs von acht Pfaden nicht) | ✅ A2 |
+| *(cross-phase)* `phase9_universe/universe/models.py` | `DS_STALE_SOURCE` ins Vokabular (Live-Blocker B1) | ✅ A1 |
+| *(cross-phase)* `phase9_universe/universe/store.py` | yF-Projektion in `set_symbol`, nicht-fatal | ✅ A4 (Session 7) |
+| *(cross-phase)* `phase13_live_data/live_data/backfill.py` | `CapitalSource.discover()` (B1b); `EPIC_MAP` raus + Symbol-Lookup rein (B2) | 🔶 B1b gebaut, ⬜ B2 |
+| *(cross-phase)* `phase13_live_data/scripts/probe_capital.py` | CFD-Filter-Bug Fix: `"CFD"`-Substring → exakt `"INDICES"`; neuer Helper `_pick_index_match` für Testbarkeit | ✅ Cross-Phase-Hygiene (Session 7) |
 | *(cross-phase)* `phase13_live_data/scripts/source_delta.py` | drei Fälle statt zwei (`not_available` / `available_but_empty` / `compared`) | ⬜ B3 |
 | *(cross-phase)* `phase8_scheduler/webui/api.py` + `static/` | `GET /api/discovery`, ARM/DISARM, Warn-Banner | ⬜ C3 |
 
 ---
- 
----
 
-## Session stopped — 2026-08-22 (Session 6: B1a-Operator-Probe gelaufen + Findings dokumentiert)
+## Session stopped — 2026-08-22 (Session 7: CFD-Filter-Fix + Block B1b + Block A4)
 
-> **Auftrag:** Nikinger hat die B1a-Probe live ausgeführt (Demo, kostenlos) und
-> den vollständigen JSON-Output im Chat gepastet. Anweisung: „alle Dokumente
-> Updaten und pushen bitte". Output ist die **beobachtete Antwort-Form**,
-> gegen die `CapitalSource.discover()` (B1b) gebaut wird. Snapshot-Datei
-> angelegt; Session-Block dokumentiert die 8 wichtigsten Befunde; Push der
-> 4 ungepushten Commits liegt beim Operator.
+> **Auftrag:** Option 1+ kombiniert (Nikinger-Entscheidung) — CFD-Fix, B1b, A4
+> in getrennten Commits. Drei Commits, 16 neue Tests grün; keine Cross-Phase-
+> Edit außerhalb der freigegebenen Liste (Phase 2/8/9/12/13).
+
+### Completed
+
+**Commit 1 — `phase13: probe -- fix CFD-substring filter to exact INDICES
+match`** (`4195033`, 2 files, +154/-12). `scripts/probe_capital.py:382-388`
+Filter `"CFD" in instrumentType` war ein No-Op gegen die Realität
+(`instrumentType == "INDICES"` — Phase-14 B1a Befund 3). Helper
+`_pick_index_match` als modul-level Pure-Funktion extrahiert (gleiche
+Disziplin wie `CapitalSource._pick_markets_match` in Session 8) — exakt-
+`"INDICES"` Match mit Name-only-Fallback für forward-compat (zukünftige
+Type-Renames verlieren den Probe nicht).
++6 Tests in `phase13_live_data/tests/test_probe_capital.py` (NEU): INDICES-
+wins, type-case, fallback, no-match → None, missing-type-field, empty-list.
+
+**Commit 2 — `phase14: code+tests -- B1b CapitalSource.discover() against
+B1a snapshot`** (`3434fe7`, 2 files, +572/-1). `CapitalSource.discover`
+implementiert genau gegen den B1a-Snapshot:
+- Signatur `discover(epics, *, max_probe_calls=8) -> SourceProfile` —
+  identisch zum Protocol in `source_registry.models:192`.
+- Interner statischer Name-Lookup `_DISPLAY_NAME_BY_EPIC` (3 Paare aus B1a
+  Befund 5); Spanien 35 ist **drin** (`SP35`) — Dukascopy-Fallback wird
+  überflüssig für IBEX.
+- Filter exakt `instrumentName == name` UND `instrumentType == "INDICES"`
+  (B1a Befund 3); Strict — kein Fallback auf non-INDICES (Discover
+  schreibt in die `instrument_source_availability` Tabelle, da ist
+  `status='ok'` ein bindender Vertrag).
+- Fail-soft (Plan §8.5): network / parse / non-200 → `errors`-Tuple;
+  iteriert weiter. Auth-POST zählt nicht gegen `max_probe_calls`.
++8 Tests in `phase13_live_data/tests/test_capital_discover.py` (NEU):
+Happy DE40, unknown epic ohne HTTP, search-hit-mit-non-INDICES-Result →
+no_source, `max_probe_calls=0` → keine GETs, `max_probe_calls=1` → nur
+erste Epic, `requests.ConnectionError` → error, non-200 → error, B1a 3-Paar
+round-trip.
+
+**Commit 3 — `phase14: code+tests -- A4 yF-Projektion in
+UniverseStore.set_symbol`** (`ee48cd2`, 2 files, +326/-0). `set_symbol`
+schreibt nach dem Registry-UPDATE in try/except-Block die yF-Zeile in
+`instrument_source_availability` (Migration 007). Schreib-Mechanik gelockt
+(Plan §6 A4): rohes SQL gegen `self.conn`, **kein** Cross-Phase-Import von
+`source_registry.models` (Phase 9 ist sealed, Phase 14 hängt davon ab —
+Importer würde in die falsche Richtung laufen). INSERT … ON CONFLICT …
+DO UPDATE — gleiche Shape wie `SourceAvailabilityStore.upsert`.
+Doppelschreiber-Gleichheit wird zur Laufzeit zugesichert (Test 6),
+nicht zur Compile-Zeit. Fail-soft gemäß D5: fehlt die Tabelle, geht der
+Registry-Write durch, der Projektions-Fehler landet im Log.
++6 Tests in `phase9_universe/tests/test_store.py`: round-trip (status='ok'),
+overwrite on second call, source_symbol=None, **D5-Beweis mit fehlendem
+Migration 007** (Fixture `store` ohne 007; `set_symbol` raises nicht),
+measurable_universe byte-equal vor/nach, doppelschreiber-gleichheit mit
+beiden `utc_iso_now` auf fixed clock gepatcht.
+
+### Verified
+
+- Regression-Sweep aller 14 Suiten + root `tests/` (Stand nach den drei
+  Commits, ohne Docs-Edits):
+  | Suite | Vor Session 7 | Nach | Δ |
+  |---|---:|---:|---:|
+  | phase1_broker_wrapper | 95 | 95 | 0 |
+  | phase2_persistence | 77 | 77 | 0 |
+  | phase3_external_data | 104 | 104 | 0 |
+  | phase4_research | 155 | 155 | 0 |
+  | phase5_execution | 173 | 173 | 0 |
+  | phase6_debate | 76 | 76 | 0 |
+  | phase7_reward | 138 | 138 | 0 |
+  | phase8_scheduler | 244 | 244 | 0 |
+  | phase9_universe | 81 | 87 | +6 (A4) |
+  | phase10_v3 | 165 | 165 | 0 |
+  | phase12_data_foundation | 143 | 143 | 0 |
+  | phase13_live_data | 59 | 67 | +8 (CFD-Fix: 0; B1b: 8) |
+  | phase14_discovery | 22 | 22 | 0 |
+  | meta_m1_harness | 28 | 28 | 0 |
+  | root `tests/` | 80 | 80 | 0 |
+  | **Σ** | **1638** | **1652** | **+14** |
+  *(Cross-check: 6 A4 + 8 B1b = 14 neue Tests, keine Lücke.)*
+- Working tree clean (außer `data/`-Ordner, der ist gitignored), keine
+  Cross-Phase-Edits außerhalb der freigegebenen Phase-13-Liste,
+  `git log --oneline -4` zeigt eine saubere Commit-Kette.
+
+### Findings (drei, davon einer war neu)
+
+- **CFD-Filter-Bug-Lage korrigiert:** Plan §6 0.3, Session-6-Doc, der
+  Phase-13-Closeout-Handover und die ROOT-CLAUDE-MD zitierten alle
+  `live_data/backfill.py:339-366` (oder `:300-316`) als Bug-Stelle. **Falsch.**
+  Der `"CFD" in instrumentType`-Substring lebt in `scripts/probe_capital.py:385`.
+  `_extract_ohlc` in `backfill.py` filtert nicht nach Typ — sucht nur
+  OHLC-Feldnamen. Plan-Drift-Listeneintrag #2 ("Zeilennummern
+  verschieben sich") hat sich hier bestätigt; die Korrektur wandert
+  in die Plan-§9-Drift-Liste der nächsten Plan-Session.
+- **`CapitalSource._pick_markets_match` ist strict-by-design:**
+  `scripts/probe_capital._pick_index_match` hat einen Fallback auf
+  exakten Namen ohne Typ-Check (für Forward-Kompat im Operator-Tooling).
+  `_pick_markets_match` hat **keinen** Fallback — Discover schreibt
+  in die Cross-Product-Tabelle, wo `status='ok'` bedeutet "diese
+  Quelle liefert CFD-Index-Bars". SHARES/COMMODITIES sind die falsche
+  Antwort, kein Notbehelf. Begründung im Helper-Docstring.
+- **`import logging` war `phase9_universe/universe/store.py` fremd** bis
+  A4 (verifiziert im Plan-Drift-Item #12). `logger = logging.getLogger
+  ("universe.store")` ergänzt; nur für den Projektions-Warning-Pfad —
+  andere Methoden ändern ihr Verhalten nicht.
+
+### Unverändert offen
+
+- **B2** (`EPIC_MAP` raus, `SourceAvailabilityStore.symbol_for` rein)
+  — wartet auf die jetzt baubare B1b-Availability. Empfehlung: nächste
+  Session.
+- **B3** (`source_delta.py` drei Fälle) — orthogonal, danach.
+- **Block C** (Daemon + Web-UI-Scharfschalten) — C1/C2/C3/C4 jeweils
+  eigener Commit.
+- **Block D** (Closeout) — kommt am Ende der Phase, sobald A1–A8 grün
+  sind (A1–A4, B1b, B2, B3, C1–C4).
+- **Hygiene-Tickets** aus Session 4: `*.sqlite.bak-*` in `.gitignore`,
+  `ROADMAP.md:427` Aktualisierung — bewusst zurückgestellt.
+- **Plan-§9-Drift-Listeneintrag #2 erweitern** in der nächsten Plan-
+  Session (Editor-Notiz für Phase-15-Planung oder eine Phase-14-
+  Closeout-Session).
+
+### NEXT
+
+- **Operator (Nikinger):** Push-Freigabe für die 3 Commits (`4195033`,
+  `3434fe7`, `ee48cd2`) + diesen Docs-Commit. Stand jetzt: 3 Commits
+  vor `origin/main`.
+- **Ausführende Session (nächste):** **B2** (`EPIC_MAP` raus,
+  `SourceAvailabilityStore.symbol_for` rein) — jetzt baubar, weil
+  B1b die `capital`-Availability liefern kann. Plus B3
+  (`source_delta.py` drei Fälle). Block C danach.
+- **Beweiswoche läuft separat weiter** (Phase 13 Plan §7 P1–P9). Die
+  hier committeten Schreib-Pfade sind alle nicht im Konsumentenpfad
+  (D6-Muster), berühren die laufende Beweiswoche nicht.
 
 ### Completed
 

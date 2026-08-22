@@ -5,6 +5,93 @@ carries exactly one `## Session stopped` block; the previously-newest block move
 verbatim when a new one is appended.
 
 ---
+## Session stopped — 2026-08-22 (Session 6: B1a-Operator-Probe gelaufen + Findings dokumentiert)
+
+> **Auftrag:** Nikinger hat die B1a-Probe live ausgeführt (Demo, kostenlos) und
+> den vollständigen JSON-Output im Chat gepastet. Anweisung: „alle Dokumente
+> Updaten und pushen bitte". Output ist die **beobachtete Antwort-Form**,
+> gegen die `CapitalSource.discover()` (B1b) gebaut wird. Snapshot-Datei
+> angelegt; Session-Block dokumentiert die 8 wichtigsten Befunde; Push der
+> 4 ungepushten Commits liegt beim Operator.
+
+### Completed
+
+**`phase14_discovery/PHASE14_B1A_PROBE_OUTPUT_2026-08-22.md`** (NEU, L3-Snapshot) —
+Roh-Output der Operator-Probe + 8 nummerierte Befunde mit Mapping auf B1b.
+Header-Karte nach Doku-Konvention (`status: snapshot`, `read-when`,
+`up:`/`down:`). Cross-Verweis vom Plan (`docs/concepts/phase14_discovery_plan.md`).
+
+### Die 8 Befunde — was B1a gelehrt hat
+
+| # | Befund | Konsequenz für B1b |
+|---|---|---|
+| 1 | Response ist `{ "markets": [...] }` — Array, je Eintrag ein Market-Objekt | `discover()` iteriert über `markets`, filtert, emittiert pro Match eine `SourceAvailability` |
+| 2 | **`epic`-Feld ist das gesuchte Source-Symbol** (`"DE40"`, `"FR40"`, `"SP35"`) | geht 1:1 in `instrument_source_availability.source_symbol` — exakt dieselbe Identitäts-These wie yF (B2) |
+| 3 | `instrumentType` ist **`"INDICES"`** (nicht `"CFD"`, wie der bestehende `live_data/backfill.py:339-366`-Filter annimmt) | B1b filtert auf `"INDICES"`. **Offener Filter-Bug im bestehenden Code** — der Fallback `[m for m in markets if m.get("instrumentName") == index_name]` rettet es heute. B1b macht es richtig; bestehender Code wird in B2 oder als separates Hygiene-Ticket nachgezogen (Nikinger-Entscheidung) |
+| 4 | **Spain 35 IST verfügbar** als `epic: "SP35"` (war bisher Path-C-Territorium in Phase 13) | Block B erweitert Coverage. Dukascopy-Fallback für SP35 wird überflüssig |
+| 5 | Sucht mit `searchTerm=<instrumentName>` → erster Eintrag mit `instrumentName == searchTerm` + `instrumentType == "INDICES"` ist die kanonische Übersetzung | B1b-Such-Algorithmus: `for epic in input: name = instrument_universe[epic].name; GET /markets?searchTerm=name; first INDICES match → SourceAvailability` |
+| 6 | `delayTime: 0` für alle drei → **Echtzeit** | `history_min_days=30, latency_min=0` für die `capital`-Zeilen (NICHT die 15-Min-yF-Heuristik) |
+| 7 | Jeder Eintrag hat `instrumentId` (numerisch), `epic` (kurz), `symbol` (lang/kurz), `bid`/`offer` (Live-Preise), `lotSize`, `tickSize`, `pipPosition` | B1b braucht nur `epic` + `instrumentName` + `instrumentType`. Andere Felder sind für Discover irrelevant — kein Schema-Mapping nötig |
+| 8 | `marketStatus: "CLOSED"` für alle drei am Wochenende | erwartbar (Markt zu), **kein** B1b-Sonderfall. Discover prüft Verfügbarkeit via Existenz des Eintrags, nicht via `marketStatus` |
+
+### Operator-Setup (verifiziert, 2026-08-22)
+
+- **Auth funktioniert:** `POST /api/v1/session` → HTTP 200, `account_type=CFD`,
+  CST + X-SECURITY-TOKEN im Response-Header. **Demo-Keyring `trading-bot-capital`
+  ist intakt** (Vorbedingung für B1b gegeben).
+- **Drei Suchterme, drei Treffer** — alle im ersten Listeneintrag.
+- **Probe-Script** (`probe_capital.py --markets --terms ...`) tat ohne
+  Modifikation. Kein Code-Edit in dieser Session.
+
+### Nicht-B1b-Stoff (separate Tasks)
+
+- **B2 (`EPIC_MAP` raus):** Plan §6 B2 wartet auf B1b. Heute gibt
+  `SourceAvailabilityStore.symbol_for(epic, 'capital')` für keinen Epic
+  einen Wert (Tabelle 007 wurde nur mit yF-Backfill gefüllt). Nach B1b
+  liefert sie für DE40/FR40/SP35 die richtigen Kürzel.
+- **Offener Filter-Bug im bestehenden Code** (`live_data/backfill.py:339-366`,
+  `backfill.py:300-316`): `"CFD" in instrumentType` matched nie — die
+  Realität ist `"INDICES"`. Der Fallback `candidates = [m for m in markets
+  if m.get("instrumentName") == index_name]` rettet es heute. **Nicht in
+  dieser Session gefixt** — bewusst zurückgestellt (Phase-14-Cross-Phase-
+  Edit nur für Phase 2/8/9/12/13 freigegeben; eine Edit in `backfill.py`
+  ist Phase-13-Territorium und gehört in B2 oder als separates Ticket).
+  **Empfehlung:** in B2 mit aufnehmen, weil B2 den `EPIC_MAP`-Hintergrund
+  eh anfasst.
+
+### Verified (heute nachgemessen, 2026-08-22)
+
+| Suite | Vor B1a | Nach B1a | Δ |
+|---|---:|---:|---:|
+| (alle Suiten) | 1634 | 1634 | 0 (B1a war Operator-Run, kein Code-Edit) |
+
+Working tree clean (außer Hygiene-Findling `*.sqlite.bak-*`-Pattern aus Session 4),
+`ps aux | grep scheduler.run` leer, kein Live-DB-Write. Cross-Phase-Edits: null
+in dieser Session.
+
+### NEXT
+
+- **Operator (Nikinger):** Push-Freigabe für die **4 ungepushten Commits**:
+  ```bash
+  cd /home/trading-bot/trading-bot
+  git push origin main
+  ```
+  Reihenfolge: `fd9e7f8` (A3-Code, 491 Zeilen), `888ee01` (Session-4-Docs,
+  Rotation), `69cfc31` (B1a-Script-Erweiterung, +79 Zeilen),
+  `+der B1a-Snapshot + Session-6-Docs aus dieser Session` (nach commit).
+- **Ausführende Session (nächste):** Plan §6 **Block A4** (yF-Projektion
+  in `UniverseStore.set_symbol`) **ODER** Block B1b (`CapitalSource.discover()`
+  gegen die beobachtete Form, Snapshot als Quell-der-Wahrheit). Beide sind
+  jetzt baubar; meine Empfehlung **B1b zuerst** weil:
+  1. Der Snapshot ist die genaueste Spec — direkt in Code umsetzbar.
+  2. Block B2 wartet auf B1b.
+  3. A4 ist orthogonal und kann danach kommen.
+  Sag, welche Reihenfolge.
+- **Unverändert offen:** A4 (yF-Projektion), B2 (`EPIC_MAP` raus), B3
+  (`source_delta.py` drei Fälle), C (Daemon), D (Closeout). Plus die zwei
+  Optional-Hygiene-Tickets aus Session 4 (`.gitignore`-Pattern, `ROADMAP.md:427`).
+
+---
 ## Session stopped — 2026-08-22 (Session 5: B1a — probe_capital.py erweitert + Operator-Probe startklar)
 
 > **Auftrag:** Nikinger-Frage „was sagt der Plan zu B1a-vs-A4?" → Plan schweigt
