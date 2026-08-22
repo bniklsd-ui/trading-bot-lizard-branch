@@ -391,3 +391,60 @@ def test_last_cycle_exposes_abstain_detail(client) -> None:
     body = c.get("/api/last_cycle").json()
     assert body["last_no_trade_reason"] == "LLM_ABSTAIN"
     assert body["last_no_trade_detail"] == "Weak momentum and a wide spread; skipping."
+
+
+# --- discovery (Phase 14 §5.5 / §6 C3) -------------------------------------
+
+
+def test_discovery_unarmed_reports_false(client) -> None:
+    """The flag file is absent on a fresh checkout — ``armed`` reads False."""
+    c, _cfg = client
+    body = c.get("/api/discovery").json()
+    assert body["armed"] is False
+    assert body["armed_by"] is None
+    assert body["armed_ts"] is None
+    assert body["last_run_utc"] is None
+
+
+def test_discovery_arm_creates_flag_and_subsequent_get_reports_true(client) -> None:
+    """POST /api/discovery/arm writes the flag file; a follow-up GET sees armed=true."""
+    from source_registry.arm import DEFAULT_ARM_PATH
+    c, _cfg = client
+    r = c.post("/api/discovery/arm")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "armed": True}
+    # The flag file lives at the Phase-14 DEFAULT_ARM_PATH — same path the daemon reads.
+    assert DEFAULT_ARM_PATH.exists()
+    body = c.get("/api/discovery").json()
+    assert body["armed"] is True
+    assert body["armed_by"] == "dashboard"
+
+
+def test_discovery_disarm_removes_flag(client) -> None:
+    """POST /api/discovery/disarm deletes the flag file (no-op if absent)."""
+    from source_registry.arm import DEFAULT_ARM_PATH
+    c, _cfg = client
+    c.post("/api/discovery/arm")             # arm first
+    assert DEFAULT_ARM_PATH.exists()
+    r = c.post("/api/discovery/disarm")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "armed": False}
+    assert not DEFAULT_ARM_PATH.exists()
+    # GET now reports unarmed again.
+    assert c.get("/api/discovery").json()["armed"] is False
+
+
+def test_discovery_endpoint_fails_soft_without_migration_007(client) -> None:
+    """Migration 007 is not applied in this fixture (the seeded DB has no
+    ``instrument_source_availability`` table) — the endpoint must return ``None`` counts,
+    not 500. This is the Plan §6 C3 acceptance for the fail-soft direction.
+    """
+    c, _cfg = client
+    body = c.get("/api/discovery").json()
+    # Fail-soft contract: rows_total / rows_by_source / stale_rows are None
+    # when the availability table isn't there yet.
+    assert body["rows_total"] is None
+    assert body["rows_by_source"] is None
+    assert body["stale_rows"] is None
+    # And the arm-flag is still reported correctly (independent of DB).
+    assert body["armed"] is False

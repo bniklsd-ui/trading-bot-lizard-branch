@@ -267,6 +267,15 @@ body {
 .kill-banner-label { font-weight: 700; letter-spacing: 0.18em; color: var(--red); font-size: 12px; }
 .kill-banner-reason { color: var(--text); font-size: 13px; }
 
+/* Discovery banner (Phase 14 §6 C3): same shape as the kill-banner, amber instead of red.
+   The banner is the visible signal of "DISCOVERY NOT ARMED" — the operator reads it without
+   a stacktrace, then clicks ARM to flip the flag file. */
+.discovery-banner {
+  background: rgba(230,162,76,0.10);
+  box-shadow: inset 0 0 0 1px rgba(230,162,76,0.45);
+}
+.discovery-banner-label { color: var(--amber) !important; }
+
 /* ---- controls ---- */
 .control-note { margin: 0 0 16px; font-size: 11px; color: var(--dim); line-height: 1.5; }
 .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
@@ -285,6 +294,12 @@ body {
 .btn--kill { color: #e8a39e; }
 .btn--kill:hover  { color: var(--red); }
 .btn--clear:hover { color: var(--text); }
+/* Discovery ARM/DISARM buttons (Phase 14 §6 C3): amber-tinted to match the banner. */
+.btn--discovery-arm { color: var(--amber); }
+.btn--discovery-arm:hover { color: var(--amber); }
+.btn--discovery-disarm { color: var(--muted); }
+.btn--discovery-disarm:hover { color: var(--text); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; }
 .control-msg { margin: 4px 0 0; min-height: 16px; font-size: 11px; color: var(--amber); letter-spacing: 0.04em; }
 
 /* ---- score sparkline (framed instrument) ---- */

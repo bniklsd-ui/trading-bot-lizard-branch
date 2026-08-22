@@ -28,6 +28,7 @@ import dataclasses
 import json
 import logging
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -48,6 +49,17 @@ logger = logging.getLogger("webui.api")
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DATA_DIR = _REPO_ROOT / "data"
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+# Discovery arm-flag path (Phase 14 §5.4 / §6 C1). Mirrored from
+# ``source_registry.arm.DEFAULT_ARM_PATH`` so the UI and the daemon agree on the
+# file location without one importing the other at module load. The daemon's
+# daemon's own default is identical; a future rename must touch both.
+_ARM_PATH = _DATA_DIR / "state" / "DISCOVERY_ARMED"
+# UI-side stale-row TTL hint. The daemon's authoritative check lives in
+# ``DiscoveryDaemon.run_once`` (with ``profile_ttl_days``, default 7); the UI just
+# shows the same default for operator guidance. If the operator runs the daemon
+# with a different TTL, this display label drifts — display-only, never a control.
+_DISCOVERY_UI_TTL_DAYS = 7
 
 # How many rows the history-style endpoints return (newest first).
 _DEFAULT_LIMIT = 200
@@ -385,6 +397,118 @@ def create_app(config: SchedulerConfig | None = None) -> FastAPI:
             raise HTTPException(status_code=400, detail="cmd must be 'start' or 'stop'")
         command.write_command(cfg.command_path, cmd)
         return {"ok": True, "cmd": cmd}
+
+    @app.get("/api/discovery")
+    def discovery() -> dict[str, Any]:
+        """Discovery arm-flag + last-cycle summary + availability-table counts (Phase 14 §5.5).
+
+        Three lazy imports keep the module surface tight: a fresh checkout that does not yet
+        have the Phase-14 ``source_registry`` package installed sees 503 only on *this*
+        endpoint, never on ``/api/status`` (the dashboard's headline card).
+
+        Fail-soft: missing flag file / missing ``discovery_state.json`` / missing migration
+        007 / missing DB → safe defaults (``armed=False``, ``rows_total=None``) instead of
+        500. The banner is the visible signal — the operator reads "DISCOVERY NOT ARMED"
+        without a stacktrace.
+        """
+        try:
+            from source_registry.arm import is_armed, read_state
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"source_registry not importable: {exc}",
+            )
+
+        arm_path = str(_ARM_PATH)
+        armed = is_armed(arm_path)
+        arm_state = read_state(arm_path) or {}
+
+        # Last-cycle summary from discovery_state.json (atomic .tmp + os.replace writer
+        # lives in source_registry.run). Fail-soft on any read/decoding error.
+        last_run_utc: str | None = None
+        last_rows_written: int | None = None
+        last_errors: list[str] | None = None
+        state_path = _DATA_DIR / "state" / "discovery_state.json"
+        if state_path.exists():
+            try:
+                payload = json.loads(state_path.read_text(encoding="utf-8"))
+                last_run_utc = payload.get("ts_utc")
+                last_rows_written = payload.get("rows_written")
+                last_errors = payload.get("errors") or []
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                logger.warning("discovery_state.json unreadable (%s) — UI shows None.", exc)
+
+        # DB-derived counts (fail-soft: missing migration 007 / DB ⇒ all None).
+        # The whole block is wrapped in try/except so a freshly-seeded checkout that
+        # has not yet applied Migration 007 doesn't 500 the dashboard.
+        rows_total: int | None = None
+        rows_by_source: dict[str, int] | None = None
+        stale_rows: int | None = None
+        try:
+            conn = ro_connect(cfg.live_db_path)
+            try:
+                count_rows = conn.execute(
+                    "SELECT source, COUNT(*) AS n FROM instrument_source_availability "
+                    "GROUP BY source"
+                ).fetchall()
+                rows_by_source = {r["source"]: r["n"] for r in count_rows}
+                rows_total = sum(rows_by_source.values())
+                # Display-only stale hint; matches the daemon's default profile_ttl_days.
+                # The ISO format mirrors the daemon's ``_iso`` (Z-suffixed, ms-precision).
+                cutoff_dt = datetime.now(timezone.utc) - timedelta(days=_DISCOVERY_UI_TTL_DAYS)
+                cutoff_iso = cutoff_dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{cutoff_dt.microsecond // 1000:03d}Z"
+                stale_rows = conn.execute(
+                    "SELECT COUNT(*) AS n FROM instrument_source_availability "
+                    "WHERE last_verified_utc < ?",
+                    (cutoff_iso,),
+                ).fetchone()["n"]
+            finally:
+                conn.close()
+        except sqlite3.OperationalError as exc:
+            logger.info("instrument_source_availability unavailable (%s) — UI shows None counts.", exc)
+
+        return {
+            "armed": armed,
+            "armed_by": arm_state.get("by"),
+            "armed_ts": arm_state.get("ts"),
+            "last_run_utc": last_run_utc,
+            "last_rows_written": last_rows_written,
+            "last_errors": last_errors,
+            "rows_total": rows_total,
+            "rows_by_source": rows_by_source,
+            "stale_rows": stale_rows,
+        }
+
+    @app.post("/api/discovery/arm")
+    def discovery_arm() -> dict[str, Any]:
+        """Engage the Discovery daemon by writing the arm-flag file.
+
+        Lazy-imports ``source_registry.arm`` so a missing Phase-14 install never breaks
+        the dashboard's headline endpoints (Repo-Konvention: cross-phase reads live in
+        the endpoint body, not at module load).
+        """
+        try:
+            from source_registry.arm import arm as _arm
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"source_registry not importable: {exc}",
+            )
+        _arm(str(_ARM_PATH), by="dashboard")
+        return {"ok": True, "armed": True}
+
+    @app.post("/api/discovery/disarm")
+    def discovery_disarm() -> dict[str, Any]:
+        """Disengage the Discovery daemon by deleting the arm-flag file (no-op if absent)."""
+        try:
+            from source_registry.arm import disarm as _disarm
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"source_registry not importable: {exc}",
+            )
+        _disarm(str(_ARM_PATH))
+        return {"ok": True, "armed": False}
 
     # --- static dashboard --------------------------------------------------
 

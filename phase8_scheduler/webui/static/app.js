@@ -162,6 +162,21 @@ function renderStatus(s) {
   }
 }
 
+// Discovery (Phase 14 §5.5 / §6 C3) — fail-soft: missing DB / missing flag / missing
+// migration 007 all degrade to a banner that says "not armed" and zero counts.
+function renderDiscovery(d) {
+  const banner = $("discovery-banner");
+  const armed = !!d.armed;
+  // Hide the banner when armed; show when not armed (the safe-direction-False default).
+  banner.hidden = armed;
+  // Reflect arm state on the buttons too: ARM is disabled when armed (it's already on,
+  // you can't arm twice — disarm first); DISARM is disabled when not armed.
+  const armBtn = $("btn-discovery-arm");
+  const disarmBtn = $("btn-discovery-disarm");
+  if (armBtn) armBtn.disabled = armed;
+  if (disarmBtn) disarmBtn.disabled = !armed;
+}
+
 // local calendar date (YYYY-MM-DD) of an ISO ts, in the browser's tz (Berlin for the operator)
 function localDay(ts) {
   if (!ts) return null;
@@ -417,7 +432,7 @@ function setConn(ok) {
 // ---- poll loop ----
 async function refresh() {
   try {
-    const [status, cycle, conf, score, trades, lessons, tokens] = await Promise.all([
+    const [status, cycle, conf, score, trades, lessons, tokens, discovery] = await Promise.all([
       getJSON("/api/status"),
       getJSON("/api/last_cycle"),
       getJSON("/api/confidence"),
@@ -425,10 +440,12 @@ async function refresh() {
       getJSON("/api/trades"),
       getJSON("/api/lessons"),
       getJSON("/api/token_usage"),
+      getJSON("/api/discovery"),
     ]);
     renderStatus(status);
     renderConfidence(conf);
     renderTokenMeter(tokens);
+    renderDiscovery(discovery);
     // heavy DOM rebuilds only when their payload changed (also preserves open <details>)
     renderIfChanged("cycle", cycle, renderCycle);
     renderIfChanged("score", score, renderScore);
@@ -458,6 +475,8 @@ async function control(action) {
       if (!confirm("Engage the KILL switch? The daemon stops at the next cycle.")) return;
       await postJSON("/api/kill", { reason: "dashboard" }); flash("KILL engaged");
     } else if (action === "clear") { await postJSON("/api/clear_kill", {}); flash("KILL cleared"); }
+    else if (action === "discovery-arm") { await postJSON("/api/discovery/arm", {}); flash("DISCOVERY armed"); }
+    else if (action === "discovery-disarm") { await postJSON("/api/discovery/disarm", {}); flash("DISCOVERY disarmed"); }
     refresh();
   } catch (err) {
     flash(String(err.message || err), true);
@@ -468,6 +487,8 @@ $("btn-start").addEventListener("click", () => control("start"));
 $("btn-stop").addEventListener("click", () => control("stop"));
 $("btn-kill").addEventListener("click", () => control("kill"));
 $("btn-clear").addEventListener("click", () => control("clear"));
+$("btn-discovery-arm").addEventListener("click", () => control("discovery-arm"));
+$("btn-discovery-disarm").addEventListener("click", () => control("discovery-disarm"));
 
 refresh();
 setInterval(refresh, POLL_MS);
