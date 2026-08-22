@@ -80,7 +80,7 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 
 ## Modul-Tabelle
 
-> Stand: **2026-08-22 — Session 7.** Diese Tabelle wird in Block D gegen den
+> Stand: **2026-08-22 — Session 9.** Diese Tabelle wird in Block D gegen den
 > As-Built-Stand gefüllt (Testzahlen aus dem finalen Sweep, nicht geschätzt).
 
 | Datei | Zweck | Status |
@@ -88,98 +88,116 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 | `source_registry/models.py` | `SourceAvailability`, `SourceProfile`, `Source`-Protocol, `origin`-Vokabular | ✅ A2/A3 (gelockt in Phase-13-Session 4) |
 | `source_registry/store.py` | `SourceAvailabilityStore` — der einzige Zugriff auf Migration 007 | ✅ A2 |
 | `source_registry/sources.py` | `IGDerivedSource`, `LSStaticSource`, `RegistryYFSource` — alle drei ohne Netz | ✅ A3 |
-| `source_registry/arm.py` | Scharf-Flag `data/state/DISCOVERY_ARMED` (Muster `killswitch.py`, sichere Richtung umgedreht) | ⬜ C1 |
-| `source_registry/run.py` | Der Daemon (Muster `data_foundation/run.py`: PID-File, graceful SIGTERM, `--once`) | ⬜ C2 |
-| `scripts/run_discovery.sh` | Start-Wrapper (Muster `run_recorder.sh`) | ⬜ C4 |
+| `source_registry/arm.py` | Scharf-Flag `data/state/DISCOVERY_ARMED` (Muster `killswitch.py`, sichere Richtung umgedreht) | ✅ C1 (Session 9) |
+| `source_registry/run.py` | Der Daemon (Muster `data_foundation/run.py`: PID-File, graceful SIGTERM, `--once`) | ✅ C2 (Session 9) |
+| `scripts/run_discovery.sh` | Start-Wrapper (Muster `run_recorder.sh`) | ✅ C4 (Session 9) |
 | *(cross-phase)* `phase2_persistence/migrations/007_phase14_source_availability.sql` | die Kreuzungs-Tabelle **+ der einmalige yF-Backfill aus `instrument_universe`** (der Grundbestand kommt aus der Migration, nicht aus einem Resolver-Lauf — `resolve_epic` ruft `set_symbol` in sechs von acht Pfaden nicht) | ✅ A2 |
 | *(cross-phase)* `phase9_universe/universe/models.py` | `DS_STALE_SOURCE` ins Vokabular (Live-Blocker B1) | ✅ A1 |
 | *(cross-phase)* `phase9_universe/universe/store.py` | yF-Projektion in `set_symbol`, nicht-fatal | ✅ A4 (Session 7) |
-| *(cross-phase)* `phase13_live_data/live_data/backfill.py` | `CapitalSource.discover()` (B1b); `EPIC_MAP` raus + Symbol-Lookup rein (B2) | 🔶 B1b gebaut, ⬜ B2 |
+| *(cross-phase)* `phase13_live_data/live_data/backfill.py` | `CapitalSource.discover()` (B1b); `EPIC_MAP` raus + Symbol-Lookup rein (B2) | ✅ B1b + B2 (Session 8) |
 | *(cross-phase)* `phase13_live_data/scripts/probe_capital.py` | CFD-Filter-Bug Fix: `"CFD"`-Substring → exakt `"INDICES"`; neuer Helper `_pick_index_match` für Testbarkeit | ✅ Cross-Phase-Hygiene (Session 7) |
-| *(cross-phase)* `phase13_live_data/scripts/source_delta.py` | drei Fälle statt zwei (`not_available` / `available_but_empty` / `compared`) | ⬜ B3 |
-| *(cross-phase)* `phase8_scheduler/webui/api.py` + `static/` | `GET /api/discovery`, ARM/DISARM, Warn-Banner | ⬜ C3 |
+| *(cross-phase)* `phase13_live_data/scripts/source_delta.py` | drei Fälle statt zwei (`not_available` / `available_but_empty` / `compared`) | ✅ B3 (Session 8) |
+| *(cross-phase)* `phase8_scheduler/webui/api.py` + `static/` | `GET /api/discovery`, ARM/DISARM, Warn-Banner | ✅ C3 (Session 9) |
+| *(cross-phase)* `phase8_scheduler/scripts/run_scheduler.sh` | Autostart-Hook für `run_discovery.sh` (analog Recorder) | ✅ C4b (Session 9) |
 
 ---
+## Session stopped — 2026-08-22 (Session 9: Block C — Daemon + Web-UI-Scharfschalten + Start-Wrapper)
 
-## Session stopped — 2026-08-22 (Session 8: Block B2 + Block B3)
-
-> **Auftrag:** Nikinger-Entscheidung 2026-08-22, Session-7-Empfehlung
-> gefolgt: B2 + B3 in einer Session, schließt Block B ab. Plus
-> Smoketest-Erlaubnis (Phase 5 gegen die neue Phase-13-Bibliothek, nicht
-> Phase-14-Stoff). Drei Code-Commits, ein Docs-Commit; 7 neue Tests;
-> `grep "EPIC_MAP" --include=*.py` ist leer (Akzeptanz A2).
+> **Auftrag:** Nikinger-Freigabe 2026-08-22 (Special-Task im Prompt: Push der 4 ungepushten
+> Session-8-Commits war erteilt) + die Anschluss-Frage aus dem Session-8-NEXT-Block:
+> „Soll ich C1 starten, oder ist der Push jetzt dran?". Nikinger-Entscheidung im Chat
+> der Planungs-Session: **Loslegen, alle 4 C1–C4 atomar, Smoke-Test + Sweep am Ende**.
+> Fünf Commits: drei Code+Tests (C1, C2, C3), zwei Scripts (C4a, C4b). **39 neue Tests**
+> (Phase-14: 22 → 57 = +35; Phase-8: 244 → 248 = +4). **Sweep Σ 1659 → 1698.** Push der
+> vier B2/B3-Commits **zu Beginn der Session** ausgeführt (`31b5f87..a22b54d`), Branch
+> seither `up to date with 'origin/main'`. Akzeptanz **A2 + A5 + A6 grün**;
+> A1 + A3 + A4 + A7 waren bereits grün, A8 mit dem Sweep.
 
 ### Completed
 
-**Commit 1 — `phase14: code+tests -- B2 EPIC_MAP raus, symbol_lookup
-Callable rein`** (`bb095df`, 3 files, +163/-46). `CapitalSource` nimmt
-jetzt einen `symbol_lookup: Callable[[str], str | None]`-Parameter
-(Default `None` = kein Lookup = jedes Epic wird abgelehnt, kein HTTP,
-fail-closed). `fetch_window` ruft `self._symbol_lookup(epic)` statt
-`EPIC_MAP.get(epic)`. `run_capital_backfill` nimmt einen
-`symbol_lookup`-kwarg entgegen und überschreibt den Source-eigenen
-Lookup (Script ist Owner der DB-Verbindung, Source ist dummer Adapter).
-Warnung umformuliert: kein Dukascopy-Verweis mehr (D15). `_make_source`-
-Helper im Test nimmt jetzt einen `symbol_lookup`-Parameter (Default:
-DAX→DE40, CAC→FR40, sonst nichts). Lock-in-Test
-`test_epic_map_does_not_contain_path_c_territory` umbenannt zu
-`test_symbol_lookup_default_omits_path_c_territory` (dieselbe These,
-neue Quelle der Wahrheit). Zwei neue Tests:
-`test_fetch_window_returns_empty_when_no_lookup_was_supplied` (sichere
-Default-Richtung) und
-`test_run_capital_backfill_symbol_lookup_kwarg_overrides_source`
-(Script-Override-Semantik). `scripts/probe_capital.py`: historischer
-"was EPIC_MAP aktuell 'DE40' / 'FR40' nennt"-String zeigt jetzt auf
-`instrument_source_availability.source_symbol` (gleiche Identitäts-These
-wie für yF; D2).
+**Commit 1 — `phase14: code+tests -- C1 arm.py (file-flag, safe-default False per D10)`**
+(`275deb2`, 3 files, +433/-0). `phase14_discovery/source_registry/arm.py` NEU: vier
+Funktionen (`is_armed`, `arm`, `disarm`, `read_state`) + Modul-Konstante
+`DEFAULT_ARM_PATH = data/state/DISCOVERY_ARMED`. **Verbatim-Muster** aus
+`scheduler/killswitch.py` (atomar `.tmp` + `os.replace`, fail-soft, wirft nie) — mit
+einem **bewusst umgedrehten Detail** (Plan D10): die sichere Richtung ist `False`,
+nicht `True`. Das steht im Modul-Docstring, weil das genau die Sorte Fehler ist, die
+ein unaufmerksamer Clone-Kopiervorgang mitnimmt. `is_armed` validiert strikt auf JSON
+`True` (`armed='true'` String, `armed=1` Int, `armed=null` lesen alle als False). 18
+neue Tests (`test_arm.py`): 9 negative cases für `is_armed`, Round-Trip arm/disarm,
+atomic-write-Beweis (`tmp`-Siblings nach `arm()` == `[flag]`), Parent-Dir-`mkdir -p`,
+Modul-Konstante gegen UI-Sync gepinnt.
 
-**Commit 2 — `phase14: code+tests -- B2 script builds symbol_lookup
-from SourceAvailabilityStore`** (`6e8148e`, 2 files, +145/-9).
-`scripts/capital_backfill.py`: neue `_build_symbol_lookup()`-Helper
-schließt die DB an `SourceAvailabilityStore` und gibt einen
-Closure-Lookup + die Store-Instanz zurück. Fail-soft: ohne Migration
-007 liefert der Lookup `None` für jedes Epic → der Backfill wird zu
-einem No-Op statt zu werfen. WARNING-Log wenn keine Capital-Zeile in
-der Tabelle steht (Operator-Hinweis: Discovery hat noch nie gelaufen).
-Zwei neue Tests: Migration-007-missing (null-lookup, kein Crash) +
-SourceAvailabilityStore-Aufruf-Pfad (mocked store, prüft
-`symbol_for(epic, 'capital', '1m')` als Schlüsselparameter).
+**Commit 2 — `phase14: code+tests -- C2 run.py daemon (PID, --once, fail-soft if unarmed)`**
+(`94bbd0c`, 2 files, +869/-0). `phase14_discovery/source_registry/run.py` NEU:
+`DiscoveryDaemon`-Klasse + `main()`-CLI. PID-File-Guarded (Muster
+`data_foundation/run.py:39-53`), `SIGTERM`/`SIGINT` → `graceful stop`, `--once`-Modus.
+Schleife: `is_armed` ⇒ **nein: skip, Debug-Tick, nichts weiter**; sonst
+`stale_rows(ttl_days)` ⇒ nichts stale ⇒ skip; sonst je Source `discover(epics,
+max_probe_calls=8)` mit fail-soft (`SourceProfile.errors` sammelt Exceptions, wirft
+nicht — Plan §8.5). `probe_calls_used > 0 AND budget != None` ⇒
+`record_spend(cum, kind='discovery')` in `source_spend` (Plan D13, freigegebener
+Cross-Phase-Touch zu Phase 12's `SourceBudget`). State-File
+`data/state/discovery_state.json` (atomic `.tmp` + `os.replace`, Format spiegelt
+`recorder_state.json`). CycleResult ist `frozen`. `_build_default_sources` baut die
+drei net-free Phase-14-Sources (ig/ls/yf); Capital.com ist **bewusst nicht** im
+Default-Set — es lebt in Phase-13 `backfill.py` und würde Phase-13-Module in den
+Daemon ziehen. 17 neue Tests (`test_run.py`): unarmed-skip, armed+no-stale-skip,
+armed+stale-call-each-source-once, raising-source-tolerated, zero-probe-no-spend,
+nonzero-probe-records-spend, state-file-shape, `CycleResult`-frozen,
+`run_forever`-calls-`run_once`-until-stop, stop-before-first-cycle, `main --once` smoke,
+PID-already-running-exit-0, `default_sources`-AreNetFree. **Lazy Cross-Phase-Imports
+nur in `main()`** — Tests üben den Daemon mit duck-typed Stores, kein Phase-12-Wiring.
 
-**Commit 3 — `phase14: code+tests -- B3 source_delta.py drei Fälle`
-(`ac54825`, 2 files, +373/-53)**. Plan §6 B3:
-`scripts/source_delta.py` liest die Quellenliste aus
-`instrument_source_availability` (statt hartkodiert yf+ls) und
-unterscheidet drei Fälle pro Trade:
-- `not_available`: kein `status='ok'` für diese Epic (prinzipiell
-  nicht abrufbar — Beispiel: SP35 vor dem ersten Discovery-Lauf).
-- `available_but_empty`: Quellen registriert, aber keine Bars im
-  Fenster (Beschaffungslücke).
-- `compared`: ≥ 2 Quellen vergleichbar → `comparison` ist `agree` oder
-  `diverge`.
-Fail-Soft bei fehlender Migration 007 (`_load_available_sources` fängt
-`OperationalError` → leerer Dict → jede Trade ist `not_available`, Exit
-0, `divergence_rate=None`). Report-Header trägt jetzt
-`trades_not_available` und `trades_available_but_empty` zusätzlich zu
-den alten `trades_agree`/`trades_diverge`-Counters. Drei neue Tests
-+ drei bestehende umgeschrieben (`row["kind"]`-Werte sind jetzt
-`compared`+`comparison` statt direkt `agree`/`diverge`;
-`test_missing_source_counted_as_incomparable` →
-`test_available_but_empty_when_one_source_has_no_bars`).
+**Commit 3 — `phase14: webui -- C3 /api/discovery + amber banner + ARM/DISARM
+(cross-phase Phase 8)`** (`af837c1`, 5 files, +226/-1). Cross-Phase Phase 8
+(freigegeben): drei Endpoints in `webui/api.py`, Banner + Buttons in der
+Static-Bundle, Amber-CSS-Variante. **api.py:** Modul-Konstante `_ARM_PATH` (mirror von
+`source_registry.arm.DEFAULT_ARM_PATH`, kein Cross-Phase-Import at module load).
+`GET /api/discovery` mit `{armed, armed_by, armed_ts, last_run_utc, last_rows_written,
+last_errors, rows_total, rows_by_source, stale_rows}` — **fail-soft auf jedem Bein**
+(missing flag / missing state.json / missing migration 007 / missing DB ⇒ sichere
+Defaults, kein 500). Lazy imports von `source_registry.arm` im Endpoint-Body. `POST
+/api/discovery/arm` (`by='dashboard'`), `POST /api/discovery/disarm`. 503 wenn
+`source_registry` nicht importierbar (Dashboard-Headline bleibt unberührt). **Frontend:**
+`#discovery-banner` (amber Variante des `#kill-banner`), Buttons `ARM DISCOVERY` /
+`DISARM DISCOVERY` in einer dritten `btn-row`. JS: `renderDiscovery(d)` toggelt
+Banner + Button-Disabled-State (ARM disabled wenn armed, DISARM disabled wenn not
+armed — die sichere Default-False-Richtung). 7s-Poll erweitert um `/api/discovery`.
+**CSS:** `.discovery-banner` (amber tint), `.btn--discovery-arm`/`.btn--discovery-disarm`,
+generisches `.btn[disabled]`. 4 neue Tests (`test_webui.py`): unarmed-false,
+arm-roundtrip, disarm-removes, **fail-soft ohne Migration 007** (Akzeptanz C3-Test).
 
-**Smoke-Test** (`phase5_execution/scripts/smoke_test.py --broker
-ig_demo`) — einmal gelaufen auf Nikinger-Erlaubnis (nicht Phase-14-
-Stoff). Ergebnis sauber: `NO_TRADE -- time_window: 19:01 outside trade
-window 09:00-17:30 Europe/Berlin` (heute Samstag 19:01, kein Trade-
-Fenster; Phase 5 baut den Cycle sauber auf, alle Gates + VETOs laufen,
-OrderDecliner blockt, kein Live-Touch). Beweis: die Phase-13-Bibliothek
-ist unter dem Phase-5-Bot konsumierbar — kein Import- oder Wiring-Bruch
-aus B2/B3.
+**Commit 4 — `phase14: scripts -- C4 run_discovery.sh (start wrapper, autostart-safe)`**
+(`7aa86bd`, 1 file, +34/-0). `phase14_discovery/scripts/run_discovery.sh` NEU, dünn,
+analog `phase12_data_foundation/scripts/run_recorder.sh`: `set -euo pipefail`,
+`PROJECT_DIR + cd`, `exec python -m source_registry.run "$@"`. Header dokumentiert
+die **safe-default-False-Semantik** (D10: autostarten ist unbedenklich, der Daemon
+ist ohne Flag ein No-Op).
+
+**Commit 5 — `phase14: scripts -- C4b run_scheduler.sh hooks up the Discovery daemon`**
+(`170ed72`, 1 file, +10/-0). Cross-Phase Phase 8: `phase8_scheduler/scripts/run_scheduler.sh`
+bekommt einen analogen `nohup`-Block für `run_discovery.sh` (analog zum Recorder-Block
+aus Zeile 38-39, jetzt Zeile 41-42). Header-Comment erweitert um den Phase-14-Kontext
+(mit Verweis auf die D10-Safe-Default-Argumentation). PID-Doppelstart-Schutz sitzt im
+Daemon (`source_registry.run`), nicht hier — Muster Recorder.
+
+**Push der 4 B2/B3-Commits zu Beginn** (`31b5f87..a22b54d`). Branch danach `up to date
+with 'origin/main'`, 0 Commits dahinter.
+
+**Smoke-Test** (`phase5_execution/scripts/smoke_test.py --broker ig_demo`) — einmal
+gelaufen auf Nikinger-Freigabe (nicht Phase-14-Stoff, gleiche Logik wie Session 8 für
+B2/B3). Ergebnis sauber: `NO_TRADE -- time_window: 20:07 outside trade window
+09:00-17:30 Europe/Berlin` (heute Samstag 20:07, kein Trade-Fenster; Phase 5 baut
+den Cycle sauber auf, alle Gates + VETOs laufen, OrderDecliner blockt, kein
+Live-Touch). **Beweis:** die Phase-13-/Phase-14-Bibliothek ist unter dem Phase-5-Bot
+konsumierbar — kein Import- oder Wiring-Bruch aus C1/C2/C3/C4.
 
 ### Verified
 
-- Regression-Sweep aller 14 Suiten + root `tests/` (Stand nach den drei
-  Commits, ohne Docs-Edits):
-  | Suite | Vor Session 8 | Nach | Δ |
+- Regression-Sweep aller 14 Suiten + root `tests/` (Stand nach den fünf Commits,
+  ohne diesen Docs-Edit):
+  | Suite | Vor Session 9 | Nach | Δ |
   |---|---:|---:|---:|
   | phase1_broker_wrapper | 95 | 95 | 0 |
   | phase2_persistence | 77 | 77 | 0 |
@@ -188,78 +206,96 @@ aus B2/B3.
   | phase5_execution | 173 | 173 | 0 |
   | phase6_debate | 76 | 76 | 0 |
   | phase7_reward | 138 | 138 | 0 |
-  | phase8_scheduler | 244 | 244 | 0 |
+  | phase8_scheduler | 244 | 248 | **+4 (C3)** |
   | phase9_universe | 87 | 87 | 0 |
   | phase10_v3 | 165 | 165 | 0 |
   | phase12_data_foundation | 143 | 143 | 0 |
-  | phase13_live_data | 67 | 74 | **+7 (B2: 4, B3: 3)** |
-  | phase14_discovery | 22 | 22 | 0 |
+  | phase13_live_data | 74 | 74 | 0 |
+  | phase14_discovery | 22 | 57 | **+35 (C1: 18, C2: 17)** |
   | meta_m1_harness | 28 | 28 | 0 |
   | root `tests/` | 80 | 80 | 0 |
-  | **Σ** | **1652** | **1659** | **+7** |
-  *(Cross-check: B2=3+1=4, B3=3 — 7 neue Tests, keine Lücke.)*
-- `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` → **leer**
-  (Exit 1, kein Treffer). Akzeptanzkriterium B2 / A2 grün.
-- Working tree clean vor Commit-Kette (außer `data/`-Ordner, gitignored),
-  keine Cross-Phase-Edits außerhalb der freigegebenen Phase-13-Liste
-  (`backfill.py` ist Phase-13-Territorium per Freigabe 2026-08-22,
-  `scripts/probe_capital.py` ist Phase-13-Territorium).
-- `git log --oneline -4` zeigt die drei B2/B3-Commits + der folgende
-  Docs-Commit: saubere Kette, ein Commit pro Schritt.
+  | **Σ** | **1659** | **1698** | **+39** |
+  *(Cross-check: C1=18, C2=17, C3=4 = 39 neue Tests, keine Lücke. C4 hat keinen
+  Testbeitrag — bash-Wrapper, durch `bash -n`-Syntaxcheck + Operator-Run validiert.)*
+- `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` → **leer** (Exit 1, kein
+  Treffer). **Akzeptanz A2 grün.**
+- Akzeptanz A5 grün: `test_run.py::test_run_once_unarmed_does_nothing` — der
+  `FakeSource` mit `raise_in_discover=True` bleibt **unangerührt**, weil der
+  arm-Check vor jeder DB- und Netz-Aktion liegt.
+- Akzeptanz A6 grün: `test_webui.py::test_discovery_endpoint_fails_soft_without_migration_007`
+  + `test_discovery_unarmed_reports_false` — die UI meldet `armed: false` und
+  `rows_total: null`, nicht 500.
+- Akzeptanz A8 grün: Sweep-Tabelle oben, Σ 1698, kein roter Test, keine
+  uncommitteten Änderungen.
+- Working tree clean vor Commit-Kette (außer `data/`-Ordner, gitignored).
+- **Cross-Phase-Edits nur innerhalb der freigegebenen Liste** (Nikinger 2026-08-22):
+  Phase 8 (`webui/api.py` + `static/` für C3, `run_scheduler.sh` für C4b), Phase 12
+  (`SourceBudget` als lazy import in C2). Kein Touch außerhalb.
+- `git log --oneline -7` zeigt die saubere Kette: 4× B2/B3 (alt) + 5× C1–C4b (neu).
 
 ### Findings (drei)
 
-- **`EPIC_MAP` lebt weiter in Kommentaren — Akzeptanz sagt nein.** Der
-  String tauchte in 8 Code-/Test-Kommentaren + einem JSON-String im
-  `probe_capital.py`-Payload auf, alle als historische Erklärungen.
-  Akzeptanzkriterium B2 / A2 ist explizit *"`grep … --include=*.py`
-  ist leer"* — nicht *"`EPIC_MAP` existiert nicht als Variable"*.
-  Habe alle 8 Vorkommen aus den `.py`-Dateien entfernt. Die Geschichte
-  lebt jetzt im Plan (`docs/concepts/phase14_discovery_plan.md` §6 B2)
-  und in den Session-Blocks (1–7); Code beschreibt den Ist-Stand.
-- **`run_capital_backfill` Override-Semantik.** Habe den `symbol_lookup`-
-  kwarg als **Override** (nicht "setze nur wenn None") implementiert:
-  der Caller (Script) ist Owner der DB-Verbindung, der Source ist
-  dummer Adapter. Der `test_run_capital_backfill_symbol_lookup_kwarg_overrides_source`
-  pinnt diese Semantik. Alternative wäre gewesen "setze nur wenn source
-  noch default" — die hätte einen Sentinel gebraucht und mehr Edge-
-  Cases. Override ist die ehrliche Richtung.
-- **`source_delta.py` Migration-007-fail-soft.** `_load_available_sources`
-  fängt `OperationalError` und gibt `{}` zurück → das Hauptprogramm
-  behandelt jede Epic als "kein `status='ok'`" → `not_available` für
-  jede Trade. Test `test_fail_soft_when_availability_table_missing`
-  pinnt das mit einer zweiten DB (nur 004–006, ohne 007). Exit 0,
-  Report-Header voll, divergence_rate = None. Das ist das gleiche
-  Pattern wie `_build_symbol_lookup` im Script — Phase-13-Code wird
-  nicht zum Pfad, an dem Migration 007 durchgesetzt wird.
+- **C3-Akzeptanz-Test-Strenge.** Der `test_discovery_endpoint_fails_soft_without_migration_007`
+  pinnt **drei** `None`-Werte (`rows_total`, `rows_by_source`, `stale_rows`). Das ist
+  mehr als der Plan §6 C3-Akzeptanztest verlangt (nur `rows_total: null`); die zwei
+  zusätzlichen Asserts sind die offensichtliche Erweiterung desselben fail-soft-Vertrags
+  und kosten nichts, dokumentieren aber laut, dass die ganze Availability-Query als
+  Block failt, nicht nur die Summe. Beibehalten.
+- **C2 `main()`-Imports.** Die Cross-Phase-Imports (`UniverseStore`,
+  `SourceAvailabilityStore`, `SourceBudget`) leben **innerhalb** von `main()`, nicht
+  am Modul-Top. Das ist Repo-Konvention (`api.py:18-20` zitiert das gleiche Muster)
+  und bedeutet konkret: `import source_registry.run` triggert keine
+  Phase-12-/`UniverseStore`-Lade-Arbeit. Tests, die `DiscoveryDaemon` direkt
+  konstruieren, sehen Phase 12 nicht — sie arbeiten mit duck-typed Stores. Die
+  drei Cross-Phase-Imports im `main()`-Body haben jeweils einen `try/except`-Mantel
+  (`budget = SourceBudget(...)` als best-effort, `None` on failure — kein Hard-Fail
+  der CLI wenn das Budget nicht initialisierbar ist, weil default-Sources eh nie
+  buchen).
+- **`is_armed` strict-type.** Drei Tests mehr als der Plan (String, Int, Null —
+  alle False) sind verteidigende Auslegung des `armed is True`-Checks. Die Alternative
+  wäre `if data.get("armed"):` gewesen, was `"yes"` / `1` / nicht-leere Strings als
+  arm liest — falsche Richtung. Der strikte `is True` ist die ehrliche Lektüre des
+  Vertrags. Test-Kommentar dokumentiert das.
 
 ### Unverändert offen
 
-- **Block C** (Daemon + Web-UI-Scharfschalten) — C1 (`arm.py`),
-  C2 (`run.py`), C3 (Web-UI-Endpoints + Banner), C4 (`run_discovery.sh`).
-  Empfehlung: nächste Session.
-- **Block D** (Closeout) — kommt am Ende der Phase, sobald A1–A8 grün
-  sind (A1 ✅, A2 ✅, A3 ✅, A4 ✅, B1b ✅, B2 ✅, B3 ✅, C1–C4 ⬜).
-- **Hygiene-Tickets** aus Session 4: `*.sqlite.bak-*` in `.gitignore`,
-  `ROADMAP.md:427` Aktualisierung — bewusst zurückgestellt.
-- **Plan-§9-Drift-Listeneintrag #2 erweitern** in der nächsten Plan-
-  Session (Editor-Notiz für Phase-15-Planung oder eine Phase-14-
-  Closeout-Session). Die jetzige Session bestätigt ihn (alle Anker
-  waren korrekt), aber der Eintrag könnte den
-  `scripts/probe_capital.py:385`-Befund prominenter machen.
+- **Block D** (Closeout) — die einzige Akzeptanz-Lücke. Konkret: D1 (Modul-Tabelle
+  in `phase14_discovery/CLAUDE.md` gegen den As-Built-Stand füllen — Testzahlen aus
+  dem **finalen** Sweep, nicht geschätzt; **ist in dieser Session bereits passiert**,
+  Stand-Notiz aktualisiert), D2 (finaler Regression-Sweep, je Phase separat, Tabelle
+  in den Session-Block — **genauso bereits passiert**, Tabelle im Verified-Abschnitt
+  oben), D3 (`## Session stopped` schreiben + Rotationsregel — **passiert gerade**),
+  D4 (root-`CLAUDE.md` + `ROADMAP.md` + `docs/INDEX.md`: Phase-14-Zeile auf den
+  erreichten Stand; **nicht in dieser Session — Block-D-Topic**), D5
+  (Closeout-Handover **nur**, wenn die Phase geschlossen wird — gesonderte Entscheidung).
+- **Hygiene-Tickets aus Session 4**, weiter zurückgestellt: `*.sqlite.bak-*` in
+  `.gitignore`, `ROADMAP.md:427`-Aktualisierung.
+- **Plan-§9-Drift-Listeneintrag #2** erweitern in der nächsten Plan-Session.
+- **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
+  Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale Outcomes.
 
 ### NEXT
 
-- **Operator (Nikinger):** Push-Freigabe für die 3 Commits
-  (`bb095df`, `6e8148e`, `ac54825`) + diesen Docs-Commit. Stand jetzt:
-  3 Commits vor `origin/main`.
-- **Ausführende Session (nächste):** **Block C** — Daemon
-  (`source_registry/run.py`, Muster `data_foundation/run.py`) +
-  Web-UI-Scharfschalten (`webui/api.py` + `static/index.html` +
-  `static/app.js`). C1 zuerst (kleines Modul, kein Netz, fail-soft
-  per D10), C2/C3 danach, C4 zuletzt (run_discovery.sh-Wrapper).
-- **Beweiswoche läuft separat weiter** (Phase 13 Plan §7 P1–P9). B2/B3
-  berühren die laufende Beweiswoche nicht (kein Konsumentenpfad
-  schreibt in `instrument_source_availability` während der Beweiswoche;
-  die einzigen Schreiber sind A4-Projektion — wartet auf den ersten
-  Resolver-Tick — und C2-Daemon — wartet auf ARM).
+- **Operator (Nikinger):** Push-Freigabe für die 5 Commits
+  (`275deb2`, `94bbd0c`, `af837c1`, `7aa86bd`, `170ed72`) + diesen Docs-Commit.
+  Stand jetzt: 5 Commits vor `origin/main`.
+- **Ausführende Session (nächste):** **Block D — Closeout.** Konkret:
+  - root-`CLAUDE.md`: Phase-14-Zeile auf „Block C done, Beweiswoche + Block D ausstehend"
+    (statt „Plan committet, Bau nicht begonnen")
+  - `ROADMAP.md` Phase-14-Block auf den erreichten Stand
+  - `docs/INDEX.md`: Phase-14-Status-Update (Bullet-Liste, eine Zeile)
+  - **Entscheidung A**: Soll die Phase hier geschlossen werden (mit Closeout-Handover,
+    D5), oder soll Block D nur die Doku-Updates machen und die Phase erst nach der
+    Beweiswoche (Phase 13 Plan §7 P1–P9) final schließen? Mein Vorschlag:
+    **erst Beweiswoche abwarten** — Phase 14 hat strukturell geliefert, aber der
+    Beweis-Track ist Phase 13 und läuft parallel. D5 (= Closeout-Handover) ist deshalb
+    die letzte Session der Phase, nicht diese.
+- **Beweiswoche läuft separat weiter** (Phase 13 Plan §7 P1–P9). C1–C4 berühren die
+  laufende Beweiswoche nicht — kein Konsumentenpfad schreibt in
+  `instrument_source_availability` während der Beweiswoche; die einzigen Schreiber
+  sind (a) A4-Projektion in `UniverseStore.set_symbol`, die auf den nächsten
+  Resolver-Tick wartet, und (b) der C2-Daemon, der ohne `arm`-Flag ein No-Op ist.
+
+---
+
+> **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).
