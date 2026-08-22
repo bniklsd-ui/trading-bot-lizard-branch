@@ -135,6 +135,20 @@ data/archive/
 # from committing runtime state.
 data/state/recorder.pid
 data/state/recorder_state.json
+# Phase 14 (Discovery-Then-Deterministic) daemon runtime files — the duplicate-process
+# PID guard and the atomic state snapshot the Discovery daemon rewrites every cycle.
+# Added 2026-08-22 (Session 9, Block C housekeeping): the same reconciliation P3–P12
+# did — the daemon's first batch made these the only files under data/ still
+# untracked-but-not-ignored.
+data/state/discovery.pid
+data/state/discovery_state.json
+# `data/*.sqlite.bak-*` — ad-hoc sqlite backups operators sometimes make before a
+# destructive migration or a manual DB edit (e.g. `cp trading_bot.sqlite
+# trading_bot.sqlite.bak-pre-migration`). These are operational, not source. They
+# don't fit the runtime-state contract above (they can appear in any phase's DB),
+# so a wildcard catches them all. Added 2026-08-22 (Session 9 — hygiene ticket
+# first raised in Session 4, picked up while the D4 Doku-Updates are in flight).
+*.sqlite.bak-*
 
 # --- Logs ---
 *.log

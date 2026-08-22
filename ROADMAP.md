@@ -310,7 +310,7 @@ weiterlaufenden Betriebs, ist aber **nicht** Bedingung dieses ✅-Flips (der dec
 > der Baseline-Lauf genug Marktdaten geliefert hat.
 
 **Goal:** die zwei strukturellen Lücken schließen, die den gesamten v1.5→v1.7-Hotfix-Arc
-getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 14/V4)
+getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 15/V4)
 auf einem unzuverlässigen Datenfundament aufbaut.
 
 > **Korrektur (2026-07-08, M1-Housekeeping):** die Checkliste unten stand noch auf `[ ]`,
@@ -425,7 +425,13 @@ mit dem nächsten Scheduler-Restart (Nikinger).
 > ⟳ **Korrektur (2026-08-18, Nikinger-Entscheidung):** nach dem Scheitern von P12.5 ist
 > **Phase 13 = Live-Datenfundament** (der strukturelle Schnitt + vierstufige Beschaffung,
 > s. u.); **V4 rutscht auf Phase 14**. Jede „Phase 13 (V4)"-Nennung in älteren Zeilen meint
-> jetzt Phase 14. Plan: [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md).
+> jetzt Phase 14.
+>
+> ⟳ **Korrektur (2026-08-22, Nikinger-Entscheidung):** die "discovery-then-deterministic"-
+> Architektur aus Block C des Phase-13-Re-Plans wird **eigene Phase 14** (s. u.); V4 rutscht
+> entsprechend auf **Phase 15**. Jede „Phase 14 (V4)"-Nennung in älteren Zeilen meint jetzt
+> **Phase 15**. Plan für die Live-Daten-Beschaffung:
+> [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md).
 >
 > Numbering claimed 2026-08-01 (Nikinger-Entscheidung)
 > — vorher stand hier "Phase 11 = V4"; V4 ist jetzt **Phase 13** (unten), unverändert im Inhalt.
@@ -572,16 +578,25 @@ strukturelle Kostenzusicherung, kein Zählwert.
 
 ## Phase 14 — Discovery-Then-Deterministic *(eröffnet 2026-08-22 aus dem Session-13-Architektur-Insight)*
 
-> **Status: 🔄 Execution-ready Plan committet 2026-08-22 — Bau nicht begonnen.**
+> **Status: 🔄 Blöcke 0 + A + B + C code-complete (Stand 2026-08-22) — Block-D-Doku-Updates
+> ausstehend, Phase-Final-Closeout nach Phase-13-Beweiswoche (Plan §7 P1–P9).**
 > **Plan:** [`docs/concepts/phase14_discovery_plan.md`](./docs/concepts/phase14_discovery_plan.md)
 > (D1–D20 gelockt, Blöcke 0/A/B/C/D mit Verbatim-Ankern, Akzeptanz A1–A8, Drift-Liste §9).
-> **Phasenkopf:** [`phase14_discovery/CLAUDE.md`](./phase14_discovery/CLAUDE.md).
+> **Phasenkopf:** [`phase14_discovery/CLAUDE.md`](./phase14_discovery/CLAUDE.md)
+> (aktuelle Modul-Tabelle, Session-9-Block, A1–A8-Stand).
 > **Concept-Skizze:** [`docs/concepts/phase14_discovery_concept.md`](./docs/concepts/phase14_discovery_concept.md)
 > (drei Bausteine: Quell-Profil + Kreuzungs-Tabelle + Konsumenten-Umstellung; sieben offene
-> Fragen für die Plan-Session).
+> Fragen für die Plan-Session — vom Plan Q1–Q7 beantwortet).
 > **Block-C-Handoff:** [`docs/concepts/phase13_c_block_c_replan.md`](./docs/concepts/phase13_c_block_c_replan.md)
 > §3 + §5 (warum die Architektur eine eigene Phase rechtfertigt; was Phase 14 implizit
 > absorbiert: hardcoded `EPIC_MAP`, Path C Dukascopy).
+>
+> **Akzeptanz A1–A8 (Plan §7), Stand 2026-08-22 nach Session 9:**
+> A1 (Discovery 0 IG-Punkte strukturell), A2 (`grep EPIC_MAP phase13_live_data/*.py` leer),
+> A3 (`measurable_universe()`-Identität), A4 (yF-Projektion), A5 (Daemon unscharf = nichts),
+> A6 (UI warnt + scharf per Datei), A7 (`source_delta.py` Drei-Fälle-Trennung), A8 (Sweep)
+> — **alle grün**. Phase ist **strukturell fertig**, aber Block D und Phase-13-Beweiswoche
+> laufen separat; Phase-Final-Closeout (D5) wird nach der Beweiswoche entschieden.
 
 **Goal:** jede Quelle (IG, yFinance, LS, Capital.com, später Dukascopy) **exponiert selbst**,
 was sie liefern kann. Eine DB-Tabelle (`instrument_source_availability`) hält die Kreuzung
@@ -618,7 +633,7 @@ angefasst wird. `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` ist leer
 ---
 
 ## Phase 15 — V4: Sophisticated / Optional *(die alte Phase 9, deferred; vormals "Phase 12",
-dann "Phase 13", dann "Phase 14" — umnummeriert 2026-08-11, 2026-08-18 und 2026-08-22)*
+dann "Phase 13", dann "Phase 14", jetzt Phase 15 — umnummeriert 2026-08-11, 2026-08-18 und 2026-08-22)*
 
 > **Status: deferred, gegatet auf Phase 9 + 11 + 12 + 13 + 14 UND reale Outcomes** (unverändert
 > aus der ursprünglichen Phase-9-Formulierung — nur numerisch verschoben, kein Inhalt geändert;
