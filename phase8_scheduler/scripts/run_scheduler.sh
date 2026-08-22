@@ -34,9 +34,19 @@ cd "$PROJECT_DIR"
 # schnell vergessen wird" (Nikinger). No IG session in the Recorder, ever (parallel
 # IG logins clobber each other's tokens) — the guard against a duplicate Recorder
 # lives in run_recorder.sh/data_foundation.run itself (PID file), not here.
+#
+# Phase 14 (Discovery-Then-Deterministic) §6 C4: keep the Discovery daemon running
+# alongside the scheduler. The daemon is **always safe to autostart** (D10) — its
+# first action every cycle is ``arm.is_armed()``; absent ``data/state/DISCOVERY_ARMED``
+# ⇒ sleep, no network, no DB writes. The UI's ARM DISCOVERY button is the only
+# documented way to enable Discovery; an operator may also ``touch`` the flag by hand.
+# The guard against a duplicate Discovery daemon lives in source_registry.run itself
+# (PID file at ``data/state/discovery.pid``), not here.
 REPO_ROOT="$(cd "$PROJECT_DIR/.." && pwd)"
 nohup bash "$REPO_ROOT/phase12_data_foundation/scripts/run_recorder.sh" \
     >>"$REPO_ROOT/data/state/recorder.log" 2>&1 &
+nohup bash "$REPO_ROOT/phase14_discovery/scripts/run_discovery.sh" \
+    >>"$REPO_ROOT/data/state/discovery.log" 2>&1 &
 
 echo "[run_scheduler] starting daemon from ${PROJECT_DIR} (keyring must be unlocked)..." >&2
 exec python -m scheduler.run "$@"
