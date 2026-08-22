@@ -15,6 +15,7 @@ same phase-isolation reason documented there.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +23,8 @@ from typing import Iterable
 
 from universe.exceptions import UniverseStoreError
 from universe.models import DS_OK, STATUS_ACTIVE, UniverseRecord
+
+logger = logging.getLogger("universe.store")
 
 # Registry-truth columns (Decision D5/D7): the only writers are `set_symbol` (Phase 12
 # SymbolResolver) and the initial INSERT (`seed_curated`/first `upsert_discovered` for a
@@ -225,6 +228,14 @@ class UniverseStore:
         ``symbol_source``, ``symbol_checked_at``) atomically, plus ``updated_at``.
         ``symbol_source=None`` is valid — it is the correct value for a status with no
         symbol at all (``no_source``/``no_intraday_source``).
+
+        Phase 14 A4: after the registry write commits, also projects the yF truth
+        into ``instrument_source_availability`` (Migration 007) as a single row
+        ``(epic, 'yf', '1m')``. The projection runs in its own try/except — a
+        projection failure must NOT take down the registry write (Plan D5 /
+        §8.2: silent measurement loss). If the projection table is missing (an
+        older DB without Migration 007) ``sqlite3.OperationalError`` is caught
+        and the registry write still stands.
         """
         existing = self.get(epic)
         if existing is None:
@@ -237,6 +248,19 @@ class UniverseStore:
         )
         self.conn.commit()
 
+        # Phase 14 D4/D5: project yF truth into the cross-product table. The
+        # registry stays the single writer; this is a named read-model
+        # (``origin='registry'``) that the measurement gate NEVER reads.
+        # Fail-soft — a projection error must not take down the registry
+        # write, or an epic silently drops out of measurable universe (§8.2).
+        try:
+            self._project_availability(epic, yf_ticker, status, now)
+        except Exception:  # noqa: BLE001 — D5: never let the projection kill the registry
+            logger.warning(
+                "source-availability projection failed for %s (registry write stands)",
+                epic, exc_info=True,
+            )
+
     def measurable_universe(self) -> list[UniverseRecord]:
         """``active`` rows with a verified data source (Decision D7) — the gate for
         paper/shadow measurement (`PaperEngine.epic_filter`, D19)."""
@@ -246,3 +270,56 @@ class UniverseStore:
             (STATUS_ACTIVE, DS_OK),
         ).fetchall()
         return [UniverseRecord.from_row(dict(r)) for r in rows]
+
+    # -- phase 14 a4: yF projection into instrument_source_availability --------
+
+    def _project_availability(
+        self,
+        epic: str,
+        yf_ticker: str | None,
+        status: str,
+        now: str,
+    ) -> None:
+        """Phase-14 A4 — project the yF registry truth into
+        ``instrument_source_availability`` (Migration 007).
+
+        Writes exactly one row at PK ``(epic, source, resolution) ==
+        (epic, 'yf', '1m')``. The same ``INSERT … ON CONFLICT DO UPDATE``
+        shape as :meth:`source_registry.store.SourceAvailabilityStore.upsert`
+        — both writers must produce byte-identical rows for the same input
+        (doppelschreiber-gleichheit — Plan §6 A4 mitigation 3 / test 6).
+
+        ``source_symbol = yf_ticker`` carries the 1:1 identity the D2
+        promise makes (``instrument_universe.yf_ticker`` is exactly
+        ``source_symbol WHERE source='yf'``). ``status`` is copied
+        verbatim from the registry row (D18: same vocabulary as
+        ``data_source_status``). ``origin = 'registry'`` per Plan D4.
+        ``history_min_days`` and ``latency_min`` are NULL — these are
+        discovery-time facts (Plan §5.1), not registry time. ``notes``
+        is NULL — the migration-backfill note belongs to backfilled
+        rows, not live registry writes.
+
+        No cross-phase import (Plan §6 A4 "Schreib-Mechanik gelockt").
+        No DDL — the table is owned by Migration 007; if it is missing,
+        ``self.conn.execute`` raises ``sqlite3.OperationalError`` and the
+        caller (``set_symbol``) catches + logs + returns (D5 fail-soft).
+        """
+        self.conn.execute(
+            "INSERT INTO instrument_source_availability "
+            "(epic, source, resolution, source_symbol, status, origin, "
+            "history_min_days, latency_min, last_verified_utc, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(epic, source, resolution) DO UPDATE SET "
+            "source_symbol = excluded.source_symbol, "
+            "status = excluded.status, "
+            "origin = excluded.origin, "
+            "history_min_days = excluded.history_min_days, "
+            "latency_min = excluded.latency_min, "
+            "last_verified_utc = excluded.last_verified_utc, "
+            "notes = excluded.notes",
+            (
+                epic, "yf", "1m", yf_ticker, status, "registry",
+                None, None, now, None,
+            ),
+        )
+        self.conn.commit()
