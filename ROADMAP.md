@@ -628,25 +628,25 @@ dann "Phase 13", dann "Phase 14" — umnummeriert 2026-08-11, 2026-08-18 und 202
 
 **Goal:** Implement the V2 improvements identified in the Council analysis.
 
-### 14a — Council Skill Integration *(vormals 9a / 11a / 12a / 13a)*
+### 15a — Council Skill Integration *(vormals 9a / 11a / 12a / 13a / 14a)*
 - [ ] Integrate `verbesserungsvorschlaege` as structured input to pipeline
 - [ ] Trigger detection for ad-hoc strategy evaluation
 
-### 14b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b / 11b / 12b / 13b)*
+### 15b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b / 11b / 12b / 13b / 14b)*
 - [ ] Context-window monitoring during debate (~60–70 %)
 - [ ] Compression of Bull/Bear/Judge state into summary
 - [ ] New session continuation
 
-### 14c — Reward/Punishment Reform *(vormals 9d / 11c / 12c / 13c)*
+### 15c — Reward/Punishment Reform *(vormals 9d / 11c / 12c / 13c / 14c)*
 - [ ] `+ process_quality_score` (VETOs, confidence, debate quality, gate path)
 - [ ] Anti-emotionality: separate process score from outcome score
 
-### 14d — Force Trigger Safeguard *(vormals 9e / 11d / 12d / 13d)*
+### 15d — Force Trigger Safeguard *(vormals 9e / 11d / 12d / 13d / 14d)*
 - [ ] Lock force trigger when daily PNL < 0 — das P2-Schema-Feld `force_trigger_locked` existiert
   bereits seit Phase 2, wird aber von keiner Funktion durchgesetzt (kein Force-Trigger existiert
   bisher überhaupt)
 
-### 14e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f / 11e / 12e / 13e, aus Phase 7 hierher verschoben)*
+### 15e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f / 11e / 12e / 13e / 14e, aus Phase 7 hierher verschoben)*
 - [ ] AI extrahiert strukturierte Instincts (`trigger` / `domain` / `confidence` / `evidence_trade_ids`) aus P7 `trade_lessons` + `reward_pts`
 - [ ] Code **validiert** Instincts gegen reale Outcomes; bewährte werden zu **deterministischen Regeln promotet** (`longterm_pre_trade_check()` VETO), mit Prune→Archiv der widerlegten
 - [ ] **Harte Leitplanke:** Promotion in die VETO-Schicht **nur** über einen deterministischen / menschlich gegateten Schritt — eine promotete Regel wird deterministischer Code, die AI sitzt nie in der VETO-Auswertung. Gegatet auf reale Outcomes (≫ `n_min`)

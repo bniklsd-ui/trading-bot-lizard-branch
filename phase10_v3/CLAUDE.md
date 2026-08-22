@@ -18,7 +18,7 @@ down:
   - ./PHASE11_DEFERRAL_HANDOVER.md   # 🛑 Notbremse 2026-08-11 — Status, Anforderungen A-G, offene Entscheidungen (L3, dated) — ZUERST LESEN
   - ../docs/architecture/data_foundation.svg   # Fehlerbild + Zielbild, 1080x1080
   - ./DATA_SOURCE_STRATEGY_2026-08-11.md   # Entscheidung: Tracker auf ChainedBarProvider (IG→yFinance), NICHT Lightstreamer; IG-Kontingent bestätigt 10.000/Woche (L3, dated)
-  - ../ROADMAP.md   # Phase 11 (this work, deferred) + Phase 12 (Datenfundament) + Phase 13 (Live-Datenfundament, opened 2026-08-18) + Phase 14 (V4) sections
+  - ../ROADMAP.md   # Phase 11 (this work, deferred) + Phase 12 (Datenfundament) + Phase 13 (Live-Datenfundament, opened 2026-08-18) + Phase 14 (Discovery) + Phase 15 (V4) sections
   - ./SESSIONS_ARCHIVE.md   # full session history (L3)
 updated: 2026-08-11
 ---

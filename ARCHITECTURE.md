@@ -59,6 +59,10 @@ updated: 2026-07-06
 > ([`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md)).
 > **V4 moves to Phase 14.** Every "Phase 13 (V4)" reference below now means Phase 14.
 
+> ⟳ Correction (2026-08-22): V4 moves again, to **Phase 15**; **Phase 14** is
+> Discovery-Then-Deterministic (the source-availability table that absorbs `EPIC_MAP`).
+> See [`phase14_discovery/CLAUDE.md`](./phase14_discovery/CLAUDE.md).
+
 ---
 
 ## System layers (top-down)
@@ -168,7 +172,7 @@ updated: 2026-07-06
   free-text lesson (language only — no number/score/decision); failures never break the close path
 - **Confidence** (Wilson lower-bound / expectancy-R / N-min) is **observe-only** — it does not
   gate `risk_pct` or anything else in v1. Promotion to an actual VETO ("Instinct→VETO ECC") is
-  deferred to **Phase 14e (V4)**, gated on real outcomes **and** on Phase 9/10 (V2/V3) landing first
+  deferred to **Phase 15e (V4)**, gated on real outcomes **and** on Phase 9/10/12/13/14 (V2/V3/Discovery) landing first
 - **No VETO touch.** Reward/lessons sit entirely downstream of order execution
 
 ### Scheduler (Phase 8 — ✅ live-verified 2026-07-03, v1.5+v1.6+v1.7 merged)
@@ -227,7 +231,7 @@ updated: 2026-07-06
    on losing days. Recommendation: lock when daily PNL < 0 (root `CLAUDE.md`
    Hard Rule 5). The P2 schema already carries a `force_trigger_locked` flag
    (`persistence/defaults.py`), but no Force Trigger feature exists yet to
-   enforce it against — tracked as Phase 14d (V4), whenever manual override is built.
+   enforce it against — tracked as Phase 15d (V4), whenever manual override is built.
 2. **Score-as-emotion** — addressed by Phase 7: `reward_pts` measures process
    quality (clean exit vs. time-stop, spread tightness, debate signal)
    independently from the outcome component, instead of punishing unlucky
@@ -258,4 +262,5 @@ Per-phase concept + implementation:
 - Phase 11 (V3-Fortsetzung — Funnel-/Mess-Fixes aus Datenwoche-2-Review, 🛑 deferred 2026-08-11) — no concept doc, lives in `phase10_v3/`; see [`phase10_v3/PHASE11_DEFERRAL_HANDOVER.md`](./phase10_v3/PHASE11_DEFERRAL_HANDOVER.md)
 - Phase 12 (Datenfundament — Registry + BarService + Bar-Archiv + Recorder, 🆕 geöffnet 2026-08-11) — [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md) · [`phase12_data_foundation/`](./phase12_data_foundation/)
 - Phase 13 (Live-Datenfundament — 4-stage acquisition, LS live stage, consumers never fetch; opened 2026-08-18) — [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md)
-- Phase 14 (V4 — Sophisticated/Optional, deferred) — no concept doc yet
+- Phase 14 (Discovery — `instrument_source_availability` table + autonomous daemon, opened 2026-08-22) — [`docs/concepts/phase14_discovery_plan.md`](./docs/concepts/phase14_discovery_plan.md) · [`phase14_discovery/`](./phase14_discovery/)
+- Phase 15 (V4 — Sophisticated/Optional, deferred) — no concept doc yet

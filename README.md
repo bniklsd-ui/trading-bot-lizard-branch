@@ -123,14 +123,20 @@ Circuit-Breaker, Lightstreamer-Multi-Epic-Diagnose → `LiveQuoteCache` in den R
 Step 7b ohne Fix-Target — die LS-Diagnose fand keinen Bug; Live-Baseline-Lauf läuft, Tag-1-Ergebnisse:
 [`phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md`](./phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md).)*
 `ROADMAP.md`s alte Phase 9 (Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC) ist jetzt
-**Phase 14 (V4)** *(umnummeriert 2026-08-11 und erneut 2026-08-18 — war vorher "Phase 12",
-dann "Phase 13"; Phase 12 ist der Datenfundament-Track, Phase 13 das Live-Datenfundament, s. u.)* — unverändert im Inhalt, nur numerisch verschoben und gegatet auf
-Phase 9+11+12 und reale Outcomes; die dazwischenliegenden Phasen: **Phase 10 (V3)** bündelt
-Persistenz-Reform + No-Trade-Lessons + optionales UI, **Phase 11** (🛑 deferred seit 2026-08-11:
-V3-Fortsetzung, Funnel-/Mess-Fixes aus der zweiten Datenwoche-Review,
-`phase10_v3/PHASE11_DEFERRAL_HANDOVER.md`), **Phase 12** (🆕 Datenfundament — Registry +
-BarService + Bar-Archiv + Recorder, die gemeinsame Wurzel hinter Phase 11s Notbremse,
-`docs/concepts/phase12_data_foundation_plan.md`).
+**Phase 15 (V4)** *(umnummeriert 2026-08-11, 2026-08-18 und 2026-08-22 — war vorher "Phase 12",
+dann "Phase 13", dann "Phase 14"; Phase 12 ist der Datenfundament-Track, Phase 13 das
+Live-Datenfundament, Phase 14 ist Discovery-Then-Deterministic, s. u.)* — unverändert im
+Inhalt, nur numerisch verschoben und gegatet auf Phase 9+11+12+13+14 und reale Outcomes; die
+dazwischenliegenden Phasen: **Phase 10 (V3)** bündelt Persistenz-Reform + No-Trade-Lessons +
+optionales UI, **Phase 11** (🛑 deferred seit 2026-08-11: V3-Fortsetzung, Funnel-/Mess-Fixes
+aus der zweiten Datenwoche-Review, `phase10_v3/PHASE11_DEFERRAL_HANDOVER.md`), **Phase 12**
+(🆕 Datenfundament — Registry + BarService + Bar-Archiv + Recorder, die gemeinsame Wurzel
+hinter Phase 11s Notbremse, `docs/concepts/phase12_data_foundation_plan.md`), **Phase 13**
+(Live-Datenfundament — 4-stage acquisition, LS live stage, Konsumentenpfade fetchen nie;
+opened 2026-08-18, `docs/concepts/phase13_live_data_plan.md`), **Phase 14 (Discovery)** (🆕
+eröffnet 2026-08-22 — eine DB-Tabelle hält die Kreuzung IG-Epic × Quelle × Auflösung;
+Konsumenten lesen die Tabelle statt `EPIC_MAP`, neuer Daemon füllt sie autonom,
+`phase14_discovery/CLAUDE.md` + `docs/concepts/phase14_discovery_plan.md`).
 Plan: [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md).
 
 Detaillierter Plan: [`ROADMAP.md`](./ROADMAP.md)
