@@ -301,6 +301,54 @@ def test_set_symbol_missing_epic_raises(store: UniverseStore):
         store.set_symbol("IX.D.NOPE.IFM.IP", "^GDAXI", symbol_source="resolver", status="ok")
 
 
+def test_active_universe_survives_stale_source_marker(store: UniverseStore):
+    """Phase-14 finding B1: ``DS_STALE_SOURCE`` was introduced by Phase-13
+    A4 (``wiring.py::_mark_stale``) but never added to
+    ``_VALID_DATA_SOURCE_STATUSES`` (``universe/models.py:61-63``). ``set_symbol``
+    writes it through fine (raw SQL, no validation), but the next read throws
+    ``ValueError: invalid data_source_status: 'stale_source'`` from
+    ``UniverseRecord.__post_init__`` — and ``active_universe()`` calls
+    ``from_row`` on every row it returns. Reproduced live (2026-08-22) on a
+    fresh DB + one active epic.
+
+    The bug zündet exactly when the Beweiswoche sets
+    ``enable_divergence_sampler=True`` (Phase 9 P9 demands „no epic with
+    dead history stands on ``ok``"). Without this fix, the daemon crashes at
+    ``wiring.py:131`` on the next start. Fix = 2 lines in models.py (DS_STALE_SOURCE
+    + set membership)."""
+    from universe.models import DS_STALE_SOURCE
+
+    # Seed an active epic + mark it stale.
+    store.upsert_discovered(_record(
+        epic="IX.D.STALE.IFM.IP",
+        status=STATUS_ACTIVE,
+        yf_ticker="^STALE",
+    ))
+    store.set_symbol(
+        "IX.D.STALE.IFM.IP", None,
+        symbol_source=None, status=DS_STALE_SOURCE,
+    )
+
+    # The read that previously crashed. ``active_universe`` returns all
+    # active rows regardless of data_source_status; today only DS_OK feeds
+    # ``measurable_universe()``, so the stale row is correctly absent from
+    # measurement (the discovery step sets stale on purpose) — but the read
+    # itself must not throw.
+    active = store.active_universe()
+    assert any(r.epic == "IX.D.STALE.IFM.IP" for r in active), (
+        "stale-source row missing from active_universe() — expected presence "
+        "(the typing marker must survive a round trip, not silent drop)"
+    )
+
+    # measurable_universe still filters to DS_OK — the stale row must NOT
+    # leak into measurement.
+    measured = store.measurable_universe()
+    assert not any(r.epic == "IX.D.STALE.IFM.IP" for r in measured), (
+        "stale_source row leaked into measurable_universe() — would re-enter "
+        "the data pipeline despite being marked dead"
+    )
+
+
 def test_measurable_universe_filters_active_and_ok(store: UniverseStore):
     store.upsert_discovered(_record(epic="OK-ACTIVE", status=STATUS_ACTIVE))
     store.set_symbol("OK-ACTIVE", "^GDAXI", symbol_source="resolver", status="ok")

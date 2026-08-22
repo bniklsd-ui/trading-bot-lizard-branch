@@ -57,9 +57,14 @@ DS_UNVERIFIED = "unverified"
 DS_NO_SOURCE = "no_source"
 DS_NO_INTRADAY_SOURCE = "no_intraday_source"
 DS_MISMATCH = "mismatch"
+# Phase 13 §6 A4 (F1): IG lieferte ok=True auf tote Historie — geschrieben von
+# wiring.py::_mark_stale. Ohne diese Konstante wirft UniverseRecord.__post_init__
+# beim LESEN ValueError, sobald die Beweiswoche enable_divergence_sampler=True setzt
+# (Phase-14-Plan §3.1 reproduziert: ValueError invalid data_source_status: 'stale_source').
+DS_STALE_SOURCE = "stale_source"
 
 _VALID_DATA_SOURCE_STATUSES = frozenset(
-    {DS_OK, DS_UNVERIFIED, DS_NO_SOURCE, DS_NO_INTRADAY_SOURCE, DS_MISMATCH}
+    {DS_OK, DS_UNVERIFIED, DS_NO_SOURCE, DS_NO_INTRADAY_SOURCE, DS_MISMATCH, DS_STALE_SOURCE}
 )
 
 # symbol_source vocabulary (Phase 12 / Decision D5-D6) — who last set yf_ticker.
