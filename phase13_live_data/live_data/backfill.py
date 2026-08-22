@@ -60,10 +60,17 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Sequence
 from zoneinfo import ZoneInfo
 
 import requests
+from source_registry.models import (
+    SOURCE_CAPITAL,
+    STATUS_NO_SOURCE,
+    STATUS_OK,
+    SourceAvailability,
+    SourceProfile,
+)
 
 logger = logging.getLogger("live_data.backfill")
 
@@ -87,7 +94,34 @@ EPIC_MAP: dict[str, str] = {
     "IX.D.CAC.IFE.IP":  "FR40",   # France 40
 }
 
+# Phase-14 B1b (2026-08-22): each Capital.com ``/markets?searchTerm=…``
+# call needs the *human-readable* index name. The B1a operator probe
+# observed what each IG epic maps to — see
+# ``phase14_discovery/PHASE14_B1A_PROBE_OUTPUT_2026-08-22.md`` §5.
+# Today this is the same three pairs that ``EPIC_MAP`` covers; B2 will
+# replace ``EPIC_MAP`` with a runtime DB lookup (``SourceAvailabilityStore
+# .symbol_for``) but the search-term dict remains here — the source
+# itself opens no DB (Plan §5.2).
+_DISPLAY_NAME_BY_EPIC: dict[str, str] = {
+    "IX.D.DAX.IFMM.IP":  "Germany 40",
+    "IX.D.CAC.IFE.IP":   "France 40",
+    "IX.D.IBEX.FWM2.IP": "Spain 35",
+}
+
 SOURCE_TAG = "capital"
+
+
+def _utc_iso_now() -> str:
+    """Current UTC time as an ISO 8601 string with ms precision and Z suffix.
+
+    Mirrors the formatter used by ``phase9_universe/universe/store.py::utc_iso_now``
+    and ``phase14_discovery/source_registry/store.py::utc_iso_now`` (duplicated
+    for phase isolation, not imported — keeps ``live_data.backfill`` importable
+    without dragging in P9/P14). Used by :meth:`CapitalSource.discover` to stamp
+    ``last_verified_utc`` on every emitted ``SourceAvailability`` row.
+    """
+    now = datetime.now(timezone.utc)
+    return now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
 
 
 @dataclass(frozen=True)
@@ -227,6 +261,140 @@ class CapitalSource:
             f"last error: {last_error}"
         )
 
+    # -- discover -----------------------------------------------------------
+
+    def discover(
+        self,
+        epics: Sequence[str],
+        *,
+        max_probe_calls: int = 8,
+    ) -> SourceProfile:
+        """Phase-14 B1b. Discover what Capital.com can serve for ``epics``.
+
+        For each ``epic`` known to :data:`_DISPLAY_NAME_BY_EPIC` the method
+        issues exactly ONE HTTP GET against ``/api/v1/markets?searchTerm=<name>``,
+        filters the response to the first entry with ``instrumentName == name``
+        AND ``instrumentType == "INDICES"`` (Phase-14 B1a Befund 3, observed
+        2026-08-22 — Capital.com's CFD index entries carry ``"INDICES"``, not
+        ``"CFD"``), and emits one :class:`SourceAvailability` per epic:
+
+        - **Hit**: ``status='ok'``, ``source_symbol = match["epic"]`` (the
+          ``"DE40"`` / ``"FR40"`` / ``"SP35"`` short code), ``origin='discovery'``,
+          ``history_min_days=30``, ``latency_min=0`` (B1a Befund 6: ``delayTime: 0``
+          for all three).
+        - **Miss**: ``status='no_source'``, ``source_symbol=None``, ``notes`` carries
+          the searchTerm we tried.
+
+        Epics unknown to :data:`_DISPLAY_NAME_BY_EPIC` emit
+        ``status='no_source'`` WITHOUT an HTTP call (the integration of additional
+        indices is a configuration step, not a runtime guess — Plan §6 B1 / D6).
+
+        Fail-soft per Plan §8.5: network / parse / non-200 errors are appended to
+        ``SourceProfile.errors`` and the iteration continues — one bad row does
+        not poison the cycle. ``max_probe_calls`` is the hard deckel (Plan D14);
+        once exhausted, remaining epics emit ``status='no_source'`` with the
+        note ``"max_probe_calls=N reached"``. The auth POST is a one-off warm-up
+        and is NOT counted against ``max_probe_calls`` — only ``/markets`` GETs
+        are. The daemon (Phase-14 C2) wraps the returned ``probe_calls_used``
+        in ``SourceBudget.record_spend(points, kind='discovery')`` (Plan D13).
+        """
+        rows: list[SourceAvailability] = []
+        errors: list[str] = []
+        calls_used = 0
+
+        # Auth warm-up — one-off; not counted against max_probe_calls. A failure
+        # here aborts the whole discovery cycle loudly (errors carry the cause).
+        if self._cst is None:
+            try:
+                self.authenticate()
+            except Exception as exc:  # noqa: BLE001 — fail-soft per Plan §8.5
+                return SourceProfile(
+                    source=SOURCE_CAPITAL,
+                    rows=(),
+                    probe_calls_used=0,
+                    errors=(f"auth: {exc}",),
+                )
+
+        now = _utc_iso_now()
+        for epic in epics:
+            name = _DISPLAY_NAME_BY_EPIC.get(epic)
+            if name is None:
+                rows.append(SourceAvailability(
+                    epic=epic, source=SOURCE_CAPITAL, resolution="1m",
+                    source_symbol=None,
+                    status=STATUS_NO_SOURCE,
+                    origin="discovery",
+                    history_min_days=None, latency_min=None,
+                    last_verified_utc=now,
+                    notes=f"no display name registered for epic {epic!r}",
+                ))
+                continue
+
+            if calls_used >= max_probe_calls:
+                rows.append(SourceAvailability(
+                    epic=epic, source=SOURCE_CAPITAL, resolution="1m",
+                    source_symbol=None,
+                    status=STATUS_NO_SOURCE,
+                    origin="discovery",
+                    history_min_days=None, latency_min=None,
+                    last_verified_utc=now,
+                    notes=f"max_probe_calls={max_probe_calls} reached",
+                ))
+                continue
+
+            url = f"{self._base_url}/api/v1/markets"
+            params = {"searchTerm": name}
+            try:
+                resp = requests.get(
+                    url, params=params, headers=self._session_headers,
+                    timeout=REQUEST_TIMEOUT_SEC,
+                )
+                calls_used += 1
+            except requests.RequestException as exc:
+                errors.append(f"{epic}: network: {exc}")
+                continue
+
+            if resp.status_code != 200:
+                errors.append(f"{epic}: http_{resp.status_code}")
+                continue
+
+            try:
+                body = resp.json()
+            except ValueError as exc:
+                errors.append(f"{epic}: parse: {exc}")
+                continue
+
+            markets = (body or {}).get("markets") or []
+            match = self._pick_markets_match(markets, name)
+            if match is None:
+                rows.append(SourceAvailability(
+                    epic=epic, source=SOURCE_CAPITAL, resolution="1m",
+                    source_symbol=None,
+                    status=STATUS_NO_SOURCE,
+                    origin="discovery",
+                    history_min_days=None, latency_min=None,
+                    last_verified_utc=now,
+                    notes=f"no INDICES match for searchTerm={name!r}",
+                ))
+                continue
+
+            rows.append(SourceAvailability(
+                epic=epic, source=SOURCE_CAPITAL, resolution="1m",
+                source_symbol=match.get("epic") or None,
+                status=STATUS_OK,
+                origin="discovery",
+                history_min_days=30, latency_min=0,
+                last_verified_utc=now,
+                notes=None,
+            ))
+
+        return SourceProfile(
+            source=SOURCE_CAPITAL,
+            rows=tuple(rows),
+            probe_calls_used=calls_used,
+            errors=tuple(errors),
+        )
+
     # -- internals ----------------------------------------------------------
 
     def _backoff(self, attempt: int, reason: str) -> None:
@@ -364,6 +532,35 @@ class CapitalSource:
             else:
                 return None  # this OHLC field not found in any variant
         return (result["open"], result["high"], result["low"], result["close"])
+
+    @staticmethod
+    def _pick_markets_match(markets: list[dict], index_name: str) -> dict | None:
+        """Pick the first market whose ``instrumentName == index_name`` AND
+        whose ``instrumentType == "INDICES"`` — the strict filter against
+        Capital.com's observed response form (Phase-14 B1a Befund 3,
+        2026-08-22).
+
+        Strict by design: ``CapitalSource.discover`` writes into the
+        ``instrument_source_availability`` table, where ``status='ok'``
+        means "Capital.com has a CFD index bar stream under this symbol".
+        Anything outside ``INDICES`` (SHARES / COMMODITIES / …) is a wrong
+        answer that must NOT propagate — that would mislead
+        ``run_capital_backfill`` into fetching from a market we cannot
+        actually backfill. The fallback to non-INDICES entries that
+        ``scripts.probe_capital._pick_index_match`` uses is intentionally
+        NOT carried over: the probe is operator tooling (forward-compat
+        loses nothing if a future type rename mis-routes), the discover
+        path is contract-binding.
+
+        Returns ``None`` when no INDICES entry exists for ``index_name`` —
+        the caller emits ``status='no_source'`` with the searchTerm in
+        ``notes``.
+        """
+        for m in markets:
+            if m.get("instrumentName") == index_name \
+                    and (m.get("instrumentType") or "").upper() == "INDICES":
+                return m
+        return None
 
 
 def run_capital_backfill(
