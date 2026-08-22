@@ -2,12 +2,28 @@
 """Phase 13 §6 C3 — source-delta diagnostic.
 
 For every resolved ``paper_trades`` row in the requested window, re-resolve
-the trade **per source** (yf only, then ls only) and report how often
-the two sources disagree. The point is **P6 of the Block-A PASS criteria**
+the trade **per available source** (the list comes from
+``instrument_source_availability`` — Phase 14 B3) and report how often
+the sources disagree. The point is **P6 of the Block-A PASS criteria**
 (Plan §7): a measurable, ongoing difference between sources is the
 sentinel that something is wrong with one of them — a tick aggregator
 silently dropping volume, a stale bar somehow surviving, a future-
 timestamped candle.
+
+**Three-row cases per trade** (Phase 14 B3, the discovery-then-deterministic
+read of "verfügbar vs. verglichen"):
+
+- ``not_available``: **no** ``status='ok'`` row in
+  ``instrument_source_availability`` for this epic → the source was
+  *prinzipiell nicht abrufbar* on this account. Today's two hardcoded
+  sources (yf, ls) cannot be resolved at all here — yF is the
+  registry-projected row, ls is structural-empty until the live data
+  foundation lands bars from the recorder.
+- ``available_but_empty``: the source is registered (``status='ok'``)
+  but no bars landed in the window — a **Beschaffungslücke**. Sentinel
+  for "LS is connected but no candles in the last 4 hours".
+- ``compared``: at least two sources resolved with an ``exit_reason``
+  and ``pnl_points`` — comparison yielded ``agree`` or ``diverge``.
 
 Read-only. Operates in two modes:
 
@@ -139,10 +155,32 @@ def main(argv: list[str] | None = None) -> int:
         _eprint(f"source_delta: no resolved trades in [{start_day}, {end_day}]")
         print(json.dumps({
             "ok": True, "start_day": start_day, "end_day": end_day,
-            "trades_total": 0, "trades_agree": 0, "trades_diverge": 0,
-            "trades_incomparable": 0, "divergence_rate": None, "rows": [],
+            "trades_total": 0,
+            "trades_agree": 0, "trades_diverge": 0,
+            "trades_not_available": 0, "trades_available_but_empty": 0,
+            "divergence_rate": None, "rows": [],
         }))
         return 0
+
+    # Phase 14 B3: the universe-DB (trading_bot.sqlite) holds
+    # ``instrument_source_availability`` (Migration 007). Open it
+    # once and read the per-epic availability rows. Fail-soft: if the
+    # migration hasn't been applied, every source is treated as
+    # ``unknown`` (no row) — the script still emits a report, every
+    # trade is reported as ``not_available``, divergence_rate = None.
+    try:
+        avail_conn = sqlite3.connect(f"file:{args.db}?mode=ro", uri=True)
+    except sqlite3.OperationalError as exc:
+        _eprint(f"source_delta: cannot open universe-db {args.db}: {exc}")
+        return 1
+    try:
+        # Build the availability lookup once per epic as we iterate.
+        # _load_available_sources returns a list of ``source`` strings
+        # (status='ok', resolution='1m') for the given epic, or None
+        # if the table doesn't exist (fail-soft per Phase 14 B3).
+        _AVAILABILITY_OK = _load_available_sources(avail_conn)
+    finally:
+        avail_conn.close()
 
     # Open the bars DB once for the whole window. The trade fetches
     # a small (max_hold + 60 min) sub-window per row; one connection
@@ -150,35 +188,28 @@ def main(argv: list[str] | None = None) -> int:
     bars_conn = sqlite3.connect(f"file:{args.bars_db}?mode=ro", uri=True)
     try:
         rows = []
-        n_agree = n_diverge = n_incomparable = 0
+        n_agree = n_diverge = n_not_available = n_available_but_empty = 0
         for t in trades:
             window_start = t["created_utc"]
             window_end = _add_minutes(window_start, t.get("max_hold_min", 240) + 60)
-            yf_bars = _fetch_bars(bars_conn, t["epic"], window_start, window_end, "yf")
-            ls_bars = _fetch_bars(bars_conn, t["epic"], window_start, window_end, "ls")
-            yf_reason, yf_pnl = _resolve_per_source(t, yf_bars)
-            ls_reason, ls_pnl = _resolve_per_source(t, ls_bars)
-            if yf_reason is None or ls_reason is None:
-                n_incomparable += 1
-                continue
-            if yf_reason == ls_reason and (yf_pnl is None or ls_pnl is None or abs((yf_pnl or 0) - (ls_pnl or 0)) < 1e-9):
-                n_agree += 1
-                row_kind = "agree"
-            else:
-                n_diverge += 1
-                row_kind = "diverge"
-            rows.append({
-                "paper_id": t["paper_id"],
-                "epic": t["epic"],
-                "created_utc": t["created_utc"],
-                "yf": {"exit_reason": yf_reason, "pnl_points": yf_pnl, "n_bars": len(yf_bars)},
-                "ls": {"exit_reason": ls_reason, "pnl_points": ls_pnl, "n_bars": len(ls_bars)},
-                "kind": row_kind,
-            })
+            row = _resolve_one_trade(
+                t, bars_conn, window_start, window_end,
+                available_sources=_AVAILABILITY_OK.get(t["epic"]),
+            )
+            if row["kind"] == "compared":
+                if row["comparison"] == "agree":
+                    n_agree += 1
+                else:
+                    n_diverge += 1
+            elif row["kind"] == "not_available":
+                n_not_available += 1
+            elif row["kind"] == "available_but_empty":
+                n_available_but_empty += 1
+            rows.append(row)
     finally:
         bars_conn.close()
 
-    n_total = n_agree + n_diverge + n_incomparable
+    n_total = len(rows)
     comparable = n_agree + n_diverge
     divergence_rate = (n_diverge / comparable) if comparable else None
     payload = {
@@ -188,19 +219,128 @@ def main(argv: list[str] | None = None) -> int:
         "trades_total": n_total,
         "trades_agree": n_agree,
         "trades_diverge": n_diverge,
-        "trades_incomparable": n_incomparable,
+        "trades_not_available": n_not_available,
+        "trades_available_but_empty": n_available_but_empty,
         "divergence_rate": divergence_rate,
         "rows": rows,
     }
     if not args.quiet:
-        _eprint(
-            f"source_delta: {start_day}..{end_day} total={n_total} "
-            f"agree={n_agree} diverge={n_diverge} incomparable={n_incomparable} "
-            f"rate={divergence_rate:.2%}" if divergence_rate is not None else
-            f"source_delta: {start_day}..{end_day} no trades to compare"
-        )
+        if divergence_rate is not None:
+            _eprint(
+                f"source_delta: {start_day}..{end_day} total={n_total} "
+                f"agree={n_agree} diverge={n_diverge} "
+                f"not_available={n_not_available} "
+                f"available_but_empty={n_available_but_empty} "
+                f"rate={divergence_rate:.2%}"
+            )
+        else:
+            _eprint(
+                f"source_delta: {start_day}..{end_day} total={n_total} "
+                f"no trades to compare"
+            )
     print(json.dumps(payload))
     return 0
+
+
+def _load_available_sources(conn: sqlite3.Connection) -> dict[str, list[str]]:
+    """Return ``{epic: [source, ...]}`` for every epic with at least one
+    ``status='ok', resolution='1m'`` row in
+    ``instrument_source_availability`` (Migration 007).
+
+    Fail-soft per Phase-14 B3: if the table does not exist (an older
+    ``trading_bot.sqlite`` pre-dating Migration 007), the function
+    returns an empty dict. The caller treats empty results as
+    "no source is registered for any epic" → every trade reports
+    ``kind='not_available'`` with ``exit_code=0`` (the script never
+    crashes on a missing availability table).
+
+    The keys are epics, the values are sorted lists of source strings
+    (deterministic ordering — easier on the consumer).
+    """
+    try:
+        cur = conn.execute(
+            "SELECT epic, source FROM instrument_source_availability "
+            "WHERE status = 'ok' AND resolution = '1m' "
+            "ORDER BY epic ASC, source ASC"
+        )
+        rows = cur.fetchall()
+    except sqlite3.OperationalError:
+        # Table doesn't exist — Phase-14 migration not applied yet.
+        return {}
+
+    out: dict[str, list[str]] = {}
+    for epic, source in rows:
+        out.setdefault(epic, []).append(source)
+    return out
+
+
+def _resolve_one_trade(
+    trade: dict,
+    bars_conn: sqlite3.Connection,
+    window_start: str,
+    window_end: str,
+    *,
+    available_sources: list[str] | None,
+) -> dict:
+    """Resolve a single trade per Phase-14 B3's three-case rule.
+
+    ``available_sources`` is the list of ``source`` strings registered as
+    ``status='ok'`` for this epic in
+    ``instrument_source_availability``. ``None`` (no availability info)
+    is treated identically to an empty list — the trade reports
+    ``not_available`` and the loop continues.
+
+    Returns a dict with the same shape as the other rows in the
+    ``rows`` list — see ``main`` for the field layout.
+    """
+    sources = available_sources or []
+
+    per_source: dict[str, dict] = {}
+    for src in sources:
+        bars = _fetch_bars(bars_conn, trade["epic"], window_start, window_end, src)
+        reason, pnl = _resolve_per_source(trade, bars)
+        per_source[src] = {
+            "n_bars": len(bars),
+            "exit_reason": reason,
+            "pnl_points": pnl,
+        }
+
+    # Classify the trade per the three-case rule.
+    if not sources:
+        kind = "not_available"
+        comparison = None
+    else:
+        # At least one source is registered.
+        comparable = [
+            (s, info) for s, info in per_source.items()
+            if info["exit_reason"] is not None and info["pnl_points"] is not None
+        ]
+        if len(comparable) >= 2:
+            # Real head-to-head between at least two sources.
+            reasons = [info["exit_reason"] for _, info in comparable]
+            pnls = [info["pnl_points"] for _, info in comparable]
+            same_reason = len(set(reasons)) == 1
+            same_pnl = all(abs(pnls[0] - p) < 1e-9 for p in pnls[1:])
+            kind = "compared"
+            comparison = "agree" if (same_reason and same_pnl) else "diverge"
+        elif len(comparable) == 1:
+            # One source resolved, the other(s) had no bars → a
+            # Beschaffungslücke on at least one registered source.
+            kind = "available_but_empty"
+            comparison = None
+        else:
+            # All registered sources had empty bars in window.
+            kind = "available_but_empty"
+            comparison = None
+
+    return {
+        "paper_id": trade["paper_id"],
+        "epic": trade["epic"],
+        "created_utc": trade["created_utc"],
+        "sources": per_source,
+        "kind": kind,
+        "comparison": comparison,
+    }
 
 
 def _load_resolved_trades(conn: sqlite3.Connection, start_iso: str, end_iso: str) -> list[dict]:
