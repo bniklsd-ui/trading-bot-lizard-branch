@@ -94,6 +94,34 @@ def _read_creds() -> tuple[str, str, str]:
     )
 
 
+def _pick_index_match(markets: list[dict], index_name: str) -> dict | None:
+    """Pick the first market whose ``instrumentName`` equals ``index_name``
+    and whose ``instrumentType`` is exactly ``INDICES``.
+
+    Capital.com's REST ``/markets?searchTerm=`` returns CFD indices under
+    ``instrumentType == "INDICES"`` (Phase-14 B1a probe observed
+    2026-08-22 — same finding that ``CapitalSource.discover()`` (B1b) and
+    the migration ``instrument_source_availability`` schema also rely on).
+    An earlier sub-string match on ``"CFD"`` matched nothing against that
+    response, so this helper was previously a no-op: the fallback always
+    carried the day. Fix is the exact-equality check below, plus a
+    name-only fallback so a future API rename does not silently lose the
+    probe.
+
+    Returns ``None`` when no market carries ``instrumentName == index_name``
+    at all (the script emits ``error='no_exact_name_match'`` in that case).
+    """
+    indices_matches = [
+        m for m in markets
+        if m.get("instrumentName") == index_name
+        and (m.get("instrumentType") or "").upper() == "INDICES"
+    ]
+    if indices_matches:
+        return indices_matches[0]
+    exact_matches = [m for m in markets if m.get("instrumentName") == index_name]
+    return exact_matches[0] if exact_matches else None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -376,17 +404,8 @@ def main(argv: list[str] | None = None) -> int:
             results[index_name] = {"found": False, "error": f"search_parse: {exc}"}
             continue
 
-        # Prefer CFD indices; if multiple match, take the first one with
-        # "CFD" in the type or name (the index CFDs are the rollable ones
-        # we want for archive backfill).
-        candidates = [
-            m for m in markets
-            if m.get("instrumentName") == index_name
-            and "CFD" in (m.get("instrumentType") or "").upper()
-        ]
-        if not candidates:
-            candidates = [m for m in markets if m.get("instrumentName") == index_name]
-        if not candidates:
+        match = _pick_index_match(markets, index_name)
+        if match is None:
             results[index_name] = {
                 "found": False,
                 "error": "no_exact_name_match",
@@ -394,7 +413,7 @@ def main(argv: list[str] | None = None) -> int:
             }
             continue
 
-        epic = candidates[0].get("epic") or ""
+        epic = match.get("epic") or ""
         if not epic:
             results[index_name] = {"found": False, "error": "no_epic_in_match"}
             continue
