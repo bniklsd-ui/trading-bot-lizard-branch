@@ -91,7 +91,7 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 | `source_registry/arm.py` | Scharf-Flag `data/state/DISCOVERY_ARMED` (Muster `killswitch.py`, sichere Richtung umgedreht) | ⬜ C1 |
 | `source_registry/run.py` | Der Daemon (Muster `data_foundation/run.py`: PID-File, graceful SIGTERM, `--once`) | ⬜ C2 |
 | `scripts/run_discovery.sh` | Start-Wrapper (Muster `run_recorder.sh`) | ⬜ C4 |
-| *(cross-phase)* `phase2_persistence/migrations/007_phase14_source_availability.sql` | die Kreuzungs-Tabelle | ⬜ A2 |
+| *(cross-phase)* `phase2_persistence/migrations/007_phase14_source_availability.sql` | die Kreuzungs-Tabelle **+ der einmalige yF-Backfill aus `instrument_universe`** (der Grundbestand kommt aus der Migration, nicht aus einem Resolver-Lauf — `resolve_epic` ruft `set_symbol` in sechs von acht Pfaden nicht) | ⬜ A2 |
 | *(cross-phase)* `phase9_universe/universe/models.py` | `DS_STALE_SOURCE` ins Vokabular (Live-Blocker B1) | ⬜ A1 |
 | *(cross-phase)* `phase9_universe/universe/store.py` | yF-Projektion in `set_symbol`, nicht-fatal | ⬜ A4 |
 | *(cross-phase)* `phase13_live_data/live_data/backfill.py` | `EPIC_MAP` raus, Symbol-Lookup rein; `CapitalSource.discover()` | ⬜ B1/B2 |
@@ -114,6 +114,17 @@ Fehlgriff-Tabelle (§8, sechs Einträge), vollständige Drift-Liste (§9, 13 Ein
 Out-of-Scope (§10).
 
 **Dieses Dokument** (`phase14_discovery/CLAUDE.md`, NEU) — Phasenkopf + Session-Block 1.
+
+**Nachtrag im selben Commit-Strang (Advisor-Review):** der Grundbestand der yF-Projektion
+kommt aus **Migration 007 selbst** (vier Zeilen `INSERT … SELECT`), nicht aus einem
+Resolver-Lauf — `SymbolResolver.resolve_epic` ruft `set_symbol` in sechs von acht Pfaden
+**nicht** (`symbols.py:194-199, 207-210, 213-214, 219-220, 222-223, 229-230`), und die drei
+`SUN*`-Epics stehen bereits auf ihrem Zielstatus ⇒ sie bekämen sonst nie eine Zeile. Der
+Backfill kauft zusätzlich den Identitätsbeweis **vor** der ersten Zeile neuem Code. Ebenfalls
+nachgezogen: die Schreib-Mechanik der Projektion ist auf **rohes SQL über `self.conn`**
+gelockt (kein `source_registry`-Import in `phase9_universe` — Paket-Zyklus in der falschen
+Richtung, plus zweite Verbindung auf dieselbe DB), abgesichert durch einen
+Doppelschreiber-Gleichheitstest.
 
 **Nikinger-Entscheidungen dieser Session (2026-08-22):**
 - Discovery läuft **autonom als eigener Daemon** (nicht im `universe_refresher`-Slot),

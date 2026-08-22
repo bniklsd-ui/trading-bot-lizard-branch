@@ -303,6 +303,52 @@ CREATE INDEX IF NOT EXISTS idx_isa_source_status
     ON instrument_source_availability(source, status);
 ```
 
+**Und im selben Migrationsfile der einmalige Backfill** (Block-C-Re-Plan §2 nennt genau
+diesen Schritt: „Tabelle anlegen, Backfill einmalig laufen lassen, Konsumenten umstellen"):
+
+```sql
+INSERT OR IGNORE INTO instrument_source_availability
+    (epic, source, resolution, source_symbol, status, origin, last_verified_utc, notes)
+SELECT epic, 'yf', '1m', yf_ticker, data_source_status, 'registry',
+       COALESCE(symbol_checked_at, updated_at),
+       'backfilled from instrument_universe by migration 007'
+FROM instrument_universe;
+```
+
+**Warum das in die Migration gehört und nicht in einen Resolver-Lauf:** `SymbolResolver.resolve_epic`
+ruft `set_symbol` in **sechs** von acht Pfaden **nicht** — heute nachgemessen an
+`phase12_data_foundation/data_foundation/symbols.py`:
+
+| Zeilen | Pfad | schreibt? |
+|---|---|---|
+| 194-199 | Wochenend-Instrument, **schon** `no_intraday_source` | **nein** (Kurzschluss auf Zeile 195) |
+| 207-210 | kein Kandidat, **schon** `no_source` | **nein** (Kurzschluss auf Zeile 208) |
+| 213-214 | Markt geschlossen | nein |
+| 219-220 | `quote_fetch`/`yf_last_fetch` wirft | nein |
+| 222-223 | `yf_result is None` | nein |
+| 229-230 | yF-Bar älter als `max_yf_age_min` | nein |
+
+Die drei `SUN*`-Epics stehen **heute schon** auf `no_intraday_source` (§2.2) ⇒ Zeile 195
+schließt kurz ⇒ ohne Migrations-Backfill bekämen sie **nie** eine Projektionszeile, egal wie
+oft der Resolver läuft. Ein Lauf bei geschlossenem Markt schriebe überhaupt nichts.
+
+Der Backfill kauft zusätzlich den **Identitätsbeweis**: unmittelbar nach der Migration,
+**vor der ersten Zeile neuem Code**, muss
+`SELECT epic FROM instrument_source_availability WHERE source='yf' AND status='ok'`
+genau die fünf Epics aus §2.2 liefern. Offline testbar, kein Live-Lauf nötig.
+
+> **Präzision, damit später niemand darüber stolpert:** die Tabelle ist **nicht**
+> epic-status-bewusst (D8 — Fakten, kein Gate). Der Backfill nimmt *alle* 22
+> `instrument_universe`-Zeilen, nicht nur die `active`. Dass die `(yf,'ok')`-Menge heute
+> exakt der `measurable_universe()`-Menge entspricht, ist eine **Eigenschaft des heutigen
+> Substrats** (die 14 `verified`-Zeilen stehen auf `unverified`), keine strukturelle
+> Invariante. Wer sie später als Invariante behandelt, baut das Gate nach — genau das
+> verbietet D3.
+
+Der Backfill verletzt **D4 nicht**: er ist eine einmalige Ableitung aus der Registry, mit
+`origin='registry'` markiert — dieselbe Richtung, derselbe Ursprung, weiterhin ein Schreiber
+der zugrunde liegenden Tatsache.
+
 **Kein `FOREIGN KEY`** — bewusst: in `001…006` gibt es **null** FK-Klauseln (heute
 gezählt), und `UniverseStore` öffnet eine rohe Verbindung ohne `PRAGMA foreign_keys = ON`
 (nur `persistence/db.py:65` setzt es). Ein nicht erzwungener FK ist Dokumentation, die sich
@@ -616,8 +662,14 @@ Implementierungshinweise:
 9. `stale_rows(ttl_days=7)` liefert genau die Zeile mit altem `last_verified_utc`
 10. eine Zeile mit einem `source`, der nicht in `KNOWN_SOURCES` steht, lässt sich schreiben
     und lesen (D17: die Tabelle gattet nicht, der Archiv-Schreibpfad gattet)
+11. **Identitätsprobe des Migrations-Backfills:** eine Fixture-DB mit den 22 Zeilen aus §2.2
+    (fünf `active`+`ok`, drei `active`+`no_intraday_source`, 14 `verified`+`unverified`),
+    Migration 007 anwenden ⇒ `for_source('yf', status='ok')` liefert **genau** die fünf
+    Epics aus §2.2, und die drei `SUN*`-Epics stehen auf `no_intraday_source`. ← das ist der
+    Test, der beweist, dass die Umstellung nichts verliert
+12. Migration 007 zweimal anwenden ist ein No-Op (`INSERT OR IGNORE`, keine Duplikate)
 
-**Akzeptanz A2:** 10 Tests grün; `SourceAvailabilityStore` hat **null Aufrufer** (wird in
+**Akzeptanz A2:** 12 Tests grün; `SourceAvailabilityStore` hat **null Aufrufer** (wird in
 A3/A4 verdrahtet).
 
 #### A3 — Quell-Profile: `derived` (IG) + `static` (LS) + Registry-Projektion (yF)
@@ -671,12 +723,32 @@ Projektion:
             )
 ```
 
-`_project_availability` öffnet **keine zweite Verbindung** — es schreibt über
-`self.conn` in dieselbe DB (dieselbe Datei, eine Transaktion pro `commit`). `store.py` hat
-heute **keinen** `logger`; einen Modul-Logger `logging.getLogger("universe.store")`
-ergänzen (Repo-Konvention: stderr, nie stdout).
+**Schreib-Mechanik — gelockt, nicht der ausführenden Session überlassen:**
+`_project_availability` setzt **rohes SQL über `self.conn` ab** und importiert
+`source_registry` **nicht**.
 
-**Tests** (`phase9_universe/tests/test_store.py`, +5):
+Grund, in zwei Sätzen: `phase9_universe` ist eine abgeschlossene Phase, von der
+`phase14_discovery` abhängt — die Gegenrichtung wäre ein Paket-Zyklus, den auch ein Lazy-Import
+im Funktionsrumpf nur zur Importzeit versteckt, nicht architektonisch auflöst. Und ein
+`SourceAvailabilityStore` würde aus einer Klasse heraus, die bereits eine Verbindung auf
+`trading_bot.sqlite` hält, eine **zweite** öffnen — genau die Schreiblast-Trennung, deretwegen
+`bars.sqlite` überhaupt eine eigene Datei ist (`archive.py:4-7`).
+
+**Der Preis** (bewusst bezahlt): die Spaltenliste steht an zwei Stellen. Drei Mitigationen
+sind Pflicht:
+1. Das **DDL steht ausschließlich in Migration 007** — weder `set_symbol` noch
+   `SourceAvailabilityStore` legt die Tabelle an. Fehlt sie, ist das ein Operator-Fehler, der
+   sichtbar sein muss (und in `set_symbol` durch D5 nicht-fatal bleibt).
+2. Beide Schreiber benutzen **denselben** `INSERT … ON CONFLICT(epic, source, resolution) DO UPDATE`.
+3. **Ein Test vergleicht sie:** derselbe Input über `set_symbol` und über
+   `SourceAvailabilityStore.upsert` erzeugt **bit-identische Zeilen** (`SELECT *` beider Wege
+   gleich). Divergiert die Spaltenliste je, fällt dieser Test — nicht der Live-Betrieb.
+
+`_project_availability` öffnet **keine zweite Verbindung** — dieselbe Datei, eine Transaktion
+pro `commit`. `store.py` hat heute **keinen** `logger` und importiert `logging` nicht
+(`store.py:15-24` geprüft); beides ergänzen (Repo-Konvention: stderr, nie stdout).
+
+**Tests** (`phase9_universe/tests/test_store.py`, +6):
 1. nach `set_symbol(epic, '^GDAXI', symbol_source='seed', status='ok')` existiert genau
    eine Zeile `(epic, 'yf', '1m')` mit `source_symbol='^GDAXI'`, `status='ok'`,
    `origin='registry'`
@@ -687,12 +759,20 @@ ergänzen (Repo-Konvention: stderr, nie stdout).
    Registry-Wert steht trotzdem korrekt in `instrument_universe` ← D5
 5. `measurable_universe()` liefert **exakt dasselbe** wie vor dem Schritt (Byte-gleicher
    Vergleich über eine Fixture mit den fünf Live-Epics)
+6. **Doppelschreiber-Gleichheit:** derselbe Input über `set_symbol` und über
+   `SourceAvailabilityStore.upsert` erzeugt bit-identische Zeilen
 
-**Akzeptanz A4 (falsifizierbar, gegen das heutige Substrat):** ein Read-only-Report über
-die Produktions-DB nach einem Resolver-Lauf muss genau
-`IX.D.CAC.IFE.IP`, `IX.D.DAX.IFMM.IP`, `IX.D.DAX.IGN.IP`, `IX.D.IBEX.FWM2.IP`,
-`IX.D.IBEX.IFM.IP` als `(source='yf', status='ok')` zeigen und die drei `SUN*`-Epics als
-`no_intraday_source`. Weicht das ab, ist die Projektion falsch, nicht die Registry.
+**Akzeptanz A4 (falsifizierbar, gegen das heutige Substrat) — der Beweis liegt bei der
+Migration, nicht beim Resolver-Lauf:** unmittelbar nach Migration 007 (A2, Test 11) muss
+`(source='yf', status='ok')` genau `IX.D.CAC.IFE.IP`, `IX.D.DAX.IFMM.IP`, `IX.D.DAX.IGN.IP`,
+`IX.D.IBEX.FWM2.IP`, `IX.D.IBEX.IFM.IP` enthalten und die drei `SUN*`-Epics auf
+`no_intraday_source` stehen. **A4 selbst beweist nur den inkrementellen Pfad**: dass ein
+*Statuswechsel* durch `set_symbol` in der Tabelle ankommt.
+
+> **Warum die Akzeptanz nicht am Resolver-Lauf hängen darf:** `resolve_epic` ruft `set_symbol`
+> in sechs von acht Pfaden nicht (Tabelle in §5.1). Ein Epic, das schon auf seinem Zielstatus
+> steht, erzeugt **nie** eine Projektionszeile — deshalb macht die Migration den Grundbestand
+> und `set_symbol` nur die Fortschreibung.
 
 ---
 
@@ -943,9 +1023,9 @@ Daemon-Tick schreibt Zeilen.
 | # | Kriterium | Wie belegt |
 |---|---|---|
 | **A1** | Discovery gibt **strukturell** null IG-Punkte aus | `test_sources.py` Test 2: Broker-Fake, dessen jede Methode `AssertionError` wirft, `discover()` läuft durch, `probe_calls_used == 0` |
-| **A2** | `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` ist **leer** | Shell, nach B2 |
+| **A2** | `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` ist **leer** | Shell, nach B2. **Der `--include=*.py`-Filter ist Absicht**, nicht Schummelei: `phase13_live_data/CLAUDE.md:201`, `SESSIONS_ARCHIVE.md` und der 📕-Closeout nennen `EPIC_MAP` in ihrer Chronik und dürfen **nicht** editiert werden (📕 never edit / 📦 verbatim history). `ROADMAP.md:608` nennt das Kriterium ohne Filter — dort im selben Schritt nachziehen, sonst „scheitert" später eine bestandene Phase an einem Doku-Treffer. |
 | **A3** | `measurable_universe()` liefert vor und nach Phase 14 dasselbe | `test_store.py` Test A4.5 + Read-only-Probe gegen die Produktions-DB (dieselben 5 Epics wie §2.2) |
-| **A4** | Die yF-Projektion reproduziert das heutige Registry-Substrat exakt | 5× `(yf, ok)` + 3× `(yf, no_intraday_source)`, namentlich in §6/A4 |
+| **A4** | Die yF-Projektion reproduziert das heutige Registry-Substrat exakt | **Migration 007 (A2, Test 11)**: 5× `(yf, ok)` + 3× `(yf, no_intraday_source)`, namentlich in §2.2. `set_symbol` (A4) beweist zusätzlich nur die Fortschreibung — nicht den Grundbestand (Begründung in §5.1/§6 A4) |
 | **A5** | Der Daemon tut unscharf **nichts** | `test_run.py`: Fake-Source, die bei Aufruf wirft; unscharfer Durchlauf wirft nicht |
 | **A6** | Die UI warnt, bis scharfgestellt, und schaltet per Datei | `test_webui.py` +4; Sichtprüfung durch den Nikinger |
 | **A7** | `source_delta.py` unterscheidet „nicht abrufbar" von „divergiert" | `test_source_delta.py` +4 |

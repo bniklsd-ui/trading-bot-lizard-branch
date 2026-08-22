@@ -608,7 +608,10 @@ Daten-Infrastruktur **konfigurierbar** ist, nicht nur vorhanden.
 
 **Done-Kriterium** (Concept, zu schärfen in der Plan-Session): eine neue Quelle (Dukascopy
 als Test-Kandidat) ist mit ≤ 50 Zeilen Commit angebunden, ohne dass ein Konsument
-angefasst wird. `grep -n "EPIC_MAP" phase13_live_data/` ist leer.
+angefasst wird. `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` ist leer.
+*(`--include=*.py` ist Absicht: Phasenkopf, Session-Archiv und Closeout-Handover nennen
+`EPIC_MAP` in ihrer Chronik und werden nicht editiert — 📕/📦-Konvention. Präzisiert
+2026-08-22 im Phase-14-Plan §7/A2.)*
 
 **Directory:** noch nicht angelegt — entsteht in der Plan-Session.
 
