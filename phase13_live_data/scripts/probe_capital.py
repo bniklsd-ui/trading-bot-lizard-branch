@@ -21,6 +21,13 @@ Usage:
     python phase13_live_data/scripts/probe_capital.py --timeout 30
     python phase13_live_data/scripts/probe_capital.py --debug
 
+    # Phase-14 B1a: raw /markets response dump, one term at a time, no filtering
+    # or interpretation. Operator-run once to learn the response shape; the
+    # ausführende Session builds CapitalSource.discover() against the
+    # observed form (B1b — Plan §6 B1).
+    python phase13_live_data/scripts/probe_capital.py --markets \
+        --terms "Germany 40,France 40,Spain 35"
+
 Exit codes:
     0  YES    — alle Indizes liefern MINUTE-Bars
     1  NO     — Auth OK, aber kein Index liefert Bars
@@ -103,6 +110,16 @@ def main(argv: list[str] | None = None) -> int:
                         help=f"keyring service prefix (default: {_KEYRING_SERVICE})")
     parser.add_argument("--debug", action="store_true",
                         help="verbose HTTP logging")
+    parser.add_argument("--markets", action="store_true",
+                        help="Phase-14 B1a: raw /markets?searchTerm=... dump "
+                             "per term (no filtering, no prices probe). Output "
+                             "is the raw JSON the API returned, one envelope per "
+                             "term. Use this once to learn the response shape "
+                             "before building CapitalSource.discover() in B1b.")
+    parser.add_argument("--terms", default=None,
+                        help="comma-separated search terms for --markets mode "
+                             "(e.g., 'Germany 40,France 40,Spain 35'). If "
+                             "unset, falls back to --indices.")
     args = parser.parse_args(argv)
 
     sys.path.insert(0, str(_REPO_ROOT))
@@ -258,6 +275,68 @@ def main(argv: list[str] | None = None) -> int:
             account_type = acct.get("accountType", "?")
             break
     _eprint(f"[probe_capital] auth OK, account_type={account_type}")
+
+    # ---------- Phase-14 B1a: raw /markets dump ----------
+    if args.markets:
+        terms_str = args.terms if args.terms else args.indices
+        terms = [s.strip() for s in terms_str.split(",") if s.strip()]
+        if not terms:
+            _eprint("[probe_capital] --markets requires at least one term "
+                    "(via --terms or --indices)")
+            print(json.dumps({
+                "ok": False, "error": "no_terms",
+                "hint": "pass --terms 'Germany 40,France 40,Spain 35' "
+                        "or set --indices to a non-empty list",
+            }))
+            return 2
+        results = {}
+        for term in terms:
+            _eprint(f"[probe_capital] /markets?searchTerm={term!r}")
+            try:
+                resp = requests.get(
+                    f"{args.base}/api/v1/markets",
+                    params={"searchTerm": term},
+                    headers=session_headers,
+                    timeout=args.timeout,
+                )
+            except requests.RequestException as exc:
+                results[term] = {"ok": False, "error": f"connection_failed: {exc}"}
+                continue
+            body_text = resp.text or ""
+            body_json = None
+            try:
+                body_json = resp.json()
+            except ValueError:
+                pass
+            results[term] = {
+                "ok": resp.status_code == 200,
+                "http_status": resp.status_code,
+                "url": resp.url,
+                "content_type": resp.headers.get("Content-Type", ""),
+                "raw_text_snippet": body_text[:500],
+                "raw_body": body_json if body_json is not None else body_text,
+            }
+        payload = {
+            "mode": "markets-raw",
+            "purpose": ("Phase-14 B1a: learn the response shape of "
+                        "GET /api/v1/markets?searchTerm=... before building "
+                        "CapitalSource.discover() (B1b). Inspect raw_body per "
+                        "term for the field names that carry (a) the source's "
+                        "own symbol — what EPIC_MAP currently calls 'DE40' / "
+                        "'FR40' — and (b) anything that maps back to the IG "
+                        "epic we already have on the universe side."),
+            "next_step_hint": ("Copy one or two raw_body entries into the "
+                               "Phase-14-Ausführende-Session conversation so "
+                               "the discover() implementation can be written "
+                               "against the observed field names (no guessing — "
+                               "Plan §6 B1: 'Achtung — die Antwort-Form ist "
+                               "unbekannt')."),
+            "results": results,
+        }
+        print(json.dumps(payload, indent=2, default=str))
+        if all(r.get("ok") for r in results.values()):
+            return 0
+        return 1
 
     # ---------- per-index probe ----------
     indices = [s.strip() for s in args.indices.split(",") if s.strip()]
