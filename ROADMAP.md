@@ -572,7 +572,10 @@ strukturelle Kostenzusicherung, kein Zählwert.
 
 ## Phase 14 — Discovery-Then-Deterministic *(eröffnet 2026-08-22 aus dem Session-13-Architektur-Insight)*
 
-> **Status: 🔄 Concept vorhanden — execution-ready Plan in eigener Planungssession.**
+> **Status: 🔄 Execution-ready Plan committet 2026-08-22 — Bau nicht begonnen.**
+> **Plan:** [`docs/concepts/phase14_discovery_plan.md`](./docs/concepts/phase14_discovery_plan.md)
+> (D1–D20 gelockt, Blöcke 0/A/B/C/D mit Verbatim-Ankern, Akzeptanz A1–A8, Drift-Liste §9).
+> **Phasenkopf:** [`phase14_discovery/CLAUDE.md`](./phase14_discovery/CLAUDE.md).
 > **Concept-Skizze:** [`docs/concepts/phase14_discovery_concept.md`](./docs/concepts/phase14_discovery_concept.md)
 > (drei Bausteine: Quell-Profil + Kreuzungs-Tabelle + Konsumenten-Umstellung; sieben offene
 > Fragen für die Plan-Session).
