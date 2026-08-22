@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# dev_install.sh — composition root (concept §"Step C", Phase 5 + Phase 6 + Phase 7 + Phase 8 + Phase 9 + Phase 10 + Phase 12 + Phase 13).
+# dev_install.sh — composition root (concept §"Step C", Phase 5 + Phase 6 + Phase 7 + Phase 8 + Phase 9 + Phase 10 + Phase 12 + Phase 13 + Phase 14).
 #
 # Editable-install every phase package in dependency order (P1 -> P2 -> P3 -> P4
-# -> P5 -> P6 -> P7 -> P8 -> P9 -> P10 -> P12 -> P13) into the *currently active* virtualenv, so that
-#   import broker_wrapper / persistence / external_data / research / execution / debate / reward / scheduler / universe / abstain_lessons / data_foundation / live_data
+# -> P5 -> P6 -> P7 -> P8 -> P9 -> P10 -> P12 -> P13 -> P14) into the *currently active* virtualenv, so that
+#   import broker_wrapper / persistence / external_data / research / execution / debate / reward / scheduler / universe / abstain_lessons / data_foundation / live_data / source_registry
 # all resolve at runtime WITHOUT any sys.path manipulation, and `pytest`
 # collects cleanly. Run once per fresh venv. (P6 + P7 import `research`, so they
 # are installed after P4; P7 also reuses the Phase-2 `persistence` Database. P8
@@ -16,7 +16,10 @@
 # own-connection `bars.sqlite` (D4), no cross-phase import at load time — Steps
 # 3/4/6/7 wire it INTO P8/P9/P10 via their own lazy imports, not the reverse.
 # P13 (`live_data`) is the same again: no cross-phase import at load time, wires
-# INTO P1/P8/P10/P12 via lazy imports as each block lands.)
+# INTO P1/P8/P10/P12 via lazy imports as each block lands. P14
+# (`source_registry`) is the same again: own-connection `trading_bot.sqlite`
+# (D3-Muster von UniverseStore/BarArchive), no cross-phase import at load
+# time, wires INTO P9/P13 via its own lazy imports as each block lands.)
 #
 # Usage:
 #   source <your-venv>/bin/activate
@@ -56,10 +59,11 @@ for pkg in \
     phase9_universe \
     phase10_v3 \
     phase12_data_foundation \
-    phase13_live_data
+    phase13_live_data \
+    phase14_discovery
 do
     echo "dev_install: pip install -e $pkg"
     "$PY" -m pip install -e "$ROOT/$pkg"
 done
 
-echo "dev_install: all twelve packages installed editable. Run: pytest phase13_live_data/tests -v"
+echo "dev_install: all thirteen packages installed editable. Run: pytest phase14_discovery/tests -v"

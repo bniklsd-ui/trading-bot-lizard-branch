@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "source_registry"
+version = "0.1.0"
+description = "Phase 14 — Discovery-Then-Deterministic: what each source can deliver is said by the source, not by the consumer. Cross-product IG-Epic × Source × Resolution lives in `instrument_source_availability` (Migration 007); consumers read the table instead of the code; `EPIC_MAP` disappears. Bauprinzip: NULL new AI — source discovery, symbol mapping, availability evaluation, scharfschalt logic are deterministic code."
+requires-python = ">=3.11"
+# Packaging metadata only, enabling an editable install (`pip install -e`) so
+# `import source_registry` resolves at runtime without sys.path hacks — same
+# pattern as `phase9_universe` (`universe`), `phase10_v3` (`abstain_lessons`),
+# `phase12_data_foundation` (`data_foundation`) and `phase13_live_data`
+# (`live_data`). The sibling `tests`/`scripts` dirs are deliberately excluded
+# from the installed package.
+
+[tool.setuptools.packages.find]
+include = ["source_registry*"]
