@@ -1,10 +1,11 @@
 ---
 status: live
-purpose: PHASE-HEAD, Phase 10 (V3) ✅ abgeschlossen und live auf `main`. **Phase 11 ist seit 2026-08-11 🛑 DEFERRED (Notbremse)** — B1/B2/B4/B5 + H1 + H4-a gebaut, aber WI-2/W2 nach drei Datenwochen unbeantwortet; alle drei Wochen scheiterten an Infrastruktur, nie an der Messung. Gemeinsame Wurzel = das **Datenfundament** (eine Tatsache in drei divergenten Speichern → Fallback deckt 1 von 4 aktiven Epics; dazu: die Mehrquellen-Kette aus Phase 9 Step 6 lief nie, `enable_ig_bars` default `False`). Nichts zurückgerollt. **Einstieg für die nächste Session ist PHASE11_DEFERRAL_HANDOVER.md**, nicht dieser Kopf.
-read-when: working in phase10_v3/ — ZUERST PHASE11_DEFERRAL_HANDOVER.md, dann dieser Kopf + newest Session-stopped block; vor jedem Scheduler-Neustart zusätzlich ALLOWANCE_INCIDENT_2026-08-08.md
+purpose: PHASE-HEAD, Phase 10 (V3) ✅ **abgeschlossen (Closeout 2026-08-25)** und live auf `main`. Council-Paper-Call ✅ gebaut, **default `False`, bis auf weiteres in mind Phase 15** (Nikinger 2026-08-25). **Phase 11 ist seit 2026-08-11 🛑 DEFERRED (Notbremse)** — B1/B2/B4/B5 + H1 + H4-a gebaut, aber WI-2/W2 nach drei Datenwochen unbeantwortet; alle drei Wochen scheiterten an Infrastruktur, nie an der Messung. Gemeinsame Wurzel = das **Datenfundament** (eine Tatsache in drei divergenten Speichern → Fallback deckt 1 von 4 aktiven Epics; dazu: die Mehrquellen-Kette aus Phase 9 Step 6 lief nie, `enable_ig_bars` default `False`). Nichts zurückgerollt. **Einstieg für jede Folge-Session an Phase 10: PHASE10_CLOSEOUT_HANDOVER.md (2026-08-25).** Einstieg für Phase-11-Wiederaufnahme: PHASE11_DEFERRAL_HANDOVER.md.
+read-when: working in phase10_v3/ — ZUERST PHASE10_CLOSEOUT_HANDOVER.md, dann dieser Kopf + newest Session-stopped block; für Phase-11-Wiederaufnahme zusätzlich PHASE11_DEFERRAL_HANDOVER.md; vor jedem Scheduler-Neustart zusätzlich ALLOWANCE_INCIDENT_2026-08-08.md
 detail: L2
 up: ../CLAUDE.md
 down:
+  - ./PHASE10_CLOSEOUT_HANDOVER.md   # ✅ Closeout-Handover (2026-08-25) — Status, Bilanz, Delta, offene Entscheidungen, Konsistenz-Regeln, Datei-Anker (L3, dated) — ZUERST LESEN
   - ../docs/concepts/phase10_v3_plan.md   # full execution-ready plan (L3, ausführungsreif)
   - ../docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md   # kickoff handover from M1 into V3 (L3)
   - ../meta_m1_harness/specs/S1.md   # ... S7.md — Abstain-Lessons Bauplan-Specs (L3, zweifach real durchgebaut)
@@ -15,12 +16,13 @@ down:
   - ./DATA_WEEK_REVIEW_2026-08-07.md   # Datenwoche 3 (erste H1-Live-Woche): IG-/prices-Ausfall + Universe-Quarantäne-Kaskade (L3, dated) — §3 Root Cause SUPERSEDED, s. nächste Zeile
   - ./ALLOWANCE_INCIDENT_2026-08-08.md   # korrigiert obige §3.1/§3.2: kein IG-Ausfall, sondern erschöpftes Konto-Kontingent; + Fix + Restart-Gate (L3, dated)
   - ./H4_LESSON_FEEDBACK_SCOPE_2026-08-08.md   # H4-Scoping gegen As-Built: 4 Trades → 4 Lessons → 5.973 Renderings, relevance_score tot (L3, dated)
-  - ./PHASE11_DEFERRAL_HANDOVER.md   # 🛑 Notbremse 2026-08-11 — Status, Anforderungen A-G, offene Entscheidungen (L3, dated) — ZUERST LESEN
-  - ../docs/architecture/data_foundation.svg   # Fehlerbild + Zielbild, 1080x1080
+  - ./PHASE11_DEFERRAL_HANDOVER.md   # 🛑 Notbremse 2026-08-11 — Status, Anforderungen A-G, offene Entscheidungen (L3, dated) — Phase-11-Wiederaufnahme-Handoff
+  - ../docs/architecture/data_foundation.svg   # Fehlerbild + Zielbild, 1080x1080 (P11-Deferral-Bild)
+  - ../docs/architecture/phase10_v3.svg   # Phase-10-Bild (1080×1080, Closeout) — Block-A/B + Council→P15 + Bilanz
   - ./DATA_SOURCE_STRATEGY_2026-08-11.md   # Entscheidung: Tracker auf ChainedBarProvider (IG→yFinance), NICHT Lightstreamer; IG-Kontingent bestätigt 10.000/Woche (L3, dated)
-  - ../ROADMAP.md   # Phase 11 (this work, deferred) + Phase 12 (Datenfundament) + Phase 13 (Live-Datenfundament, opened 2026-08-18) + Phase 14 (Discovery) + Phase 15 (V4) sections
+  - ../ROADMAP.md   # Phase 11 (deferred) + Phase 12 (Datenfundament) + Phase 13 (Live-Datenfundament) + Phase 14 (Discovery) + Phase 15 (V4) sections
   - ./SESSIONS_ARCHIVE.md   # full session history (L3)
-updated: 2026-08-11
+updated: 2026-08-25
 ---
 # CLAUDE.md — Phase 10 (V3): Abstain-Lessons + Persistenz-Reform + Paper-Trades (`phase10_v3/`)
 
@@ -40,8 +42,9 @@ Drei Blöcke, sequenziert (§1 des Plans):
 3. **Block B (Bot-berührend, Wochenende 2, Sa 2026-07-17):** ✅ Persistenz-Reform
    (`market_regime_snapshots` + `decision_context`, observe-only `regime_tag`, degradiert
    immer auf `quote_only` — kein VETO-Code-Touch) + Paper-Trades (Both-Sides-Shadow-Tracking
-   live). **Council-Paper-Call ✅ gebaut** (Folge-Session, selber Tag) — hinter Flag
-   `enable_paper_debate` (default `False`), Nikinger flippt wann gewünscht.
+   live). **Council-Paper-Call ✅ gebaut** (Folge-Session, selber Tag) — **default `False`,
+   bis auf weiteres in mind Phase 15** (Nikinger 2026-08-25). Die P10-Implementation bleibt
+   als Eingangs-Schnittstelle-Vorschlag im Code; P15 subsumiert sie.
 
 Block C (UI) ist **nicht Teil dieses Plans** — geparkt, siehe Plan §13.
 
@@ -63,14 +66,23 @@ Gates unantastbar, keine AI-Order-Triggerung — siehe Root-`CLAUDE.md` Hard Rul
   Regime-*Nutzung* (Floor/Directions-Modulation), UI (Block C), S6-Aktivierung (eigener
   Operator-Schritt nach Lesson-Review), M2 (geparkt, kein V3-Blocker).
 
-## Modul-Tree (Block A ✅ WE 1 2026-07-11; Block B ✅ WE 2 2026-07-17; Bug A/B + Council-Paper-Call ✅ Folge-Session 2026-07-17)
+## Modul-Tree (Block A ✅ WE 1 2026-07-11; Block B ✅ WE 2 2026-07-17; Bug A/B + Council-Paper-Call ✅ Folge-Session 2026-07-17; Closeout 2026-08-25)
 
 ```
 phase10_v3/
-├── CLAUDE.md                                  ← dieser Kopf
+├── CLAUDE.md                                  ← dieser Kopf (✅ Closeout 2026-08-25)
+├── PHASE10_CLOSEOUT_HANDOVER.md               ← ✅ 2026-08-25 — Phase-10-Abschluss + Council→P15
 ├── SESSIONS_ARCHIVE.md                        ← rotierte Session-Blöcke (L3)
 ├── STEP0_DATA_ANALYSIS_2026-07-10.md          ← Step 2 Output (dated)
 ├── WEEK1_REVIEW_2026-07-17.md                 ← Step-8-Nachzügler Review (dated)
+├── TRADE_DATA_DIAGNOSIS_2026-07-19.md         ← pre-V4 Strukturdiagnose W1–W6 (dated)
+├── DATA_WEEK_REVIEW_2026-07-25.md            ← WI-1..WI-6 + 2 Bugfixes + N1/N2 (dated)
+├── DATA_WEEK_REVIEW_2026-07-31.md            ← W2: 3 neue Bugs, Phase-11-H1..H7 (dated)
+├── DATA_WEEK_REVIEW_2026-08-07.md            ← W3: Allowance-Incident (SUPERSEDED §3; s. u.)
+├── ALLOWANCE_INCIDENT_2026-08-08.md          ← §3-Korrektur + Fix + Restart-Gate (dated)
+├── H4_LESSON_FEEDBACK_SCOPE_2026-08-08.md    ← H4-Scoping: relevance_score tot (dated)
+├── PHASE11_DEFERRAL_HANDOVER.md               ← 🛑 Notbremse 2026-08-11, P11-Wiederaufnahme
+├── DATA_SOURCE_STRATEGY_2026-08-11.md         ← ChainedBarProvider statt Lightstreamer (dated)
 ├── pyproject.toml · requirements.txt          ← ✅ eine Distribution, zwei Pakete
 │                                                (abstain_lessons* + market_context*), editable
 ├── abstain_lessons/                            ✅ models.py, exceptions.py, classifier.py,
@@ -78,14 +90,37 @@ phase10_v3/
 │                                                paper.py (WE 1 Modelle + WE 2 Engine:
 │                                                open_shadow_pair/resolve_paper_trade/
 │                                                PaperEngine/PaperTradeTracker + §10.3
-│                                                PaperDebateCaller, Folge-Session), paper_store.py
+│                                                PaperDebateCaller, Folge-Session — Council
+│                                                default OFF, deferred → P15), paper_store.py
 ├── market_context/                             ✅ (WE 2) models.py, exceptions.py, regime.py
 │                                                (quote_only-Degrade), writer.py
 │                                                (MarketContextWriter + ContextRecorder)
 ├── scripts/                                    ✅ abstain_report.py (+ WE-2 `--paper`-Sektion)
-└── tests/                                      ✅ 147 Tests (125 bis WE 2/Council, + B4/H6 + H1,
-                                                 + 5 Tracker-Guards + 4 Lesson-Salvage 08-08)
+└── tests/                                      ✅ **165** Tests (frisch gemessen 2026-08-25;
+                                                 Stand der Head-Doku 147 war stale — Korrektur
+                                                 147 → 165 ist Teil des Closeout-Commits.
+                                                 Zusammensetzung: 125 bis WE 2/Council
+                                                 + B4/H6 + H1 + 5 Tracker-Guards
+                                                 + 4 Lesson-Salvage 08-08
+                                                 + 14 nachgelagerte Bugfix-Targets
+                                                 = 165 grün)
 ```
+
+**Bugfix-Block (zusammengefasst für die Audit-Kette):**
+- 2026-07-25 — zwei stille 100%-Failure-Bugs: `wiring.py:616` `MINUTE_1` → `MINUTE` (422
+  Tracker-Failures über 5 Tage 0/15 resolved); `_AbstainLLMAdapter._SCHEMA`
+  `additionalProperties: False` (sonst kein Structured-Output — 0 Lessons seit 2026-07-15)
+- 2026-07-31 — **B1 point_value-Drift** (40×-Oversizing für AEX; erklärt 3 historische
+  Rejects 07-15/20/30): `wiring.py` `point_values` aus `_build_universe_from_db()` statt
+  statischem `research.EXTENDED_UNIVERSE`; `compute_size` now fail-closed bei unmapptem Epic
+- 2026-08-08 — Allowance-Incident-Fix (Stale-Expiry + Budget-Breaker + Fetch-Cap),
+  B5 Lesson-Salvage (Satzgrenzen-Trim, keine Verwerfung), H4-a Alters-Cap
+
+**Phase-15-Erbschaften (Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC):**
+die P10-Paper-Council-Implementation (Phase 14 wurde nie gebraucht) bleibt im Code als
+ein **Eingangs-Schnittstelle-Vorschlag** für P15. Vor jedem Council-Touch im
+Phase-14-Konsumentenpfad: `enable_paper_debate` bleibt default `False`, Nikinger
+genehmigt jeden Flip explizit.
 
 ## Arbeitsteilung (nicht verhandelbar)
 
@@ -248,79 +283,110 @@ Time-Stop-Dauer-Key: `max_hold_minutes` (Default 240), konsumiert in `monitor.py
 
 **9. Test-Baseline-Korrektur:** siehe Step-1-Abschnitt oben (1162 grün, P4 141→148).
 
-## Session stopped — 2026-08-11 (Di — 🛑 NOTBREMSE: Phase 11 deferred, Datenfundament-Track eröffnet)
+## Session stopped — 2026-08-25 (Mo — Phase-10-Closeout, Council→P15, Σ 1698)
 
-> **BLUF:** Der Nikinger zieht die Notbremse. Phase 11 wird **vor Erreichen ihrer Ziele**
-> zurückgestellt, weil drei Datenwochen an derselben Wurzel gescheitert sind und diese Wurzel
-> wichtiger ist als die Phase. Vollständiger Handover — **das erste Dokument der nächsten
-> Session**: [`PHASE11_DEFERRAL_HANDOVER.md`](./PHASE11_DEFERRAL_HANDOVER.md).
-> Docs-only, kein Code berührt.
+> **BLUF:** Phase 10 ist **✅ abgeschlossen** (Closeout 2026-08-25). Council-Paper-Call ist
+> **bis auf weiteres in mind Phase 15 verschoben** (Nikinger 2026-08-25). Vollständiger
+> Handover — **das erste Dokument jeder Folge-Session an Phase 10**:
+> [`PHASE10_CLOSEOUT_HANDOVER.md`](./PHASE10_CLOSEOUT_HANDOVER.md). Read-only-Analyse,
+> kein Produktionscode-Edit; eine eigenständige, dokumentationsdominierte Atom-Einheit.
 
 ### Completed
 
-- **36 Commits gepusht.** Der Baum war sauber, aber `main` lag **36 Commits vor
-  `origin/main`** — die gesamte Arbeit seit dem 07-31-Bugfix-Block war lokal geblieben. Jetzt
-  `main...origin/main` ohne Abstand.
-- **`PHASE11_DEFERRAL_HANDOVER.md` geschrieben** — Status, Delta seit dem P8-Closeout,
-  Durability-Anforderungen **A–G** für den neuen Track, offene Entscheidungen, Datei-Anker.
-  Nach Handover-Vertrag: keine Implementierungsdetails wiederholt, Code bleibt Wahrheit.
-- **`docs/architecture/data_foundation.svg`** (1080×1080) — Fehlerbild + Zielbild.
-- **`docs/HANDOVER_PROMPT.md`** — der Handover-Auftrag des Nikinger, von Browser-Chat auf
-  Claude Code umgeschrieben: Google-Drive-Upload und Drive-Analyse entfallen ersatzlos (Claude
-  Code liest das Repo; eine gespiegelte Kopie ist eine zweite Wahrheit mit eigenem
-  Verfallsdatum). Bewusst **dazugekommen**: eine Ergebniszeile „nicht erreicht / offen
-  geblieben" (die alte Fassung listete nur Erfolge — ein Deferral hat genau die andere Sorte
-  Inhalt), die Pflicht zu benennen was **nur offline** bewiesen ist, „selbst nachprüfen statt
-  aus früheren Handovers übernehmen", und Entscheidungen mit Empfehlung statt Fragen ins Leere.
-- **Zwei Befunde, die die Notbremse tragen** (beide neu heute, beide im Handover ausgeführt):
-  1. **Dieselbe Tatsache in drei divergenten Speichern** — `KNOWN_YF_TICKERS` (12
-     Namensmuster) · `instrument_universe.yf_ticker` · `TickerMapper._MAP` (7 Defaults).
-     Ein Writer, einmalig, per Namensabgleich bei der Entdeckung. Ergebnis: der
-     yFinance-Fallback deckt **1 von 4 aktiven Epics**. Das ist die **dritte** Instanz
-     derselben Fehlerklasse wie B1 (statisches Artefakt vs. autonom wachsende Menge, ohne
-     Divergenz-Erkennung).
-  2. **Die Mehrquellen-Kette aus Phase 9 Step 6 lief noch nie.** `enable_ig_bars` ist
-     `False` per Default, wird von keinem Startskript gesetzt, taucht in keinem Log auf. V2s
-     ausdrücklicher zweiter Auftrag hieß „Daten-Input-Zuverlässigkeit" — die **entdeckende**
-     Hälfte lief mit voller Geschwindigkeit, die **absichernde** blieb dunkel. Der Abstand
-     zwischen beiden ist exakt der heutige Ausfall.
-- **Korrektur an [`DATA_SOURCE_STRATEGY_2026-08-11.md`](./DATA_SOURCE_STRATEGY_2026-08-11.md)
-  (heute früher, selbe Session):** dessen §2 stützt sich auf das Setup eines Kollegen als
-  Bestätigung — der Kollege bezeichnet es selbst als **Workaround**, nicht als
-  funktionierendes System. Bestätigung zurückgezogen, Richtung bleibt. Ebenso zu schwach war
-  der dortige Vorschlag, „nur die Kette zu verdrahten": auf dem realen aktiven Universum hätte
-  das 1 von 4 Epics abgedeckt.
-- Status propagiert: Root-`CLAUDE.md` (Phasenzeile + neue Track-Zeile), `ROADMAP.md`
-  (Phase-11-Header auf DEFERRED), `docs/INDEX.md` (3 Einträge), dieser Kopf.
+- **As-Built-Inventur** (Read-only): jede Zahl selbst nachgemessen — Phase-10-Tests
+  **165 grün**, Σ-Sweep **1698 grün / 0 fails**, **`main` = `origin/main` = `03a0919`**,
+  25 `phase10_v3:`-Commits auf `origin/main`, 0 unpushed lokal. Keine Zahl aus
+  Vordokumenten übernommen, was sich selbst prüfen ließ.
+- **`PHASE10_CLOSEOUT_HANDOVER.md`** geschrieben (L3-Snapshot) — 5-Zeilen-Bilanz
+  (fertig / getestet / live-validiert / gepusht / nicht-erreicht), Architektur-Bild
+  in einer Zeile, §3 Delta seit `PHASE11_DEFERRAL_HANDOVER.md`, §4 vier offene
+  Entscheidungen mit Optionen + Empfehlungen + Konsequenzen, §5 Datei-Anker,
+  §6 fünf Konsistenz-Regeln (nicht antasten ohne Not), §7 fünf Don't-Anweisungen.
+  Nach Handover-Vertrag: keine Implementierungsdetails wiederholt, Code bleibt
+  Wahrheit.
+- **`docs/architecture/phase10_v3.svg`** (1080×1080) — fünf-Panel-Layout: Block A
+  (Abstain-Lessons, NO_TRADE-Pfade 1-7) + Block B (Persistenz-Reform +
+  Paper-Pipeline, market_context + paper_trades) + Council-Paper-Call (default
+  `False`, **→ Phase 15** als gestrichelter Parked-Pfad mit klarer
+  Eingangs-Schnittstellen-Definition) + Status-Bilanz (was geleistet, was offen,
+  Phase-11-Inhalte explizit ausgenommen) + Bugfix-Block + Konsistenz-Regeln.
+  Style-konsistent mit `data_foundation.svg` / `phase13_live_data.svg` /
+  `phase12_5_failure.svg`.
+- **Status pflegepropagiert in diesem einen Commit**: Root-`CLAUDE.md`
+  (Phase-10-Row: `🔄 aktiv` → `✅ abgeschlossen` + Closeout-Link +
+  Council→P15-Markierung + Test-Zahl 165 + Commit-Count 25 + Synchron-Hinweis
+  auf `origin/main`); `ROADMAP.md` (Phase-10-Header gleicher Status-Flip +
+  Closeout-Verweis + `📕 Closeout 2026-08-25`-Absatz); `docs/INDEX.md`
+  (`Active phases`-Header → ohne P10 + neuer `Closed phases`-Header mit P10;
+  zwei neue INDEX-Zeilen — Closeout-Handover-Linie + SVG-Linie; phase10_v3-
+  Linienreflex: Council→P15, Closeout-Link); Phasenkopf selbst (`up`/`down`/
+  `purpose`/`updated` YAML, Mission-B-Block, Modul-Tree um SVG + Closeout-
+  Handover + Bugfix-Block erweitert).
+- **Drei Drift-Korrekturen an Doku** (Code = source of truth):
+  1. **Modul-Tabelle `tests/` 147 → 165 Tests** (Head war stale; reale
+     Zusammensetzung: 125 bis WE 2/Council + B4/H6 + H1 + 5 Tracker-Guards
+     + 4 Lesson-Salvage 08-08 + 14 nachgelagerte Bugfix-Targets = 165).
+     Korrektur im selben Commit, gegen den `pytest phase10_v3/tests -q`.
+  2. **Council-Call-Status**: „✅ gebaut, default OFF, Nikinger flippt
+     wann gewünscht" → „✅ gebaut, default `False`, **bis auf weiteres in
+     mind Phase 15**". Header, Mission-Block-B, Modul-Tree und
+     Phase-15-Erbschaften-Block alle gleichlautend.
+  3. **Header `## Session stopped — 2026-08-11` (Notbremse)** bleibt
+     **unverändert in der Geschichte** — siehe SESSIONS_ARCHIVE.md, rotiert
+     verbatim (Auditkette).
+- **Keine Cross-Phase-Produktionscode-Edits** in dieser Session. Phase-10-
+  Closeout ist eine **eigenständige dokumentationsdominierte Atom-Einheit**
+  (so wie `PHASE11_DEFERRAL_HANDOVER.md` 2026-08-11 auch docs-only war).
+  Bot läuft unverändert weiter (vier Daemons alive), die drei Patch-Hygiene-
+  Änderungen aus Phase-14-Session-10 vom Vortag (PATH-Prepend in 5
+  Start-Wrappern + Phase-8-C3-Test-Hermetization + restart-services.sh
+  Helper) sind seit gestern live auf `origin/main`.
 
-### Next (die nächste Session startet hier)
+### Findings (eines, ehrlich)
 
-1. **`PHASE11_DEFERRAL_HANDOVER.md` lesen** — §3 (Anforderungen A–G) und §4 (offene
-   Entscheidungen) sind der eigentliche Auftrag.
-2. ✅ **Nummerierung final (2026-08-11):** „Phase 12 = Datenfundament, V4 → Phase 13" —
-   entschieden, in allen fünf Dokumenten nachgezogen (Root-`CLAUDE.md`, `ROADMAP.md`,
-   `README.md`, `ARCHITECTURE.md`, `docs/INDEX.md`). Plan: `docs/concepts/phase12_data_foundation_plan.md`.
-3. ✅ **Live-Check erledigt (2026-08-11):** `GET /markets/{epic}` (Rohdaten, nicht die
-   projizierte `get_market_info`-Envelope) auf DAX (gemappt), US 500 (ungemappt), SUNDAX
-   (Wochenend) — Ergebnis + B3-Margin-Felder in `phase12_data_foundation/CLAUDE.md`.
-4. **Erst danach** den Datenfundament-Plan entwerfen. Ein Rewrite der Datenschicht ist
-   ausdrücklich erlaubt („by all means", Nikinger 2026-08-11).
-5. **Restart-Gate + Universe-Reset** unverändert gesperrt — aber **nicht mehr dringend**,
-   solange nicht gemessen wird. Der Allowance-Probe-Einzeiler bleibt ein kostenloser
-   Tagescheck.
+- 🟡 **Pre-existing Test-Failures im Nachbar-Repo:** 4 Phase-14
+  `test_webui.py`-Tests (`test_discovery_unarmed_*`) bleiben in Phase-14-
+  Statistik rot — bereits im Phase-14-Session-10-Hygiene-Block (Nikinger-
+  Antwort auf den „was ist das Problem bei Phase 8"-Ping) durch Commit
+  `0a55818` gelöst → Phase-8-Sweep wieder **248 grün**. **In dieser
+  Phase-10-Closeout-Session NICHT weiter angetastet** — gehört zu Phase 8,
+  nicht Phase 10. Sweep-Stand für Phase 10 selbst = **165 grün, 0 fails**.
 
-### Open questions / blockers
+### Unverändert offen
 
-- **Alles vom 08-08 Gebaute ist ausschließlich offline bewiesen** (1336 grüne Tests, kein Lauf
-  gegen echte IG-Daten). Der nächste Daemon-Start ist ihr erster Realkontakt — beim Auswerten
-  nicht mit „verifiziert" verwechseln.
-- **WI-2/W2 bleibt unbeantwortet**, jetzt zum dritten Mal, und wird es bis nach dem Fundament
-  bleiben. Das ist der bewusst akzeptierte Preis der Notbremse.
-- **H4-as Wirkung ungemessen**, und der Alters-Cap rollt: bei einem Neustart ab **2026-08-20**
-  überleben **0** Lessons und der Prompt-Block rendert dauerhaft „none on record". Gewollt,
-  kein Bug — aber beim Auswerten zu wissen.
-- Offene Nummerierung (s. Next 2) blockiert nichts, sollte aber vor dem nächsten Doc-Schwung
-  entschieden sein, sonst wird sie in weiteren Dateien zementiert.
+- **Phase 11 (V3-Fortsetzung)** bleibt 🛑 DEFERRED — drei Datenwochen
+  unbeantwortet, gehören in den Datenfundament-Track (Phase 12/13/14). Die
+  Übergabe-Anforderungen **A–G** im [`PHASE11_DEFERRAL_HANDOVER.md`](./PHASE11_DEFERRAL_HANDOVER.md)
+  bleiben der Einstieg für jede Wiederaufnahme; die Phase-10-Closeout ändert daran
+  nichts.
+- **WI-2/W2 / H3 / H5 / H7 / B3 / M2 / S6 / Block C (UI)** — alles in den
+  Phase-11-/Phase-12-/Phase-13-/Phase-15-Tracks dokumentiert. Nicht in
+  Phase-10-Scope, auch nicht durch den Closeout erledigt.
+- **Bug B5 + H4-a Wirkung** — H4-a wird beim nächsten echten Scheduler-
+  Restart (Phase-13-Beweiswoche läuft seit Mo 2026-08-25) erstmals live zu
+  beobachten sein; Lessons-Alter-Cap rollt erst ab **2026-08-20**, also kann
+  der Effekt erst danach im Lauf sichtbar werden.
+
+### Next
+
+- **Operator (Nikinger):** **Push-Freigabe** für den Phase-10-Closeout-Commit.
+  Diff ist dokumentationsdominiert: ein .md-File neu (`PHASE10_CLOSEOUT_HANDOVER.md`)
+  + ein .svg-File neu (`docs/architecture/phase10_v3.svg`) + Phasenkopf-Updates +
+  Root-CLAUDE.md-Row + ROADMAP-Sektion + INDEX.md-Einträge. **Sweep** Σ 1698 grün,
+  kein Bot-Touch, kein Cross-Phase-Produktionscode-Edit.
+- **Phase 10 ist abgeschlossen und wird nicht wieder aktiv**. Jeder Touch am
+  Produktionscode (`abstain_lessons/`, `market_context/`, `scripts/abstain_report.py`,
+  Cross-Phase-Nähte in P5/P8/P9) braucht eine **neue Cross-Phase-Freigabe** des
+  Nikinger — die Phase-14-Freigabe-Liste deckt Phase 10 nicht ab.
+- **Phase 15 Plan-Session (V4)** — bleibt long-horizon, gegatet auf Outcomes aus
+  Phase 9+11+12+13+14. Die Council-Eingangs-Schnittstelle aus Phase 10 ist im
+  Closeout §6.3 dokumentiert; P15-Plan-Session entscheidet, ob das als
+  Startpunkt übernommen oder durch eine eigene V4-Implementation ersetzt wird.
+- **Phase 11 Wiederaufnahme** — strukturell blockiert auf Datenfundament-Track
+  (Phase 12/13/14). Beweiswoche läuft seit Mo 2026-08-25, **nicht** vor deren
+  Abschluss WI-2/W2 beantwortbar.
+
 ---
+
 
 > **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).

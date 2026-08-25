@@ -4,7 +4,7 @@ purpose: Verbatim session-history archive rotated out of `CLAUDE.md`
 read-when: auditing how a past phase-10 (V3) decision came about — never needed at session start
 detail: L3
 up: ./CLAUDE.md
-updated: 2026-08-08
+updated: 2026-08-25
 ---
 
 # phase10_v3 — Session Archive
@@ -14,6 +14,82 @@ updated: 2026-08-08
 > preserved (newest-first). The newest `## Session stopped` block always stays in the source file;
 > at each session end, the previously-newest block rotates here.
 
+---
+## Session stopped — 2026-08-11 (Di — 🛑 NOTBREMSE: Phase 11 deferred, Datenfundament-Track eröffnet)
+
+> **BLUF:** Der Nikinger zieht die Notbremse. Phase 11 wird **vor Erreichen ihrer Ziele**
+> zurückgestellt, weil drei Datenwochen an derselben Wurzel gescheitert sind und diese Wurzel
+> wichtiger ist als die Phase. Vollständiger Handover — **das erste Dokument der nächsten
+> Session**: [`PHASE11_DEFERRAL_HANDOVER.md`](./PHASE11_DEFERRAL_HANDOVER.md).
+> Docs-only, kein Code berührt.
+
+### Completed
+
+- **36 Commits gepusht.** Der Baum war sauber, aber `main` lag **36 Commits vor
+  `origin/main`** — die gesamte Arbeit seit dem 07-31-Bugfix-Block war lokal geblieben. Jetzt
+  `main...origin/main` ohne Abstand.
+- **`PHASE11_DEFERRAL_HANDOVER.md` geschrieben** — Status, Delta seit dem P8-Closeout,
+  Durability-Anforderungen **A–G** für den neuen Track, offene Entscheidungen, Datei-Anker.
+  Nach Handover-Vertrag: keine Implementierungsdetails wiederholt, Code bleibt Wahrheit.
+- **`docs/architecture/data_foundation.svg`** (1080×1080) — Fehlerbild + Zielbild.
+- **`docs/HANDOVER_PROMPT.md`** — der Handover-Auftrag des Nikinger, von Browser-Chat auf
+  Claude Code umgeschrieben: Google-Drive-Upload und Drive-Analyse entfallen ersatzlos (Claude
+  Code liest das Repo; eine gespiegelte Kopie ist eine zweite Wahrheit mit eigenem
+  Verfallsdatum). Bewusst **dazugekommen**: eine Ergebniszeile „nicht erreicht / offen
+  geblieben" (die alte Fassung listete nur Erfolge — ein Deferral hat genau die andere Sorte
+  Inhalt), die Pflicht zu benennen was **nur offline** bewiesen ist, „selbst nachprüfen statt
+  aus früheren Handovers übernehmen", und Entscheidungen mit Empfehlung statt Fragen ins Leere.
+- **Zwei Befunde, die die Notbremse tragen** (beide neu heute, beide im Handover ausgeführt):
+  1. **Dieselbe Tatsache in drei divergenten Speichern** — `KNOWN_YF_TICKERS` (12
+     Namensmuster) · `instrument_universe.yf_ticker` · `TickerMapper._MAP` (7 Defaults).
+     Ein Writer, einmalig, per Namensabgleich bei der Entdeckung. Ergebnis: der
+     yFinance-Fallback deckt **1 von 4 aktiven Epics**. Das ist die **dritte** Instanz
+     derselben Fehlerklasse wie B1 (statisches Artefakt vs. autonom wachsende Menge, ohne
+     Divergenz-Erkennung).
+  2. **Die Mehrquellen-Kette aus Phase 9 Step 6 lief noch nie.** `enable_ig_bars` ist
+     `False` per Default, wird von keinem Startskript gesetzt, taucht in keinem Log auf. V2s
+     ausdrücklicher zweiter Auftrag hieß „Daten-Input-Zuverlässigkeit" — die **entdeckende**
+     Hälfte lief mit voller Geschwindigkeit, die **absichernde** blieb dunkel. Der Abstand
+     zwischen beiden ist exakt der heutige Ausfall.
+- **Korrektur an [`DATA_SOURCE_STRATEGY_2026-08-11.md`](./DATA_SOURCE_STRATEGY_2026-08-11.md)
+  (heute früher, selbe Session):** dessen §2 stützt sich auf das Setup eines Kollegen als
+  Bestätigung — der Kollege bezeichnet es selbst als **Workaround**, nicht als
+  funktionierendes System. Bestätigung zurückgezogen, Richtung bleibt. Ebenso zu schwach war
+  der dortige Vorschlag, „nur die Kette zu verdrahten": auf dem realen aktiven Universum hätte
+  das 1 von 4 Epics abgedeckt.
+- Status propagiert: Root-`CLAUDE.md` (Phasenzeile + neue Track-Zeile), `ROADMAP.md`
+  (Phase-11-Header auf DEFERRED), `docs/INDEX.md` (3 Einträge), dieser Kopf.
+
+### Next (die nächste Session startet hier)
+
+1. **`PHASE11_DEFERRAL_HANDOVER.md` lesen** — §3 (Anforderungen A–G) und §4 (offene
+   Entscheidungen) sind der eigentliche Auftrag.
+2. ✅ **Nummerierung final (2026-08-11):** „Phase 12 = Datenfundament, V4 → Phase 13" —
+   entschieden, in allen fünf Dokumenten nachgezogen (Root-`CLAUDE.md`, `ROADMAP.md`,
+   `README.md`, `ARCHITECTURE.md`, `docs/INDEX.md`). Plan: `docs/concepts/phase12_data_foundation_plan.md`.
+3. ✅ **Live-Check erledigt (2026-08-11):** `GET /markets/{epic}` (Rohdaten, nicht die
+   projizierte `get_market_info`-Envelope) auf DAX (gemappt), US 500 (ungemappt), SUNDAX
+   (Wochenend) — Ergebnis + B3-Margin-Felder in `phase12_data_foundation/CLAUDE.md`.
+4. **Erst danach** den Datenfundament-Plan entwerfen. Ein Rewrite der Datenschicht ist
+   ausdrücklich erlaubt („by all means", Nikinger 2026-08-11).
+5. **Restart-Gate + Universe-Reset** unverändert gesperrt — aber **nicht mehr dringend**,
+   solange nicht gemessen wird. Der Allowance-Probe-Einzeiler bleibt ein kostenloser
+   Tagescheck.
+
+### Open questions / blockers
+
+- **Alles vom 08-08 Gebaute ist ausschließlich offline bewiesen** (1336 grüne Tests, kein Lauf
+  gegen echte IG-Daten). Der nächste Daemon-Start ist ihr erster Realkontakt — beim Auswerten
+  nicht mit „verifiziert" verwechseln.
+- **WI-2/W2 bleibt unbeantwortet**, jetzt zum dritten Mal, und wird es bis nach dem Fundament
+  bleiben. Das ist der bewusst akzeptierte Preis der Notbremse.
+- **H4-as Wirkung ungemessen**, und der Alters-Cap rollt: bei einem Neustart ab **2026-08-20**
+  überleben **0** Lessons und der Prompt-Block rendert dauerhaft „none on record". Gewollt,
+  kein Bug — aber beim Auswerten zu wissen.
+- Offene Nummerierung (s. Next 2) blockiert nichts, sollte aber vor dem nächsten Doc-Schwung
+  entschieden sein, sonst wird sie in weiteren Dateien zementiert.
+
+---
 ## Session stopped — 2026-08-08 (Sa — Allowance-Root-Cause + Tracker-Fix; Neustart bleibt gesperrt)
 
 > **BLUF:** Der `/prices`-Health-Check des Nikinger hat die Diagnose der letzten Session

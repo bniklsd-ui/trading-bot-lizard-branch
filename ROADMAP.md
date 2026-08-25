@@ -353,8 +353,13 @@ ehrlich quarantänisiert.
 
 ## Phase 10 — V3: Persistenz-Reform + No-Trade-Lessons + (optionales) UI
 
-> **Status: 🔄 aktiv — Block A ✅ live auf main seit WE 1 (2026-07-11, Montag-Restart-Beweis
-> 2026-07-14) + Block B ✅ live auf main seit WE 2 (2026-07-17).** Ausführungsreifer Plan lag
+> **Status: ✅ abgeschlossen (Closeout 2026-08-25) — Block A ✅ live auf main seit WE 1
+> (2026-07-11, Montag-Restart-Beweis 2026-07-14) + Block B ✅ live auf main seit WE 2
+> (2026-07-17) + Bugfix-Block 2026-07-25/31/08-08 + H1 (1 Woche gelaufen) + H4-a.**
+> **Council-Paper-Call ✅ gebaut, default `False`, bis auf weiteres in mind Phase 15**
+> (Nikinger 2026-08-25). Phase-11-Inhalte (WI-2/W2, H3/H5/H7, B3-Margin-Headroom) bleiben
+> offen und gehören in den Datenfundament-Track (Phase 12/13/14) — dort dokumentiert,
+> nicht hier. Ausführungsreifer Plan lag
 > vor: [`docs/concepts/phase10_v3_plan.md`](./docs/concepts/phase10_v3_plan.md) (Decisions
 > V3-D1…D10, Steps 0–11); Kickoff-Kontext:
 > [`docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md`](./docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md).
@@ -399,6 +404,12 @@ lernbaren Signal machen, nicht nur einem verworfenen Reason-Code.
 **Done when:** Abstain-Zyklen erzeugen genauso Lessons wie geschlossene Trades; `decision_context`/
 `market_regime_snapshots` sind befüllt statt leer. **Erreicht (2026-07-17)** — live Rows folgen
 mit dem nächsten Scheduler-Restart (Nikinger).
+
+**📕 Closeout 2026-08-25:** Phase 10 ist abgeschlossen. Council-Paper-Call-Implementation
+bleibt im Code (default `False`) als Eingangs-Schnittstelle für Phase 15 (V4 — Council für
+Live-Trades + Handover + Reward-Reform). Vollständiger Handover:
+[`phase10_v3/PHASE10_CLOSEOUT_HANDOVER.md`](./phase10_v3/PHASE10_CLOSEOUT_HANDOVER.md),
+Bild: [`docs/architecture/phase10_v3.svg`](./docs/architecture/phase10_v3.svg).
 
 **Directory:** [`phase10_v3/`](./phase10_v3/)
 

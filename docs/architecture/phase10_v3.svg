@@ -1,0 +1,199 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080  1080" font-family="Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6470"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1e7a4d"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+    <marker id="ad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a5d0d"/>
+    </marker>
+  </defs>
+
+  <rect width="1080" height="1080" fill="#f7f8fa"/>
+
+  <text x="40" y="42" font-size="24" font-weight="bold" fill="#1b1f24">Phase 10 (V3) — Abstain-Lessons + Persistenz-Reform + Paper-Trades</text>
+  <text x="40" y="64" font-size="13" fill="#5b6470">Stand 2026-08-25 · ✅ abgeschlossen · 165 Phase-10-Tests grün · 25 Commits auf origin · Council-Paper-Call → Phase 15</text>
+  <line x1="40" y1="78" x2="1040" y2="78" stroke="#d5d9de" stroke-width="1"/>
+
+  <!-- ================= PANEL 1 — BLOCK A ================= -->
+  <rect x="40" y="92" width="500" height="372" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="92" width="500" height="28" rx="6" fill="#e8f5ee"/>
+  <rect x="40" y="110" width="500" height="10" fill="#e8f5ee"/>
+  <text x="56" y="111" font-size="14" font-weight="bold" fill="#1e7a4d">① Block A — Abstain-Lessons (Sa WE 1 2026-07-11, live seit Mo 2026-07-14)</text>
+
+  <!-- source: P5 NO_TRADE -->
+  <rect x="56" y="138" width="468" height="50" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="290" y="160" font-size="12" font-weight="bold" fill="#1b1f24" text-anchor="middle">P5-Executor · NO_TRADE-Pfade</text>
+  <text x="290" y="178" font-size="10.5" fill="#5b6470" text-anchor="middle">Gate 1/2/Debatte/3/5/4/VETO · 7 Rückgabepfade</text>
+
+  <line x1="290" y1="188" x2="290" y2="218" stroke="#1e7a4d" stroke-width="1.5" marker-end="url(#ag)"/>
+
+  <!-- AbstainSink -->
+  <rect x="56" y="222" width="468" height="56" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="290" y="244" font-size="12" font-weight="bold" fill="#1e7a4d" text-anchor="middle">AbstainSink (Phase 10)</text>
+  <text x="290" y="261" font-size="10.5" fill="#5b6470" text-anchor="middle">try/except · wirft nie · ruft store.record()</text>
+  <text x="290" y="275" font-size="10" fill="#5b6470" text-anchor="middle">Pattern analog reward_sink (best-effort)</text>
+
+  <line x1="290" y1="278" x2="290" y2="310" stroke="#1e7a4d" stroke-width="1.5" marker-end="url(#ag)"/>
+
+  <!-- AbstainStore -->
+  <rect x="56" y="314" width="220" height="64" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="166" y="338" font-size="12" font-weight="bold" fill="#1e7a4d" text-anchor="middle">AbstainStore</text>
+  <text x="166" y="355" font-size="10.5" fill="#5b6470" text-anchor="middle">abstain_records-Tabelle</text>
+  <text x="166" y="369" font-size="10" fill="#1e7a4d" text-anchor="middle">66 echte Zeilen (Mo 07-14)</text>
+
+  <!-- classify -->
+  <rect x="296" y="314" width="228" height="64" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="410" y="338" font-size="12" font-weight="bold" fill="#1b1f24" text-anchor="middle">Classifier</text>
+  <text x="410" y="355" font-size="10.5" fill="#5b6470" text-anchor="middle">12-Reason-Taxonomie</text>
+  <text x="410" y="369" font-size="10" fill="#5b6470" text-anchor="middle">deterministisch, kein LLM</text>
+
+  <!-- reflect_abstain -->
+  <rect x="56" y="394" width="220" height="56" rx="5" fill="#fdf6ec" stroke="#c98a1a"/>
+  <text x="166" y="416" font-size="12" font-weight="bold" fill="#8a5d0d" text-anchor="middle">reflect_abstain</text>
+  <text x="166" y="433" font-size="10.5" fill="#5b6470" text-anchor="middle">Haiku · best-effort · Tages-Cap</text>
+  <text x="166" y="447" font-size="10" fill="#5b6470" text-anchor="middle">NUR AI-Naht #1 in Block A</text>
+
+  <!-- abstain_report -->
+  <rect x="296" y="394" width="228" height="56" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="410" y="416" font-size="12" font-weight="bold" fill="#1b1f24" text-anchor="middle">abstain_report.py</text>
+  <text x="410" y="433" font-size="10.5" fill="#5b6470" text-anchor="middle">Reports — manuell / on-demand</text>
+  <text x="410" y="447" font-size="10" fill="#5b6470" text-anchor="middle">schreibt nicht zurück</text>
+
+  <!-- ================= PANEL 2 — BLOCK B ================= -->
+  <rect x="560" y="92" width="480" height="372" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="560" y="92" width="480" height="28" rx="6" fill="#e8f5ee"/>
+  <rect x="560" y="110" width="480" height="10" fill="#e8f5ee"/>
+  <text x="576" y="111" font-size="14" font-weight="bold" fill="#1e7a4d">② Block B — Persistenz-Reform + Paper-Pipeline (Sa WE 2 2026-07-17)</text>
+
+  <!-- source: cycle -->
+  <rect x="576" y="138" width="448" height="50" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="800" y="160" font-size="12" font-weight="bold" fill="#1b1f24" text-anchor="middle">Jeder P5-Zyklus</text>
+  <text x="800" y="178" font-size="10.5" fill="#5b6470" text-anchor="middle">auch NO_TRADE · unabhängig vom Trade-Outcome</text>
+
+  <line x1="800" y1="188" x2="800" y2="218" stroke="#1e7a4d" stroke-width="1.5" marker-end="url(#ag)"/>
+
+  <!-- ContextRecorder -->
+  <rect x="576" y="222" width="220" height="86" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="686" y="244" font-size="12" font-weight="bold" fill="#1e7a4d" text-anchor="middle">ContextRecorder</text>
+  <text x="686" y="261" font-size="10.5" fill="#5b6470" text-anchor="middle">decision_context</text>
+  <text x="686" y="276" font-size="10.5" fill="#5b6470" text-anchor="middle">market_regime_snapshots</text>
+  <text x="686" y="291" font-size="10" fill="#5b6470" text-anchor="middle">epic-scoped (NICHT trade-scoped)</text>
+  <text x="686" y="305" font-size="10" fill="#1e7a4d" text-anchor="middle">regime_tag: quote_only-Degrade</text>
+
+  <!-- PaperTracker -->
+  <rect x="816" y="222" width="208" height="86" rx="5" fill="#e8f5ee" stroke="#1e7a4d"/>
+  <text x="920" y="244" font-size="12" font-weight="bold" fill="#1e7a4d" text-anchor="middle">PaperTracker-Tick</text>
+  <text x="920" y="261" font-size="10.5" fill="#5b6470" text-anchor="middle">beide Seiten (BUY + SELL)</text>
+  <text x="920" y="276" font-size="10.5" fill="#5b6470" text-anchor="middle">shadow pair → resolution</text>
+  <text x="920" y="291" font-size="10" fill="#5b6470" text-anchor="middle">observed-only · keine Order</text>
+  <text x="920" y="305" font-size="10" fill="#1e7a4d" text-anchor="middle">B5 + Fetch-Cap live seit 08-08</text>
+
+  <!-- DB boxes -->
+  <rect x="576" y="322" width="220" height="56" rx="5" fill="#1e7a4d" stroke="#1e7a4d"/>
+  <text x="686" y="344" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">decision_context-Tabelle</text>
+  <text x="686" y="361" font-size="10.5" fill="#e8f5ee" text-anchor="middle">Outcome ∈ {TRADE, NO_TRADE, ABORT}</text>
+  <text x="686" y="375" font-size="10" fill="#e8f5ee" text-anchor="middle">Bull/Bear-Summary aus Transcript</text>
+
+  <rect x="816" y="322" width="208" height="56" rx="5" fill="#1e7a4d" stroke="#1e7a4d"/>
+  <text x="920" y="344" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">paper_trades-Tabelle</text>
+  <text x="920" y="361" font-size="10.5" fill="#e8f5ee" text-anchor="middle">shadow pairs · resolved</text>
+  <text x="920" y="375" font-size="10" fill="#e8f5ee" text-anchor="middle">B-Cap bewahrt IG-Kontingent</text>
+
+  <!-- callout -->
+  <rect x="576" y="394" width="448" height="56" rx="5" fill="#fdf6ec" stroke="#c98a1a"/>
+  <text x="592" y="416" font-size="12" font-weight="bold" fill="#8a5d0d">Warum 7 von 8 Resolution-Pfaden KEINEN LLM-Aufruf brauchen</text>
+  <text x="592" y="432" font-size="10.5" fill="#5b6470">Symbol-Resolver, Klassifikation, Persistenz, Regime-Features = deterministischer Code.</text>
+  <text x="592" y="446" font-size="10.5" fill="#5b6470"><tspan font-weight="bold">Genau zwei AI-Nähte</tspan> (Block A: reflect_abstain · Block B: Council-Paper-Call, beide best-effort).</text>
+
+  <!-- ================= PANEL 3 — COUNCIL PAPER CALL (PARKED → P15) ================= -->
+  <rect x="40" y="484" width="1000" height="200" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="484" width="1000" height="28" rx="6" fill="#fdf6ec"/>
+  <rect x="40" y="502" width="1000" height="10" fill="#fdf6ec"/>
+  <text x="56" y="503" font-size="14" font-weight="bold" fill="#8a5d0d">③ Council-Paper-Call — gebaut, default OFF, bis auf weiteres in mind Phase 15 (Nikinger 2026-08-25)</text>
+
+  <rect x="56" y="528" width="180" height="56" rx="5" fill="#fdf6ec" stroke="#c98a1a"/>
+  <text x="146" y="550" font-size="12" font-weight="bold" fill="#8a5d0d" text-anchor="middle">enable_paper_debate</text>
+  <text x="146" y="567" font-size="10.5" fill="#5b6470" text-anchor="middle">SchedulerConfig</text>
+  <text x="146" y="580" font-size="10.5" fill="#8a5d0d" text-anchor="middle">default = False</text>
+
+  <line x1="236" y1="556" x2="280" y2="556" stroke="#8a5d0d" stroke-width="1.5" marker-end="url(#ad)"/>
+
+  <rect x="282" y="528" width="180" height="56" rx="5" fill="#fdf6ec" stroke="#c98a1a"/>
+  <text x="372" y="550" font-size="12" font-weight="bold" fill="#8a5d0d" text-anchor="middle">_AbstainLLMAdapter</text>
+  <text x="372" y="567" font-size="10.5" fill="#5b6470" text-anchor="middle">paper-only schema</text>
+  <text x="372" y="580" font-size="10.5" fill="#5b6470" text-anchor="middle">forced-pick Modus</text>
+
+  <line x1="462" y1="556" x2="506" y2="556" stroke="#8a5d0d" stroke-width="1.5" marker-end="url(#ad)"/>
+
+  <rect x="508" y="528" width="180" height="56" rx="5" fill="#fdf6ec" stroke="#c98a1a"/>
+  <text x="598" y="550" font-size="12" font-weight="bold" fill="#8a5d0d" text-anchor="middle">Cap 3 / Tag</text>
+  <text x="598" y="567" font-size="10.5" fill="#5b6470" text-anchor="middle">Output nur in</text>
+  <text x="598" y="580" font-size="10.5" fill="#5b6470" text-anchor="middle">paper_trades-Tabelle</text>
+
+  <line x1="688" y1="556" x2="732" y2="556" stroke="#8a5d0d" stroke-width="1.5" marker-end="url(#ad)"/>
+
+  <rect x="734" y="528" width="290" height="56" rx="5" fill="#f7f8fa" stroke="#5b6470"/>
+  <text x="879" y="550" font-size="12" font-weight="bold" fill="#1b1f24" text-anchor="middle">Live-Status</text>
+  <text x="879" y="567" font-size="10.5" fill="#5b6470" text-anchor="middle">nie eingeschaltet im Live-Betrieb</text>
+  <text x="879" y="580" font-size="10.5" fill="#5b6470" text-anchor="middle">Test-Coverage 100 % · aber kein Real-Kontakt</text>
+
+  <rect x="56" y="608" width="968" height="60" rx="5" fill="#f7f8fa" stroke="#d5d9de"/>
+  <text x="72" y="630" font-size="12" font-weight="bold" fill="#1b1f24">→ Phase 15 (V4 — Sophisticated/Optional): Council für Live-Trades + Handover-Logik + Reward-Reform</text>
+  <text x="72" y="648" font-size="10.5" fill="#5b6470">Die P10-Paper-Implementation ist <tspan font-weight="bold">Eingangs-Schnittstelle-Vorschlag</tspan>, kein Endpunkt. P15 subsumiert sie. Flag bleibt default <tspan font-weight="bold">False</tspan>;</text>
+  <text x="72" y="662" font-size="10.5" fill="#5b6470">wer das Flag flippt, ohne mit P15 zu planen, baut gegen das Architekturthema, nicht die Implementation.</text>
+
+  <!-- ================= PANEL 4 — STATUS &amp; WAS OFFEN BLIEB ================= -->
+  <rect x="40" y="704" width="500" height="336" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="704" width="500" height="28" rx="6" fill="#eef1f4"/>
+  <rect x="40" y="722" width="500" height="10" fill="#eef1f4"/>
+  <text x="56" y="723" font-size="14" font-weight="bold" fill="#1b1f24">④ Was Phase 10 leistet (5 Zeilen)</text>
+
+  <text x="72" y="754" font-size="11" fill="#1e7a4d">✓ Block A + B + Council-Paper-Call + 3 Bugfix-Blöcke + H1 + H4-a</text>
+  <text x="72" y="772" font-size="11" fill="#1e7a4d">✓ 165 Phase-10-Tests grün · 1698 Σ-Sweep grün</text>
+  <text x="72" y="790" font-size="11" fill="#1e7a4d">✓ Block A live-verifiziert (66 echte `abstain_records`, Mo 07-14)</text>
+  <text x="72" y="808" font-size="11" fill="#1e7a4d">✓ H1 lief 1 Woche bis Allowance-Incident (B5+Cap-Fix live)</text>
+  <text x="72" y="826" font-size="11" fill="#1e7a4d">✓ B1 retroaktiv: 3 AEX-Rejects (07-15/20/30) erklärt</text>
+  <text x="72" y="844" font-size="11" fill="#1e7a4d">✓ 25 phase10_v3-Commits auf origin · main = 03a0919</text>
+
+  <text x="72" y="876" font-size="11" font-weight="bold" fill="#c0392b">NICHT erreicht / offen:</text>
+  <text x="72" y="894" font-size="10.5" fill="#c0392b">· Council live (default OFF, deferred → P15) — siehe Panel ③</text>
+  <text x="72" y="910" font-size="10.5" fill="#c0392b">· H4-a Wirkung (Cap rollt erst ab 2026-08-20 — Lessons-Alter)</text>
+  <text x="72" y="926" font-size="10.5" fill="#c0392b">· S6 Prompt-Rückspeisung (Operator-Flip wartet auf Lesson-Review)</text>
+  <text x="72" y="942" font-size="10.5" fill="#c0392b">· Block C UI (out of scope per Plan §13)</text>
+  <text x="72" y="966" font-size="10.5" fill="#5b6470">Phase-11-Inhalte (WI-2/W2, H3/H5/H7, B3) sind <tspan font-weight="bold">nicht</tspan> in Phase 10; sie leben im Datenfundament-Track (P12/13/14).</text>
+  <text x="72" y="982" font-size="10.5" fill="#5b6470">Phase-10 ist strukturell fertig — Closeout gilt.</text>
+  <text x="72" y="998" font-size="10.5" fill="#5b6470">Modul-Tabelle im Phase-Head (147 Tests) ist stale — Korrektur 147 → 165 in diesem Commit.</text>
+
+  <!-- ================= PANEL 5 — BUGFIX BLOCK + KONSISTENZ-REGELN ================= -->
+  <rect x="560" y="704" width="480" height="336" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="560" y="704" width="480" height="28" rx="6" fill="#eef1f4"/>
+  <rect x="560" y="722" width="480" height="10" fill="#eef1f4"/>
+  <text x="576" y="723" font-size="14" font-weight="bold" fill="#1b1f24">⑤ Bugfix-Block + Konsistenz-Regeln</text>
+
+  <!-- Bugfix rows -->
+  <text x="576" y="754" font-size="11.5" font-weight="bold" fill="#1b1f24">3 stille 100-%-Failure-Bugs gefixt</text>
+  <text x="576" y="772" font-size="10.5" fill="#5b6470">·  2026-07-25  <tspan font-weight="bold">wiring.py:616</tspan> „MINUTE_1" → „MINUTE"  · 422 Paper-Tracker-Failures über 5 Tage</text>
+  <text x="576" y="788" font-size="10.5" fill="#5b6470">·  2026-07-25  <tspan font-weight="bold">_SCHEMA</tspan> „additionalProperties: False"  · 0 Haiku-Lessons seit 2026-07-15</text>
+  <text x="576" y="804" font-size="10.5" fill="#5b6470">·  2026-07-31  <tspan font-weight="bold">point_values</tspan> aus DB statt EXTENDED_UNIVERSE  · 40×-Oversizing, 3 AEX-Rejects retroaktiv erklärt</text>
+  <text x="576" y="820" font-size="10.5" fill="#5b6470">·  2026-08-08  <tspan font-weight="bold">Allowance-Incident</tspan>: Stale-Expiry + Budget-Breaker + Fetch-Cap  · 4,5k IG-Pkt erspart</text>
+  <text x="576" y="836" font-size="10.5" fill="#5b6470">·  2026-08-08  <tspan font-weight="bold">B5</tspan> Lesson-Salvage statt Verwerfen (Sentence-Trim, harte Grenze)</text>
+
+  <!-- rule-of-the-phase -->
+  <text x="576" y="872" font-size="11.5" font-weight="bold" fill="#1b1f24">Konsistenz-Regeln (nicht antasten, ohne Not)</text>
+  <text x="576" y="890" font-size="10.5" fill="#5b6470">1. Genau <tspan font-weight="bold">zwei</tspan> AI-Nähte: reflect_abstain + Council-Paper-Call</text>
+  <text x="576" y="906" font-size="10.5" fill="#5b6470">2. VETOs / Gates / Sizing unangetastet · keine AI löst eine Order aus</text>
+  <text x="576" y="922" font-size="10.5" fill="#5b6470">3. paper_trades = pure Beobachtung; Phase 15 darf das aufweichen, Phase 10 nicht</text>
+  <text x="576" y="938" font-size="10.5" fill="#5b6470">4. degradation muss typisiert sein (regime.py → quote_only)</text>
+  <text x="576" y="954" font-size="10.5" fill="#5b6470">5. Alters-Cap (H4-a) rollt, bricht nicht — Prompt rendert „none on record"</text>
+
+  <text x="576" y="982" font-size="11" font-weight="bold" fill="#1b1f24">Phase 14/15/15 erbt</text>
+  <text x="576" y="1000" font-size="10.5" fill="#5b6470">· Council-Schema-Hooks (P10-Paper-Pfad ist P15-Eingangs-Schnittstelle)</text>
+  <text x="576" y="1016" font-size="10.5" fill="#5b6470">· market_context (Decisions O1–O3 + regime_tag sind </text>
+  <text x="576" y="1030" font-size="10.5" fill="#5b6470">  Datenfundament-erweiterbar)</text>
+</svg>
