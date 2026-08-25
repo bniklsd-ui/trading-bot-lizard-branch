@@ -259,42 +259,57 @@ konsumierbar — kein Import- oder Wiring-Bruch aus C1/C2/C3/C4.
 
 ### Unverändert offen
 
-- **Block D** (Closeout) — die einzige Akzeptanz-Lücke. Konkret: D1 (Modul-Tabelle
-  in `phase14_discovery/CLAUDE.md` gegen den As-Built-Stand füllen — Testzahlen aus
-  dem **finalen** Sweep, nicht geschätzt; **ist in dieser Session bereits passiert**,
-  Stand-Notiz aktualisiert), D2 (finaler Regression-Sweep, je Phase separat, Tabelle
-  in den Session-Block — **genauso bereits passiert**, Tabelle im Verified-Abschnitt
-  oben), D3 (`## Session stopped` schreiben + Rotationsregel — **passiert gerade**),
-  D4 (root-`CLAUDE.md` + `ROADMAP.md` + `docs/INDEX.md`: Phase-14-Zeile auf den
-  erreichten Stand; **nicht in dieser Session — Block-D-Topic**), D5
-  (Closeout-Handover **nur**, wenn die Phase geschlossen wird — gesonderte Entscheidung).
-- **Hygiene-Tickets aus Session 4**, weiter zurückgestellt: `*.sqlite.bak-*` in
-  `.gitignore`, `ROADMAP.md:427`-Aktualisierung.
+- **D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche (Plan §7 P1–P9).
+  D1 (Modul-Tabelle gegen As-Built), D2 (finaler Sweep), D3 (`## Session stopped` +
+  Rotationsregel), D4 (root-`CLAUDE.md` + `ROADMAP.md` + `docs/INDEX.md`-Update) sind
+  **alle in Session 9 abgeschlossen** (Commits `88fb4db` + `2d2df0f` + `9707317`).
+  Phase ist **strukturell fertig** (A1–A8 grün, Σ 1698); Closeout-Handover
+  (`docs/concepts/PHASE14_CLOSEOUT_HANDOVER.md` o.ä., analog zu Phase 12) kommt als
+  letzte Phase-14-Session, **nach** der Beweiswoche. Mein Vorschlag steht: **erst
+  Beweiswoche abwarten** — ehrlich final schließen geht nur, wenn die Beweiswoche
+  die Quell-Verfügbarkeit einmal real verifiziert hat.
+- **Restart-Hygiene-Fix** (Nikinger-bestätigt 2026-08-25, **nächste Mini-Session**):
+  1-Zeilen-Fix in `scripts/dev_install.sh` + die drei `run_*.sh`-Wrapper
+  (`run_scheduler.sh`, `run_recorder.sh`, `run_discovery.sh`, `run_webui.sh`):
+  venv-Bin-Pfad als PATH-Prepend ganz oben, damit nach Reboot kein manuelles
+  `source venv/bin/activate` mehr nötig ist. Konkret: ein vorheriger unerwarteter
+  Restart der Maschine hat gezeigt, dass die Skripte ohne aktive venv sofort
+  scheitern (`exec: uvicorn: not found` etc.); die damalige vorherige Session hat
+  die Prozesse manuell neu gestartet (kein dauerhafter Fix). Hygiene-Edits sind
+  Wochenend-tauglich (1-Datei-Fix + Sweep + Commit + Push, ~15 Min).
+- **Hygiene-Tickets aus Session 4**, weiter zurückgestellt: `*.sqlite.bak-*` ist
+  ✅ (Commit `2d2df0f`), `ROADMAP.md:427`-Nummerierungs-Korrektur ist ✅
+  (selber Commit). Damit ist die Session-4-Hygiene-Liste leer.
 - **Plan-§9-Drift-Listeneintrag #2** erweitern in der nächsten Plan-Session.
 - **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
   Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale Outcomes.
 
 ### NEXT
 
-- **Operator (Nikinger):** Push-Freigabe für die 5 Commits
-  (`275deb2`, `94bbd0c`, `af837c1`, `7aa86bd`, `170ed72`) + diesen Docs-Commit.
-  Stand jetzt: 5 Commits vor `origin/main`.
-- **Ausführende Session (nächste):** **Block D — Closeout.** Konkret:
-  - root-`CLAUDE.md`: Phase-14-Zeile auf „Block C done, Beweiswoche + Block D ausstehend"
-    (statt „Plan committet, Bau nicht begonnen")
-  - `ROADMAP.md` Phase-14-Block auf den erreichten Stand
-  - `docs/INDEX.md`: Phase-14-Status-Update (Bullet-Liste, eine Zeile)
-  - **Entscheidung A**: Soll die Phase hier geschlossen werden (mit Closeout-Handover,
-    D5), oder soll Block D nur die Doku-Updates machen und die Phase erst nach der
-    Beweiswoche (Phase 13 Plan §7 P1–P9) final schließen? Mein Vorschlag:
-    **erst Beweiswoche abwarten** — Phase 14 hat strukturell geliefert, aber der
-    Beweis-Track ist Phase 13 und läuft parallel. D5 (= Closeout-Handover) ist deshalb
-    die letzte Session der Phase, nicht diese.
-- **Beweiswoche läuft separat weiter** (Phase 13 Plan §7 P1–P9). C1–C4 berühren die
-  laufende Beweiswoche nicht — kein Konsumentenpfad schreibt in
-  `instrument_source_availability` während der Beweiswoche; die einzigen Schreiber
-  sind (a) A4-Projektion in `UniverseStore.set_symbol`, die auf den nächsten
-  Resolver-Tick wartet, und (b) der C2-Daemon, der ohne `arm`-Flag ein No-Op ist.
+- **Operator (Nikinger):** Restart-Hygiene-Fix in der **nächsten Mini-Session**
+  freigeben (siehe „Unverändert offen"-Block oben). Vorher ist nichts mehr zu pushen
+  — `git log origin/main..HEAD` ist leer, Working tree clean.
+- **Ausführende Session (nächste):** **Restart-Hygiene-Fix.** Konkret:
+  1. `scripts/dev_install.sh` + die vier `run_*.sh`-Wrapper lesen (Anker finden,
+    aktuellen Zustand verifizieren — die Empfehlung aus Session 6 wurde bisher
+    **nicht** umgesetzt)
+  2. PATH-Prepend-Block als 1-2 Zeilen oben in jedes Skript einbauen
+  3. (optional) Bonus: einfache `restart-services.sh`-Helfer-Skript mit
+    `pkill -f 'python -m (scheduler|data_foundation|source_registry)\.run'`
+    + Re-Start der vier Prozesse
+  4. Tests unverändert (Skript-Edits, kein Python-Code), Sweep-Check
+    (Σ 1698 muss halten), Commit + Push
+  5. **Keine Cross-Phase-Touches** — alles in `scripts/`-Verzeichnissen der
+    betroffenen Phasen, die bereits in der freigegebenen Liste stehen
+- **Phase-14-Aktivität:** Mid-Phase-Status läuft, Phase-13-Beweiswoche läuft
+  separat (Plan §7 P1–P9), D5 wartet auf Beweiswoche.
+- **Beweiswoche** läuft seit Mo 2026-08-25 (laut Phase-13-Plan §7 operator-getrieben).
+  Erste Beobachtung (aus diesem Restart-Check): Trade #8 BUY DAX.IGN offen,
+  5. BUY auf DAX in Folge nach 4 Verlust-Trades (-2530.82 EUR realisiert),
+  Token-Budget 38.5% / Weekly-Allowance 48% / Loss-Breaker **nicht** ausgelöst.
+  Kein Handlungsbedarf (Safety-Mechanismen innerhalb Caps), aber Phase-15-Territorium
+  (V4 — Council, Handover, Reward-Reform: BUY-Serie gegen das Modell stärker
+  gewichten).
 
 ---
 

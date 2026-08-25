@@ -213,28 +213,34 @@ selbst bleibt unberührt, der Re-Plan ist die kanonische Aussage.
 
 ### Next
 
-- **Operator (Nikinger):** Push-Freigabe für die zwei Commits (`074d6c9` +
-  dieser Docs-Commit). Stand jetzt: **40 Commits** vor `origin/main`.
-- **Phase-14-Planning-Session (eigene, neue):** liest zuerst den
-  Block-C-Re-Plan + das Phase-14-Concept, dann den Phase-13-Hauptplan
-  (L1–L17), dann die Phase-12.5-Closeout (Lehre „nicht im Konsumentenpfad
-  kaufen"). Schreibt `docs/concepts/phase14_discovery_plan.md` mit
-  gelockten Decisions D1–D?, Steps 0–?, Drift-Liste, Akzeptanz.
-- **Phase-14-Planning-Session Schritt 0.0** (aus Re-Plan §5):
-  Regression-Sweep + `ps aux | grep scheduler.run` (Gegenprobe) + Live-DB-
-  Stand frisch (heutige `instrument_source_availability`-Substrat-Grösse).
-- **Cross-Phase-Freigabe** für Phase 14 (Nikinger): die Discovery-Tabelle
-  berührt Phase 2 (Migration), Phase 3 (yFinance), Phase 9 (Universe),
-  Phase 13 (`backfill.py`). Vor dem ersten Code-Schritt einholen — analog
-  zur Phase-13-Freigabe 2026-08-18.
-- **Beweiswoche läuft parallel** (Phase 13 Plan §7 P1–P9). `data_health.py`
-  täglich, `source_delta.py` wöchentlich. P6 (Quellen-Delta-Report) hat mit
-  den 962 `source='capital'`-Bars jetzt ein echtes Substrat.
+- **Operator (Nikinger):** kein Push nötig — Phase 13 ist seit Session 8 mit `74`
+  grünen Tests (war zum Session-14-Stand 50, +24 aus Phase 14 B1b+B2+B3 im
+  `phase13_live_data/`-Tree), Commits alle auf `origin/main`.
+- **Phase-14-Planning-Session:** **erledigt** — Plan liegt in
+  [`docs/concepts/phase14_discovery_plan.md`](../../docs/concepts/phase14_discovery_plan.md),
+  Decisions D1–D20 gelockt, Akzeptanz A1–A8 alle grün (Σ 1698 nach Session 9).
+- **Cross-Phase-Freigabe** für Phase 14 (Nikinger, 2026-08-22): **erteilt** für
+  Phase 2 (Migration), Phase 8 (`webui/`, `run_scheduler.sh`), Phase 9
+  (`models.py`, `store.py`), Phase 12 (`budget.py`-Nutzung) und Phase 13
+  (`backfill.py`, `scripts/`).
+- **Beweiswoche läuft parallel** (Plan §7 P1–P9), gestartet Mo 2026-08-25.
+  Erste Beobachtung aus dem Restart-Check: Trade #8 BUY DAX.IGN offen
+  (5. BUY auf DAX in Folge nach 4 Verlust-Trades, -2530.82 EUR realisiert);
+  Loss-Breaker nicht ausgelöst (€1800-Cap, aktuelle realized-pnl heute = 0);
+  Token-Budget 38.5% / Weekly-Allowance 48% / 0 Discovery-Punkte gebucht.
+  Kein Handlungsbedarf, Safety-Mechanismen innerhalb Caps; Phase-15-Territorium
+  (V4 — Council, Handover, Reward-Reform).
 
 ### Offene Findings (für Folge-Sessions, nicht in diesem Build-Scope)
 
-- **Modul-Tabelle in `phase13_live_data/CLAUDE.md` ist nicht aktualisiert**
-  (Test-Count 39 statt 50, Block-C-Zeilen brauchen ein „final"-Tag).
+- **Modul-Tabelle in `phase13_live_data/CLAUDE.md` ist nicht aktualisiert** —
+  Stand Session 14 nannte Test-Count 39, inzwischen sind es **74** (50 nach
+  Session 14 + 24 aus Phase-14-B1b/B2/B3-Commits `ac54825`/`6e8148e`/`bb095df`,
+  die in `phase13_live_data/` mit-tests-edits haben). Block-C-Zeilen brauchen
+  ein „final"-Tag. Beides für eine Phase-13-Hygiene-Session vorgemerkt, kein
+  Phase-14-Scope.
+- **Plan-§9-Drift-Listeneintrag #2** (Phase-14) erweitern in der nächsten Plan-
+  Session — Editor-Notiz, kein Doku-Touch.
   Bewusst NICHT in diesem Commit geändert — der Plan-Snapshot und die
   Re-Plan-Datei sind die kanonische Aussage, der Phasen-Kopf folgt in
   einer Folge-Session (oder direkt mit der Phase-14-Eröffnung).
