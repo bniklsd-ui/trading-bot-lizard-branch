@@ -1,11 +1,11 @@
 ---
 status: snapshot
-purpose: Phase-10-Closeout-Handover (2026-08-25, Nikinger-Freigabe 2026-08-25) — Phase 10 (V3: Abstain-Lessons + Persistenz-Reform + Paper-Trades) ist ✅ abgeschlossen. Council-Paper-Call ist **bis auf weiteres in mind Phase 15 verschoben** (Nikinger 2026-08-25). Was die nächste Session wissen muss, BEVOR sie einen Plan schreibt — knapp, code-zentriert, kein Plan-Reprint. Read-only-Inventur, jeder Datenpunkt selbst nachgemessen.
-read-when: vor jedem Plan, der Phase 11 wieder aufnimmt; vor jedem Touch an `enable_paper_debate`/Council; vor jedem Re-Read der Bugfix-Block-Historie; vor jeder Frage „ist Phase 10 eigentlich fertig?"
+purpose: Phase-10-Closeout-Handover (2026-08-25, Nikinger-Freigabe 2026-08-25) — Phase 10 (V3: Abstain-Lessons + Persistenz-Reform + Paper-Trades) ist ✅ abgeschlossen. Council-Paper-Call ist **bis auf weiteres in mind Phase 15 verschoben** (Nikinger 2026-08-25). Was die nächste Session wissen muss, BEVOR sie einen Plan schreibt — knapp, code-zentriert, kein Plan-Reprint. Read-only-Inventur, jeder Datenpunkt selbst nachgemessen. **§8 (diese Datei): Phase-11-Wiederaufnahme-Inputs von Nikinger 2026-08-25 (Wait-Default + Positive-Lessons-Pflicht) — keine Plan-Arbeit vor Phase-13-Beweiswoche.**
+read-when: vor jedem Plan, der Phase 11 wieder aufnimmt; vor jedem Touch an `enable_paper_debate`/Council; vor jedem Re-Read der Bugfix-Block-Historie; vor jeder Frage „ist Phase 10 eigentlich fertig?"; **für Phase-11-Wiederaufnahme-Inputs: §8 dieser Datei (Nikinger 2026-08-25)**
 detail: L3
 up: ./CLAUDE.md
 down:
-  - ./PHASE11_DEFERRAL_HANDOVER.md   # 📕 die Notbremse vom 2026-08-11 — Phase-10-Status dort unverändert ✅
+  - ./PHASE11_DEFERRAL_HANDOVER.md   # 📕 die Notbremse vom 2026-08-11 — Phase-10-Status dort unverändert ✅; **Einstieg für Phase-11-Wiederaufnahme + §8 dieser Datei für Nikinger-Inputs 2026-08-25**
   - ../docs/concepts/phase10_v3_plan.md   # 📕 execution-ready Plan (L1–L11, Decisions V3-D1…D10, 📕 Convention „never edit")
   - ../docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md   # 📕 Kickoff-Handover aus M1 → V3
   - ./DATA_SOURCE_STRATEGY_2026-08-11.md   # 📕 die Richtung (mit Korrektur §2.6: nur Workaround, kein Bestätigungs-Beweis)
@@ -208,6 +208,117 @@ letzte echte Closeout-Handover vor Phase 10), `./STEP0_DATA_ANALYSIS_2026-07-10.
   (Phase 13 läuft seit Mo 2026-08-25 den Messarm).
 
 ---
+
+## §8 Phase-11-Wiederaufnahme — Nikinger-Inputs (2026-08-25)
+
+> Hänge an diesem Closeout-Handover fest, damit die Anforderungen nicht im
+> Chat-Verlauf versickern. **Einstieg für die Phase-11-Plan-Session, BEVOR ein neuer
+> Plan geschrieben wird:** §1 hier, dann `PHASE11_DEFERRAL_HANDOVER.md` §3 (Anforderungen
+> A–G — alle durch Phase 12+13+14 strukturell erfüllt) + §4 (offene Entscheidungen
+> — die meisten durch Phase-10/12-Closeout mit Nikinger-Entscheidungen geklärt).
+
+### 8.1 Timing-Entscheidung: **Warten** auf die Phase-13-Beweiswoche
+
+Phase 11 ist definitionsgemäß eine **Mess-Phase, keine Build-Phase** — sie braucht
+gültige Daten als Input, nicht als Hypothese. Solange die Phase-13-Beweiswoche (seit
+Mo 2026-08-25) die Datenverlässlichkeit noch nicht unter Beweis gestellt hat, würde
+eine Phase-11-Wiederaufnahme das Muster zum 4. Mal reproduzieren, das die Notbremse
+2026-08-11 ausgelöst hat (drei Datenwochen, gute Fragen, kaputte Daten).
+
+**Reihenfolge** (Nikinger 2026-08-25 bestätigt):
+
+1. Phase 13 Beweiswoche läuft (seit 2026-08-25, kein Eingriff).
+2. Phase 14 D5 Final-Closure, sobald Phase 13 bewiesen hat.
+3. **Phase 11 Plan-Session** mit echtem Datenmaterial + aktualisiertem Plan.
+
+In der Zwischenzeit: **keine parallele Arbeit** an Phase 11 (außer dem optionalen
+B3-Mini-Schritt, s. §8.3). Wer vor Abschluss der Beweiswoche etwas tut, arbeitet
+auf einem Hypothesen-Stand, der drei Mal widerlegt wurde.
+
+### 8.2 Zusatz-Anforderung (Nikinger-Note 2026-08-25): **Positive Lessons**
+
+> *„Es sollte auch positive Lessons geben, das LLM soll ja aktiv dazu ermutigt
+> werden funktionierende Methoden aktiv zu wiederholen."* — Nikinger
+
+**Was heute asymmetrisch ist:** der aktuelle Lesson-Pfad
+(`phase10_v3/abstain_lessons/reflect.py` + `Classifier`/`AbstainReason`) erfasst
+**nur NO_TRADE/ABSTAIN-Vorfälle** — also was zu vermeiden ist. Es gibt **keinen**
+Mechanismus, der Trades dokumentiert, die gut gelaufen sind, plus die Methoden/
+Setups, die dazu geführt haben. Das LLM wird heute einseitig dazu ermutigt, weniger
+zu tun (Avoidance-Bias), nicht aber, das Erfolgreiche zu wiederholen.
+
+**Konsequenz für Phase-11-Wiederaufnahme** (Pflicht-Item, kein „nice to have"):
+
+- **Positives Pendant** zu `reflect_abstain` muss existieren — eine Quelle, die
+  geschlossene Trades mit positiver P&L aufnimmt, daraus eine „diese Konfiguration
+  / dieses Pattern hat funktioniert"-Lesson extrahiert (deterministischer Code, nicht
+  LLM-Schwall — ein Template mit `epic`, `direction`, `entry_context`, `exit_reason`,
+  `p_r_multiple`, `lesson_text`).
+- **Symmetrische Aktivierung**: das Prompt-Builder-`_render_lessons`-Modul
+  (`phase4_research/research/prompt.py:135-142`) muss zwischen „Lessons to avoid"
+  und „Lessons to repeat" unterscheiden — sonst kommt der Avoidance-Bias durch die
+  Hintertür zurück, diesmal als „nur negativen Stuff rendern".
+- **LLM-Encouragement (Nikinger-Anforderung, wörtlich):** der Schritt, der die
+  Lessons vor dem Render filtert, muss **aktiv dazu ermutigen**, funktionierende
+  Methoden zu wiederholen — also nicht nur „zeig recent_lessons", sondern
+  mindestens gewichten, dass die positiven Einträge den negativen gleichwertig
+  sichtbar sind. Konkret: der Render-Prompt soll beide Klassen enthalten und
+  gleich lang rendern (oder positiv sogar priorisieren, falls die LLM-Confidence
+  für Trade-Reproduktion sonst zu konservativ bleibt).
+
+**Anmerkung zum Stand:** diese Anforderung steht **nicht** in der alten
+`phase10_v3_plan.md` §5 (Specs S1–S7) und **nicht** im `PHASE11_DEFERRAL_HANDOVER.md` —
+beide Dokumente stammen aus dem Zeitfenster 2026-07-10/11, in dem die Lessons-
+Asymmetrie noch nicht thematisiert war. Die Anforderung kommt erst jetzt, von
+Nikinger, in dieser Session. **Eine neue Phase-11-Plan-Session muss sie als Pflicht-
+Scope-Item mit aufnehmen**, sonst bleibt die Asymmetrie strukturell.
+
+### 8.3 Optional in der Zwischenzeit (beweiswoche-unabhängig)
+
+- **B3 (Margin-Headroom)** als Mini-Session (~30 Min): der Live-Check ist eine
+  Operator-Task (`/markets/{epic}`-Margin-Felder), die Umsetzung ist Sizing-Code.
+  B3 tangiert das WI-2/W2-Messergebnis nicht (Sizing ist VOR dem Trade,
+  WI-2/W2 ist NACH dem Trade). Empfehlung: **nicht** parallel starten, weil
+  parallele Mini-Schritte in der sonst stillen Phase die Wiederaufnahme-
+  Disziplin verwässern. Wenn B3, dann in einer eigenen Session mit eigener
+  Freigabe.
+
+### 8.4 Was die Phase-11-Wiederaufnahme NICHT mitnimmt
+
+- **Datenfundament-Aufbau** → bleibt bei Phase 12 (✅ closed 2026-08-25)
+  und Phase 13 (laufende Beweiswoche + D-Achse S3-/S4-Vorbereitung).
+- **Quell-Auswahl / Source-Registry** → bleibt bei Phase 14 (✅ strukturell,
+  D5 wartet auf Phase 13).
+- **Council / Handover / Reward-Reform** → bleibt bei Phase 15 (long-horizon,
+  gegatet auf reale Outcomes).
+- **„Alles gleichzeitig"** → kein Patch auf den Lesson-Pfad, bevor die Beweiswoche
+  entschieden hat, ob die jetzige Datenverlässlichkeit überhaupt stabil ist.
+
+### 8.5 Wie diese Inputs in der Phase-11-Plan-Session zu lesen sind
+
+Die Phase-11-Plan-Session öffnet mit dieser Sektion + §8.2 als Pflicht-Scope +
+`PHASE11_DEFERRAL_HANDOVER.md` §3 (Anforderungen A–G — Status jetzt: alle erfüllt
+außer G „Messfähigkeit als Betriebseigenschaft", das von der Phase-13-Beweiswoche
+bewiesen werden muss) + §4 (offene Entscheidungen, davon 2 bereits entschieden:
+Weg/Label abgelöst durch P13+14, Wiederanlauf abgelöst, einer offen für die
+Plan-Session: konkrete Mess-Endpunkte für WI-2/W2 jenseits von „mehr Trades
+abwarten"). Der neue Plan ersetzt nicht den 📕-Snapshot
+`phase12_data_foundation_plan.md` — er bekommt einen **eigenen Plan-Pfad** unter
+`docs/concepts/phase11_resumption_plan.md` (Nikinger-Entscheidung Vorbehalten,
+Nummerierung ist hier nicht mein Bier).
+
+---
+
+> **Autor dieses Files:** Claude Code (Sonnet 5, MiniMax M3 via claude-minimax), Read-only-Session
+> 2026-08-25. Cross-Phase-Liste (Plan §4 + Session-9-NEXT) abgearbeitet: Phase-10-Files editiert,
+> Phase-9 (CLAUDE.md, models.py, store.py — Sync-Projection), Phase-2 (Migrationen), Phase-8
+> (webui + wiring) **nicht** angefasst — diese Liste gilt für Phase-14, nicht für Phase-10-Close.
+> **Phase-10-Closeout-Handover ist eine eigene, dokumentationsdominierte Atom-Einheit** — keine
+> Cross-Phase-Edits am Produktionscode in dieser Session.
+>
+> **§8 ergänzt 2026-08-25, am selben Tag, Nikinger-Inputs (Wait-Default + Positive-Lessons-
+> Pflicht + B3-Optionale-Separierung) sicherend.** Der Closeout-Handover bleibt sonst
+> unverändert.
 
 > **Autor dieses Files:** Claude Code (Sonnet 5, MiniMax M3 via claude-minimax), Read-only-Session
 > 2026-08-25. Cross-Phase-Liste (Plan §4 + Session-9-NEXT) abgearbeitet: Phase-10-Files editiert,
