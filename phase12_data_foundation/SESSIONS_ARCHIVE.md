@@ -4,7 +4,7 @@ purpose: Verbatim session-history archive rotated out of `CLAUDE.md`
 read-when: auditing how a past Phase-12 decision came about — never needed at session start
 detail: L3
 up: ./CLAUDE.md
-updated: 2026-08-18
+updated: 2026-08-25
 ---
 
 # phase12_data_foundation — Session Archive
@@ -14,6 +14,63 @@ updated: 2026-08-18
 > preserved (newest-first). The newest `## Session stopped` block always stays in the source file;
 > at each session end, the previously-newest block rotates here.
 
+---
+## Session stopped — 2026-08-18 (Session 9: Closeout-Analyse nach dem Scheitern — Root Cause korrigiert, neuer Weg empfohlen)
+
+> **Auftrag:** die abgeschlossene/zurückgestellte Phase gegen den As-Built-Zustand prüfen
+> (selbst nachmessen, nicht aus Handovers übernehmen), SVG + Closeout-Handover + Statuspflege.
+> **Volles Ergebnis:
+> [`PHASE12_5_CLOSEOUT_HANDOVER.md`](./PHASE12_5_CLOSEOUT_HANDOVER.md)** — dieser Block ist die
+> Kurzfassung. Keine Produktionscode-Änderung in dieser Session.
+
+### Completed
+
+1. **As-Built selbst nachgemessen** (Code, Tests, Live-DB `mode=ro`): Tests **123 / 160** grün,
+   `main` **4 Commits vor `origin/main` (nicht gepusht)**, Scheduler aus, Recorder (`pid 33151`)
+   läuft kostenlos weiter, IG-Fenster 4731/10 000, IG-eigene Restmeldung 5054 (14:08).
+2. **Neuer, entscheidender Befund:** von **1782 bei IG gekauften 1-Min-Bars trugen 1638 (92 %)
+   Zeitstempel, die bereits als yF-Bar im Archiv lagen** — gekauft wurden ~144 Bars echter neuer
+   Information für 4515 Punkte. Das kippt die Empfehlung von „billiger kaufen" auf „nicht kaufen".
+3. **Zwei Korrekturen an der bisherigen Root-Cause-Erzählung** (Closeout §2, datiert):
+   **K1** — `_covers_tail and coverage_ratio` kurzschließt links; `_covers_tail` verlangt eine
+   Bar ≤ 1 Min alt, yF liefert mit ~15 Min Eigenverzug (15:05er Bar um 15:20 geholt, Recorder-Takt
+   300 s) ⇒ **U3 kann den Reffetch nie ausgelöst haben**; Auslöser ist allein das Einschalten des
+   Messarms, der Pfad lag seit Step 4 latent. **K2** — „41 von 90" war falsch: 45 Paare / 90
+   Zeilen, 70 aufgelöst, **54 von 70** mit IG-Beteiligung, 20 blieben OPEN.
+4. **Testlücke benannt:** keine der 123 Zusicherungen prüft *Kosten* — `test_service.py` prüft,
+   **dass** ein Refetch feuert, nie **wie teuer** er ist.
+5. **Neue Dateien:** [`PHASE12_5_CLOSEOUT_HANDOVER.md`](./PHASE12_5_CLOSEOUT_HANDOVER.md) und
+   [`../docs/architecture/phase12_5_failure.svg`](../docs/architecture/phase12_5_failure.svg)
+   (1080×1080: Fehlerbild → Zielbild → was offen bleibt).
+6. **Doku-Sync + Korrekturen** (dieser Commit): Root-`CLAUDE.md`, `ROADMAP.md` (u. a. „P12 117"
+   → **123**), `docs/INDEX.md` (+2 Zeilen), dieser Kopf inkl. Rotation des Session-8-Blocks.
+
+### Verified
+
+- 123 / 160 Tests heute getrennt gelaufen, beide grün.
+- Alle Zahlen dieses Blocks stammen aus eigenen read-only Abfragen gegen `data/bars.sqlite` und
+  `data/trading_bot.sqlite`, nicht aus Vordokumenten.
+- K1 gegen den Quelltext geprüft (`service.py:218-219`, `:229-238`, `_covers_tail` ab `:266`),
+  nicht nur argumentiert.
+
+### Next
+
+- **Entscheidungen einholen, bevor geplant wird** (Closeout §4/§5/§6): Weg (Empfehlung
+  **Option B** — Auflöse-Pfad kauft nie wieder Daten, Frage wechselt von „reicht das Archiv bis
+  jetzt?" zu „deckt es das Fenster dieses Trades bis `time_stop_utc`?"; Option A/Patch-Leiter
+  explizit abgelehnt), Label (Empfehlung: kein neues Unter-Label), Wiederanlauf-Zeitpunkt
+  (Empfehlung: nicht vor Umsetzung + frischer `remainingAllowance`-Probe; Fenster rollt ~25.08. ab).
+- Erste Akzeptanzbedingung des nächsten Plans soll eine **Kostenzusicherung** sein.
+
+### Open questions / blockers
+
+- **Ungeklärt, bewusst nicht geraten:** warum `IX.D.IBEX.FWM2.IP` als einzige Epic 14/14 Trades
+  rein aus yF auflöste (identische Zeitfenster und yF-Abdeckung wie die anderen vier, dennoch
+  10 `ig`-ok-Events in `research_health.jsonl`). Für Option B unmittelbar relevant — sie ist der
+  Existenzbeweis.
+- Kein technischer Blocker: Bot steht sicher, Recorder sammelt weiter kostenlos.
+
+---
 ## Session stopped — 2026-08-18 (Session 8: Step 4/5 live durchgeführt, P12.5 dann formal CLOSED — GESCHEITERT)
 
 > **Verlauf:** Step 4 (Neustart mit beiden Flags) lief Nikinger-seitig 2026-08-17 abends.

@@ -494,13 +494,20 @@ Bild: [`docs/architecture/phase10_v3.svg`](./docs/architecture/phase10_v3.svg).
 
 ## Phase 12 — Datenfundament (Registry + BarService + Bar-Archiv + Recorder)
 
-> **Status: 🔄 in Arbeit — Steps 0–8.5 gebaut, getestet (P12 123, Stand 2026-08-18) und auf
-> `main` (noch nicht gepusht); Step 9 (Beweiswoche) nicht begonnen, Done-Kriterium offen.** Notbremse aus Phase 11 (oben):
-> drei Datenwochen sind an drei Infrastruktur-Ausfällen gescheitert, nie an der Messung — die
-> gemeinsame Wurzel (**eine Tatsache in drei divergenten Speichern**, die Mehrquellen-Kette aus
-> Phase 9 nie eingeschaltet) ist wichtiger als die vorherige Phase. Execution-ready Plan
-> (Überweg C, Decisions D1–D20, Steps 0–10): [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md).
-> Bild: [`docs/architecture/data_foundation.svg`](./docs/architecture/data_foundation.svg).
+> **Status: ✅ abgeschlossen (Closeout 2026-08-25) — Steps 0–8.5 auf `main`, 143 Tests grün
+> (Stand 2026-08-25), 18 Phase-12-Commits auf `origin/main`.** **Die strukturelle Antwort
+> auf das P12.5-Scheitern steht in Phase 13+14** (Nikinger 2026-08-25): der Auflöse-Pfad
+> kauft nie wieder Daten — Phase 13 Block A trennte Beschaffung und Verbrauch, Phase 14
+> macht Quellen zur Registry-Zeile. **Phase-12-Beweiswoche wird nicht wieder aufgenommen**;
+> die Phase-13-Beweiswoche läuft seit Mo 2026-08-25 separat, gegen die Phase-13-Architektur.
+> P12.5 wurde 2026-08-18 formal CLOSED + GESCHEITERT — die fünf Code-Edits (U1/U2/U3/U5 +
+> Entscheidung B) bleiben **unabhängig korrekt im Repo**. Notbremse aus Phase 11 (oben):
+> die gemeinsame Wurzel war strukturell, nicht messbar — durch Phase 13+14 abgelöst.
+> Closeout-Handover: [`phase12_data_foundation/PHASE12_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_CLOSEOUT_HANDOVER.md),
+> Bild: [`docs/architecture/phase12_closeout.svg`](./docs/architecture/phase12_closeout.svg).
+> As-Built-Analyse: [`PHASE12_5_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md),
+> Sofort-Befund: [`PHASE12_5_FAILURE_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_FAILURE_HANDOVER.md).
+> Plan: [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md).
 >
 > **Tag-1-Live-Auswertung (2026-08-17):** die Kette Resolver → Registry → `measurable_universe()`
 > → Recorder/BarService → `bars.sqlite` läuft end-to-end im Echtbetrieb (5 `ok`-Epics, 3 typisiert
