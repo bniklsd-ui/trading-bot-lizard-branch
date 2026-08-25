@@ -101,120 +101,148 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 | *(cross-phase)* `phase8_scheduler/scripts/run_scheduler.sh` | Autostart-Hook für `run_discovery.sh` (analog Recorder) | ✅ C4b (Session 9) |
 
 ---
-## Session stopped — 2026-08-25 (Session 10: Restart-Hygiene — 5 Start-Wrapper PATH-prepend)
+## Session stopped — 2026-08-25 (Session 10: Restart-Hygiene — 4 Commits, atomar aus einer Nikinger-Antwort)
 
 > **Auftrag:** Special-Task aus dem Prompt (Nikinger-bestätigt 2026-08-25), schon im
 > Session-9-NEXT-Block + „Unverändert offen"-Block vorregistriert. Wochenend-taugliche
-> Mini-Session (~15 Min), genau wie der NEXT-Block angekündigt hat. **Keine Push-Freigabe
-> eigenmächtig** — Working-Style-Regel „Push fragt der Nikinger frei".
+> Mini-Session (~15 Min) plus Erweiterung in derselben Nikinger-Antwort („Gerne alles
+> genannte, aber was ist das Problem bei phase 8?"). **Vier Atome, eine Session.**
+> **Keine Push-Freigabe eigenmächtig** — Working-Style-Regel „Push fragt der Nikinger frei".
 
 ### Completed
 
 **Commit 1 — `phase14: scripts -- restart-hygiene (PATH-prepend in dev_install + 4 run_*.sh)`**
-(`6644773`, 5 files, +63/-0). Session-9-NEXT-Block Punkt 2 erfüllt: PATH-Prepend-Block
-als 5 Sites (eine pro betroffenem Start-Wrapper). Die einzige venv im Repo ist
-`phase1_broker_wrapper/.venv` (bestätigt mit `ls`), in deren `bin/` sowohl `python` als
-auch `uvicorn` liegen. Nach einem Reboot funktionieren jetzt alle Start-Wrapper ohne
-`source <venv>/bin/activate` von Hand.
+(`6644773`, 5 files, +63/-0). NEXT-Punkt 2 des Session-9-NEXT-Blocks: PATH-Prepend-Block
+in allen fünf Start-Wrappern. Die einzige venv im Repo ist `phase1_broker_wrapper/.venv`
+(in deren `bin/` sowohl `python` als auch `uvicorn` liegen). Nach Reboot funktionieren
+alle Start-Wrapper ohne `source <venv>/bin/activate` von Hand.
 
-Fünf Sites, ein Commit, additiv (0 Zeilen gelöscht):
-- `scripts/dev_install.sh` (Repo-Root: `ROOT=` statt `REPO_ROOT=`, weil `ROOT` schon für
-  die pip-Install-Schleife da war — Wiederverwendung, keine neue Variable)
+Fünf Sites, additiv (0 Zeilen gelöscht):
+- `scripts/dev_install.sh` (`ROOT=` statt `REPO_ROOT=` — `ROOT` schon da, wiederverwendet)
 - `phase8_scheduler/scripts/run_scheduler.sh` (`REPO_ROOT=`)
 - `phase8_scheduler/scripts/run_webui.sh` (`REPO_ROOT=`) — **Fix für den explizit
   benannten `uvicorn: not found`-Befund**
 - `phase12_data_foundation/scripts/run_recorder.sh` (`REPO_ROOT=`)
 - `phase14_discovery/scripts/run_discovery.sh` (`REPO_ROOT=`)
 
-Jeder Block: 5 Zeilen Comment-Header (warum + Verweis auf den Session-9-NEXT-Block) +
-6 Zeilen Logik (`REPO_ROOT` aus `BASH_SOURCE`, `_VENV_BIN` berechnen, Existence-Check,
-Path-Prepend, `unset _VENV_BIN`). 11 Zeilen pro Datei, identische Form; einziger
-var-name-Unterschied ist `ROOT` vs `REPO_ROOT`. `bash -n` OK auf allen 5 Dateien.
+Jeder Block: 5 Zeilen Comment-Header + 6 Zeilen Logik (`REPO_ROOT` aus `BASH_SOURCE`,
+`_VENV_BIN` berechnen, Existence-Check, Path-Prepend, `unset _VENV_BIN`). 11 Zeilen
+pro Datei, identische Form. `bash -n` OK auf allen 5.
 
-**Bonus-`restart-services.sh` bewusst NICHT mitgebaut** (NEXT-Punkt 3 war als optional
-markiert). Begründung im Commit-Body: Bot läuft aktuell (3 Prozesse alive:
-`data_foundation.run` PID 4190, `scheduler.run` PID 4237, `source_registry.run` PID 4243),
-Operator-Kultur ist „KILL-File ist sticky, kein zweiter Login, Restart ist sequenziell".
-Ein `pkill`-Helfer wäre die Sorte Fußkanone, die diese Kultur vermeidet — die
-Hygiene-Korrektur macht den **Reboot**-Pfad selbstständig (was der Auftrag war), nicht
-den aggressiven **In-Session**-Restart. Wenn der Nikinger das später will: separat, mit
-Care-Instructions für KILL-File und PID-File-Konflikte.
+**Commit 2 — `phase8: tests -- hermetic DISCOVERY_ARMED in client-fixture (4 C3-tests grün)`**
+(`0a55818`, 1 file, +27/-1). Nikinger-Antwort auf den Phase-8-Befund: die 4 C3-Akzeptanz-
+Tests (`test_discovery_unarmed_reports_false`,
+`test_discovery_arm_creates_flag_and_subsequent_get_reports_true`,
+`test_discovery_disarm_removes_flag`,
+`test_discovery_endpoint_fails_soft_without_migration_007`) teilten den Live-Pfad
+`data/state/DISCOVERY_ARMED` mit dem Endpoint — alle anderen Fixture-Pfade benutzten
+`tmp_path`, **nur** der Arm-Pfad nicht. Plus eine **zweite** Live-Bleed-Stelle, die
+erst diese Sitzung entdeckt hat: `webui/api.py:431` liest `data/state/discovery_state.json`
+für das Last-Run-Summary-Feld, ebenfalls live. Beide Bleeds adressiert mit
+monkeypatch-Pinning von drei Modul-Konstanten auf `tmp_path`:
+
+```python
+monkeypatch.setattr(api,   "_DATA_DIR",          tmp_path)              # deckt _ARM_PATH + Zeile 431
+monkeypatch.setattr(api,   "_ARM_PATH",          tmp_path / "DISCOVERY_ARMED")
+monkeypatch.setattr(arm,   "DEFAULT_ARM_PATH",   tmp_path / "DISCOVERY_ARMED")
+```
+
+Zwei Implementierungs-Details im Commit-Kommentar dokumentiert:
+- **Module-Shadowing von `source_registry.arm`.** `source_registry/__init__.py:26-32`
+  re-exportiert `arm` (die Funktion) als Top-Level-Paketattribut, was `source_registry.arm`
+  als Namen schattet. `from source_registry import arm` würde die Funktion binden, nicht
+  das Submodul. Workaround: `importlib.import_module("source_registry.arm")` umgeht den
+  `__init__`-Shadow und liefert das echte `arm.py`-Modul, wo `DEFAULT_ARM_PATH` definiert ist.
+- **Blast-Radius `_DATA_DIR`-Redirect.** `api.py` nutzt `_DATA_DIR` zur Laufzeit nur an
+  Zeile 57 (via `_ARM_PATH`, separat gerichtet) und Zeile 431 (das
+  `discovery_state.json`-Reading). Die Zeilen 76-79 sind `SchedulerConfig()`-Defaults,
+  die nur greifen wenn keine cfg übergeben wird — der Test übergibt immer eine eigene
+  cfg, also inert.
+
+**Commit 3 — `phase14+8: scripts -- restart-services.sh (status/stop/start/restart + --dry-run) + run_webui.sh +x`**
+(`c97e82a`, 2 files, +266/-0). Nikinger-Antwort: „Gerne alles genannte". NEXT-Punkt 3
+war als optional markiert — gebaut mit Disziplin, nicht als `pkill`-Fußkanone.
+
+`scripts/restart-services.sh` (NEU): vier Modi + `--dry-run`:
+- `status` — Inventur, exit 0 wenn ≥1 alive (default)
+- `stop` — TERM, 5s grace, KILL nur als Fallback nach Grace
+- `start` — `nohup` via die kanonischen Wrapper, idempotent (skip wenn alive)
+- `restart` — stop + start, sequenziell in Start-Reihenfolge
+
+Sicherheits-Disziplin (Projekt-Kultur eingebaut):
+- **Niemals SIGKILL** vor SIGTERM + 5s Grace
+- **`data/state/KILL` und `data/state/DISCOVERY_ARMED`** nie angefasst (operator-sticky)
+- **Pattern-Match + `/proc/<pid>/cwd`-Check**: ein `python -m scheduler.run` aus
+  einem anderen Repo / von einer anderen Maschine wird **nicht** gekillt
+- **Sequentielle Starts** mit sleep zwischen Daemons (Parallel-Login-Falle-Konvention)
+- **Skript wurde nie echt ausgeführt** — Bot läuft unverändert (4 PIDs alive:
+  `data_foundation.run` 4190, `source_registry.run` 4243, `scheduler.run` 4237,
+  `uvicorn webui.api:app` 4595). Status-Aufruf listet sie korrekt, restart --dry-run
+  zeigt jede Aktion, ohne anzufassen.
+
+Begleitend: `chmod +x phase8_scheduler/scripts/run_webui.sh` (war historisch nur
+manuell via `bash ... run_webui.sh` gestartet; Restart-Helper macht es uniform +
++x). Mode-Change 100644 → 100755 im selben Commit.
 
 ### Verified
 
-- `bash -n` Syntaxcheck auf allen 5 Dateien: **OK**.
-- Mechanik-Direkttest (gleiche 6 Logik-Zeilen, einmal ausgeführt mit `PATH=/usr/bin:/bin`)
-  ⇒ `python → /home/trading-bot/trading-bot/phase1_broker_wrapper/.venv/bin/python`,
-  `uvicorn → /home/trading-bot/trading-bot/phase1_broker_wrapper/.venv/bin/uvicorn`.
-  **Prepend funktioniert**, exakt das Symptom-Bild des NEXT-Blocks ist behoben.
-- `git diff --name-only` = 5 `.sh`-Files only, 0 `.py`-Files (NEXT-Punkt 4: „Tests
-  unverändert" eingehalten).
-- Working tree clean nach Commit, einziger uncommitteter Punkt ist `data/`-Ordner
-  (gitignored, normal).
-- Cross-Phase-Edits in der freigegebenen Phase-14-Liste: Phase 8 (`scripts/`),
-  Phase 12 (`scripts/`), root (`scripts/dev_install.sh`). Kein Touch außerhalb.
-- Commit-Message verweist explizit auf den Session-9-NEXT-Block + listet die fünf
-  Sites + liefert die Begründung für den übersprungenen Bonus + die Root-Cause-
-  Erzählung der Pre-existing-Test-Failures (siehe Findings).
+- `bash -n` alle Skripte: **OK** (5 PATH-Prepend + 1 restart-services.sh)
+- Mechanik-Direkttest (PATH-Prepend mit `PATH=/usr/bin:/bin`):
+  `python → phase1_broker_wrapper/.venv/bin/python`,
+  `uvicorn → phase1_broker_wrapper/.venv/bin/uvicorn`. **Prepend funktioniert.**
+- Hermetic-fixture-Test (Phase 8): vorher 4 failed, **jetzt 248 passed** in Phase 8.
+- Full Sweep nach allen 3 Edits: **Σ 1698 grün, 0 fails** (Phase 8 248 · restliche
+  Phasen 1450 unverändert). Σ-Konvergenz auf Session-9-Baseline (1698) erreicht.
+- `git diff --name-only` (kumulativ): 5 `.sh` + 1 Test-Datei + 1 NEU `.sh` + 1 mode-change =
+  nichts außerhalb der freigegebenen Phase-14-Sites (Phase 8 `scripts/` + `tests/`,
+  Phase 12 `scripts/`, Phase 14 `scripts/`, root `scripts/`).
+- `restart-services.sh status` (live, idempotent): listet alle 4 alive mit ihren PIDs.
+- `restart-services.sh restart --dry-run`: zeigt jede TERM-/KILL-/nohup-Aktion an.
 
-### Findings (zwei Hygiene-Beobachtungen, keine Maßnahme in dieser Session)
+### Findings (zwei, beide produktiv behandelt in dieser Session)
 
-- 🟡 **Pre-existing failures: 4 Phase-8 `test_webui.py`-Tests rot** — die vier C3-
-  Akzeptanz-Tests (`test_discovery_unarmed_reports_false`,
-  `test_discovery_arm_creates_flag_and_subsequent_get_reports_true`,
-  `test_discovery_disarm_removes_flag`,
-  `test_discovery_endpoint_fails_soft_without_migration_007`). Session-9-Akzeptanz A6
-  war grün; heute rot. **Root Cause:** die Phase-13-Beweiswoche hat
-  `data/state/DISCOVERY_ARMED` (75 bytes, gültiges `{armed, by, ts}`-JSON) als
-  Operator-Schritt gesetzt — die Tests prüfen aber Unarmed-Verhalten. **Nicht durch
-  diese Session verursacht** (rein Shell-Skript-Edits, `git diff --name-only` = 0
-  `.py`-Touches). Sweep-Zahl: von Σ 1698 (Session-9-Closeout) auf **1694 passed +
-  4 failed = 1698 total** — identische Testkollektions-Größe, **null Regressionen
-  durch diese Hygiene-PR**. **Empfehlung an Nikinger:** die 4 Tests sind mit der
-  aktuellen Beweiswoche-Konfiguration (Discovery armed) nicht ausführbar —
-  entweder via `monkeypatch._ARM_PATH` (Phase-8-Hygiene-Session, ~30 Min) oder
-  Skip-Decorator. Würde in einer eigenen Mini-Session nachschieben, **wenn
-  Nikinger zustimmt** — kein Auto-Fix in dieser Hygiene-PR, weil Phase-8-Tests
-  + Beweiswoche-Aktivität zu eng gekoppelt sind für One-Commit-Drift. Beweis
-  „nicht durch diese Session" verifiziert: `git log origin/main..HEAD --name-only`
-  zeigt nur die 5 `.sh`-Files, kein Python.
-- 🟢 **Hygiene-Skip dokumentiert** (NEXT-Punkt 3): Bonus-`restart-services.sh` ist
-  bewusst NICHT gebaut. „Less is more" — die Hygiene-PR adressiert das genaue Symptom
-  (Reboot ohne aktive venv), nicht den hypothetischen Operator-Workflow daneben.
+- 🟢 **Phase-8-C3-Test-Bleed → gelöst** (Commit 2). Bleed war an **zwei** Pfaden
+  (nicht nur dem Arm-Flag — `discovery_state.json` ist der zweite). Beide im selben
+  `_DATA_DIR`-Redirect adressiert. Lesson: bei hermetic-Test-Fixtures immer prüfen,
+  ob ein Modul-Konstante-Pfad direkt verwendet wird, zusätzlich zu allen Funktionen,
+  die ihn via Attribut lesen.
+- 🟢 **Restart-Helper-Fußkanone vermieden** (Commit 3, Bau mit Disziplin). Das Skript
+  hat **keinen** `--force`-Flag, **kein** automatisches KILL-File-Clearing, **kein**
+  blindes `pkill` — jede Destruktiv-Aktion ist TERM-zuerst mit dokumentierter Grace
+  und CWD-Match als Schutz gegen versehentliche Fremdprozess-Kills. `--dry-run`
+  previews alles. Der ursprüngliche Skeptizismus („Restart-Helper als Fußkanone") wird
+  damit operativ belegt statt postuliert: der Helper ist da, mit klaren Leitplanken,
+  für die Fälle in denen ihn jemand bewusst einsetzen will.
 
 ### Unverändert offen
 
 - **D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche (Plan §7 P1–P9).
-  Phase ist **strukturell fertig** (A1–A8 grün; Σ 1698 = 1694 passed + 4 pre-existing
-  failed, **null Regressionen durch Session 10**).
+  Phase ist **strukturell fertig** (A1–A8 grün; **Σ 1698 grün, 0 fails**).
 - **Hygiene-Tickets aus Session 4** bleibt leer.
 - **Plan-§9-Drift-Listeneintrag #2** erweitern in der nächsten Plan-Session.
 - **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
   Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale Outcomes.
-- **Neu dokumentiert:** die 4 Phase-8-C3-Test-Failures (Findings oben) — potentielle
-  nächste Hygiene-Mini-Session, Entscheidung des Nikingers.
 
 ### NEXT
 
-- **Operator (Nikinger):** Push-Freigabe für Commit `6644773`. **Working-Style-Regel:**
-  „Push fragt der Nikinger frei, nie selbst pushen." Vor Push: nichts mehr zu tun —
-  Working tree clean, einziger Commit ist die Hygiene-Korrektur, diff = +63/-0,
-  5 `.sh`-Files. **Optional:** Entscheidung zu den 4 Phase-8-C3-Test-Fails
-  (Findings) — eigene Mini-Session oder bewusst stehen lassen bis die Beweiswoche
-  DISCOVERY_ARMED wieder disarmt.
+- **Operator (Nikinger):** Push-Freigabe für die **drei** Commits `6644773` +
+  `0a55818` + `c97e82a`. **Working-Style-Regel:** „Push fragt der Nikinger frei,
+  nie selbst pushen." Vor Push: nichts mehr zu tun — Working tree clean, alle
+  drei Commits sind die angeforderten Korrekturen + Erweiterungen. `restart-services.sh`
+  ist gebaut, aber **nicht ausgeführt** — der nächste Reboot wird zeigen, ob die
+  Helper-Pfade greifen (Nikkings erster Test nach Push).
 - **Ausführende Session (nächste):** keine Phase-14-Code-Pflicht — die Phase ist
-  **strukturell fertig** (A1–A8 grün). Wahrscheinliche Tracks je nach Nikinger-
-  Entscheidung: (a) Push-Bestätigung + warten auf Beweiswoche; (b) Mini-Hygiene-
-  Session für die 4 Phase-8-Test-Failures (Phase-8 monkeypatch/skip-Decorator),
-  ~30 Min; (c) Phase-15-Plan-Session (V4).
+  **strukturell fertig** + Σ wieder grün. Wahrscheinliche Tracks je nach Nikinger-
+  Entscheidung: (a) Push-Bestätigung + warten auf Beweiswoche; (b) Phase-15-Plan-
+  Session (V4); (c) etwas anderes (Phase-13-Beweiswoche-Beobachtung).
 - **Phase-14-Aktivität:** Mid-Phase-Status läuft weiter, Phase-13-Beweiswoche läuft
   separat (Plan §7 P1–P9), D5 wartet auf Beweiswoche.
 - **Beweiswoche** läuft seit Mo 2026-08-25 (laut Phase-13-Plan §7 operator-getrieben).
-  Stand der Session-9-Beobachtung bleibt gültig: Trade #8 BUY DAX.IGN offen, 5. BUY
-  auf DAX in Folge nach 4 Verlust-Trades (-2530.82 EUR realisiert), Token-Budget
-  38.5% / Weekly-Allowance 48% / Loss-Breaker **nicht** ausgelöst. Kein
-  Handlungsbedarf (Safety-Mechanismen innerhalb Caps), Phase-15-Territorium (V4:
-  BUY-Serie gegen das Modell stärker gewichten).
+  Stand der Session-9-Beobachtung bleibt gültig: Trade #8 BUY DAX.IGN offen,
+  5. BUY auf DAX in Folge nach 4 Verlust-Trades (-2530.82 EUR realisiert),
+  Token-Budget 38.5% / Weekly-Allowance 48% / Loss-Breaker **nicht** ausgelöst.
+  Kein Handlungsbedarf (Safety-Mechanismen innerhalb Caps), Phase-15-Territorium
+  (V4: BUY-Serie gegen das Modell stärker gewichten).
 
 ---
 
