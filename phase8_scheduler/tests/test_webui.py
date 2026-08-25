@@ -87,7 +87,7 @@ def _seed_db(db_path: str) -> None:
 
 
 @pytest.fixture()
-def client(tmp_path):
+def client(tmp_path, monkeypatch):
     db_path = str(tmp_path / "trading_bot.sqlite")
     _seed_db(db_path)
     cfg = dataclasses.replace(
@@ -100,6 +100,32 @@ def client(tmp_path):
     StateStore(cfg.state_path).save(
         SchedulerState(date="2026-06-28", trades_today=1, realized_pnl_today=-41.16)
     )
+    # Hermetic DISCOVERY_ARMED (Phase-14 Session-10 finding): the C3-akzeptanz tests
+    # for /api/discovery read api._ARM_PATH and source_registry.arm.DEFAULT_ARM_PATH,
+    # AND api.py line 431 reads data/state/discovery_state.json for the last-run
+    # summary. Without these redirects all three point at the live tree — the same
+    # files the Phase-13-Beweiswoche writes — so a clean DB/state/kill fixture
+    # would still bleed live state into the assertions. Point _ARM_PATH, arm's
+    # DEFAULT_ARM_PATH, and api._DATA_DIR at tmp_path, so the tests exercise
+    # their contract regardless of the Beweiswoche state.
+    #
+    # Caveat: source_registry/__init__.py re-exports `arm` (the function from arm.py)
+    # as a top-level package attribute, which shadows `source_registry.arm` as a name.
+    # `from source_registry import arm` would bind the function, not the submodule.
+    # Use importlib.import_module to bypass the package's __init__-driven shadow and
+    # reach the actual arm.py module where DEFAULT_ARM_PATH is defined.
+    #
+    # Scope of redirecting _DATA_DIR: api.py uses it at runtime only at lines 57
+    # (already redirected via _ARM_PATH) and 431 (the discovery_state.json path).
+    # The lines 76-79 usages are SchedulerConfig() defaults that apply only when
+    # no cfg is passed, and the test always supplies its own cfg, so the redirect
+    # is hermetic and silent for everything except the two runtime consumers.
+    import importlib
+    from webui import api as _api_mod
+    _arm_mod = importlib.import_module("source_registry.arm")
+    monkeypatch.setattr(_api_mod, "_DATA_DIR", tmp_path)
+    monkeypatch.setattr(_api_mod, "_ARM_PATH", tmp_path / "DISCOVERY_ARMED")
+    monkeypatch.setattr(_arm_mod, "DEFAULT_ARM_PATH", tmp_path / "DISCOVERY_ARMED")
     return TestClient(create_app(cfg)), cfg
 
 
