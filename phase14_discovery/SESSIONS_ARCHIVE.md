@@ -5,6 +5,140 @@ carries exactly one `## Session stopped` block; the previously-newest block move
 verbatim when a new one is appended.
 
 ---
+## Session stopped — 2026-08-25 (Session 10: Restart-Hygiene-Fix — PATH-Prepend in 5 Start-Wrappern)
+
+> **Auftrag:** Special-Task aus dem Phase-14-CLAUDE.md-Prompt (Nikinger-bestätigt
+> 2026-08-25), schon im Session-9-NEXT-Block und im „Unverändert offen"-Block
+> vorregistriert. Nikinger-Anweisung: Loslegen, atomar, kein Push ohne Freigabe.
+> Mini-Session, Wochenend-tauglich (~15 Min).
+
+### Completed
+
+**Commit 1 — `phase14: scripts -- restart-hygiene (PATH-prepend in dev_install + 4 run_*.sh)`**
+(`6644773`, 5 files, +63/-0). Die Bootstrap-Reihenfolge nach einem Reboot war bisher
+„`source phase1_broker_wrapper/.venv/bin/activate` von Hand". Vergessen ⇒
+„`exec: uvicorn: not found`" (Phase-8-Web-UI) bzw. „`No module named scheduler`/"
+`data_foundation`/`source_registry`" für die drei Daemons. Damalige
+Vorab-Behebung war manuelles `ps aux` + Neustart mit activate — kein dauerhafter
+Fix (Session 9 hat den Befund dokumentiert). Fix: jeder Wrapper prependet den
+venv-Bin-Pfad an PATH, direkt nach `set -euo pipefail` und vor dem ersten
+`exec`. Idempotent + non-destruktiv (eine bereits aktivierte venv gewinnt, weil
+PATH-prepend sie nicht überschreibt — `PATH=/a:$PATH` lässt das aktuelle `python`
+in Ruhe, solange `/a` schon dort ist).
+
+Fünf Sites, ein Commit:
+- `scripts/dev_install.sh` (Repo-Root: ROOT= statt REPO_ROOT=, weil `ROOT` schon
+  für die pip-Install-Schleife da war)
+- `phase8_scheduler/scripts/run_scheduler.sh` (`REPO_ROOT=`)
+- `phase8_scheduler/scripts/run_webui.sh` (`REPO_ROOT=`) — **das ist der Fix
+  für den explizit benannten `uvicorn: not found`-Befund**
+- `phase12_data_foundation/scripts/run_recorder.sh` (`REPO_ROOT=`)
+- `phase14_discovery/scripts/run_discovery.sh` (`REPO_ROOT=`)
+
+Jeder Block: 5 Zeilen Comment-Header (warum + Verweis auf den Session-9-NEXT-Block)
++ 6 Zeilen Logik (`REPO_ROOT` aus BASH_SOURCE, _VENV_BIN berechnen, Existence-Check,
+Path-Prepend, `unset`). 11 Zeilen pro Datei, identische Form, der einzige var-name-
+Unterschied ist `ROOT` vs `REPO_ROOT`. Die einzige `.venv` im Repo ist
+`phase1_broker_wrapper/.venv` (bestätigt: dort liegen `python` und `uvicorn`
+editierbar installiert). Tests sind nicht angefasst — keine `.py`-Datei editiert
+(`git diff --name-only` = 5 `.sh`-Files only).
+
+**Bonus-Skript `restart-services.sh` bewusst NICHT mitgebaut.** Der NEXT-Block
+markierte es als optional; Begründung: der Bot läuft aktuell (3 Prozesse:
+`data_foundation.run` PID 4190, `scheduler.run` PID 4237, `source_registry.run`
+PID 4243), die Operator-Kultur ist explizit „KILL-File ist sticky, kein zweiter
+Login, Restart ist sequenziell". Ein `pkill`-Helfer wäre genau die Sorte
+Fußkanone, die diese Kultur vermeidet — die Hygiene-Korrektur macht den
+**Reboot**-Pfad selbstständig (was der Auftrag war), nicht den aggressiven
+**In-Session**-Restart. Wenn das Nikinger später will: separat, mit
+Care-Instructions für KILL-File und PID-File-Konflikte.
+
+### Verified
+
+- `bash -n` Syntaxcheck auf allen 5 Dateien: **OK**.
+- Mechanik-Direkttest (gleiche 6 Logik-Zeilen, einmal ausgeführt mit
+  `PATH=/usr/bin:/bin`) ⇒ `python → /home/trading-bot/trading-bot/phase1_broker_
+  wrapper/.venv/bin/python`, `uvicorn → /home/trading-bot/trading-bot/phase1_
+  broker_wrapper/.venv/bin/uvicorn`. **Prepend funktioniert**, exakt das Symptom-
+  Bild des NEXT-Blocks ist behoben.
+- `git diff --name-only` = 5 `.sh`-Files only, 0 `.py`-Files. Sweep war
+  Pflicht-Sanity (NEXT-Block: „Tests unverändert"), siehe Findings.
+- `git status --short` vor Commit: nur die 5 modifizierten Skripte (plus
+  `data/`-Folder, gitignored).
+- Working tree clean nach Commit.
+- Cross-Phase-Edits in der freigegebenen Phase-14-Liste (Plan §4 + Session-9-NEXT-
+  Block): Phase 8 (`scripts/`), Phase 12 (`scripts/`), root (`scripts/`). Kein
+  Touch außerhalb.
+- Commit-Message verweist explizit auf den Session-9-NEXT-Block + listet die
+  fünf Sites + liefert die Begründung für das übersprungene Bonus-Skript + die
+  Root-Cause-Erzählung der Pre-existing-Test-Failures (siehe Findings).
+
+### Findings (eines + ein expliziter „less is more"-Hygiene-Skip)
+
+- **🟡 Pre-existing failures: 4 Phase-8 `test_webui.py`-Tests rot** —
+  `test_discovery_unarmed_reports_false`, `test_discovery_arm_creates_flag_and_
+  subsequent_get_reports_true`, `test_discovery_disarm_removes_flag`,
+  `test_discovery_endpoint_fails_soft_without_migration_007`. Vollständige
+  Session-9-Akzeptanz **A6 war grün** (Commit `af837c1`/`C3` Session 9). Heute
+  rot. **Root Cause:** die Phase-13-Beweiswoche (Start Mo 2026-08-25, laut
+  Session-9-NEXT) hat `data/state/DISCOVERY_ARMED` (75 bytes, mit `{armed,
+  by, ts}`) als Operator-Schritt gesetzt. Die vier Tests setzen **unarmed-State**
+  voraus (Akzeptanz A6 = „UI meldet armed: false"). Die Tests sind also nicht
+  falsch — sie prüfen das Unarmed-Verhalten korrekt, aber die Live-DB
+  (Phase-13-Beweiswoche hat sie scharf gestellt) erfüllt diese Voraussetzung
+  nicht. **Nicht durch diese Session verursacht** (rein Shell-Skript-Edits, keine
+  Python-Datei): `git diff --name-only` bestätigt 0 `.py`-Touches. Auch nicht im
+  Scope der Restart-Hygiene-Aufgabe (Phase-14-freigegebene Sites sind
+  `scripts/`-Verzeichnisse; `phase8_scheduler/tests/test_webui.py` ist nicht in
+  der Liste). **Empfehlung an den Nikinger:** die vier Tests sind mit der
+  aktuellen Live-Konfiguration (Discovery armed) nicht ausführbar. Entweder
+  die Tests `monkeypatchen` `_ARM_PATH` auf eine tmp-Pfad (Phase-8-Hygiene,
+  vielleicht ~30 Min) oder sie werden via Skip-Decorator an die DISCOVERY_ARMED-
+  Präsenz gebunden. Würde gern in einer eigenen Mini-Session nachschieben,
+  wenn der Nikinger zustimmt — **kein Auto-Fix in dieser Hygiene-PR**, weil
+  Phase-8-Tests + Beweiswoche-Aktivität zu eng gekoppelt sind für
+  One-Commit-Drift. Sweep-Zahl: von Σ 1698 (Session-9-Closeout) auf **1694
+  passed + 4 failed = 1698 total**, identisch zur Testkollektions-Größe, **null
+  Regressionen** durch diese Session.
+- **Hygiene-Skip dokumentiert:** das Bonus-`restart-services.sh` ist bewusst
+  NICHT gebaut (Begründung: Bot läuft, Operator-Kultur, Reboot-Hygiene ist das
+  eigentliche Ziel, aggressive Restart-Helfer sind Out-of-Scope).
+
+### Unverändert offen
+
+- **D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche (Plan §7 P1–P9).
+  Phase ist **strukturell fertig** (A1–A8 grün, Σ 1698 = 1694 passed + 4
+  pre-existing failed).
+- **Hygiene-Tickets aus Session 4** bleibt leer.
+- **Plan-§9-Drift-Listeneintrag #2** erweitern in der nächsten Plan-Session.
+- **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
+  Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale Outcomes.
+- **Neu dokumentiert:** die 4 Phase-8-C3-Test-Failures (Findings oben) — potentielle
+  nächste Hygiene-Mini-Session, Entscheidung des Nikingers.
+
+### NEXT
+
+- **Operator (Nikinger):** Push-Freigabe für Commit `6644773`. **Erinnerung
+  Working-Style-Regel:** „Push fragt der Nikinger frei, nie selbst pushen."
+  Vor Push: nichts mehr zu tun — Working tree clean, einziger Commit ist die
+  Hygiene-Korrektur, diff = +63/-0, 5 `.sh`-Files. **Optional:** Entscheidung
+  zu den 4 Phase-8-C3-Test-Fails (Findings) — eigene Mini-Session oder bewusst
+  stehen lassen bis die Beweiswoche DISCOVERY_ARMED wieder disarmt.
+- **Ausführende Session (nächste):** keine Phase-14-Code-Pflicht — die Phase
+  ist **strukturell fertig** (A1–A8 grün). Wahrscheinliche Tracks je nach
+  Nikinger-Entscheidung: (a) Push-Bestätigung + warten auf Beweiswoche; (b)
+  Mini-Hygiene-Session für die 4 Phase-8-Test-Failures (Phase-8
+  monkeypatch/skip-Decorator), ~30 Min; (c) Phase-15-Plan-Session (V4).
+- **Phase-14-Aktivität:** Mid-Phase-Status läuft weiter, Phase-13-Beweiswoche
+  läuft separat (Plan §7 P1–P9), D5 wartet auf Beweiswoche.
+- **Beweiswoche** läuft seit Mo 2026-08-25 (laut Phase-13-Plan §7
+  operator-getrieben). Stand der letzten Session-9-Beobachtung: Trade #8 BUY
+  DAX.IGN offen, 5. BUY auf DAX in Folge nach 4 Verlust-Trades (-2530.82 EUR
+  realisiert), Token-Budget 38.5% / Weekly-Allowance 48% / Loss-Breaker **nicht**
+  ausgelöst. Kein Handlungsbedarf (Safety-Mechanismen innerhalb Caps), aber
+  Phase-15-Territorium (V4: BUY-Serie gegen das Modell stärker gewichten).
+
+---
 ## Session stopped — 2026-08-22 (Session 8: Block B2 + Block B3)
 
 > **Auftrag:** Nikinger-Entscheidung 2026-08-22, Session-7-Empfehlung
