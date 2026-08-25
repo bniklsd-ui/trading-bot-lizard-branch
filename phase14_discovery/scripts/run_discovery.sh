@@ -26,6 +26,19 @@
 
 set -euo pipefail
 
+# Restart-hygiene (Phase-14 Session-9 NEXT-Block): prepend the canonical
+# venv's `bin/` to PATH so this wrapper works after a reboot without requiring
+# `source <venv>/bin/activate`. The venv lives under phase1_broker_wrapper/.venv
+# (where `scripts/dev_install.sh` puts every phase's editable install) and is
+# the only place that has the `python` module this wrapper `exec`s. Prepending
+# is non-destructive — an already-active venv stays first.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+_VENV_BIN="${REPO_ROOT}/phase1_broker_wrapper/.venv/bin"
+if [[ -x "${_VENV_BIN}/python" ]]; then
+    export PATH="${_VENV_BIN}:${PATH}"
+fi
+unset _VENV_BIN
+
 # phase14_discovery/ (this script lives in phase14_discovery/scripts/)
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"

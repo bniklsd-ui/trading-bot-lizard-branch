@@ -39,7 +39,18 @@
 
 set -euo pipefail
 
+# Restart-hygiene (Phase-14 Session-9 NEXT-Block): prepend the canonical
+# venv's `bin/` to PATH so this script works after a reboot without requiring
+# `source <venv>/bin/activate`. The venv lives under phase1_broker_wrapper/.venv
+# (see the comment header above) and is where the editable installs below land.
+# Prepending is non-destructive — an already-active venv stays first.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+_VENV_BIN="${ROOT}/phase1_broker_wrapper/.venv/bin"
+if [[ -x "${_VENV_BIN}/python" ]]; then
+    export PATH="${_VENV_BIN}:${PATH}"
+fi
+unset _VENV_BIN
+
 PY="${PYTHON:-python}"
 
 echo "dev_install: using interpreter -> $("$PY" -c 'import sys; print(sys.executable)')"

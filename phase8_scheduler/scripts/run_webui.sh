@@ -22,6 +22,19 @@
 
 set -euo pipefail
 
+# Restart-hygiene (Phase-14 Session-9 NEXT-Block): prepend the canonical
+# venv's `bin/` to PATH so this wrapper works after a reboot without requiring
+# `source <venv>/bin/activate`. This is the exact fix for `exec: uvicorn: not
+# found` after a fresh boot — `uvicorn` lives in phase1_broker_wrapper/.venv/bin
+# (installed alongside FastAPI in phase8_scheduler/requirements.txt). Prepending
+# is non-destructive — an already-active venv stays first.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+_VENV_BIN="${REPO_ROOT}/phase1_broker_wrapper/.venv/bin"
+if [[ -x "${_VENV_BIN}/python" ]]; then
+    export PATH="${_VENV_BIN}:${PATH}"
+fi
+unset _VENV_BIN
+
 PORT=8000
 if [[ "${1:-}" == "--port" && -n "${2:-}" ]]; then PORT="$2"; fi
 
