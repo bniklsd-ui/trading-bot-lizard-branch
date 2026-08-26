@@ -5,6 +5,196 @@ carries exactly one `## Session stopped` block; the previously-newest block move
 verbatim when a new one is appended.
 
 ---
+
+## Session stopped — 2026-08-26 (Session 13: P14-D Implementation — chunked Sleep-Cap, lokal grün, Push ausstehend)
+
+> **Auftrag:** Special-Task aus dem Phase-14-CLAUDE.md-Prompt: P14-D-Fix
+> (Doc-Plan `96353f6` schon committet, Implementation noch offen — 1 Code-Stelle
+> in `run_forever` + 1 Test in `test_run.py`, ~15 min, kein Operator-Restart nötig).
+> Plan ist execution-ready, D1–D3 gelockt. **Atomic-only:** Code + Test in einem
+> Commit, **kein** Push (Working-Style-Regel, P14-D §1: „Push = Nikinger-Freigabe").
+> Phase-8-wiring-Bug (Cross-Phase-Edit, getrennt festgehalten — siehe Open
+> questions) wartet weiter auf eigene Mini-Session-Freigabe.
+>
+> **Ergebnis:** Implementation done, Tests grün, Commit `27f04d9` lokal.
+> Discovery-Daemon (PID 43104, läuft seit 16:24 CEST) **nicht** angerührt
+> (Plan D3 — der nächste Cycle, spätestens 17:24 CEST, lädt den neuen Code
+> automatisch; `run_forever` ist Methode ohne Cross-Modul-Import).
+
+### Completed
+
+**Commit 1 — `phase14: code+tests -- P14-D fix: chunked between-cycle sleep (signal cap, 2026-08-26)`**
+(`27f04d9`, 2 files, +89/−7). Fix lebt komplett in `phase14_discovery/`
+(kein Cross-Phase-Edit, kein neuer Default-Parameter öffentlich sichtbar —
+`sigterm_check_interval_s` ist optionaler Konstruktor-Parameter mit
+Default 60 s, additive API).
+
+Konkrete Änderungen:
+
+`source_registry/run.py` (+30/−7):
+- neue Modul-Konstante `_DEFAULT_SIGNAL_CHECK_INTERVAL_S = 60` (Zeile 73-78),
+  mit Kommentar der auf Plan §2 D2 + Phase-8-POST_WINDOW-Hotfix 2026-07-11
+  verweist.
+- neuer optionaler Konstruktor-Parameter `signal_check_interval_s: int =
+  _DEFAULT_SIGNAL_CHECK_INTERVAL_S` (Zeile 170), gebunden an
+  `self._signal_check_interval_s` (Zeile 183).
+- `run_forever`-Docstring erweitert (Zeile 257-269): erklärt den Cap,
+  verweist auf PEP-475-Verhalten und Phase-8-Analogie.
+- `run_forever`-Body: `self._sleep_fn(float(self._interval_s))` →
+  `self._sleep_capped(float(self._interval_s))` (Zeile 273).
+- neue Methode `_sleep_capped(total_s: float)` (Zeile 275-287): chunked
+  Sleep-Helper, zerlegt `total_s` in Brocken `≤ signal_check_interval_s`
+  und prüft `self._stop` **vor** jedem Brocken. Loop-Pattern statt
+  Phase-8's `min(seconds_until(...), idle_poll_s)`, weil `run_forever`
+  eine Periode hat, kein Zielzeitpunkt.
+
+`tests/test_run.py` (+56/−2):
+- `_make_daemon`-Helper: neuer optionaler Parameter
+  `signal_check_interval_s: int | None = None`, weitergereicht wenn
+  gesetzt (Backwards-kompatibel: Default bleibt `_DEFAULT_SIGNAL_CHECK_INTERVAL_S`).
+- neuer Test `test_run_forever_caps_between_cycle_sleep_to_signal_check_interval`:
+  `interval_s=3600` + `signal_check_interval_s=10`, `fake_sleep` ruft
+  `request_stop()` nach erstem Brocken. Assertions: jeder Brocken ≤ 10 s,
+  Summe < 3600 s (= Bug-Indikator: ohne Cap wäre Summe = 3600 s).
+  Test schlägt sicher fehl ohne den Fix.
+
+Akzeptanz §5 P14-D-Mini-Plan alle grün:
+- A1: `signal_check_interval_s` Default 60 s ✓ (`grep` zeigt 4 Treffer in `run.py`)
+- A2: `run_forever` ruft `_sleep_capped` statt direktem `self._sleep_fn(...)` ✓
+- A3: `_sleep_capped` chunked + `_stop`-Check zwischen Brocken ✓ (neuer Test)
+- A4: bestehende Aufrufer sehen altes Verhalten ✓ (`test_run_forever_calls_run_once_in_loop_until_request_stop` mit `interval_s=42`/Default-Cap 60 bleibt grün, weil `min(42, 60) == 42`)
+- A5: kein Cross-Phase-Edit, nur Phase 14 angefasst ✓
+
+### Verified
+
+- `pytest phase14_discovery/tests -q` → **61 passed** (vorher 60, +1 neuer Test;
+  Σ-Drift Phase 14: +1, Phase-8-Suite unverändert).
+- `pytest phase8_scheduler/tests -q` → **248 passed** (unverändert).
+- Bestehender `test_run_forever_calls_run_once_in_loop_until_request_stop`
+  (interval_s=42, Default-Cap 60) bleibt grün — der Chunked-Loop zerlegt
+  42 s nicht, weil `min(42, 60) == 42` ⇒ exakt ein `sleep_fn(42.0)`-Call.
+- `git log --oneline -5`: `27f04d9` direkt nach `3f5fdd1` (Session 12) auf `main.
+- `git diff 3f5fdd1..27f04d9 --stat` → 2 files, +89/−7. Sauber lokal.
+- Daemon PID 43104 läuft weiter (gestartet 16:24:42 CEST, jetzt ~17:00 CEST,
+  CWD `phase14_discovery/`, `armed: true`, `stale_count: 14`,
+  `rows_written: 24`). **Kein Operator-Restart** ausgelöst — Plan D3 hält
+  (run_forever ist Methode ohne Cross-Modul-Import, Method-Body wird beim
+  nächsten Cycle aus frischem Modul-Code geladen, spätestens 17:24 CEST).
+
+### Findings
+
+🟢 **P14-D-Fix wirkt strukturell** (Plan §2 D2): `_sleep_capped` chunked
+den Sleep in `≤ signal_check_interval_s` und prüft `self._stop` zwischen
+Brocken. Ab jetzt reagiert der Daemon auf SIGTERM innerhalb von **maximal
+60 Sekunden** (Default) statt bis zu 3600 Sekunden. Phase-8 hat das
+exakt gleiche Pattern in `runner.py:370` mit `min(..., idle_poll_s)`
+seit 2026-07-11 — Phase 14 zieht jetzt nach.
+
+🟡 **Doc-Drift aus Session 12 entdeckt + aufgeräumt:** Session-12-Commit
+(`3f5fdd1`) hat behauptet „Session-12-Block ersetzt Session-11 im Phasenkopf;
+Session-11 wandert verbatim ins SESSIONS_ARCHIVE.md" — das Archiv
+enthält Session-11 in der Tat (Zeile 8 von `SESSIONS_ARCHIVE.md` nach
+dieser Session), aber Session-11-Block wurde **nicht** aus dem
+`CLAUDE.md`-Phasenkopf entfernt, sondern nur ohne `## Session stopped
+— ...`-Header inlined weiter unten (CLAUDE.md Zeilen 251-481).
+Doc-Hygiene-Drift, mit dieser Rotation aufgeräumt: Session-12 wandert
+ins Archiv (oben), der inlined-duplicate Session-11-Block im Phasenkopf
+verschwindet. **Footer-Pointer bleibt** (`> Ältere Session-Blöcke ...`).
+
+### Unverändert offen
+
+- **Phase-8-wiring.py-`record_event`-Fix** (Cross-Phase-Edit, braucht
+  Nikinger-Freigabe, **nicht** in Phase-14-Plan-§4-Freigabe-Liste).
+  Fix-Scope 1-3 Zeilen (Lazy-Import in `window_ok` analog zur dort
+  existenten `from data_foundation.coverage import assess_window`-Zeile
+  ODER Module-Top-Level-Import in `wiring.py:30-40`). 88 CRITICAL-Logs
+  heute, ~26 h aktiv, **null Trading-Impact** (nur Paper-Tracker-Pfad).
+  Empfehlung: eigene Phase-8-Mini-Session analog P14-C/P14-D, ~15 min,
+  1 Commit. **In dieser Session nicht angefasst** (Cross-Phase-Edit
+  außerhalb der freigegebenen Liste; Special-Task hatte das festgehalten,
+  nicht zur Umsetzung freigegeben).
+- **P14-D-Push-Freigabe** — Commit `27f04d9` lokal, kein Push. Working-
+  Style-Regel „nie selbst pushen" gilt (P14-D-Plan §1 explizit).
+  Push-Freigabe via `git push origin main` (kein Konflikt erwartet,
+  Working-Tree clean + zwei Markdown-Dateien via Rotation parallel in
+  diesem Commit).
+- **D5 Closeout-Handover** — wartet weiter auf Phase-13-Beweiswoche
+  (Plan §7 P1–P9). P14-D war eine **operativ-aufgefallene Lücke** im
+  Mutterplan (gleicher Status wie P14-C) — keine Plan-Änderung nötig.
+- **Recorder-Daemon (`phase12_data_foundation/data_foundation/run.py`)**
+  hat denselben theoretischen Bug mit `interval_s=300` (5 min, 12×
+  weniger schmerzhaft). Phase-15-Territorium — Nikinger-Entscheidung
+  2026-08-26: „nicht heute". Empfehlung: gleichzeitiger Hygiene-Pass
+  beim Phase-15-Plan (eine Helper-Klasse in einem gemeinsamen Modul).
+- **Hygiene-Tickets aus Session 4** bleibt leer.
+- **Plan-§9-Drift-Listeneintrag #2** — jetzt vierfach relevant
+  (B5-Hinweis + P14-C-Befund zur Modul-Konstanten-Konvention
+  `parents[2]` + P14-D-Befund zur fehlenden Sleep-Cap-Konvention +
+  die Doc-Rotation-Drift aus Session 12). Erweiterung in der nächsten
+  Plan-Session.
+- **Phase-15-Planungs-Session**: V4-Themen (Council, Handover,
+  Reward-Reform, Force-Trigger, Instinct-ECC) — gegatet auf
+  Phase 9+11+12+13+14 + reale Outcomes.
+- **EOD-Check um 17:30 CEST (= 15:30 UTC)** — Nikinger-Entscheidung
+  in Session 12 noch offen („falls Nikinger den Tagesschluss sehen
+  will, sonst in der Folge-Session"). Heute 16:50 CEST (= 14:50 UTC)
+  Stand kurz vor Session-Ende: 1 closed Trade (+939.75 €), 1 offener
+  BUY DAX.IGN (DIAAAAYCPU28MA4 @ 26428.86, eingegangen 15:42 CEST),
+  Loss-Breaker aus, Discovery wieder operativ. Der offene Trade läuft
+  bis SL/TP oder 17:30 CEST Window-Close (Scheduler fährt in
+  POST_WINDOW → Reconcile).
+
+### NEXT
+
+- **Operator (Nikinger):**
+  (1) **Push-Freigabe für `27f04d9`** (Code+Tests-Commit) +
+      parallel für den Session-13-Rotation-Commit (2 Markdown-Dateien,
+      SESSIONS_ARCHIVE.md prepend Session-12-Block + CLAUDE.md
+      Session-13 ersetzt). Beide lokal vorhanden, kein Konflikt
+      erwartet. Default-Working-Style-Regel „nie selbst pushen"
+      bleibt verbindlich.
+  (2) **Freigabe für Phase-8-wiring-`record_event`-Fix** als eigene
+      Mini-Session (Cross-Phase-Edit, Trading-Impact null). Falls ja:
+      identische Struktur wie P14-D — Mini-Plan + Code+Test in
+      einem Commit + Doc-Commit, ~15 min.
+  (3) **EOD-Check um 17:30 CEST** in eigener Mini-Session oder
+      verschoben auf Folge-Session.
+  (4) **Phase-15-Plan** (V4-Themen) als nächste große Session —
+      gegatet auf Phase 9+11+12+13+14 + reale Outcomes.
+
+- **Ausführende Session (nächste):** keine Pflicht. P14-D-Fix ist
+  lokal grün und wird beim nächsten Discovery-Cycle automatisch
+  geladen. Wahrscheinliche Tracks je nach Nikinger-Entscheidung:
+  (a) Phase-8-wiring-Fix als Mini-Session (~15 min); (b) EOD-Check;
+  (c) Phase-15-Plan-Session (V4); (d) Phase-13-Beweiswoche-
+  Beobachtung. **Discovery-Daemon läuft** (PID 43104, neuer Code
+  wird automatisch beim nächsten Cycle geladen — Plan D3 eingehalten).
+
+- **Phase-14-Aktivität:** Mid-Phase-Status, strukturell + operativ
+  fertig. P14-C und P14-D beide gefixt + live-verifiziert (P14-C
+  bereits auf `origin/main`, P14-D wartet auf Push). Phase-13-
+  Beweiswoche läuft separat. D5 wartet auf Beweiswoche. Hygiene-
+  Tickets leer.
+
+- **Beweiswoche** Stand 2026-08-26 ~16:50 CEST (= Session-Ende):
+  - 1 closed Trade heute (+939.75 €, BUY DAX.IGN)
+  - 1 offener BUY DAX.IGN (DIAAAAYCPU28MA4 @ 26428.86, eingegangen 15:42)
+  - **+1852 € realisiert über die letzten 2 DAX-IGN-Trades** (gestern +912.9,
+    heute +939.75) — brach die -2530-€-Streak über 4 DAX-Buys
+  - Allowance 10000 → 9245 (7.5 % verbraucht, sauber)
+  - Loss-Breaker **nicht** ausgelöst
+  - Token-Budget innerhalb Caps, Weekly-Allowance 48%
+  - Scheduler `consecutive_failures: 0`, `kill_reason: null`
+  - **yfinance-Circuit-Breaker offen** für ^GDAXI, ^FCHI, ^IBEX
+    (delisted/no-data, degradiert ohne Netz-Versuch) — Trading-Impact
+    null, brain-context 5/5 als „present"
+  - **88 `record_event` NameError**-Logs heute (Phase-8-Bug, siehe
+    Open-Questions — Cross-Phase-Edit, wartet auf Freigabe)
+
+---
+
+> **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).
+
 ## Session stopped — 2026-08-26 (Session 12: Discovery-Daemon-Restart + EOD-Findings-Handover)
 
 > **Auftrag:** Nikinger-Antwort auf den EOD-Pre-Close-Check (Session 11+). Der
