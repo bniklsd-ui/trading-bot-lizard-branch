@@ -151,13 +151,14 @@ def _make_daemon(
     universe: list[FakeUniverseRecord] | None = None,
     budget: Any = None,
     interval_s: int = 3600,
+    signal_check_interval_s: int | None = None,
     sleep_fn=None,
 ):
     arm_path = tmp_path / "DISCOVERY_ARMED"
     state_path = tmp_path / "discovery_state.json"
     universe_store = FakeUniverseStore(records=universe or [])
     availability_store = FakeAvailabilityStore(stale=stale or [])
-    return DiscoveryDaemon(
+    daemon_kwargs: dict[str, Any] = dict(
         sources=sources,
         universe_store=universe_store,
         availability_store=availability_store,
@@ -166,7 +167,10 @@ def _make_daemon(
         state_path=str(state_path),
         interval_s=interval_s,
         sleep_fn=sleep_fn or (lambda _s: None),
-    ), arm_path, state_path, universe_store, availability_store
+    )
+    if signal_check_interval_s is not None:
+        daemon_kwargs["signal_check_interval_s"] = signal_check_interval_s
+    return DiscoveryDaemon(**daemon_kwargs), arm_path, state_path, universe_store, availability_store
 
 
 # ---------------------------------------------------------------------------
@@ -374,6 +378,57 @@ def test_run_forever_stops_when_already_stopped_before_first_cycle(tmp_path: Pat
     daemon.run_forever()  # must not run any cycle
 
     assert src.discover_calls == []
+
+
+def test_run_forever_caps_between_cycle_sleep_to_signal_check_interval(
+    tmp_path: Path,
+) -> None:
+    """P14-D (Daemon-Signal-Response-Bug): the between-cycle sleep is chunked at
+    ``signal_check_interval_s`` so a SIGTERM / ``request_stop()`` during sleep is
+    honored within at most one chunk — NOT after the full ``interval_s``.
+
+    Without the cap (the P14-D bug), ``time.sleep(interval_s=3600)`` would block
+    SIGTERM for up to an hour (Python PEP 475 retries interrupted syscalls until
+    they complete; ``self._stop`` is only checked at the top of each iteration).
+    The fix is structurally identical to the Phase-8 POST_WINDOW hotfix
+    (2026-07-11, ``runner.py:370``, ``min(..., idle_poll_s)``).
+
+    Strategy: inject a ``sleep_fn`` that records its argument and calls
+    ``request_stop()`` after the first chunk; the loop must exit without
+    sleeping the full ``interval_s``. With ``interval_s=3600`` and
+    ``signal_check_interval_s=10`` the total sleep should be 10, not 3600.
+    """
+    sleeps: list[float] = []
+
+    def fake_sleep(s: float) -> None:
+        sleeps.append(s)
+        # request_stop after the first chunk — proves the loop exits during
+        # the chunked sleep, not after the full interval_s.
+        if len(sleeps) >= 1:
+            daemon.request_stop()
+
+    src = FakeSource(name_str=SOURCE_IG)
+    daemon, arm_path, _, _, _ = _make_daemon(
+        tmp_path,
+        sources=[src],
+        interval_s=3600,             # default-ish: big enough that an uncapped
+                                     # sleep would be unmistakable
+        signal_check_interval_s=10,  # small cap for the assertion to be tight
+        sleep_fn=fake_sleep,
+    )
+    arm(str(arm_path), by="dashboard")
+
+    daemon.run_forever()
+
+    # The loop must have slept at least once between cycles.
+    assert sleeps, "run_forever produced no sleeps — between-cycle sleep missing"
+    # Critical assertion: every chunk respects the cap.
+    assert all(s <= 10.0 for s in sleeps), \
+        f"chunk exceeded signal_check_interval_s=10: {sleeps}"
+    # Bug indicator: without the cap, the first (and only) sleep would have
+    # been 3600.0 — the total time slept must be far below that.
+    assert sum(sleeps) < 3600.0, \
+        f"cap not enforced — total sleep {sum(sleeps)} should be < interval_s=3600"
 
 
 def test_main_with_once_flag_runs_one_cycle_and_exits(tmp_path: Path, monkeypatch) -> None:

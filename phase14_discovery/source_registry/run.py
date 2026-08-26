@@ -67,6 +67,12 @@ _DEFAULT_BARS_DB_PATH = _REPO_ROOT / "data" / "bars.sqlite"
 # Plan §4 D13/D14: 8 Probe-Calls max pro Run, 7-Tage-TTL als Stale-Schwelle.
 _DEFAULT_MAX_PROBE_CALLS_PER_RUN = 8
 _DEFAULT_PROFILE_TTL_DAYS = 7
+# P14-D plan §2 D2: cap the between-cycle sleep so SIGTERM is honored within
+# at most this many seconds (analog to Phase-8 idle_poll_s, 2026-07-11 hotfix).
+# Default 60s ≪ interval_s=3600 default, so a stop is responsive without
+# hammering the loop. Testable via the same _sleep_fn injection as the cycle
+# sleep itself.
+_DEFAULT_SIGNAL_CHECK_INTERVAL_S = 60
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +167,7 @@ class DiscoveryDaemon:
         arm_path: str = str(DEFAULT_ARM_PATH),
         state_path: str = str(_DEFAULT_STATE_PATH),
         interval_s: int = 3600,
+        signal_check_interval_s: int = _DEFAULT_SIGNAL_CHECK_INTERVAL_S,
         max_probe_calls_per_run: int = _DEFAULT_MAX_PROBE_CALLS_PER_RUN,
         profile_ttl_days: int = _DEFAULT_PROFILE_TTL_DAYS,
         now_fn: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
@@ -173,6 +180,7 @@ class DiscoveryDaemon:
         self._arm_path = arm_path
         self._state_path = Path(state_path)
         self._interval_s = interval_s
+        self._signal_check_interval_s = signal_check_interval_s
         self._max_probe_calls = max_probe_calls_per_run
         self._profile_ttl_days = profile_ttl_days
         self._now_fn = now_fn
@@ -249,16 +257,35 @@ class DiscoveryDaemon:
     def run_forever(self) -> None:
         """Loop ``run_once`` until :meth:`request_stop` is called.
 
-        The interval is *between* cycles, not "after a cycle ran" — even an
-        armed-but-no-stale cycle consumes its full sleep. This matches the
-        scheduler's own ``idle_poll_s`` semantics and means a Ctrl+C during
-        sleep returns within ``interval_s`` seconds.
+        The between-cycle sleep is **capped** at ``signal_check_interval_s``
+        (D2, analog Phase-8 POST_WINDOW hotfix 2026-07-11) — without the cap,
+        ``time.sleep(interval_s)`` blocks SIGTERM for up to ``interval_s``
+        seconds (Python PEP 475 retries interrupted syscalls until they
+        complete; the ``self._stop`` flag is only checked at the top of each
+        iteration). With the cap, a Ctrl+C / SIGTERM during sleep is honored
+        within at most ``signal_check_interval_s`` seconds — same guarantee
+        as ``phase8_scheduler.scheduler.runner``'s POST_WINDOW cap.
         """
         while not self._stop:
             self.run_once()
             if self._stop:
                 break
-            self._sleep_fn(float(self._interval_s))
+            self._sleep_capped(float(self._interval_s))
+
+    def _sleep_capped(self, total_s: float) -> None:
+        """Sleep ``total_s`` in chunks of at most ``signal_check_interval_s``.
+
+        Each chunk re-checks ``self._stop`` so a SIGTERM / request_stop()
+        during sleep short-circuits the loop within at most one chunk.
+        Mirrors the POST_WINDOW fix pattern: ``min(seconds_until(...), idle_poll_s)``
+        — but here we loop because the total is bounded, not a target time.
+        """
+        chunk_s = min(total_s, float(self._signal_check_interval_s))
+        elapsed = 0.0
+        while elapsed < total_s and not self._stop:
+            remaining = total_s - elapsed
+            self._sleep_fn(min(remaining, chunk_s))
+            elapsed += chunk_s
 
 
 # ---------------------------------------------------------------------------
