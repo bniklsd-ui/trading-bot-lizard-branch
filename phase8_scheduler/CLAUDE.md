@@ -294,6 +294,27 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 > "operator-run, not pytest-collected" convention) — verified via `py_compile` + unchanged
 > P8 count (**222**, unaffected — the edit touches only an inline dict comprehension).
 
+> 🟡 **Cross-phase bugfix (2026-08-26, Phase-14 EOD-Audit): `scripts/wiring.py:555`
+> `window_ok` NameError on `record_event`.** Der Closure `window_ok` (in
+> `_build_paper_tracker`, `wiring.py:508`) ruft `record_event(...)` als freie Funktion,
+> aber das `from scheduler.observability import record_event` (wiring.py:164) lebt
+> **innerhalb** der Funktion `_build_data_foundation` (wiring.py:143) — und ist damit
+> nicht im Closure-Scope von `window_ok` (dessen enclosing function ist
+> `_build_paper_tracker`, nicht `_build_data_foundation`). Beim ersten
+> `not verdict.covered`-Aufruf ⇒ `NameError('record_event')` ⇒ caught by
+> `paper.py:684-687` mit `logger.critical('PaperTradeTracker resolve failed for %s: %s', …)`,
+> deshalb 88 CRITICAL-Logs heute (Erstauftreten 2026-08-25 14:05, nach Phase-10-Session-
+> 10's `--enable-divergence-sampler`-Aktivierung) — ~26 h unentdeckt, **null
+> Trading-Impact** (nur Paper-Tracker-Pfad, kein offener Trade heute, Loss-Breaker
+> innerhalb Caps). **Fix:** Lazy-Import in `window_ok` analog zur dort bereits existenten
+> `from data_foundation.coverage import assess_window`-Zeile. Cross-Phase-Edit mit
+> expliziter Nikinger-Freigabe 2026-08-26 16:50 CEST (Phase-14-Freigabe-Liste
+> `scripts/wiring.py` ist nicht enthalten — Phase 14 deckt Phase 8 nicht ab). Voll-
+> forensic: [`../phase14_discovery/SESSIONS_ARCHIVE.md`](../phase14_discovery/SESSIONS_ARCHIVE.md),
+> Session 12/13. Same convention wie 2026-07-25 (`scripts/wiring.py` hat keine
+> pytest-Datei — verifiziert via `py_compile` + Integration-Smoke + full regression
+> **P8 248 unverändert**, keine getesteten Module angefasst).
+
 ---
 
 ## Session stopped — 2026-07-11 (Hotfix: POST_WINDOW-Sleep gecappt — Kill-Switch/SIGINT waren bis zu ~63h wirkungslos)

@@ -553,7 +553,14 @@ def _build_paper_tracker(config: SchedulerConfig, exec_cfg: Any, bar_service: An
     # "gap" reason catches the case the old tail-only check didn't see at all.
     # Lazy import — phase isolation (paper.py is in phase10_v3, coverage.py in phase12).
     def window_ok(epic: str, bars: Sequence[Mapping[str, Any]], created_utc: str, time_stop_utc: str) -> bool:
+        # Lazy imports — see Phase-12-data-foundation-block-B Audit (2026-08-26):
+        # `record_event` is imported inside `_build_data_foundation` (wiring.py:164),
+        # which is NOT the enclosing scope of this closure (enclosing is
+        # `_build_paper_tracker`). Calling it as a free function here would raise
+        # NameError on every `not verdict.covered` branch — same pattern as the
+        # pre-existing `assess_window` lazy import below.
         from data_foundation.coverage import assess_window
+        from scheduler.observability import record_event
         verdict = assess_window(
             [b.get("timestamp", "") for b in bars],
             created_utc, time_stop_utc, 1,
