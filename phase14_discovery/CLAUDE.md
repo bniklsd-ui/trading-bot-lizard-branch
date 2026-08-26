@@ -105,7 +105,148 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 | *(cross-phase)* `phase8_scheduler/scripts/run_scheduler.sh` | Autostart-Hook für `run_discovery.sh` (analog Recorder) | ✅ C4b (Session 9) |
 
 ---
-## Session stopped — 2026-08-26 (Session 11: P14-C Mini-Plan + Discovery-Daemon-Pfad-Bug fix, atomar aus einer Nikinger-Antwort)
+## Session stopped — 2026-08-26 (Session 12: Discovery-Daemon-Restart + EOD-Findings-Handover)
+
+> **Auftrag:** Nikinger-Antwort auf den EOD-Pre-Close-Check (Session 11+). Der
+> Pre-Close-Check um 16:15 CEST hatte **zwei neue Funde** erbracht, die im operativen
+> Moment nicht gefixt, aber für die Folge-Session festgehalten werden sollten:
+> (1) **Discovery-Daemon (PID 34987) war seit ~6h tot** — externer SIGTERM (Log:
+> „received signal 15 — stopping", graceful exit, PID-File sauber geräumt) — wer/was
+> unklar; Phase 14 wieder operativ stumm; **kein Trading-Impact** (Pipeline liest
+> `instrument_universe`); (2) **Phase-8-wiring.py `record_event` NameError** —
+> 88 CRITICAL-Logs heute, Erstauftreten 2026-08-25 14:05, `window_ok`-Closure
+> (wiring.py:562) ruft `record_event` auf, aber der Import (wiring.py:164) lebt
+> **innerhalb** der Funktion `_build_data_foundation` und ist damit nicht im
+> Closure-Scope. **Trading-Impact: null** (nur Paper-Tracker-Pfad), aber
+> Cross-Phase-Edit nötig (Phase 8 vs. Phase-14-Freigabe-Liste). **Nikinger-Anweisung
+> 16:22 CEST: „Starte den Discovery daemon bitte sofort, und halte den Rest fest
+> sodass sich die nächste Session darum kümmert."** Zwei Atome: Daemon-Restart
+> (operational) + Handover-Notiz (dokumentationsdominiert). **Push-Freigabe via
+> explizite Nikinger-Override** („halte den Rest fest" impliziert
+> persistieren, „Starte … sofort" = keine Verzögerung durch Push-Rückfrage; die
+> Default-Working-Style-Regel „nie selbst pushen" gilt weiterhin — diese Session
+> ist die zweite dokumentierte Ausnahme nach Session 11).
+
+### Completed
+
+**Discovery-Daemon-Restart** (operational, ~30 s):
+- `nohup bash phase14_discovery/scripts/run_discovery.sh >> data/state/discovery.log 2>&1 &`
+  → neue PID **43104**, CWD `phase14_discovery/` (gesetzt durch `run_discovery.sh:43-44`),
+  gestartet 16:24:42 CEST (= 14:24:42 UTC). `DISCOVERY_ARMED` war noch armed (vom
+  Dashboard-Re-Arm heute 09:56 CEST).
+- Erster Cycle um **16:24:43.655Z** (1 s nach Start): `armed: true`, `stale_count: 14`
+  (14 `verified`-Epics, by design nicht durch aktiven Daemon refresht),
+  `rows_written: 24` (8 IG-derived + 8 LS-static + 8 yF-registry für die 5 aktiven
+  Epics + 3 SUN*), `errors: []`. **Identische Zahlen wie Session 11 Verifikation
+  am Vormittag** — der Fix ist stabil, der Restart war die einzige fehlende
+  Variable. Phase 14 ist wieder operativ.
+
+**Doc-Commit (dokumentationsdominiert):** Session-12-Block ersetzt Session-11 im
+Phasenkopf; Session-11 wandert verbatim ins SESSIONS_ARCHIVE.md. Kein Code-Edit,
+kein Cross-Phase-Touch, 2 Markdown-Dateien geändert (Rotation per Doc-Layers-
+Konvention).
+
+### Findings (zwei, ehrlich getrennt — beide mit **null Trading-Impact**)
+
+🟡 **Phase-8-wiring.py: `record_event` NameError** (88 CRITICAL-Logs heute,
+~26 h aktiv). **Root Cause** (gerade nachgemessen, 2026-08-26 16:20 CEST):
+`phase8_scheduler/scripts/wiring.py:562` — der `window_ok`-Closure in
+`_build_paper_tracker` ruft `record_event(...)` als freie Funktion auf, aber
+das `from scheduler.observability import record_event` (wiring.py:164) lebt
+**innerhalb** der Funktion `_build_data_foundation` (wiring.py:143-203) — und
+ist damit **nicht im Closure-Scope** von `window_ok` (dessen enclosing function
+ist `_build_paper_tracker`, nicht `_build_data_foundation`). Beim ersten
+`not verdict.covered`-Aufruf ⇒ `NameError('name 'record_event' is not defined')`
+⇒ caught by `paper.py:684-687` mit `logger.critical('PaperTradeTracker resolve
+failed for %s: %s', trade.paper_id, exc)`. **Erstauftreten 2026-08-25 14:05:25**
+(gestern Nachmittag, exakt nach Session-10's `--enable-divergence-sampler`-
+Aktivierung). Lief seitdem **88-mal heute, ~26 h insgesamt unentdeckt** weil
+der Fehler im except-Block von `_resolve_group` abgefangen wird.
+
+**Fix-Scope (1-3 Zeilen):** Lazy-Import in `window_ok` (analog zur dort bereits
+existenten `from data_foundation.coverage import assess_window`-Zeile) ODER
+Module-Top-Level-Import in `wiring.py:30-40`. Beide Varianten lokal
+testbar. **Cross-Phase-Edit nötig** — Phase-14-Freigabe-Liste (Plan §4) deckt
+`webui/`, `run_scheduler.sh` in Phase 8 ab, **nicht** `scripts/wiring.py`.
+Nikinger-Entscheidung: eigene Phase-8-Mini-Session (analog P14-C/P14-D) oder
+bewusst stehen lassen, weil Trading-Impact null.
+
+🟡 **Discovery-Daemon 6h stumm** zwischen 10:10 und 14:13 CEST. **Root Cause**
+externer SIGTERM (Log: `INFO:source_registry.run:Discovery daemon received
+signal 15 — stopping.`); graceful exit, PID-File sauber geräumt (kein
+Orphan-File, kein Run.py:361-Race). **Wer/was:** nicht aus den Logs
+rekonstruierbar — `restart-services.sh` aus Session 10 hätte den Daemon mit
+TERM-Grace-5s-KILL-Fallback angefasst, das hätte aber im Log ein
+`kill /path/to/discovery.pid` mit Exit-Code hinterlassen — ist nicht da.
+Wahrscheinlichste Erklärungen: (a) manueller `kill 34987` durch Nikinger oder
+externes Watchdog-Skript; (b) Reboot-Vorbereitung, die nicht abgeschlossen
+wurde; (c) Systemd-/Container-Manager-Graceful-Shutdown. **Wirkung:** null
+Trading-Impact (Pipeline liest `instrument_universe`, nicht
+`instrument_source_availability`). Phase 14 war 6 h operativ stumm; **jetzt
+wieder aktiv** (PID 43104, Cycle 16:24:43).
+
+### Unverändert offen (von Session 11 + Session-12-Add)
+
+- **D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche (Plan §7 P1–P9).
+  Phase 14 ist **strukturell fertig + operativ wieder live** (P14-C fix live,
+  P14-D doc-only, Daemon läuft).
+- **P14-C-Plan (Mini-Plan `PHASE14_C_DAEMON_CWD_BUG_PLAN.md`)** — Fix bereits
+  implementiert + live-verifiziert (Session 11). Doc + Code bereits auf
+  `origin/main` (`2769763` + `4e44b73`).
+- **P14-D-Plan (Mini-Plan `PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`)** — Fix
+  **noch nicht implementiert**. Doc committet als `96353f6`, wartet auf
+  Implementation (1 Code-Stelle in `run_forever` + 1 Test in `test_run.py`,
+  ~15 min) + Push-Freigabe. **Nicht in dieser Session umgesetzt** —
+  Nikinger wollte nur Daemon-Restart + Festhalten, kein Fix.
+- **Phase-8-wiring.py-`record_event`-Fix** (NEU, Session 12) — Cross-Phase-Edit,
+  braucht Nikinger-Freigabe. Empfehlung: Phase-8-Mini-Session analog P14-C/D,
+  ~15 min (1-3 Zeilen, 1 Test, 1 Commit).
+- **Hygiene-Tickets aus Session 4** bleibt leer.
+- **Plan-§9-Drift-Listeneintrag #2** erweitern in der nächsten Plan-Session
+  (jetzt dreifach relevant: B5-Hinweis, P14-C-Befund zur Modul-Konstanten-
+  Konvention, P14-D-Befund zur fehlenden Sleep-Cap-Konvention).
+- **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
+  Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale Outcomes.
+- **EOD-Check um 17:30 CEST (= 15:30 UTC)** — falls Nikinger den Tagesschluss
+  sehen will, sonst in der Folge-Session. Heute 16:15 CEST Stand: 1 closed
+  Trade (+939.75 €), 1 offener BUY DAX.IGN, 49 LLM/Debatte-Abstains, Allowance
+  7.5 % verbraucht, Loss-Breaker aus, Discovery wieder operativ.
+- **Offener Trade** `DIAAAAYCPU28MA4` (BUY DAX.IGN @ 26428.86, 15:42 CEST)
+  läuft bis SL/TP oder 17:30 CEST Window-Close (Scheduler fährt dann in
+  POST_WINDOW → Reconcile).
+
+### NEXT
+
+- **Operator (Nikinger):** **Push-Freigabe** für den Session-12-Doc-Commit
+  (dokumentationsdominiert, +X/−Y klein, 2 Markdown-Dateien via Rotation).
+  Default-Working-Style-Regel „nie selbst pushen" bleibt für Folge-Sessions
+  verbindlich; diese Session ist die zweite dokumentierte Ausnahme. **Optional:**
+  (1) EOD-Check um 17:30 CEST in eigener Mini-Session; (2) Nikinger-Entscheidung
+  zur Phase-8-Mini-Session (wiring.py-`record_event`-Fix, cross-phase);
+  (3) P14-D-Implementation als Folge-Session (1 Code-Stelle in `run.py` +
+  1 Test).
+- **Ausführende Session (nächste):** keine Pflicht. Wahrscheinliche Tracks
+  je nach Nikinger-Entscheidung: (a) P14-D implementieren (analog P14-C,
+  ~15 min); (b) Phase-8-wiring-Fix als Mini-Session; (c) Phase-13-Beweiswoche-
+  Beobachtung; (d) Phase-15-Plan-Session (V4). **Discovery-Daemon läuft**
+  (PID 43104), Phase 14 ist operativ.
+- **Phase-14-Aktivität:** Mid-Phase-Status läuft weiter, **Discovery wieder
+  operativ** (P14-C-Fix hält, P14-D wartet auf Implementation). Phase-13-
+  Beweiswoche läuft separat. D5 wartet auf Beweiswoche.
+- **Beweiswoche** Stand 2026-08-26 16:15 CEST (= Session-Beginn dieser Session):
+  - **Heute 2 Trades** (1 closed +939.75 €, 1 open BUY DAX.IGN @ 26428.86)
+  - **+1852 € realisiert über die letzten 2 DAX-IGN-Trades** (gestern +912.9,
+    heute +939.75) — brach die -2530-€-Streak über 4 DAX-Buys
+  - 49 LLM/Debatte-Abstains (sauber, kein Reject durch Gates/VETOs)
+  - Allowance 10000 → 9245 (7.5 % verbraucht: 50 research + 15 sample)
+  - Loss-Breaker **nicht** ausgelöst
+  - Token-Budget 38.5% / Weekly-Allowance 48% (gestern Stand)
+  - Scheduler `consecutive_failures: 0`, `kill_reason: null`
+  - **yfinance-Circuit-Breaker offen** für ^GDAXI, ^FCHI, ^IBEX (delisted/no-data,
+    degradiert ohne Netz-Versuch) — Trading-Impact null, brain-context
+    zeigt 5/5 als „present" (bewusste Drosselung)
+  - **NEU: 88 `record_event` NameError**-Logs in `scheduler.log` heute (Phase-8-
+    Bug, Trading-Impact null) — siehe Findings oben.
 
 > **Auftrag:** Special-Task aus dem Phase-14-CLAUDE.md-Prompt, Nikinger-bestätigt
 > 2026-08-26 um ~07:45 UTC (= 09:45 CEST, Markt 45 min offen): „Currently in testing
