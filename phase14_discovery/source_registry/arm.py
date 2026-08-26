@@ -49,10 +49,16 @@ from pathlib import Path
 
 logger = logging.getLogger("source_registry.arm")
 
-# Default path matches the Web-UI constant (`_ARM_PATH` in `phase8_scheduler/webui/api.py`)
-# and the daemon's default. Kept here as a single source of truth — modules that need it
-# import this constant; never duplicate the literal in another file.
-DEFAULT_ARM_PATH = Path("data") / "state" / "DISCOVERY_ARMED"
+# Module resolves the canonical repo root via ``Path(__file__).resolve().parents[2]`` —
+# the same pattern ``source_registry/run.py:62`` and ``phase8_scheduler/webui/api.py:49``
+# already use for their own absolute default paths. ``run_discovery.sh`` cds into
+# ``phase14_discovery/`` before ``exec python -m source_registry.run``; a relative path
+# here would resolve to ``phase14_discovery/data/state/DISCOVERY_ARMED`` (does not exist)
+# and the daemon would silently stay unarmed despite the operator having set the file.
+# Fixed 2026-08-26 (P14-C plan §3.1 — D1/D2). Kept as a single source of truth: callers
+# import this constant, never duplicate the literal.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ARM_PATH = _REPO_ROOT / "data" / "state" / "DISCOVERY_ARMED"
 
 
 def is_armed(arm_path: str) -> bool:
