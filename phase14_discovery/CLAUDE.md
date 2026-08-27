@@ -265,6 +265,17 @@ Territorium (Phase-12-Reconcile-Step), nicht Phase 14.
   Session (V4); (c) Recorder-Daemon-Hygiene-Pass (analog Phase-8
   POST_WINDOW); (d) Phase-12-Reconciliation-Timing-Fix für die
   12 „no usable history row"-Vorkommen (nicht Phase-14-Scope).
+
+**Do 2026-08-27 Morgen-Add (Chat-Handover, kein Code in dieser
+Session):** Nikinger-Priorität für die Folge-Session ist die Auflösung
+der **Dokumentations-Items** (Plan-§9-Drift-Listeneintrag #2
+erweitern — vierfach relevant: B5 + P14-C + P14-D + Doc-Rotation-
+Drift aus Session 12; Advisor-Tool-Fehler-Doku als Phase-8-Restpostand;
+ggf. weitere Plan-§9-Drift-Einträge). **Mini-Session als nächster
+konkreter Step** — was am dringendsten wirkt (Recorder-Sleep-Cap-
+Hygiene, Plan-§9-Drift, Advisor-Tool-Doku) je nach Nikinger-Entscheidung
+beim nächsten Aufmachen. Phase-13-Beweiswoche läuft weiter separat,
+D5 wartet weiter auf deren Abschluss.
 - **Phase-14-Aktivität:** **closed-in-all-but-D5** — strukturell +
   operativ fertig. P14-C + P14-D beide auf origin/main. Discovery
   läuft mit neuem Code. D5 wartet auf Phase-13-Beweiswoche.
