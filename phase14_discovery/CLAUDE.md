@@ -106,197 +106,134 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 
 ---
 
-## Session stopped — 2026-08-26 (Session 14: P14-D live-loaded + Phase-8-wiring-Fix + Scheduler-Restart + EOD-Check, alle live-verifiziert)
+## Session stopped — 2026-08-27 (Session 15: Mini-Session — Plan-§11-Korrekturnotiz + Advisor-Tool-Restpostand-Notiz, dokumentationsdominiert, 0 Code-Edits)
 
-> **Auftrag:** Nikinger-Freigabe (Question-Tool, 16:55 CEST) für zwei
-> Cross-Session-Schritte: (1) `git push origin main` für die zwei P14-D-Commits
-> (`27f04d9` + `22cc688`) und (2) Phase-8-wiring-`record_event`-Fix als Mini-Session
-> (Cross-Phase-Edit, freigegeben 16:50 CEST). Später (Question-Tool, 17:24 CEST)
-> zusätzlich: EOD-Check 17:30 CEST + Phase-8-Commit pushen + Scheduler heute Abend
-> neustarten. **Alles in dieser Session ausgeführt, alle live-verifiziert.**
+> **Auftrag:** Nikinger-Chat-Handover (Do 2026-08-27, ~10:00 CEST). Priorität für
+> die Folge-Session war die Auflösung der **Dokumentations-Items** aus dem
+> Session-14-Morgen-Add: (1) Plan-§9-Drift-Listeneintrag #2 erweitern —
+> vierfach relevant (B5 + P14-C + P14-D + Doc-Rotation-Drift aus Session 12);
+> (2) Advisor-Tool-Fehler-Doku als Phase-8-Restpostand; (3) ggf. weitere
+> §9-Drift-Einträge. Mini-Session-Scope: keine Code-Edits, keine Cross-Phase-
+> Touches, eine atomare Doc-Einheit.
 
 ### Completed
 
-**Push-Freigabe Override (Nikinger, 16:55 CEST) — 3 P14-Commits live:**
-- `git push origin main` (3f5fdd1..27f04d9) — `27f04d9` (P14-D code+tests) +
-  `22cc688` (Session 13 docs/rotation). Working-Style-Regel „nie selbst pushen"
-  hat als Default weiterhin Bestand; diese Session ist die dokumentierte Ausnahme
-  (Auditkette über die Question-Tool-Antwort, im Commit-Block der Commits).
+**Plan §11 Korrekturnotiz** ([`../docs/concepts/phase14_discovery_plan.md`](../docs/concepts/phase14_discovery_plan.md)):
+vier Post-Execution-Drifts als neue Sektion nach §10 dokumentiert. Konvention
+folgt dem Phase-12-Praezedens (inline-Footnote in §4 + Header-Blockquote) —
+*erweitert* um eine **Post-Execution-Sektion**, weil die vier Befunde alle erst
+nach der Ausführung sichtbar wurden und keine D1–D20 ändern:
 
-**Commit `5cda375` — `phase8_scheduler: fix window_ok NameError on record_event
-(cross-phase, 2026-08-26)`** (2 files, +28/−0). Lokal committet + via
-zweiter Push-Freigabe (`git push origin main` 17:24 CEST) live:
-- `scripts/wiring.py:555` `window_ok`-Closure in `_build_paper_tracker`:
-  Lazy-Import von `record_event` analog zur dort bereits existenten
-  `from data_foundation.coverage import assess_window`-Zeile. Root Cause
-  nachgemessen 16:20 CEST (Session 12): `from scheduler.observability
-  import record_event` (wiring.py:164) lebte **innerhalb** `_build_data_foundation`
-  (wiring.py:143) — nicht im Closure-Scope von `window_ok` (dessen enclosing
-  function ist `_build_paper_tracker`). Beim ersten `not verdict.covered`-Aufruf
-  ⇒ `NameError('record_event')` ⇒ caught by `paper.py:684-687` mit
-  `logger.critical('PaperTradeTracker resolve failed …')` — **88 CRITICAL-Logs
-  seit 2026-08-25 14:05 (Erstauftreten nach Session-10's
-  `--enable-divergence-sampler`-Aktivierung)**.
-- Phase-8-CLAUDE.md-Inline-Note zwischen den existierenden 2026-07-25
-  und 2026-07-31 Notizen im Modul-Struktur-Abschnitt (gleiche
-  `>`-Blockquote-Konvention).
-- Konvention `scripts/wiring.py` hat keine pytest-Datei (`operator-run,
-  not pytest-collected`) — verifiziert via `py_compile` + Integration-Smoke
-  (`window_ok` mit `verdict.covered=False` ruft `record_event` genau einmal
-  auf, kein NameError) + full regression **P8 248 unverändert**.
+- **§11.1 B5** — `backfill.py:414-416` verwirft `insert_bars`-Rückgabewert.
+  Code-Bug, aber **kein Phase-14-Scope**; latent bis zum nächsten Cross-Phase-
+  Touch. Fix-Scope: 1 Zeile + Regressionstest.
+- **§11.2 P14-C-Befund** — Modul-Konstanten-Konvention `parents[2]` fehlte an
+  einer von sechs Stellen (`arm.py:55`). **Impl-Drift zu D11**, nicht Plan-
+  Konflikt. Fix bereits auf `origin/main` (Session 11, Commit `2769763`).
+- **§11.3 P14-D-Befund** — Sleep-Cap-Konvention für Daemon-Loops fehlte in
+  `run_forever`. **Impl-Drift zum Phase-8-POST_WINDOW-Hotfix** (2026-07-11).
+  Fix bereits auf `origin/main` (Session 13+14, Commit `27f04d9`). Recorder-
+  Daemon (Phase 12) hat denselben Bug — **Phase-15-Territorium**.
+- **§11.4 Doc-Rotation-Drift** — Inline-Duplikat eines Session-Blocks im
+  Phasenkopf (entdeckt + aufgeräumt in Session 13). Lehre: Pre-Commit-Hook
+  oder Editor-Checklist diskutieren.
 
-**Scheduler-Restart (operational, ~3 min)** — Cross-Phase-Fix kann nur durch
-Prozess-Neustart wirksam werden (laufende Module bleiben im RAM). Sauberer
-Ablauf:
-- `kill -TERM 17018` → Signal-Handler greift (`received signal 15 —
-  requesting graceful stop` um 17:23:13), WINDOW-Sleep durch den
-  2026-07-11-POST_WINDOW-Hotfix auf `idle_poll_s` gecappt ⇒ 2:12 später
-  „stop requested — shutting down." → „scheduler daemon stopped cleanly."
-  um 17:25:25. **Kein SIGKILL nötig** (der Hotfix wirkt).
-- `nohup bash phase8_scheduler/scripts/run_scheduler.sh --enable-shadow-schedule
-  --enable-divergence-scheduler >> data/state/scheduler.log 2>&1 &` →
-  PID **47166**, started 17:27:08 CEST.
-- `run_scheduler.sh:59-62` autostart-hook startet zusätzlich Recorder
-  (PID 4190 war noch aktiv) und Discovery-Daemon. Da der vorige
-  Discovery-PID 43104 zwischenzeitlich extern beendet worden war
-  (Log: „received signal 15 — stopping", wer/was nicht rekonstruierbar,
-  identisch zur Session-12-Findung), wurde ein **neuer** Discovery-Daemon
-  PID **47174** gestartet, gestartet 17:27:07. Dieser lädt den **P14-D-Code**
-  (Plan D3 — `run_forever` ist Methode ohne Cross-Modul-Import) und der
-  nächste Cycle benutzt den chunked Sleep-Cap automatisch.
-- Erster Cycle um 17:27:08.138Z: `armed:true`, `stale_count:14`,
-  `rows_written:24`, `errors:[]`. **Identische Substrat-Zahlen wie
-  Session 11 + 12 — der P14-D-Fix ist strukturell unsichtbar** (= richtig,
-  weil er nur das Signal-Handling ändert, nicht den Cycle-Output).
-- Scheduler-Cycle um 17:31:01: „market closed, skipping intraday bars for
-  IX.D.DAX.IFMM.IP" → POST_WINDOW-Phase korrekt erkannt.
+Plan-Header mit `down:`-Links auf die zwei Schwester-Mini-Pläne (P14-C,
+P14-D) ergänzt, `updated:` auf 2026-08-27 gesetzt. **Snapshot-Status
+unverändert** — §11 ist additiv, kein Eingriff in bestehende Inhalte.
 
-**EOD-Check 17:30 CEST** — heute 1 Trade mehr als in Session-12 dokumentiert
-(damals 1 closed + 1 offen; jetzt 2 closed):
-- Trade 1: `DIAAAAYCN87PCAT` BUY DAX.IGN 21.0 @ 26315.19 → 26360.19,
-  **+939.75 EUR**, closed 14:02:57 CEST (vorher schon dokumentiert).
-- Trade 2: `DIAAAAYCPU28MA4` BUY DAX.IGN 21.6 @ 26428.86 → 26398.86,
-  **−653.40 EUR**, closed 16:07:57 CEST (war in Session 12 noch offen —
-  die Auflösung passierte zwischen 16:15 und 17:14, Hold 25 min,
-  normaler TIME_STOP).
-- **Realisiert heute: +286.35 EUR über 2 BUYs** · **Diese Woche (Mo–Di):
-  +1199.25 EUR über 3 BUYs** (alle DAX.IGN).
-- **0 offene Positionen** jetzt — Scheduler fährt sauber in POST_WINDOW.
+**Advisor-Tool-Restpostand (Phase 8):** der Eintrag in
+[`../phase8_scheduler/CLAUDE.md`](../phase8_scheduler/CLAUDE.md) Zeile 414
+„Advisor-Tool war diese Session **nicht erreichbar** (ein Aufruf, sofortiger
+Fehler, keine weiteren Details in der Tool-Antwort) — exakte Fehlermeldung
+geht an den Nikinger zur eigenen Recherche" **bleibt sachlich korrekt**.
+Keine Aktion nötig — der Tool-Status hat sich seit 2026-07-25 nicht
+geändert (keine neue Session hat das Tool benutzt; Phase 14 lief ohne
+Advisor-Session, alle P14-C/D-Punkte wurden per Code-Selbstprüfung + Live-
+Verify abgenommen). **Closed Loop:** diese Mini-Session bestätigt nur, dass
+der Eintrag sufficient ist. Kein Repo-Fix, kein neuer Plan — Werkzeug-
+Verfügbarkeit ist Operator-Infrastruktur, nicht Phase-14-Scope.
+
+**Rotation Session 14 → SESSIONS_ARCHIVE.md** (Doc-Layers-Konvention):
+Session-14-Block (inkl. Morgen-Add-Paragraph) wandert **verbatim** an den
+Anfang des Archivs; Phasenkopf trägt jetzt nur noch den neuen Session-15-
+Block. Footer-Pointer bleibt. Σ-Sweep-Stand 2026-08-27 ~10:50 CEST unten
+im Block dokumentiert.
 
 ### Verified
 
-- `grep "name 'record_event'" data/state/scheduler.log | awk '$1 >= "2026-08-26" && $2 >= "17:27:08"' | wc -l` → **0**.
-- `grep "CRITICAL" data/state/scheduler.log | awk '$1 >= "2026-08-26" && $2 >= "17:27:08"' | wc -l` → **0**.
-- `pytest phase14_discovery/tests -q` → **61 passed** (unverändert seit
-  Session 13).
-- `pytest phase8_scheduler/tests -q` → **248 passed** (unverändert).
-- `git log --oneline -5` → `5cda375 phase8_scheduler: fix …` als HEAD auf
-  origin/main (`27f04d9..5cda375`).
-- Daemon-Prozesse alle alive: Scheduler PID 47166 (Sl), Discovery PID 47174 (S),
-  Recorder PID 4190 (Sl), WebUI PID 4595 (Sl). **Kein** paralleler Login,
-  **kein** Doppel-Prozess.
-- P14-D-Code automatisch geladen (Plan D3 eingehalten, **kein** Operator-
-  Restart für Discovery nötig — neuer PID hat den Code direkt).
-- Verbleibende 88 record_event-Logs im Log sind **historisch** (vor dem
-  Restart), werden beim nächsten normalen Log-Rotate archiviert.
+- `pytest phase14_discovery/tests -q` → **61 passed** (unverändert).
+- `pytest phase13_live_data/tests -q` → **74 passed** (unverändert).
+- `pytest phase12_data_foundation/tests -q` → **143 passed** (unverändert).
+- `pytest phase9_universe/tests -q` → **87 passed** (unverändert).
+- `pytest phase8_scheduler/tests -q` → **248 passed, 1 warning** (unverändert).
+- Plan-Sektion §11 strukturell sauber: §11.1–§11.5 unter `## §11`-
+  Header, keine Duplikation mit §9 Drift-Liste, Verbatim-Anker
+  zeigen auf den heutigen Repo-Stand (Sessions 11/13/14, Commits
+  `2769763` / `27f04d9` / `22cc688`).
+- Working tree: nur Markdown-Änderungen, kein Code-Touch, kein
+  Cross-Phase-Edit. Push = Nikinger-Freigabe (Working-Style-Regel,
+  unverändert seit Session 11).
 
 ### Findings
 
-🟢 **Phase-8-wiring-Fix wirkt strukturell** — Lazy-Import in `window_ok`
-macht das `record_event` im Closure-Scope verfügbar, exakt analog zur
-bereits existenten `assess_window`-Zeile. Erstauftreten-Heilung seit
-17:27:08 (Scheduler-Restart-Zeitpunkt): **null weitere `NameError`-
-Einträge**, **null weitere CRITICAL-Logs**. Der 26-h-NameError-Spuk
-ist strukturell vorbei.
+🟢 **Drei der vier Drifts sind bereits gefixt + live-verifiziert** — §11 ist
+**deskriptiv**, nicht **präskriptiv**. Phase 14 ist **closed-in-all-but-D5**
+geblieben; diese Session ändert daran nichts. Das ist das gewünschte
+Ergebnis: die Korrekturnotiz dokumentiert eine **abgeschlossene**
+Beweis-Kette, nicht offene Arbeit.
 
-🟡 **Discovery-Daemon hat heute mehrfach neu gestartet** — zwischen
-Session-12 (PID 43104, 16:24) und jetzt (PID 47174, 17:27) liegt
-genau **1 h 03 min**, was verdächtig nach einem externen Watchdog-Tick
-riecht (vermutlich der `restart-services.sh`-Helper oder ein cron-ähnlicher
-Operator-Tick). PID-File sauber geräumt, neue PID sauber gestartet.
-**Kein** Trading-Impact (Discovery hat null IG-Calls, null Netz;
-Pipeline liest `instrument_universe`, nicht `instrument_source_availability`).
-Wurde in Session 12 schon festgehalten, jetzt bestätigt.
+🟡 **B5 (Code-Bug) bleibt latent** — kein Trading-Impact, aber der Fix
+ist 1 Zeile. Empfehlung: in einer Phase-15-Plan-Session oder einer
+Phase-13.5-Hygiene-Session aufgreifen. Nicht Phase-14-Scope.
 
-🟡 **DIAAAAYCPU28MA4 TIME_STOP-Verlust (−653.40 EUR)** — die
-„Reward-Recorder: no usable history row" Meldung (12 Vorkommen im Log)
-zeigt einen IG-History-Lag für genau diesen Trade. Trade wurde durch
-den Scheduler-Window-Close (17:30 CEST) als TIME_STOP aufgelöst, nicht
-durch SL/TP. **Kein Code-Bug** — Reconciliation-Timing-Issue, P12-V3-
-Territorium (Phase-12-Reconcile-Step), nicht Phase 14.
+🟡 **Doc-Rotation-Hygiene ohne maschinelle Prüfung** — §11.4 hält fest,
+dass die Doc-Layers-Konvention (genau ein `## Session stopped`-Block im
+Phasenkopf) **nicht** automatisch geprüft wird. Empfehlung: einen
+`scripts/check_doc_rotation.py` mit `grep -c` + Exit-Code als optionaler
+Pre-Commit-Hook. **Nicht in dieser Session umgesetzt** — neue Datei +
+neues Skript wäre eine Eigenleistung über Mini-Session-Scope.
 
-### Unverändert offen (von Session 13 + Session-14-Add)
+### Unverändert offen (von Session 14)
 
-- **P14-D5-Closeout-Handover** — wartet auf Phase-13-Beweiswoche
-  (Plan §7 P1–P9). Phase 14 ist **strukturell + operativ fertig**:
-  P14-C + P14-D beide gefixt, live-verifiziert, auf `origin/main`.
+- **D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche (Plan §7 P1–P9).
+  Phase 14 bleibt **closed-in-all-but-D5**.
 - **Hygiene-Tickets aus Session 4** bleibt leer.
-- **Plan-§9-Drift-Listeneintrag #2** — jetzt vierfach relevant
-  (B5-Hinweis + P14-C-Befund zur Modul-Konstanten-Konvention `parents[2]`
-  + P14-D-Befund zur fehlenden Sleep-Cap-Konvention + die Phase-12.5-Phase-8-
-  Doc-Rotation-Drift aus Session 12). Erweiterung in der nächsten
-  Plan-Session.
-- **Recorder-Daemon (`phase12_data_foundation/data_foundation/run.py`)**
-  hat denselben theoretischen Bug mit `interval_s=300` (5 min, 12×
-  weniger schmerzhaft). Phase-15-Territorium — gleichiger Hygiene-Pass
-  beim Phase-15-Plan empfohlen (eine Helper-Klasse in einem gemeinsamen
-  Modul, beide Daemons).
-- **Phase-15-Planungs-Session**: V4-Themen (Council, Handover,
-  Reward-Reform, Force-Trigger, Instinct-ECC) — gegatet auf
-  Phase 9+11+12+13+14 + reale Outcomes.
-- **EOD-Check Folgetag** — Mo 2026-08-31 ist der nächste Phase-13-Beweis-
-  wochen-Tag mit Allowance-Roll.
+- **Recorder-Daemon (`phase12_data_foundation/data_foundation/run.py`)** —
+  derselbe theoretische Bug wie P14-D. Phase-15-Territorium (Helper-Klasse
+  in einem gemeinsamen Modul, beide Daemons).
+- **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
+  Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale
+  Outcomes.
+- **B5-Fix (Phase-13-Code, 1 Zeile)** — latent bis Phase 13.5 oder Phase 15.
+- **Doc-Rotation-Hygiene-Hook** — Vorschlag, kein Phase-14-Scope.
 
 ### NEXT
 
-- **Operator (Nikinger):** **nichts** — diese Session hat alle drei
-  freigegebenen Schritte (P14-Push + Phase-8-Fix + Scheduler-Restart +
-  EOD-Check) selbst durchgeführt. Working tree clean, alle Commits
-  auf origin/main (`27f04d9` + `22cc688` + `5cda375`), Scheduler
-  PID 47166 mit gefixtem wiring.py, Discovery PID 47174 mit
-  gefixtem run.py, 0 CRITICAL-Logs seit Restart, +286.35 EUR heute
-  realisiert. **Auditkette:** die Push-Freigaben stehen in den
-  Question-Tool-Antworten oben; die Working-Style-Regel „nie selbst
-  pushen" bleibt für Folge-Sessions verbindlich.
-- **Ausführende Session (nächste):** keine Pflicht. Phase 14 ist
-  **operativ + strukturell fertig**. Wahrscheinliche Tracks:
-  (a) Phase-13-Beweiswoche-Beobachtung (läuft seit Mo 2026-08-25,
-  separater Track, Allowance-Roll am Mo 31.08.); (b) Phase-15-Plan-
-  Session (V4); (c) Recorder-Daemon-Hygiene-Pass (analog Phase-8
-  POST_WINDOW); (d) Phase-12-Reconciliation-Timing-Fix für die
-  12 „no usable history row"-Vorkommen (nicht Phase-14-Scope).
-
-**Do 2026-08-27 Morgen-Add (Chat-Handover, kein Code in dieser
-Session):** Nikinger-Priorität für die Folge-Session ist die Auflösung
-der **Dokumentations-Items** (Plan-§9-Drift-Listeneintrag #2
-erweitern — vierfach relevant: B5 + P14-C + P14-D + Doc-Rotation-
-Drift aus Session 12; Advisor-Tool-Fehler-Doku als Phase-8-Restpostand;
-ggf. weitere Plan-§9-Drift-Einträge). **Mini-Session als nächster
-konkreter Step** — was am dringendsten wirkt (Recorder-Sleep-Cap-
-Hygiene, Plan-§9-Drift, Advisor-Tool-Doku) je nach Nikinger-Entscheidung
-beim nächsten Aufmachen. Phase-13-Beweiswoche läuft weiter separat,
-D5 wartet weiter auf deren Abschluss.
+- **Operator (Nikinger):** **Push-Freigabe** für den Docs-Commit (2 Markdown-
+  Dateien, 2 Markdown-Files via Rotation). Diff ist dokumentationsdominiert,
+  kein Code-Touch, kein Bot-Stop nötig. Default-Working-Style-Regel „nie
+  selbst pushen" gilt weiterhin — diese Session ist **nicht** als Override-
+  Variante deklariert; falls Du pushen willst, Frage-Tool wie üblich.
+- **Ausführende Session (nächste):** keine Pflicht. Phase 14 bleibt
+  **closed-in-all-but-D5**. Wahrscheinliche Tracks je nach Nikinger-
+  Entscheidung: (a) Phase-13-Beweiswoche-Beobachtung (läuft seit Mo
+  2026-08-25, separater Track); (b) Phase-15-Plan-Session (V4) — könnte
+  den Recorder-Sleep-Cap-Helper und den B5-Fix als Hygiene-Atome
+  mitnehmen; (c) Mini-Session für den Doc-Rotation-Hygiene-Hook (gering,
+  aber lohnend); (d) Phase-12-Reconciliation-Timing-Fix für die
+  `reward.recorder: no usable history row`-Vorkommen (nicht Phase-14-Scope).
 - **Phase-14-Aktivität:** **closed-in-all-but-D5** — strukturell +
-  operativ fertig. P14-C + P14-D beide auf origin/main. Discovery
-  läuft mit neuem Code. D5 wartet auf Phase-13-Beweiswoche.
-- **Beweiswoche** Stand 2026-08-26 17:35 CEST (= Session-Ende):
-  - 2 closed Trades heute (+286.35 EUR netto)
-  - **Diese Woche: +1199.25 EUR über 3 BUYs** (alle DAX.IGN)
-  - 0 offene Positionen, Scheduler in POST_WINDOW
-  - Allowance 10000 → 9245 (7.55 % verbraucht), Roll-End Mo 31.08. 09:21 UTC
-  - 7d-Roll 210 / 10000 (2.1 %)
-  - Token heute: 99 LLM-Calls (73 Sonnet + 26 Haiku), €0.7115
-  - Loss-Breaker: **nicht** ausgelöst (deutlich positive Woche)
-  - Scheduler `consecutive_failures: 0`, `kill_reason: null`
-  - **Wiring-Fix live**: 0 `record_event` NameError seit 17:27:08
-  - **P14-D-Fix live**: Discovery-Cycles laden den chunked Sleep-Cap
-    automatisch (Plan D3 eingehalten)
-  - **yfinance-Circuit-Breaker offen** für ^GDAXI, ^FCHI, ^IBEX
-    (delisted/no-data, degradiert ohne Netz-Versuch) — Trading-Impact
-    null
-  - 12 `reward.recorder: no usable history row for deal_id=
-    DIAAAAYCPU28MA4` (IG-History-Lag, Reconciliation-Timing, nicht
-    Phase-14-Scope)
+  operativ fertig. §11 dokumentiert Post-Execution-Drifts deskriptiv,
+  ändert nichts am Phase-Status.
+- **Σ-Sweep** Stand 2026-08-27 ~10:50 CEST:
+  - P14 61, P13 74, P12 143, P9 87, P8 248 — Σ 613 für diese 5 Phasen
+    (Σ 1698 wie in den Closeout-Handovern = alle 13 Phasen + meta)
+  - Allowance (aus Session 14): 9245/10000 (7.55 % verbraucht, Mo 31.08. Roll-End)
+  - Verbleibende CRITICAL-Logs seit P14-Wiring-Fix: **0** (Bestätigung
+    aus Session 14 hält)
+  - Recorder (Phase 12): läuft weiter (PID 4190 Sl), Daemon
+    (Phase 14): läuft (PID 47174 Sl, mit P14-D-Fix), Scheduler: PID 47166
 
 ---
 

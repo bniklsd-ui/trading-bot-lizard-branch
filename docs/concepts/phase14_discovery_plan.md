@@ -10,7 +10,9 @@ down:
   - ../../phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md        # 📕 Phase-13-Abschluss, §1.5 drei geerbte Schnittstellen
   - ./phase13_live_data_plan.md                                 # 📕 L1–L17 (gelockt), gelten weiter
   - ../../phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md # 📕 die Lehre „nicht im Konsumentenpfad kaufen"
-updated: 2026-08-22
+  - ../../phase14_discovery/PHASE14_C_DAEMON_CWD_BUG_PLAN.md    # 📕 Schwester-Mini-Plan (P14-C, CWD-Pfad-Bug)
+  - ../../phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md # 📕 Schwester-Mini-Plan (P14-D, Sleep-Cap-Bug)
+updated: 2026-08-27
 ---
 
 # Phase 14 — Discovery-Then-Deterministic · Execution-ready Plan (2026-08-22)
@@ -1172,3 +1174,139 @@ sqlite3 "file:data/trading_bot.sqlite?mode=ro" "SELECT COUNT(*) FROM instrument_
 - **WI-2/W2 + H-Serie, Research-Funnel-Fix, B3-Margin-Headroom, Council-Paper-Call, Live-Konto**
   — Phase 15.
 - **Ein Revert der fünf P12.5-Fixes** — Phase-13-L14, gilt weiter.
+
+---
+
+## §11 Korrekturnotiz (Mini-Session Do 2026-08-27 — vier Post-Execution-Drifts)
+
+> **Konvention:** diese Notiz steht hier, **nach** §10, weil sie keine
+> Plan-Korrektur ist (keine der ursprünglichen D1–D20 ändert sich), sondern
+> vier **post-execution** Drifts, die die Plan-Session am 2026-08-22 nicht
+> vorhersehen konnte und die der Phase-14-Lauf dann operativ aufgedeckt hat.
+> Sie ergänzt §9 (Drift-Liste), ersetzt keinen Eintrag dort — §9 zählte die
+> *Plan*-Drift, diese Notiz zählt die *Ausführungs*-Drift. Cross-Phase-Referenz:
+> P14-C-Mini-Plan [`../phase14_discovery/PHASE14_C_DAEMON_CWD_BUG_PLAN.md`](../phase14_discovery/PHASE14_C_DAEMON_CWD_BUG_PLAN.md) §3.1,
+> P14-D-Mini-Plan [`../phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`](../phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md) §3.2,
+> Phase-14-Session-12-Block ([`../phase14_discovery/SESSIONS_ARCHIVE.md`](../phase14_discovery/SESSIONS_ARCHIVE.md) Z. 93–102).
+
+### §11.1 B5 (Code-Bug) — `insert_bars`-Rückgabewert wird verworfen
+
+`phase13_live_data/live_data/backfill.py:414-416`:
+
+```python
+            try:
+                archive.insert_bars([archive_bar])
+                written += 1
+```
+
+`BarArchive.insert_bars` (`archive.py:119-133`, `INSERT OR IGNORE` +
+`cur.rowcount`) **gibt die Zahl der wirklich neu geschriebenen Zeilen zurück**.
+Der Rückgabewert wird verworfen; ein Duplikat zählt als „Schreibvorgang".
+
+> **Hinweis aus dem Plan** (Mutterplan §3.5 B5, am 2026-08-22 selbst
+> geschrieben): das war ein **echter Bug**, aber **kein Phase-14-Scope** — Phase 14
+> rührt `backfill.py` nur in B1b/B2 an (CapitalSource-Symbol-Lookup),
+> nicht in der Backfill-Hauptschleife. Der Zähler ist ein
+> Diagnose-Instrument, **kein** Gate oder VETO (es gibt keinen Code-Pfad,
+> der auf den Zähler schaltet). Beweiswoche läuft seit 2026-08-25,
+> Capital-Spalte zeigt die korrekten 962 Rows; die Drift wäre erst beim
+> zweiten Lauf über dasselbe Fenster sichtbar (Zähler behauptet 962,
+> Archiv hat 0 neue Rows). **Heute kein Trading-Impact**, latent bis
+> zum nächsten Cross-Phase-Touch. **Fix-Scope:** 1 Zeile
+> (`written += archive.insert_bars(...)`), trivialer Regressionstest;
+> gehört in eine Folge-Session (Phase 13.5 oder Phase 15), **nicht** in
+> Phase 14 (Scope-Grenze).
+
+### §11.2 P14-C-Befund (Impl-Drift zu D11) — Modul-Konstanten-Konvention `parents[2]` fehlte an einer Stelle
+
+`source_registry/arm.py:55` baute den ARM-Pfad mit einem **relativen**
+String (`"data/state/DISCOVERY_ARMED"`) statt mit
+`Path(__file__).resolve().parents[2] / "data" / "state" / "DISCOVERY_ARMED"`
+wie die anderen fünf Konsumenten (`run.py:62`, `api.py:49-50`,
+`webui/static/…`). Konsequenz: `run_discovery.sh` setzt CWD nach
+`phase14_discovery/`, der Daemon-Pfad wurde `phase14_discovery/data/state/...`
+statt `data/state/...`, der Daemon sah `armed: false`, die UI sah
+`armed: true` — Phase 14 war operativ **falsch stumm** (20 h seit
+Scharfschaltung 2026-08-25 14:12).
+
+> **Drift-Befund:** kein fehlender Code, sondern eine **fehlende Konvention**.
+> Der Plan hat den Pattern (`parents[2]`) an zwei Stellen explizit
+> dokumentiert (D11-Cross-Phase-Note + WebUI-Block), aber **nicht als
+> allgemeine Konvention** im §4 (gelockte Entscheidungen) festgeschrieben.
+> Folge: ein sechstes Modul (`arm.py`) hat eine eigene Variante
+> eingeführt, ohne dass der Plan widersprochen hätte — das ist kein
+> Plan-Konflikt, sondern eine **Impl-Drift zu D11** („UI schaltet per
+> Datei"). Der Plan bleibt unverändert; die Lehre für Phase 15:
+> **Modul-Konstanten mit Repo-Root-Anteil brauchen eine explizite
+> Konvention**, nicht nur Beispiele.
+
+> **Fix bereits auf `origin/main`** (Session 11, Commit `2769763`,
+> P14-C-Mini-Plan D1-D4 gelockt): `arm.py` verwendet jetzt
+> `parents[2]`, Regressionstest pinnt CWD-Unabhängigkeit, Daemon-Restart
+> hat die Lücke operativ geschlossen.
+
+### §11.3 P14-D-Befund (Impl-Drift zum Phase-8-POST_WINDOW-Hotfix) — Sleep-Cap-Konvention für Daemon-Loops fehlte
+
+`source_registry/run.py` (`run_forever`, vor Fix) rief
+`time.sleep(self._interval_s)` mit `interval_s=3600` auf. Python PEP 475
+retryt interrupted syscalls; der Signal-Handler setzte zwar
+`self._stop = True`, aber der Top-of-Iteration-Check kam erst nach
+Ablauf. Folge: `kill <pid>` war bis zu 1 h wirkungslos (reproduziert in
+Session 11: SIGTERM no-op, SIGKILL nötig).
+
+> **Drift-Befund:** strukturell identisch zum Phase-8-POST_WINDOW-Bug,
+> dort 2026-07-11 mit `min(seconds_until(...), idle_poll_s)` gefixt.
+> Der Phase-14-Plan hat das Pattern an einer Stelle (`run_forever`)
+> **nicht** als verbindlich übernommen — die Phase-13-L13-Note
+> („Momentum-VETO bleibt unangetastet") traf nicht dasselbe.
+> **Impl-Drift zum Phase-8-Hotfix**, nicht zum Phase-14-Plan.
+
+> **Fix bereits auf `origin/main`** (Session 13+14, Commit `27f04d9`,
+> P14-D-Mini-Plan D1-D3 gelockt): `_sleep_capped(total_s)` chunked den
+> Sleep in Brocken `≤ signal_check_interval_s` (Default 60 s) und
+> prüft `self._stop` **zwischen** Brocken. Discovery-Daemon
+> reagiert jetzt auf SIGTERM innerhalb von max. 60 s.
+>
+> **Offene Variante desselben Bugs:** der Recorder-Daemon
+> (`phase12_data_foundation/data_foundation/run.py:146`, `interval_s=300`,
+> 12× weniger schmerzhaft) hat denselben theoretischen Bug, **nicht
+> behoben**. Phase-15-Territorium — beim Phase-15-Plan wird eine
+> Helper-Klasse in einem gemeinsamen Modul empfohlen, die beide
+> Daemons einmal mit dem Cap ausstattet.
+
+### §11.4 Doc-Rotation-Drift (Prozess-Befund) — Inline-Duplikat eines Session-Blocks im Phasenkopf
+
+Beim Schreiben von Session 13 (Commit `22cc688`, 2026-08-26) wurde
+Session 12 **nicht** aus dem Phasenkopf entfernt, sondern nur Session 13
+oben angehängt. Resultat: der Phasenkopf trug **zwei** Session-Blöcke
+(Session 13 oben, Session 12 darunter inline) — Verstoß gegen die
+Doc-Layers-Konvention (genau **ein** Block im Phasenkopf, der Rest
+im `SESSIONS_ARCHIVE.md`).
+
+> **Drift-Befund:** die Rotation-Regel ist in `CLAUDE.md` (Root) +
+> `docs/DOC_LAYERS_CONVENTION.md` festgeschrieben, aber **nicht in
+> einer maschinen-prüfbaren Form** (z. B. ein Pre-Commit-Hook, der
+> sicherstellt, dass `grep -c '^## Session stopped' phase14_discovery/CLAUDE.md == 1`).
+> Folge: der Drift bleibt unsichtbar, bis eine Review-Session ihn findet.
+>
+> Session 13 hat den Drift entdeckt + mit derselben Rotation aufgeräumt
+> (Session 11 inline-duplicate entfernt, Session 12 ins Archiv). Seit
+> Commit `22cc688` ist der Phasenkopf wieder single-block. Lehre für
+> die nächste Plan-Session: einen **Hygiene-Pre-Commit-Hook**
+> diskutieren — oder zumindest eine **Editor-Checklist** am Ende
+> jedes Session-Commits („genau ein `## Session stopped`-Block im
+> Phasenkopf, vorheriger Block im Archiv").
+
+### §11.5 Was diese Notiz **nicht** macht
+
+- Sie ändert **keine** D1–D20. Alle 20 gelockten Entscheidungen halten.
+- Sie ersetzt **keinen** §9-Eintrag. §9 zählt Plan-Drift (vor Ausführung);
+  §11 zählt Ausführungs-Drift (nach Ausführung).
+- Sie ist **keine** Schritt-Sequenz. Die Phase bleibt
+  **closed-in-all-but-D5** (Phase 14-CLAUDE.md Session 14).
+- Sie ist **kein** Live-Change. Reine Dokumentation, keine
+  Code-Konsequenz für heute — alle drei Code-relevanten Drifts
+  (§11.1, §11.2, §11.3) sind entweder **out-of-scope** (§11.1) oder
+  **bereits gefixt + live-verifiziert** (§11.2, §11.3) oder
+  **explizit Phase-15-Territorium** (§11.3 Recorder-Daemon).
+
