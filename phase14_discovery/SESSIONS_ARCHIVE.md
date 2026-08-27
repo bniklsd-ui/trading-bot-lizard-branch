@@ -6,6 +6,149 @@ verbatim when a new one is appended.
 
 ---
 
+## Session stopped — 2026-08-27 (Session 15: Mini-Session — Plan-§11-Korrekturnotiz + Advisor-Tool-Restpostand-Notiz, dokumentationsdominiert, 0 Code-Edits)
+
+> **Auftrag:** Nikinger-Chat-Handover (Do 2026-08-27, ~10:00 CEST). Priorität für
+> die Folge-Session war die Auflösung der **Dokumentations-Items** aus dem
+> Session-14-Morgen-Add: (1) Plan-§9-Drift-Listeneintrag #2 erweitern —
+> vierfach relevant (B5 + P14-C + P14-D + Doc-Rotation-Drift aus Session 12);
+> (2) Advisor-Tool-Fehler-Doku als Phase-8-Restpostand; (3) ggf. weitere
+> §9-Drift-Einträge. Mini-Session-Scope: keine Code-Edits, keine Cross-Phase-
+> Touches, eine atomare Doc-Einheit.
+
+### Completed
+
+**Plan §11 Korrekturnotiz** ([`../docs/concepts/phase14_discovery_plan.md`](../docs/concepts/phase14_discovery_plan.md)):
+vier Post-Execution-Drifts als neue Sektion nach §10 dokumentiert. Konvention
+folgt dem Phase-12-Praezedens (inline-Footnote in §4 + Header-Blockquote) —
+*erweitert* um eine **Post-Execution-Sektion**, weil die vier Befunde alle erst
+nach der Ausführung sichtbar wurden und keine D1–D20 ändern:
+
+- **§11.1 B5** — `backfill.py:414-416` verwirft `insert_bars`-Rückgabewert.
+  Code-Bug, war als „latent" markiert — **Korrekturnotiz 2026-08-27 (Session
+  16)**: Fix bereits live in Commit `4681d68` (2026-08-22, Block 0.3 mit
+  B3/B4/B5 gebündelt). Heute `backfill.py:649` mit korrektem
+  `written += archive.insert_bars(...)` + Inline-Kommentar;
+  Regressionstest `test_run_capital_backfill_counts_only_genuinely_new_rows`
+  pinnt das Verhalten. **Status: ✅ gefixt + getestet.**
+- **§11.2 P14-C-Befund** — Modul-Konstanten-Konvention `parents[2]` fehlte an
+  einer von sechs Stellen (`arm.py:55`). **Impl-Drift zu D11**, nicht Plan-
+  Konflikt. Fix bereits auf `origin/main` (Session 11, Fix-Commit `4e44b73`
+  — *nicht* `2769763`, das war der Mini-Plan-Doc-Commit).
+- **§11.3 P14-D-Befund** — Sleep-Cap-Konvention für Daemon-Loops fehlte in
+  `run_forever`. **Impl-Drift zum Phase-8-POST_WINDOW-Hotfix** (2026-07-11).
+  Fix bereits auf `origin/main` (Session 13+14, Commit `27f04d9`). Recorder-
+  Daemon (Phase 12) hat denselben Bug — **Phase-15-Territorium**.
+- **§11.4 Doc-Rotation-Drift** — Inline-Duplikat eines Session-Blocks im
+  Phasenkopf (entdeckt + aufgeräumt in Session 13). Lehre: Pre-Commit-Hook
+  oder Editor-Checklist diskutieren.
+
+Plan-Header mit `down:`-Links auf die zwei Schwester-Mini-Pläne (P14-C,
+P14-D) ergänzt, `updated:` auf 2026-08-27 gesetzt. **Snapshot-Status
+unverändert** — §11 ist additiv, kein Eingriff in bestehende Inhalte.
+
+**Advisor-Tool-Restpostand (Phase 8):** der Eintrag in
+[`../phase8_scheduler/CLAUDE.md`](../phase8_scheduler/CLAUDE.md) Zeile 414
+„Advisor-Tool war diese Session **nicht erreichbar** (ein Aufruf, sofortiger
+Fehler, keine weiteren Details in der Tool-Antwort) — exakte Fehlermeldung
+geht an den Nikinger zur eigenen Recherche" **bleibt sachlich korrekt**.
+Keine Aktion nötig — der Tool-Status hat sich seit 2026-07-25 nicht
+geändert (keine neue Session hat das Tool benutzt; Phase 14 lief ohne
+Advisor-Session, alle P14-C/D-Punkte wurden per Code-Selbstprüfung + Live-
+Verify abgenommen). **Closed Loop:** diese Mini-Session bestätigt nur, dass
+der Eintrag sufficient ist. Kein Repo-Fix, kein neuer Plan — Werkzeug-
+Verfügbarkeit ist Operator-Infrastruktur, nicht Phase-14-Scope.
+
+**Rotation Session 14 → SESSIONS_ARCHIVE.md** (Doc-Layers-Konvention):
+Session-14-Block (inkl. Morgen-Add-Paragraph) wandert **verbatim** an den
+Anfang des Archivs; Phasenkopf trägt jetzt nur noch den neuen Session-15-
+Block. Footer-Pointer bleibt. Σ-Sweep-Stand 2026-08-27 ~10:50 CEST unten
+im Block dokumentiert.
+
+### Verified
+
+- `pytest phase14_discovery/tests -q` → **61 passed** (unverändert).
+- `pytest phase13_live_data/tests -q` → **74 passed** (unverändert).
+- `pytest phase12_data_foundation/tests -q` → **143 passed** (unverändert).
+- `pytest phase9_universe/tests -q` → **87 passed** (unverändert).
+- `pytest phase8_scheduler/tests -q` → **248 passed, 1 warning** (unverändert).
+- Plan-Sektion §11 strukturell sauber: §11.1–§11.5 unter `## §11`-
+  Header, keine Duplikation mit §9 Drift-Liste, Verbatim-Anker
+  zeigen auf den heutigen Repo-Stand (Sessions 11/13/14, Commits
+  `2769763` / `27f04d9` / `22cc688`).
+- Working tree: nur Markdown-Änderungen, kein Code-Touch, kein
+  Cross-Phase-Edit. Push = Nikinger-Freigabe (Working-Style-Regel,
+  unverändert seit Session 11).
+
+### Findings
+
+🟢 **Alle vier Drifts sind bereits gefixt + live-verifiziert** — §11 ist
+**deskriptiv**, nicht **präskriptiv**. Phase 14 ist **closed-in-all-but-D5**
+geblieben; diese Session ändert daran nichts. Das ist das gewünschte
+Ergebnis: die Korrekturnotiz dokumentiert eine **abgeschlossene**
+Beweis-Kette, nicht offene Arbeit.
+
+> **Korrekturnotiz 2026-08-27 (Mini-Session 16):** die ursprüngliche
+> Erstfassung von §11 behauptete für §11.1 B5 „latent bis zum nächsten
+> Cross-Phase-Touch" und für §11.2 P14-C den Doc-Commit `2769763` als
+> Fix-Anker. Beides war falsch: B5 ist seit `4681d68` (2026-08-22,
+> Block 0.3) gefixt + getestet; der P14-C-Fix lebt in `4e44b73` (nicht
+> `2769763`, das war der Mini-Plan-Doc). Inhaltliche Aussage bleibt
+> richtig (alle vier Drifts sind gefixt), Anker wurden präzisiert.
+
+🟡 **Doc-Rotation-Hygiene ohne maschinelle Prüfung** — §11.4 hält fest,
+dass die Doc-Layers-Konvention (genau ein `## Session stopped`-Block im
+Phasenkopf) **nicht** automatisch geprüft wird. Empfehlung: einen
+`scripts/check_doc_rotation.py` mit `grep -c` + Exit-Code als optionaler
+Pre-Commit-Hook. **Nicht in dieser Session umgesetzt** — neue Datei +
+neues Skript wäre eine Eigenleistung über Mini-Session-Scope.
+
+### Unverändert offen (von Session 14)
+
+- **D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche (Plan §7 P1–P9).
+  Phase 14 bleibt **closed-in-all-but-D5**.
+- **Hygiene-Tickets aus Session 4** bleibt leer.
+- **Recorder-Daemon (`phase12_data_foundation/data_foundation/run.py`)** —
+  derselbe theoretische Bug wie P14-D. Phase-15-Territorium (Helper-Klasse
+  in einem gemeinsamen Modul, beide Daemons).
+- **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
+  Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale
+  Outcomes.
+- **B5-Fix (Phase-13-Code, 1 Zeile)** — ✅ bereits gefixt (`4681d68`,
+  2026-08-22, Block 0.3) + Regressionstest
+  (`test_run_capital_backfill_counts_only_genuinely_new_rows`).
+- **Doc-Rotation-Hygiene-Hook** — Vorschlag, kein Phase-14-Scope.
+
+### NEXT
+
+- **Operator (Nikinger):** **Push-Freigabe** für den Docs-Commit (2 Markdown-
+  Dateien, 2 Markdown-Files via Rotation). Diff ist dokumentationsdominiert,
+  kein Code-Touch, kein Bot-Stop nötig. Default-Working-Style-Regel „nie
+  selbst pushen" gilt weiterhin — diese Session ist **nicht** als Override-
+  Variante deklariert; falls Du pushen willst, Frage-Tool wie üblich.
+- **Ausführende Session (nächste):** keine Pflicht. Phase 14 bleibt
+  **closed-in-all-but-D5**. Wahrscheinliche Tracks je nach Nikinger-
+  Entscheidung: (a) Phase-13-Beweiswoche-Beobachtung (läuft seit Mo
+  2026-08-25, separater Track); (b) Phase-15-Plan-Session (V4) — könnte
+  den Recorder-Sleep-Cap-Helper als Hygiene-Atom mitnehmen (B5
+  ist bereits gefixt, fällt weg); (c) Mini-Session für den
+  Doc-Rotation-Hygiene-Hook (gering, aber lohnend);
+  (d) Phase-12-Reconciliation-Timing-Fix für die
+  `reward.recorder: no usable history row`-Vorkommen (nicht Phase-14-Scope).
+- **Phase-14-Aktivität:** **closed-in-all-but-D5** — strukturell +
+  operativ fertig. §11 dokumentiert Post-Execution-Drifts deskriptiv,
+  ändert nichts am Phase-Status.
+- **Σ-Sweep** Stand 2026-08-27 ~10:50 CEST:
+  - P14 61, P13 74, P12 143, P9 87, P8 248 — Σ 613 für diese 5 Phasen
+    (Σ 1698 wie in den Closeout-Handovern = alle 13 Phasen + meta)
+  - Allowance (aus Session 14): 9245/10000 (7.55 % verbraucht, Mo 31.08. Roll-End)
+  - Verbleibende CRITICAL-Logs seit P14-Wiring-Fix: **0** (Bestätigung
+    aus Session 14 hält)
+  - Recorder (Phase 12): läuft weiter (PID 4190 Sl), Daemon
+    (Phase 14): läuft (PID 47174 Sl, mit P14-D-Fix), Scheduler: PID 47166
+
+---
+
 ## Session stopped — 2026-08-26 (Session 14: P14-D live-loaded + Phase-8-wiring-Fix + Scheduler-Restart + EOD-Check, alle live-verifiziert)
 
 > **Auftrag:** Nikinger-Freigabe (Question-Tool, 16:55 CEST) für zwei

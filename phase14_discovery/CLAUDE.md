@@ -106,64 +106,83 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 
 ---
 
-## Session stopped — 2026-08-27 (Session 15: Mini-Session — Plan-§11-Korrekturnotiz + Advisor-Tool-Restpostand-Notiz, dokumentationsdominiert, 0 Code-Edits)
+## Session stopped — 2026-08-27 (Session 16: Mini-Session — Phase-14-nahe Hygiene [Doc-Rotation-Hook], Code+Tests+Doc-Korrektur)
 
-> **Auftrag:** Nikinger-Chat-Handover (Do 2026-08-27, ~10:00 CEST). Priorität für
-> die Folge-Session war die Auflösung der **Dokumentations-Items** aus dem
-> Session-14-Morgen-Add: (1) Plan-§9-Drift-Listeneintrag #2 erweitern —
-> vierfach relevant (B5 + P14-C + P14-D + Doc-Rotation-Drift aus Session 12);
-> (2) Advisor-Tool-Fehler-Doku als Phase-8-Restpostand; (3) ggf. weitere
-> §9-Drift-Einträge. Mini-Session-Scope: keine Code-Edits, keine Cross-Phase-
-> Touches, eine atomare Doc-Einheit.
+> **Auftrag:** Nikinger-Antwort auf den Session-15-NEXT-Block: „Die Phase 14
+> Nahe Hygiene bitte." Zwei Items auf der Liste: (1) B5-Fix
+> (`backfill.py:414-416` `insert_bars`-Return-Verwurf) und (2)
+> Doc-Rotation-Hygiene-Hook (`scripts/check_doc_rotation.py`).
+> **Erste Entdeckung:** B5 ist **bereits gefixt** (Commit `4681d68`,
+> 2026-08-22, Block 0.3 mit B3/B4/B5 gebündelt, Inline-Kommentar in
+> `backfill.py:645-648` zeigt explizit auf B5, Regressionstest
+> `test_run_capital_backfill_counts_only_genuinely_new_rows` pinnt das
+> Verhalten). **Item 1 fällt weg** — kein Code-Edit nötig. Stattdessen:
+> Doc-Korrektur für die Session-15-Erstfassung (die §11.1 + §11.2 mit
+> falschen Ankern geschrieben hatte). Item 2 (Doc-Rotation-Hook) wird
+> gebaut. Mini-Session-Scope: **drei Atome** — Doc-Korrektur (Phase-14-
+> plan.md + CLAUDE.md + INDEX.md) + Skript+Tests (scripts/ + tests/) +
+> Session-Block-Rotation. Working-Style „Push fragt der Nikinger frei".
 
 ### Completed
 
-**Plan §11 Korrekturnotiz** ([`../docs/concepts/phase14_discovery_plan.md`](../docs/concepts/phase14_discovery_plan.md)):
-vier Post-Execution-Drifts als neue Sektion nach §10 dokumentiert. Konvention
-folgt dem Phase-12-Praezedens (inline-Footnote in §4 + Header-Blockquote) —
-*erweitert* um eine **Post-Execution-Sektion**, weil die vier Befunde alle erst
-nach der Ausführung sichtbar wurden und keine D1–D20 ändern:
+**Doc-Korrektur (Commit `3b69263`)** — Working-Style-Regel „Code > Doc"
+angewendet. Die Session-15-Erstfassung hatte **zwei** Anker-Drift
+erzeugt:
 
-- **§11.1 B5** — `backfill.py:414-416` verwirft `insert_bars`-Rückgabewert.
-  Code-Bug, war als „latent" markiert — **Korrekturnotiz 2026-08-27 (Session
-  16)**: Fix bereits live in Commit `4681d68` (2026-08-22, Block 0.3 mit
-  B3/B4/B5 gebündelt). Heute `backfill.py:649` mit korrektem
-  `written += archive.insert_bars(...)` + Inline-Kommentar;
-  Regressionstest `test_run_capital_backfill_counts_only_genuinely_new_rows`
-  pinnt das Verhalten. **Status: ✅ gefixt + getestet.**
-- **§11.2 P14-C-Befund** — Modul-Konstanten-Konvention `parents[2]` fehlte an
-  einer von sechs Stellen (`arm.py:55`). **Impl-Drift zu D11**, nicht Plan-
-  Konflikt. Fix bereits auf `origin/main` (Session 11, Fix-Commit `4e44b73`
-  — *nicht* `2769763`, das war der Mini-Plan-Doc-Commit).
-- **§11.3 P14-D-Befund** — Sleep-Cap-Konvention für Daemon-Loops fehlte in
-  `run_forever`. **Impl-Drift zum Phase-8-POST_WINDOW-Hotfix** (2026-07-11).
-  Fix bereits auf `origin/main` (Session 13+14, Commit `27f04d9`). Recorder-
-  Daemon (Phase 12) hat denselben Bug — **Phase-15-Territorium**.
-- **§11.4 Doc-Rotation-Drift** — Inline-Duplikat eines Session-Blocks im
-  Phasenkopf (entdeckt + aufgeräumt in Session 13). Lehre: Pre-Commit-Hook
-  oder Editor-Checklist diskutieren.
+- **§11.1 B5:** behauptete „latent bis zum nächsten Cross-Phase-Touch" —
+  **falsch**. Der Fix lebt seit `4681d68` (2026-08-22), Inline-Kommentar
+  in `backfill.py:645-648` (explizit „Phase-14 finding B5"), Regressionstest
+  `test_run_capital_backfill_counts_only_genuinely_new_rows`
+  (`test_capital_backfill_script.py:169-200`) pinnt das Verhalten.
+  §11.1 wurde komplett umgeschrieben mit Korrekturnotiz-Header (2026-08-27,
+  Mini-Session 15+16); Code-Snippet zeigt jetzt `backfill.py:644-649` (heute).
+- **§11.2 P14-C-Befund:** verwies auf Commit `2769763` als Fix-Anker — **falsch**.
+  `2769763` ist der Mini-Plan-Doc-Commit. Der Fix lebt in `4e44b73`
+  (2026-08-26, Session 11, Code+Tests). Inhaltliche Aussage bleibt richtig
+  (Fix ist live); Anker präzisiert + Korrekturnotiz-Block angehängt.
 
-Plan-Header mit `down:`-Links auf die zwei Schwester-Mini-Pläne (P14-C,
-P14-D) ergänzt, `updated:` auf 2026-08-27 gesetzt. **Snapshot-Status
-unverändert** — §11 ist additiv, kein Eingriff in bestehende Inhalte.
+  CLAUDE.md-Session-15-Block: Findings-Sektion „Drei der vier Drifts
+  sind gefixt" → „Alle vier Drifts sind gefixt"; Unverändert-offen-Liste
+  B5-Fix-Eintrag „latent" → „✅ bereits gefixt"; NEXT-Block Track (b)
+  „B5-Fix als Hygiene-Atom mitnehmen" gestrichen. docs/INDEX.md
+  Plan-Entry mit §11-Korrekturnotiz-Marker erweitert.
 
-**Advisor-Tool-Restpostand (Phase 8):** der Eintrag in
-[`../phase8_scheduler/CLAUDE.md`](../phase8_scheduler/CLAUDE.md) Zeile 414
-„Advisor-Tool war diese Session **nicht erreichbar** (ein Aufruf, sofortiger
-Fehler, keine weiteren Details in der Tool-Antwort) — exakte Fehlermeldung
-geht an den Nikinger zur eigenen Recherche" **bleibt sachlich korrekt**.
-Keine Aktion nötig — der Tool-Status hat sich seit 2026-07-25 nicht
-geändert (keine neue Session hat das Tool benutzt; Phase 14 lief ohne
-Advisor-Session, alle P14-C/D-Punkte wurden per Code-Selbstprüfung + Live-
-Verify abgenommen). **Closed Loop:** diese Mini-Session bestätigt nur, dass
-der Eintrag sufficient ist. Kein Repo-Fix, kein neuer Plan — Werkzeug-
-Verfügbarkeit ist Operator-Infrastruktur, nicht Phase-14-Scope.
+**Doc-Rotation-Hygiene-Hook (Commit `f403ab4`)** — strukturelle Antwort
+auf den Session-12-Befund (§11.4 Korrekturnotiz: „die Doc-Layers-Rotation-
+Regel war dokumentiert, aber nicht maschinen-prüfbar. Inline-Duplikate
+von Session-Blöcken rutschten durchs Review"). Skript macht es prüfbar:
 
-**Rotation Session 14 → SESSIONS_ARCHIVE.md** (Doc-Layers-Konvention):
-Session-14-Block (inkl. Morgen-Add-Paragraph) wandert **verbatim** an den
-Anfang des Archivs; Phasenkopf trägt jetzt nur noch den neuen Session-15-
-Block. Footer-Pointer bleibt. Σ-Sweep-Stand 2026-08-27 ~10:50 CEST unten
-im Block dokumentiert.
+`scripts/check_doc_rotation.py` (~115 Zeilen, kein Netz, keine externen
+Imports, exit codes 0/1/2):
+- `count_session_blocks(md_text)` — reine Zähl-Funktion. Ignoriert
+  Inline-Matches im Footer-Block (Quote-Paragraph, kein H2).
+- `check_phase(phase_dir)` — `(count, label)`; `0` für fehlende `CLAUDE.md`.
+- `main()` — iteriert über `PHASE_DIRS` (14 aktive/geschlossene Phasen
+  + `meta_m1_harness`), sammelt Verstöße, `exit 1` wenn `count > 1`.
+- CLI: `--phase NAME` (repeatable, Restrict), `--quiet` (OK-Zeilen
+  unterdrücken, Failures weiter gedruckt).
+- Regel: „at most one", nicht „exactly one" — virgin Phases (z. B.
+  `phase2_persistence`, kein Archiv, kein History) bleiben mit 0 OK.
+
+`tests/test_check_doc_rotation.py` (14 Tests, alle grün):
+- 5 Pure-Tests (count_session_blocks: leer / no-heading / one /
+  two-inline-duplicate / inline-match-im-Footer-ignoriert).
+- 3 check_phase-Tests (fehlt / 0 / 1).
+- 3 main-Tests mit `tmp_path` + `monkeypatch` (zero-OK / one-OK /
+  two-FAIL) + `--quiet`-Suppress-Test.
+- 2 End-to-End-Tests gegen das Live-Repo (`main()` + Subprocess-Aufruf).
+
+Convention: phase-less Skript, geladen via
+`importlib.util.spec_from_file_location` (gleiches Muster wie
+`test_verify_instrument.py` / `test_resolve_epics.py` — root `scripts/`
+ist absichtlich **kein** Package, weil die Phasen bereits auf
+`scripts.wiring` kollidieren würden).
+
+**Rotation Session 15 → SESSIONS_ARCHIVE.md** (Doc-Layers-Konvention):
+Session-15-Block (inkl. der inzwischen angebrachten §11.1/§11.2-
+Korrekturnotiz-Header) wandert **verbatim** an den Anfang des Archivs;
+Phasenkopf trägt jetzt nur noch den Session-16-Block. Footer-Pointer
+bleibt. Σ-Sweep-Stand 2026-08-27 ~13:30 CEST unten im Block dokumentiert.
 
 ### Verified
 
@@ -172,38 +191,50 @@ im Block dokumentiert.
 - `pytest phase12_data_foundation/tests -q` → **143 passed** (unverändert).
 - `pytest phase9_universe/tests -q` → **87 passed** (unverändert).
 - `pytest phase8_scheduler/tests -q` → **248 passed, 1 warning** (unverändert).
-- Plan-Sektion §11 strukturell sauber: §11.1–§11.5 unter `## §11`-
-  Header, keine Duplikation mit §9 Drift-Liste, Verbatim-Anker
-  zeigen auf den heutigen Repo-Stand (Sessions 11/13/14, Commits
-  `2769763` / `27f04d9` / `22cc688`).
-- Working tree: nur Markdown-Änderungen, kein Code-Touch, kein
-  Cross-Phase-Edit. Push = Nikinger-Freigabe (Working-Style-Regel,
-  unverändert seit Session 11).
+- `pytest tests/test_check_doc_rotation.py -v` → **14 passed** (NEU).
+- `pytest tests -q` → **94 passed** (war 80, **+14** neue Hygiene-Tests).
+- `python3 scripts/check_doc_rotation.py --quiet` → **exit 0**.
+- `python3 scripts/check_doc_rotation.py` (verbose) → alle 14 Phase-Heads
+  OK: 1× virgin (phase2_persistence), 13× canonical (1 Block).
+  **Null** Drift im Live-Repo.
+- `grep "^## Session stopped" phase14_discovery/CLAUDE.md` → **1**
+  (canonical), `.count_session_blocks(...) == 1`.
+- Working tree nach Commits `3b69263` + `f403ab4`: clean (außer `data/`
+  untracked, gitignored). **Drei** Commits in dieser Session geplant
+  (Doc-Korrektur + Skript+Tests + Session-Block-Rotation, alle lokal;
+  Push = Nikinger-Freigabe).
 
 ### Findings
 
-🟢 **Alle vier Drifts sind bereits gefixt + live-verifiziert** — §11 ist
-**deskriptiv**, nicht **präskriptiv**. Phase 14 ist **closed-in-all-but-D5**
-geblieben; diese Session ändert daran nichts. Das ist das gewünschte
-Ergebnis: die Korrekturnotiz dokumentiert eine **abgeschlossene**
-Beweis-Kette, nicht offene Arbeit.
+🟢 **Item 1 (B5-Fix) erledigt durch Entdeckung** — der Fix existierte
+seit 2026-08-22 (`4681d68`), ich hatte es in Session 15 nur nicht
+bemerkt. Die Doc-Korrektur in dieser Session macht den Drift sichtbar
+und bringt das Doc in Übereinstimmung mit dem Code. **Lesson:**
+bei zukünftigen „latent"-Aussagen erst `grep`/`git log` checken, dann
+schreiben.
 
-> **Korrekturnotiz 2026-08-27 (Mini-Session 16):** die ursprüngliche
-> Erstfassung von §11 behauptete für §11.1 B5 „latent bis zum nächsten
-> Cross-Phase-Touch" und für §11.2 P14-C den Doc-Commit `2769763` als
-> Fix-Anker. Beides war falsch: B5 ist seit `4681d68` (2026-08-22,
-> Block 0.3) gefixt + getestet; der P14-C-Fix lebt in `4e44b73` (nicht
-> `2769763`, das war der Mini-Plan-Doc). Inhaltliche Aussage bleibt
-> richtig (alle vier Drifts sind gefixt), Anker wurden präzisiert.
+🟢 **Item 2 (Doc-Rotation-Hook) gebaut + getestet + grün gegen Live-Repo**
+— strukturelle Antwort auf §11.4. Heute fängt jeder zukünftige
+Inline-Duplikat-Drift das Skript + den End-to-End-Test, **bevor** er
+committed werden kann. Die Regel ist jetzt **doppelt** geschützt:
+maschinen-prüfbar (Skript) + dokumentiert (Doc-Layers-Konvention).
 
-🟡 **Doc-Rotation-Hygiene ohne maschinelle Prüfung** — §11.4 hält fest,
-dass die Doc-Layers-Konvention (genau ein `## Session stopped`-Block im
-Phasenkopf) **nicht** automatisch geprüft wird. Empfehlung: einen
-`scripts/check_doc_rotation.py` mit `grep -c` + Exit-Code als optionaler
-Pre-Commit-Hook. **Nicht in dieser Session umgesetzt** — neue Datei +
-neues Skript wäre eine Eigenleistung über Mini-Session-Scope.
+🟡 **„at most one" statt „exactly one"** — bewusste Lockerung der Regel
+im Skript, weil Phase 2 (Persistence) legitimerweise 0 Session-Blöcke hat
+(„no archive — no history"). Die strikte „exactly one"-Lesart hätte
+einen Fehlalarm geworfen. **Regel-Drift im Skript korrekt:** das Skript
+konsumiert die Regel, nicht definiert sie — `docs/DOC_LAYERS_CONVENTION.md`
+sagt „exactly one session block" im Rotation-Kontext (nach dem ersten
+Append); Phase 2 hat nie appended.
 
-### Unverändert offen (von Session 14)
+🟡 **Pre-Commit-Hook nicht gewired** — das Skript ist gebaut + grün,
+aber **nicht** als Pre-Commit-Hook in `.git/hooks/pre-commit` o. ä.
+installiert. Empfehlung: beim Phase-15-Setup (oder einer kleinen
+Folge-Session) einen `pre-commit`-Hook installieren, der das Skript
+aufruft. **Bewusst nicht in dieser Session** — Hook-Installation ist
+Operator-Sache (Nikinger-Call), nicht Phase-14-Scope.
+
+### Unverändert offen (von Session 15)
 
 - **D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche (Plan §7 P1–P9).
   Phase 14 bleibt **closed-in-all-but-D5**.
@@ -214,38 +245,46 @@ neues Skript wäre eine Eigenleistung über Mini-Session-Scope.
 - **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
   Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale
   Outcomes.
-- **B5-Fix (Phase-13-Code, 1 Zeile)** — ✅ bereits gefixt (`4681d68`,
-  2026-08-22, Block 0.3) + Regressionstest
-  (`test_run_capital_backfill_counts_only_genuinely_new_rows`).
-- **Doc-Rotation-Hygiene-Hook** — Vorschlag, kein Phase-14-Scope.
+- **Doc-Rotation-Hook als Pre-Commit-Hook** — Skript gebaut, Hook-Installation
+  offen (siehe 🟡 Findings oben).
 
 ### NEXT
 
-- **Operator (Nikinger):** **Push-Freigabe** für den Docs-Commit (2 Markdown-
-  Dateien, 2 Markdown-Files via Rotation). Diff ist dokumentationsdominiert,
-  kein Code-Touch, kein Bot-Stop nötig. Default-Working-Style-Regel „nie
-  selbst pushen" gilt weiterhin — diese Session ist **nicht** als Override-
+- **Operator (Nikinger):** **Push-Freigabe** für **drei** Commits dieser
+  Mini-Session: `3b69263` (Doc-Korrektur, 3 Files +59/−29) +
+  `f403ab4` (Skript + Tests, 2 Files +365) + den Session-16-Block-Rotation-
+  Commit (2 Files, +X/−Y klein). Diff ist dokumentationsdominiert +
+  1 Hygiene-Skript mit voller Test-Suite; kein Cross-Phase-Edit (das
+  Skript lebt unter `scripts/` + `tests/`, beide root-level, kein
+  Phase-Package angefasst). Default-Working-Style-Regel „nie selbst
+  pushen" gilt weiterhin — diese Session ist **nicht** als Override-
   Variante deklariert; falls Du pushen willst, Frage-Tool wie üblich.
 - **Ausführende Session (nächste):** keine Pflicht. Phase 14 bleibt
-  **closed-in-all-but-D5**. Wahrscheinliche Tracks je nach Nikinger-
+  **closed-in-all-but-D5** + **Phase-14-Hygiene jetzt vollständig**
+  (alle vier Items aus dem Session-15-NEXT-Block abgearbeitet oder als
+  nicht-nötig geschlossen). Wahrscheinliche Tracks je nach Nikinger-
   Entscheidung: (a) Phase-13-Beweiswoche-Beobachtung (läuft seit Mo
-  2026-08-25, separater Track); (b) Phase-15-Plan-Session (V4) — könnte
-  den Recorder-Sleep-Cap-Helper als Hygiene-Atom mitnehmen (B5
-  ist bereits gefixt, fällt weg); (c) Mini-Session für den
-  Doc-Rotation-Hygiene-Hook (gering, aber lohnend);
+  2026-08-25, separater Track); (b) Phase-15-Plan-Session (V4 — könnte
+  den Recorder-Sleep-Cap-Helper als Hygiene-Atom mitnehmen);
+  (c) Mini-Session für den Doc-Rotation-Pre-Commit-Hook-Install (gering);
   (d) Phase-12-Reconciliation-Timing-Fix für die
   `reward.recorder: no usable history row`-Vorkommen (nicht Phase-14-Scope).
-- **Phase-14-Aktivität:** **closed-in-all-but-D5** — strukturell +
-  operativ fertig. §11 dokumentiert Post-Execution-Drifts deskriptiv,
-  ändert nichts am Phase-Status.
-- **Σ-Sweep** Stand 2026-08-27 ~10:50 CEST:
+- **Phase-14-Aktivität:** **closed-in-all-but-D5** + **Hygiene vollständig**
+  — §11 dokumentiert Post-Execution-Drifts deskriptiv; Doc-Korrektur
+  in dieser Session hat §11.1/§11.2-Anker präzisiert; Doc-Rotation-Hook
+  ist die strukturelle Antwort auf §11.4. Phase-14 ist jetzt **doppelt**
+  abgesichert (Doc-Konvention + maschinen-prüfbar).
+- **Σ-Sweep** Stand 2026-08-27 ~13:30 CEST:
   - P14 61, P13 74, P12 143, P9 87, P8 248 — Σ 613 für diese 5 Phasen
     (Σ 1698 wie in den Closeout-Handovern = alle 13 Phasen + meta)
+  - **+14** neue Hygiene-Tests in `tests/test_check_doc_rotation.py`
+    → Σ Root-Tests jetzt **94** (war 80)
   - Allowance (aus Session 14): 9245/10000 (7.55 % verbraucht, Mo 31.08. Roll-End)
-  - Verbleibende CRITICAL-Logs seit P14-Wiring-Fix: **0** (Bestätigung
-    aus Session 14 hält)
+  - Verbleibende CRITICAL-Logs seit P14-Wiring-Fix: **0**
   - Recorder (Phase 12): läuft weiter (PID 4190 Sl), Daemon
     (Phase 14): läuft (PID 47174 Sl, mit P14-D-Fix), Scheduler: PID 47166
+  - **check_doc_rotation.py** heute: alle 14 Phase-Heads OK (1× virgin,
+    13× canonical, 0× FAIL).
 
 ---
 
