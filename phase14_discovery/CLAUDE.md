@@ -125,11 +125,16 @@ folgt dem Phase-12-Praezedens (inline-Footnote in §4 + Header-Blockquote) —
 nach der Ausführung sichtbar wurden und keine D1–D20 ändern:
 
 - **§11.1 B5** — `backfill.py:414-416` verwirft `insert_bars`-Rückgabewert.
-  Code-Bug, aber **kein Phase-14-Scope**; latent bis zum nächsten Cross-Phase-
-  Touch. Fix-Scope: 1 Zeile + Regressionstest.
+  Code-Bug, war als „latent" markiert — **Korrekturnotiz 2026-08-27 (Session
+  16)**: Fix bereits live in Commit `4681d68` (2026-08-22, Block 0.3 mit
+  B3/B4/B5 gebündelt). Heute `backfill.py:649` mit korrektem
+  `written += archive.insert_bars(...)` + Inline-Kommentar;
+  Regressionstest `test_run_capital_backfill_counts_only_genuinely_new_rows`
+  pinnt das Verhalten. **Status: ✅ gefixt + getestet.**
 - **§11.2 P14-C-Befund** — Modul-Konstanten-Konvention `parents[2]` fehlte an
   einer von sechs Stellen (`arm.py:55`). **Impl-Drift zu D11**, nicht Plan-
-  Konflikt. Fix bereits auf `origin/main` (Session 11, Commit `2769763`).
+  Konflikt. Fix bereits auf `origin/main` (Session 11, Fix-Commit `4e44b73`
+  — *nicht* `2769763`, das war der Mini-Plan-Doc-Commit).
 - **§11.3 P14-D-Befund** — Sleep-Cap-Konvention für Daemon-Loops fehlte in
   `run_forever`. **Impl-Drift zum Phase-8-POST_WINDOW-Hotfix** (2026-07-11).
   Fix bereits auf `origin/main` (Session 13+14, Commit `27f04d9`). Recorder-
@@ -177,15 +182,19 @@ im Block dokumentiert.
 
 ### Findings
 
-🟢 **Drei der vier Drifts sind bereits gefixt + live-verifiziert** — §11 ist
+🟢 **Alle vier Drifts sind bereits gefixt + live-verifiziert** — §11 ist
 **deskriptiv**, nicht **präskriptiv**. Phase 14 ist **closed-in-all-but-D5**
 geblieben; diese Session ändert daran nichts. Das ist das gewünschte
 Ergebnis: die Korrekturnotiz dokumentiert eine **abgeschlossene**
 Beweis-Kette, nicht offene Arbeit.
 
-🟡 **B5 (Code-Bug) bleibt latent** — kein Trading-Impact, aber der Fix
-ist 1 Zeile. Empfehlung: in einer Phase-15-Plan-Session oder einer
-Phase-13.5-Hygiene-Session aufgreifen. Nicht Phase-14-Scope.
+> **Korrekturnotiz 2026-08-27 (Mini-Session 16):** die ursprüngliche
+> Erstfassung von §11 behauptete für §11.1 B5 „latent bis zum nächsten
+> Cross-Phase-Touch" und für §11.2 P14-C den Doc-Commit `2769763` als
+> Fix-Anker. Beides war falsch: B5 ist seit `4681d68` (2026-08-22,
+> Block 0.3) gefixt + getestet; der P14-C-Fix lebt in `4e44b73` (nicht
+> `2769763`, das war der Mini-Plan-Doc). Inhaltliche Aussage bleibt
+> richtig (alle vier Drifts sind gefixt), Anker wurden präzisiert.
 
 🟡 **Doc-Rotation-Hygiene ohne maschinelle Prüfung** — §11.4 hält fest,
 dass die Doc-Layers-Konvention (genau ein `## Session stopped`-Block im
@@ -205,7 +214,9 @@ neues Skript wäre eine Eigenleistung über Mini-Session-Scope.
 - **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
   Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale
   Outcomes.
-- **B5-Fix (Phase-13-Code, 1 Zeile)** — latent bis Phase 13.5 oder Phase 15.
+- **B5-Fix (Phase-13-Code, 1 Zeile)** — ✅ bereits gefixt (`4681d68`,
+  2026-08-22, Block 0.3) + Regressionstest
+  (`test_run_capital_backfill_counts_only_genuinely_new_rows`).
 - **Doc-Rotation-Hygiene-Hook** — Vorschlag, kein Phase-14-Scope.
 
 ### NEXT
@@ -219,9 +230,10 @@ neues Skript wäre eine Eigenleistung über Mini-Session-Scope.
   **closed-in-all-but-D5**. Wahrscheinliche Tracks je nach Nikinger-
   Entscheidung: (a) Phase-13-Beweiswoche-Beobachtung (läuft seit Mo
   2026-08-25, separater Track); (b) Phase-15-Plan-Session (V4) — könnte
-  den Recorder-Sleep-Cap-Helper und den B5-Fix als Hygiene-Atome
-  mitnehmen; (c) Mini-Session für den Doc-Rotation-Hygiene-Hook (gering,
-  aber lohnend); (d) Phase-12-Reconciliation-Timing-Fix für die
+  den Recorder-Sleep-Cap-Helper als Hygiene-Atom mitnehmen (B5
+  ist bereits gefixt, fällt weg); (c) Mini-Session für den
+  Doc-Rotation-Hygiene-Hook (gering, aber lohnend);
+  (d) Phase-12-Reconciliation-Timing-Fix für die
   `reward.recorder: no usable history row`-Vorkommen (nicht Phase-14-Scope).
 - **Phase-14-Aktivität:** **closed-in-all-but-D5** — strukturell +
   operativ fertig. §11 dokumentiert Post-Execution-Drifts deskriptiv,

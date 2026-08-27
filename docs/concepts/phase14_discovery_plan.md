@@ -1191,31 +1191,42 @@ sqlite3 "file:data/trading_bot.sqlite?mode=ro" "SELECT COUNT(*) FROM instrument_
 
 ### §11.1 B5 (Code-Bug) — `insert_bars`-Rückgabewert wird verworfen
 
-`phase13_live_data/live_data/backfill.py:414-416`:
+> **Korrekturnotiz (2026-08-27, Mini-Session 15+16):** dieser Eintrag war
+> in der Erstfassung von Session 15 als „latent" beschrieben — **das stimmt
+> nicht mehr**. Der Fix wurde bereits am 2026-08-22 im Commit
+> **`4681d68`** (`phase14: fix -- Phase-13 script bugs B3/B4/B5 (Block 0.3)`)
+> zusammen mit B3 und B4 live gebracht, **bevor** Phase 14 die §11-Notiz
+> überhaupt schrieb (Plan-Datum 2026-08-22, Notiz-Datum 2026-08-27).
+> Heute nachgemessen: `backfill.py:649` hat `written += archive.insert_bars(...)`,
+> inkl. Inline-Kommentar mit explizitem Hinweis auf B5.
+> Regressionstest `test_run_capital_backfill_counts_only_genuinely_new_rows`
+> (`test_capital_backfill_script.py:169-200`) pinnt das Verhalten.
+> **Status:** ✅ gefixt + getestet, **kein** offener Hygiene-Punkt.
+
+`phase13_live_data/live_data/backfill.py:644-649` (heute):
 
 ```python
             try:
-                archive.insert_bars([archive_bar])
-                written += 1
+                # insert_bars returns the number of *genuinely new* rows
+                # (cur.rowcount over INSERT OR IGNORE). Duplicates don't
+                # count; that's what the script-level "bars_written" metric
+                # is supposed to mean (Phase-14 finding B5).
+                written += archive.insert_bars([archive_bar])
 ```
 
 `BarArchive.insert_bars` (`archive.py:119-133`, `INSERT OR IGNORE` +
 `cur.rowcount`) **gibt die Zahl der wirklich neu geschriebenen Zeilen zurück**.
-Der Rückgabewert wird verworfen; ein Duplikat zählt als „Schreibvorgang".
+Wird seit Commit `4681d68` korrekt summiert; ein Duplikat zählt **nicht**
+als Schreibvorgang.
 
 > **Hinweis aus dem Plan** (Mutterplan §3.5 B5, am 2026-08-22 selbst
-> geschrieben): das war ein **echter Bug**, aber **kein Phase-14-Scope** — Phase 14
-> rührt `backfill.py` nur in B1b/B2 an (CapitalSource-Symbol-Lookup),
-> nicht in der Backfill-Hauptschleife. Der Zähler ist ein
-> Diagnose-Instrument, **kein** Gate oder VETO (es gibt keinen Code-Pfad,
-> der auf den Zähler schaltet). Beweiswoche läuft seit 2026-08-25,
-> Capital-Spalte zeigt die korrekten 962 Rows; die Drift wäre erst beim
-> zweiten Lauf über dasselbe Fenster sichtbar (Zähler behauptet 962,
-> Archiv hat 0 neue Rows). **Heute kein Trading-Impact**, latent bis
-> zum nächsten Cross-Phase-Touch. **Fix-Scope:** 1 Zeile
-> (`written += archive.insert_bars(...)`), trivialer Regressionstest;
-> gehört in eine Folge-Session (Phase 13.5 oder Phase 15), **nicht** in
-> Phase 14 (Scope-Grenze).
+> geschrieben, *vor* dem Fix-Commit): das war ein **echter Bug**, **kein**
+> Phase-14-Code-Edits nötig gewesen wären — der Fix kam als **Block 0.3
+> Cross-Phase-Edit** im Phase-14-Setup-Sweep. Der Zähler ist ein
+> Diagnose-Instrument, **kein** Gate oder VETO (kein Code-Pfad schaltet
+> auf den Zähler). Beweiswoche läuft seit 2026-08-25; Re-Lauf über
+> dasselbe Fenster zeigt korrekt 0 neue Rows für die bereits
+> geschriebenen Bars.
 
 ### §11.2 P14-C-Befund (Impl-Drift zu D11) — Modul-Konstanten-Konvention `parents[2]` fehlte an einer Stelle
 
@@ -1240,10 +1251,17 @@ Scharfschaltung 2026-08-25 14:12).
 > **Modul-Konstanten mit Repo-Root-Anteil brauchen eine explizite
 > Konvention**, nicht nur Beispiele.
 
-> **Fix bereits auf `origin/main`** (Session 11, Commit `2769763`,
+> **Fix bereits auf `origin/main`** (Session 11, Fix-Commit `4e44b73` —
+> *nicht* `2769763`, das war der Mini-Plan-Doc-Commit;
 > P14-C-Mini-Plan D1-D4 gelockt): `arm.py` verwendet jetzt
 > `parents[2]`, Regressionstest pinnt CWD-Unabhängigkeit, Daemon-Restart
 > hat die Lücke operativ geschlossen.
+
+> **Korrekturnotiz (2026-08-27, Mini-Session 15+16):** Erstfassung von
+> Session 15 nannte den Doc-Commit `2769763` als Fix-Anker — das ist
+> der **Mini-Plan**, nicht der **Code-Fix**. Der Fix lebt in `4e44b73`
+> (`phase14: code+tests -- P14-C fix: DEFAULT_ARM_PATH absolut (CWD-Falle)`).
+> Inhaltlich richtig (Fix ist live), Anker falsch.
 
 ### §11.3 P14-D-Befund (Impl-Drift zum Phase-8-POST_WINDOW-Hotfix) — Sleep-Cap-Konvention für Daemon-Loops fehlte
 
