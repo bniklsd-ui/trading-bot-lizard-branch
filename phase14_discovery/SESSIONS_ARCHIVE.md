@@ -5,6 +5,181 @@ carries exactly one `## Session stopped` block; the previously-newest block move
 verbatim when a new one is appended.
 
 
+## Session stopped — 2026-08-27 (Session 17: Mini-Session — Push-Status-Check + Pre-Commit-Hook-Install, 0 Code-Edits, 1 Hook + 2 Doc-Edits)
+
+> **Auftrag:** Nikinger-Chat (2026-08-27, ~17:35 CEST) auf den Kurz-Stand-Bericht:
+> „Erst pushen, dann B)." Zwei Atome: (1) die drei lokalen Session-16-Commits pushen,
+> (2) den Pre-Commit-Hook für `scripts/check_doc_rotation.py` installieren
+> (Session-16-🟡-Finding). Mini-Session-Scope: **Push-Verifikation** + **Hook-Wiring**
+> + **Doc-Rotation**. Kein Phase-Code-Edit, kein Cross-Phase-Touch.
+
+### Completed
+
+**Push-Status-Check (kein Push-Befehl nötig).** `git reflog` zeigte vor jedem Push:
+`6d18b98 refs/remotes/origin/main@{0}: update by push` — die drei Session-16-Commits
+(`3b69263` Doc-Korrektur, `f403ab4` Skript+Tests, `6d18b98` Block-Rotation) waren
+**bereits auf `origin/main`**, vermutlich durch einen manuellen Push des Nikingers
+zwischen Session-16-Ende und dieser Session (oder eine Auto-Hook-Konfiguration).
+`git status` clean, `main` = `origin/main` = `6d18b98`, `git fetch origin --dry-run`
+No-Op. **Kein Push-Befehl ausgeführt** — Working-Style-Regel eingehalten: kein
+Auto-Push, auch nicht wenn der Befehl trivial wäre. Der Status-Check stand
+vor jedem Push.
+
+**Pre-Commit-Hook installiert** (`.git/hooks/pre-commit`, **nicht getrackt** —
+Operator-seitig, analog `data/`):
+
+```sh
+#!/bin/sh
+# Pre-commit hook: doc-rotation hygiene check (Phase 14 Hygiene Item 2 follow-up,
+# 2026-08-27). Ruft scripts/check_doc_rotation.py --quiet; propagiert exit code.
+# Robust: wenn python3 oder das Skript fehlt → skip (exit 0), damit der Hook
+# keinen 'frischen Klon' sabotiert. Override pro Commit mit --no-verify.
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "pre-commit: python3 not found, skipping doc-rotation check"
+    exit 0
+fi
+if [ ! -f scripts/check_doc_rotation.py ]; then
+    echo "pre-commit: scripts/check_doc_rotation.py missing, skipping"
+    exit 0
+fi
+python3 scripts/check_doc_rotation.py --quiet
+result=$?
+if [ $result -ne 0 ]; then
+    echo ""
+    echo "pre-commit: doc-rotation check failed (exit $result)."
+    echo "  Run 'python3 scripts/check_doc_rotation.py' for details."
+    echo "  Use 'git commit --no-verify' to override if you know what you are doing."
+fi
+exit $result
+```
+
+- **Default-Verhalten:** ruft das Skript bei jedem Commit. Exit ≠ 0 ⇒ Commit
+  blockiert mit klarer Meldung.
+- **Override pro Commit:** `git commit --no-verify`.
+- **Idempotent:** Hook-Skript-Verhalten ist deterministisch (kein Netz,
+  keine externen Imports, exit 0/1/2 — siehe Skript-Doku).
+
+### Verified
+
+- `chmod +x .git/hooks/pre-commit` ⇒ `-rwxr-xr-x` (Mode 755).
+- `sh -n .git/hooks/pre-commit` ⇒ **syntax OK** (POSIX-sh).
+- `.git/hooks/pre-commit` direkt aufgerufen (Clean-State-Repo) ⇒ **exit 0**
+  (Skript-Delegate liefert 0).
+- `python3 scripts/check_doc_rotation.py --quiet` redundant gegen Session 16
+  bestätigt ⇒ exit 0.
+- `git fetch origin --dry-run` ⇒ No-Op (`main` = `origin/main` = `6d18b98`).
+- `git log origin/main..main --oneline` ⇒ leer (nichts zu pushen).
+- Working tree nach Hook-Install: clean (`.git/hooks/pre-commit` ist
+  erwartungsgemäß nicht im Index; `.git/hooks/` ist per Git-Design
+  untracked).
+- `python3 scripts/check_doc_rotation.py` (verbose) heute noch einmal:
+  14/14 Phase-Heads OK (unverändert zu Session 16).
+- **Prozess-Stand (17:40 CEST):** Scheduler **PID 47166 Sl** (mit
+  `--enable-divergence-sampler`); Recorder und Discovery-Daemon sind
+  aus `ps aux` **verschwunden** (in Session 16 noch PIDs 4190 / 47174).
+  Kein speculativer Befund — Hook-Install hat darauf keinen Einfluss
+  (Hook betrifft nur `git commit`); Auflösung obliegt dem Operator bzw.
+  dem jeweiligen Phasen-Owner (Recorder = Phase 12, Daemon = Phase 14).
+
+### Findings
+
+🟢 **Push war redundant** — die drei Commits waren schon oben (reflog-Beweis
+`origin/main@{0}: update by push`). Working-Style-Regel „nie selbst pushen"
+hat **automatisch** richtig gehandelt: vor jedem Pushen steht der Status-Check,
+und der hat ergeben „nichts zu tun". Lesson für Folge-Sessions: bei jeder
+Push-Anfrage kurz `reflog`/`fetch --dry-run` als **erste** Aktion — spart
+Round-Trips und schließt „schon gepusht?"-Vermutungen strukturell aus, ohne
+dass eine Push-Force-Flag gesetzt werden muss.
+
+🟢 **Hook ist live ab dem nächsten Commit.** Er fängt jeden zukünftigen
+Inline-Duplikat-Drift **vor** dem Index. Damit ist die Doc-Layers-Rotation-Regel
+nun **dreifach** geschützt: Konvention + Skript + Pre-Commit-Hook.
+
+🟡 **Hook ist nicht im Repo.** `.git/hooks/` ist per Git-Design lokales
+Operator-Tool — wird nicht mit-versioniert. Ein neuer Klon (oder ein
+`git clone` auf einer anderen Maschine) hat den Hook **nicht**. Drei mögliche
+nächste Schritte, alle Phase-15- oder Operator-Territorium:
+
+1. **Repo-getrackter Installer** (`scripts/install_hooks.sh`): tracked im
+   Repo, Operator ruft einmal nach `git clone`. Erfordert ein Opt-in
+   (`.git/hooks` darf nicht blind überschrieben werden).
+2. **Pure-Doku**: ein Eintrag in `AGENTS.md` / `README.md` „after clone: run
+   `bash scripts/install_hooks.sh`". Niedrigste Hürde, aber Disziplin-lastig.
+3. **Core-Hooks-Path** (`git config core.hooksPath <tracked-dir>`): der
+   tracked-Pfad `scripts/hooks/` enthält die Hook-Datei, Git ruft sie
+   automatisch. **Sauberste Lösung**, aber Projekt-weit einmal umzustellen
+   — andere Hooks (Linter, Formatierer) wären mit berührt.
+
+Empfehlung: (3) in Phase 15 als Hygiene-Atom mitnehmen, falls Phase 15 ohnehin
+am Workflow schraubt; sonst (1) jetzt in einer Folge-Mini-Session.
+
+🟡 **FAIL-Pfad des Hooks nicht Live-getestet.** Skript-Tests decken den
+`two-FAIL`-Fall ab (`test_check_doc_rotation.py` main-Test + E2E-Subprozess),
+und der Hook ist ein dünner Delegate — daher reicht die Skript-Test-Suite
+strukturell. Ein direkter Commit-Test mit absichtlich verdoppeltem Session-Block
++ `git commit --no-verify`-Vergleich wäre eine Option für eine spätere
+Mini-Session, wenn der Hook mal versagt. Heute nicht nötig.
+
+### Unverändert offen (von Session 16)
+
+- **D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche (Plan §7 P1–P9).
+  Phase 14 bleibt **closed-in-all-but-D5**.
+- **Recorder-Daemon (`phase12_data_foundation/data_foundation/run.py`)** —
+  derselbe theoretische Bug wie P14-D. Phase-15-Territorium (Helper-Klasse
+  in einem gemeinsamen Modul, beide Daemons).
+- **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
+  Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale
+  Outcomes.
+- **Hook-Installer (tracked)** — siehe 🟡 Findings oben. Heute **nicht** im
+  Scope: aktueller Auftrag war nur „Hook installieren", nicht „installierbar
+  machen für andere Maschinen".
+- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable
+  history row` (nicht Phase-14-Scope).
+
+### NEXT
+
+- **Operator (Nikinger):** **Push-Freigabe** für **einen** Commit dieser
+  Mini-Session (Session-17-Rotation: `phase14_discovery/CLAUDE.md` +
+  `phase14_discovery/SESSIONS_ARCHIVE.md`). Diff: Session-16-Block wandert
+  **verbatim** ans Archiv-Anfang; Session-17-Block ersetzt ihn im Phasenkopf;
+  Footer-Pointer unverändert. Kein Code-Edit, kein Cross-Phase-Touch, keine
+  Test-Datei geändert. (Der Hook selbst ist `.git/hooks/pre-commit` und
+  erwartungsgemäß **nicht** Teil des Commits — siehe 🟡 Findings.)
+- **Ausführende Session (nächste):** keine Pflicht. Wahrscheinliche Tracks je
+  nach Nikinger-Entscheidung: (a) Hook-Installer tracked (Option 1/3 aus
+  🟡 Findings, Mini-Session, geringer Aufwand); (b) Phase-13-Beweiswoche-
+  Beobachtung (separater Track); (c) Phase-15-Plan-Session (V4 + Recorder-
+  Helper + Hook-Installer als Hygiene-Atome); (d) Phase-12-Reconciliation-
+  Timing (nicht Phase-14-Scope); (e) Recorder-/Daemon-Restart (PIDs 4190
+  und 47174 verschwunden, Verifikation welcher Prozess wieder laufen muss).
+- **Phase-14-Aktivität:** **closed-in-all-but-D5** + **Hygiene vollständig +
+  Hook gewired**. Phase-14-Hygiene ist jetzt **dreifach** geschützt
+  (Konvention + Skript + Hook). Letzter offener Hygiene-Punkt ist
+  „Hook-Installer im Repo" — Phase-15-Territorium.
+- **Σ-Sweep** Stand 2026-08-27 ~17:40 CEST:
+  - P14 61, P13 74, P12 143, P9 87, P8 248 — Σ 613 für diese 5 Phasen
+    (Σ 1698 wie in den Closeout-Handovern = alle 13 Phasen + meta)
+  - **+14** Hygiene-Tests in `tests/test_check_doc_rotation.py`
+    → Σ Root-Tests **94** (unverändert zu Session 16)
+  - Allowance: 9245/10000 (7,55 % verbraucht, Roll-End Mo 31.08.) —
+    unverändert zu Session 16
+  - Verbleibende CRITICAL-Logs seit P14-Wiring-Fix: **0**
+  - Scheduler **PID 47166 Sl** (mit `--enable-divergence-sampler`),
+    Recorder + Discovery-Daemon: **nicht in `ps aux`** (waren in
+    Session 16 noch PIDs 4190 / 47174; Hook-Install hat darauf keinen
+    Einfluss)
+  - **check_doc_rotation.py** heute: 14/14 Phase-Heads OK
+  - **`git reflog`:** `6d18b98 origin/main@{0}: update by push` — die
+    Session-16-Commits sind live; **kein** lokaler Commit-Stand abweichend
+    von `origin/main`
+  - **`.git/hooks/pre-commit`:** installiert, `-rwxr-xr-x`, exit 0 im
+    Clean-State-Test (Delegate an `scripts/check_doc_rotation.py --quiet`).
+
+---
+
+
+
 ## Session stopped — 2026-08-27 (Session 16: Mini-Session — Phase-14-nahe Hygiene [Doc-Rotation-Hook], Code+Tests+Doc-Korrektur)
 
 

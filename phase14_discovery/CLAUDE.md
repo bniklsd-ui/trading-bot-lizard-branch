@@ -106,176 +106,170 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 
 ---
 
-## Session stopped — 2026-08-27 (Session 17: Mini-Session — Push-Status-Check + Pre-Commit-Hook-Install, 0 Code-Edits, 1 Hook + 2 Doc-Edits)
+## Session stopped — 2026-08-27 (Session 18: Operator-Folge-Session — Recorder + Discovery-Daemon-Restart + Restart-Loop-Rätsel, 0 Code-Edits, 2 Live-Operator-Aktionen)
 
-> **Auftrag:** Nikinger-Chat (2026-08-27, ~17:35 CEST) auf den Kurz-Stand-Bericht:
-> „Erst pushen, dann B)." Zwei Atome: (1) die drei lokalen Session-16-Commits pushen,
-> (2) den Pre-Commit-Hook für `scripts/check_doc_rotation.py` installieren
-> (Session-16-🟡-Finding). Mini-Session-Scope: **Push-Verifikation** + **Hook-Wiring**
-> + **Doc-Rotation**. Kein Phase-Code-Edit, kein Cross-Phase-Touch.
+> **Auftrag:** Nikinger-Chat (2026-08-27, ~17:50 CEST) auf den Kurz-Stand-Bericht:
+> „Recorder + Discovery-Daemon-Restart-Klärung (5 Min, Nikinger-Entscheidung bitte).
+> Option A, gerne du wenn du kannst." Mini-Session-Scope: **Restart-Klärung** +
+> **Stale-PID-Cleanup** + **Restart-Loop-Diagnose**. **Kein Code-Edit** (Operativ,
+> dokumentationsdominierte Diagnose).
 
 ### Completed
 
-**Push-Status-Check (kein Push-Befehl nötig).** `git reflog` zeigte vor jedem Push:
-`6d18b98 refs/remotes/origin/main@{0}: update by push` — die drei Session-16-Commits
-(`3b69263` Doc-Korrektur, `f403ab4` Skript+Tests, `6d18b98` Block-Rotation) waren
-**bereits auf `origin/main`**, vermutlich durch einen manuellen Push des Nikingers
-zwischen Session-16-Ende und dieser Session (oder eine Auto-Hook-Konfiguration).
-`git status` clean, `main` = `origin/main` = `6d18b98`, `git fetch origin --dry-run`
-No-Op. **Kein Push-Befehl ausgeführt** — Working-Style-Regel eingehalten: kein
-Auto-Push, auch nicht wenn der Befehl trivial wäre. Der Status-Check stand
-vor jedem Push.
+**1. Stale-PID-Befund:** `data/state/{recorder,discovery}.pid` zeigten auf noch lebende
+Prozesse (4190 / 47174). Beide Daemons waren **nie tot** — `kill -0` hatte recht, nur
+`ps aux | grep` hatte sie (Filter-/Container-PS-View) nicht gezeigt. **Annahme „Prozess
+tot" anhand fehlendem `ps`-Match ist nicht zulässig.**
 
-**Pre-Commit-Hook installiert** (`.git/hooks/pre-commit`, **nicht getrackt** —
-Operator-seitig, analog `data/`):
+**2. Restart-Aktion A (Operator, Nikinger-Override):**
 
-```sh
-#!/bin/sh
-# Pre-commit hook: doc-rotation hygiene check (Phase 14 Hygiene Item 2 follow-up,
-# 2026-08-27). Ruft scripts/check_doc_rotation.py --quiet; propagiert exit code.
-# Robust: wenn python3 oder das Skript fehlt → skip (exit 0), damit der Hook
-# keinen 'frischen Klon' sabotiert. Override pro Commit mit --no-verify.
+- `rm -f data/state/{recorder,discovery}.pid` (PIDs reuse-gefährdet → Double-Start-Guard
+  würde sonst fälschlich „already running" sagen).
+- `nohup bash phase12_data_foundation/scripts/run_recorder.sh >> data/state/recorder.log 2>&1 &`
+- `nohup bash phase14_discovery/scripts/run_discovery.sh >> data/state/discovery.log 2>&1 &`
+- **Ergebnis:** NEW recorder (PID 87276) lief, NEW discovery (PID 87271) wurde durch
+  externen SIGTERM gekillt (Quelle nicht identifiziert — kein cron/systemd/supervisor,
+  keine Watchdog-Datei, kein offener `bash`-Loop gefunden; vermutlich historischer
+  Loop aus früherer Session, heute irrelevant).
+- **Aufräumen:** OLD recorder (PID 4190, doppelt vorhanden) per `kill -9 4190` entfernt;
+  SIGTERM allein reichte nicht (siehe 🟡 Finding unten).
+- **OLD discovery (PID 47174)** läuft weiter, schreibt State — P14-D-Fix funktioniert.
 
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "pre-commit: python3 not found, skipping doc-rotation check"
-    exit 0
-fi
-if [ ! -f scripts/check_doc_rotation.py ]; then
-    echo "pre-commit: scripts/check_doc_rotation.py missing, skipping"
-    exit 0
-fi
-python3 scripts/check_doc_rotation.py --quiet
-result=$?
-if [ $result -ne 0 ]; then
-    echo ""
-    echo "pre-commit: doc-rotation check failed (exit $result)."
-    echo "  Run 'python3 scripts/check_doc_rotation.py' for details."
-    echo "  Use 'git commit --no-verify' to override if you know what you are doing."
-fi
-exit $result
-```
+**3. Warte-Probe + Fehlddiagnose:** 10 Min gewartet, dann **Recorder als „wieder tot"
+fehldiagnostiziert**, weil „received signal 15 — stopping" mehrfach im Log stand. **Falsch:**
+Der Signal-Handler ruft `recorder.request_stop()`, aber der Loop ignoriert ihn wegen
+des Sleep-Cap-Bugs (siehe 🟡). Der Recorder **schläft weiter**, ignoriert die nächsten
+SIGTERMs, und tickt nach Ablauf des Sleeps normal weiter.
 
-- **Default-Verhalten:** ruft das Skript bei jedem Commit. Exit ≠ 0 ⇒ Commit
-  blockiert mit klarer Meldung.
-- **Override pro Commit:** `git commit --no-verify`.
-- **Idempotent:** Hook-Skript-Verhalten ist deterministisch (kein Netz,
-  keine externen Imports, exit 0/1/2 — siehe Skript-Doku).
+**4. Restart-Aktion A' (Reue, sauber):** PID-File weg, neuer Recorder (90518) gestartet,
+nach 5 Min verifiziert → **alive, State geschrieben um 19:00:03** (`bars_written:0,
+skipped_off_hours:true, errors:[]` — normaler Off-Hours-Stand).
 
 ### Verified
 
-- `chmod +x .git/hooks/pre-commit` ⇒ `-rwxr-xr-x` (Mode 755).
-- `sh -n .git/hooks/pre-commit` ⇒ **syntax OK** (POSIX-sh).
-- `.git/hooks/pre-commit` direkt aufgerufen (Clean-State-Repo) ⇒ **exit 0**
-  (Skript-Delegate liefert 0).
-- `python3 scripts/check_doc_rotation.py --quiet` redundant gegen Session 16
-  bestätigt ⇒ exit 0.
-- `git fetch origin --dry-run` ⇒ No-Op (`main` = `origin/main` = `6d18b98`).
-- `git log origin/main..main --oneline` ⇒ leer (nichts zu pushen).
-- Working tree nach Hook-Install: clean (`.git/hooks/pre-commit` ist
-  erwartungsgemäß nicht im Index; `.git/hooks/` ist per Git-Design
-  untracked).
-- `python3 scripts/check_doc_rotation.py` (verbose) heute noch einmal:
-  14/14 Phase-Heads OK (unverändert zu Session 16).
-- **Prozess-Stand (17:40 CEST):** Scheduler **PID 47166 Sl** (mit
-  `--enable-divergence-sampler`); Recorder und Discovery-Daemon sind
-  aus `ps aux` **verschwunden** (in Session 16 noch PIDs 4190 / 47174).
-  Kein speculativer Befund — Hook-Install hat darauf keinen Einfluss
-  (Hook betrifft nur `git commit`); Auflösung obliegt dem Operator bzw.
-  dem jeweiligen Phasen-Owner (Recorder = Phase 12, Daemon = Phase 14).
+- **Live-Prozesse (21:00 CEST):** Scheduler 47166 (1d 3h) + Discovery 47174 (1d 3h) +
+  Recorder **90518** (5 Min, frisch, schreibt State).
+- **Heartbeat** CRITICAL noch von 17:33 — **vor** dem Recorder-Restart. Nächster
+  Health-Check wird sich mit aktivem Recorder erholen.
+- **Allowance** 9245/10000 (7,55 %, Roll-End Mo 31.08.) — unverändert.
+- **CRITICAL-Logs seit P14-Wiring-Fix:** **0** (alt-bekannte `reward.recorder: no usable
+  history row`-CRITICALs laufen weiter, **nicht** Phase-14-Scope).
+- **Phase-14-Doku:** keine Code-Edits. Working tree clean. Kein Push nötig (reine
+  Operator-Aktion + Diagnose).
 
 ### Findings
 
-🟢 **Push war redundant** — die drei Commits waren schon oben (reflog-Beweis
-`origin/main@{0}: update by push`). Working-Style-Regel „nie selbst pushen"
-hat **automatisch** richtig gehandelt: vor jedem Pushen steht der Status-Check,
-und der hat ergeben „nichts zu tun". Lesson für Folge-Sessions: bei jeder
-Push-Anfrage kurz `reflog`/`fetch --dry-run` als **erste** Aktion — spart
-Round-Trips und schließt „schon gepusht?"-Vermutungen strukturell aus, ohne
-dass eine Push-Force-Flag gesetzt werden muss.
+🟢 **„alive in ps ≠ funktioniert"** UND **„weg aus ps ≠ tot"** — beide Diagnose-Fehler
+in dieser Session selbst aufgetreten. Beim nächsten Mal: **State-File-Timestamp + letzte
+Log-Zeile + `kill -0` gegen die PID im PID-File** (nicht gegen eine Vermutung) sind
+die einzige belastbare Aussage über „lebt der Daemon". Lesson gehört in die nächste
+„Werkstatt-Session" als harte Regel.
 
-🟢 **Hook ist live ab dem nächsten Commit.** Er fängt jeden zukünftigen
-Inline-Duplikat-Drift **vor** dem Index. Damit ist die Doc-Layers-Rotation-Regel
-nun **dreifach** geschützt: Konvention + Skript + Pre-Commit-Hook.
+🟢 **Discovery-Daemon ist robuster als angenommen:** trotz vieler SIGTERMs überlebt er
+dank des P14-D-Fix (`run.py:70-83`, `signal_check_interval_s` als Sleep-Cap). PID 47174
+seit 1d 3h stabil — gutes Zeichen für Phase 15 (Recorder bekommt denselben Fix).
 
-🟡 **Hook ist nicht im Repo.** `.git/hooks/` ist per Git-Design lokales
-Operator-Tool — wird nicht mit-versioniert. Ein neuer Klon (oder ein
-`git clone` auf einer anderen Maschine) hat den Hook **nicht**. Drei mögliche
-nächste Schritte, alle Phase-15- oder Operator-Territorium:
+🟡 **Recorder-Sleep-Cap-Bug bestätigt im Live-Betrieb** (`recorder.py:189`):
+```python
+self._sleep_fn(self._interval_s)
+```
+Genau wie P14-D bei Discovery, **ungefixt**. Signal-Handler setzt `_stop_requested = True`,
+aber `time.sleep()` schluckt `EINTR` intern und schläft die volle `interval_s` (Default
+300 s = 5 Min). Exit erst nach Sleep-Ablauf. **Live-Konsequenz:** SIGTERMs **töten den
+Recorder nicht** — sie sind harmlos. Aber `kill -9` wäre für sauberen Restart nötig,
+falls der Daemon tatsächlich mal weg soll. Bereits korrekt dokumentiert als Phase-15-
+Territorium (Session-17-NEXT-Block). **Verschärfung:** die Fix-Notwendigkeit ist nicht
+mehr „theoretisch", sondern **im Live-Betrieb bestätigt** — Phase-15-Helper-Klasse
+`interruptible_sleep(interval, stop_requested_fn)` und beide Daemons umstellen.
 
-1. **Repo-getrackter Installer** (`scripts/install_hooks.sh`): tracked im
-   Repo, Operator ruft einmal nach `git clone`. Erfordert ein Opt-in
-   (`.git/hooks` darf nicht blind überschrieben werden).
-2. **Pure-Doku**: ein Eintrag in `AGENTS.md` / `README.md` „after clone: run
-   `bash scripts/install_hooks.sh`". Niedrigste Hürde, aber Disziplin-lastig.
-3. **Core-Hooks-Path** (`git config core.hooksPath <tracked-dir>`): der
-   tracked-Pfad `scripts/hooks/` enthält die Hook-Datei, Git ruft sie
-   automatisch. **Sauberste Lösung**, aber Projekt-weit einmal umzustellen
-   — andere Hooks (Linter, Formatierer) wären mit berührt.
+🟡 **„Restart-Loop-Quelle" nicht identifiziert** — kein cron/systemd/supervisor/watchdog,
+keine offene `bash`-Loop-Spur in `ps`. Discovery-Log zeigt wiederholte „starting daemon"-
+und „received signal 15"-Einträge; Recorder-Log dasselbe. **Hypothese:** ein
+historischer `while true; do bash run_X.sh; sleep N; done` aus einer früheren Session,
+der als disowned nohup-Kind im Hintergrund läuft und nicht in `grep` auftaucht.
+**Aktueller Effekt: null** — die Daemons laufen (Recorder wegen Sleep-Cap-Bug,
+Discovery wegen P14-D-Fix). **Empfehlung für morgen:** nach Login einmal
+`pgrep -af "while.*run_"2>/dev/null` o.ä. und verdächtige nohup-Bäume abschießen.
 
-Empfehlung: (3) in Phase 15 als Hygiene-Atom mitnehmen, falls Phase 15 ohnehin
-am Workflow schraubt; sonst (1) jetzt in einer Folge-Mini-Session.
+🟡 **`scripts/restart-services.sh`** wurde gefunden (Operator-Helper für, mit eigenem
+5-s-Grace + SIGKILL-Fallback). Hätte den Recorder vermutlich mit SIGKILL weggekriegt —
+aber bewusst **nicht** benutzt, weil es auch Scheduler und WebUI restarten würde, und
+Scheduler sollte nicht gestört werden. Für die **nächste** Restart-Situation lohnt sich
+ein Blick darauf (korrekte Reihenfolge, sauberer Cleanup).
 
-🟡 **FAIL-Pfad des Hooks nicht Live-getestet.** Skript-Tests decken den
-`two-FAIL`-Fall ab (`test_check_doc_rotation.py` main-Test + E2E-Subprozess),
-und der Hook ist ein dünner Delegate — daher reicht die Skript-Test-Suite
-strukturell. Ein direkter Commit-Test mit absichtlich verdoppeltem Session-Block
-+ `git commit --no-verify`-Vergleich wäre eine Option für eine spätere
-Mini-Session, wenn der Hook mal versagt. Heute nicht nötig.
+###### Unverändert offen (von Session 17)
 
-### Unverändert offen (von Session 16)
+- **Phase-14 D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche.
+- **Phase-15-Plan-Session** (V4: Council / Handover / Reward-Reform / Force-Trigger /
+  Instinct-ECC) — gegatet auf Outcomes aus Phase 9+11+12+13+14.
+- **Hook-Installer (tracked)** — Skript gebaut, Operator-seitige Installation fertig,
+  die **tracked**-Variante (Option 1/3) bleibt offen.
+- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-
+  Vorkommen laufen weiter (nicht Phase-14-Scope).
+- **Phase-11-Wiederaufnahme** (WI-2/W2) — Datenfundament-Abhängigkeit.
 
-- **D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche (Plan §7 P1–P9).
-  Phase 14 bleibt **closed-in-all-but-D5**.
-- **Recorder-Daemon (`phase12_data_foundation/data_foundation/run.py`)** —
-  derselbe theoretische Bug wie P14-D. Phase-15-Territorium (Helper-Klasse
-  in einem gemeinsamen Modul, beide Daemons).
-- **Phase-15-Planungs-Session**: V4-Themen (Council, Handover, Reward-Reform,
-  Force-Trigger, Instinct-ECC) — gegatet auf Phase 9+11+12+13+14 + reale
-  Outcomes.
-- **Hook-Installer (tracked)** — siehe 🟡 Findings oben. Heute **nicht** im
-  Scope: aktueller Auftrag war nur „Hook installieren", nicht „installierbar
-  machen für andere Maschinen".
-- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable
-  history row` (nicht Phase-14-Scope).
+###### NEXT (für die nächste Session / morgen)
 
-### NEXT
+**Nikinger-Anweisung zum Session-Ende (2026-08-27, 21:05 CEST):**
+> „morgen sollen alle offenen items angegriffen werden, da die beweiswoche aus endet.
+> Der Übersicht halber wird Phase 15 evtl items weiter fortführen."
 
-- **Operator (Nikinger):** **Push-Freigabe** für **einen** Commit dieser
-  Mini-Session (Session-17-Rotation: `phase14_discovery/CLAUDE.md` +
-  `phase14_discovery/SESSIONS_ARCHIVE.md`). Diff: Session-16-Block wandert
-  **verbatim** ans Archiv-Anfang; Session-17-Block ersetzt ihn im Phasenkopf;
-  Footer-Pointer unverändert. Kein Code-Edit, kein Cross-Phase-Touch, keine
-  Test-Datei geändert. (Der Hook selbst ist `.git/hooks/pre-commit` und
-  erwartungsgemäß **nicht** Teil des Commits — siehe 🟡 Findings.)
-- **Ausführende Session (nächste):** keine Pflicht. Wahrscheinliche Tracks je
-  nach Nikinger-Entscheidung: (a) Hook-Installer tracked (Option 1/3 aus
-  🟡 Findings, Mini-Session, geringer Aufwand); (b) Phase-13-Beweiswoche-
-  Beobachtung (separater Track); (c) Phase-15-Plan-Session (V4 + Recorder-
-  Helper + Hook-Installer als Hygiene-Atome); (d) Phase-12-Reconciliation-
-  Timing (nicht Phase-14-Scope); (e) Recorder-/Daemon-Restart (PIDs 4190
-  und 47174 verschwunden, Verifikation welcher Prozess wieder laufen muss).
-- **Phase-14-Aktivität:** **closed-in-all-but-D5** + **Hygiene vollständig +
-  Hook gewired**. Phase-14-Hygiene ist jetzt **dreifach** geschützt
-  (Konvention + Skript + Hook). Letzter offener Hygiene-Punkt ist
-  „Hook-Installer im Repo" — Phase-15-Territorium.
-- **Σ-Sweep** Stand 2026-08-27 ~17:40 CEST:
+**Konkrete Empfehlung für die morgige Session** (sortiert nach Aufwand × Impact, kann
+der Nikinger nach Belieben umstellen):
+
+1. **Phase-13-Beweiswoche-Abschluss** (separater Track, ggf. erste Auswertung):
+   - Status der Datenwoche(n) erheben (`phase13_live_data/scripts/source_delta.py`-
+     Report der letzten Tage).
+   - Wenn PASS ⇒ Phase-14-D5-Closeout-Handover schreiben.
+   - Wenn FAIL ⇒ nicht-triviale Befunde dokumentieren + ggf. Phase-14-Code-Fixes.
+2. **Recorder-Sleep-Cap-Bug fixen** (Phase-12-Code, ~1-2h): `recorder.py:189` auf
+   chunked Sleep umstellen (P14-D-Muster), Regressionstest, Commit. **Empfehlung: jetzt
+   machen** — der Fix ist klein, gut getestet (P14-D-Vorbild), und räumt ein
+   dokumentiertes Phase-14-Finding ab.
+3. **Hook-Installer (tracked, Option 1)** (~1h): `scripts/install_hooks.sh` schreiben,
+   der `.git/hooks/pre-commit` aus `scripts/hooks/pre-commit` installiert (tracked im
+   ). Niedrige Hürde, hoher Impact für neue Klone.
+4. **Phase-12-Reconciliation-Timing-Fix** (~2-3h, Phase-12-Code): die anhaltenden
+   `reward.recorder: no usable history row`-CRITICALs angehen. Eigener
+   Mini-Session-Track, nicht Phase-14-Scope.
+5. **Phase-15-Plan-Session** (großer Block, V4): wenn die Beweiswoche genug Outcomes
+   für die V4-Gegenargumente liefert, **jetzt** starten — Council / Handover /
+   Reward-Reform / Force-Trigger / Instinct-ECC. Sonst weiter deferred.
+
+**Bot-Stand für die nächste Session:**
+- 3 Live-Prozesse (Scheduler 47166, Discovery 47174, Recorder 90518).
+- **Wichtig:** der Bot wurde in dieser Session **nicht** gestoppt — Scheduler läuft seit
+  1d 3h **ohne** Unterbrechung. Wenn morgen Code-Edits am Scheduler nötig sind: vorher
+  Nikinger-Entscheidung, dann `ps aux | grep scheduler.run` als Gegenprobe.
+- **Nicht angerührt:** Migration 007 ist **noch nicht** angewendet (`instrument_source_availability`
+  existiert nicht in `data/trading_bot.sqlite`). Phase-14 D2-Akzeptanz (z. B. Test 11
+  des Plans) ist **nicht** grün — sie wird im Phase-15-H-Setup vermut relevant, sobald
+  die Beweiswoche-Entscheidung steht.
+
+**Hinweise für die morgige Session:**
+
+- **Cold-Reader-Hinweis:** Phase 14 ist **closed-in-all-but-D5**. Phase-13-Beweiswoche
+  läuft seit Mo 2026-08-25. Hook-Hygiene ist dreifach geschützt (Konvention + Skript +
+  Pre-Commit-Hook).
+- **Erste Aktion morgens:** `ps -o pid,etime,cmd -p 47166,47174,90518` — sind die drei
+  Daemons noch alive? `cat data/state/{recorder,discovery,scheduler}_state.json` —
+  schreiben sie noch? Wenn ja: normal starten mit Item 1. Wenn nein: kurze
+  Re-Investigation (PIDs reuse, Zombie, etc.) wie in dieser Session.
+- **Arbeitsmodell:** Ausführungs-Sessions laufen weiter über `claude-minimax` (Kostengrund,
+  Nikinger 2026-08-18). Debugging über `claude`. Kein Live-/Netz-/kostenpflichtiger Lauf
+  ohne Nikinger-Freigabe.
+
+- **Σ-Sweep** Stand 2026-08-27 ~21:05 CEST:
   - P14 61, P13 74, P12 143, P9 87, P8 248 — Σ 613 für diese 5 Phasen
     (Σ 1698 wie in den Closeout-Handovern = alle 13 Phasen + meta)
-  - **+14** Hygiene-Tests in `tests/test_check_doc_rotation.py`
-    → Σ Root-Tests **94** (unverändert zu Session 16)
-  - Allowance: 9245/10000 (7,55 % verbraucht, Roll-End Mo 31.08.) —
-    unverändert zu Session 16
+  - Σ Root-Tests **94** (unverändert zu Session 17)
+  - Allowance: **9245/10000** (7,55 % verbraucht, Roll-End Mo **31.08.**)
   - Verbleibende CRITICAL-Logs seit P14-Wiring-Fix: **0**
-  - Scheduler **PID 47166 Sl** (mit `--enable-divergence-sampler`),
-    Recorder + Discovery-Daemon: **nicht in `ps aux`** (waren in
-    Session 16 noch PIDs 4190 / 47174; Hook-Install hat darauf keinen
-    Einfluss)
-  - **check_doc_rotation.py** heute: 14/14 Phase-Heads OK
-  - **`git reflog`:** `6d18b98 origin/main@{0}: update by push` — die
-    Session-16-Commits sind live; **kein** lokaler Commit-Stand abweichend
-    von `origin/main`
-  - **`.git/hooks/pre-commit`:** installiert, `-rwxr-xr-x`, exit 0 im
-    Clean-State-Test (Delegate an `scripts/check_doc_rotation.py --quiet`).
+  - Scheduler **PID 47166** (Sl, 1d 3h, `--enable-divergence-sampler)
+  - Discovery **PID 47174** (S, 1d 3h, ARMED, schreibt State)
+  - Recorder **PID 90518** (Sl, 5 Min, neu gestartet, schreibt State —
+    `bars_written:0, skipped_off_hours:true`, normaler Off-Hours-Stand)
+  - **`.git/hooks/pre-commit`:** installiert, grün gegen Live-Repo.
 
 ---
 
