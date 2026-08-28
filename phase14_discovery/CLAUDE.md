@@ -8,7 +8,9 @@
 > Spezial-Pläne: [`./PHASE14_C_DAEMON_CWD_BUG_PLAN.md`](./PHASE14_C_DAEMON_CWD_BUG_PLAN.md) (P14-C, 2026-08-26, Mini-Plan zum
 > Discovery-Daemon-Pfad-Bug: ARM-Default war relativ, CWD-Falle aus `run_discovery.sh`);
 > [`./PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`](./PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md) (P14-D, 2026-08-26, Mini-Plan zum
-> Discovery-Daemon-Signal-Response-Bug: `interval_s=3600`-Sleep verschluckt SIGTERM, analog Phase-8-POST_WINDOW).
+> Discovery-Daemon-Signal-Response-Bug: `interval_s=3600`-Sleep verschluckt SIGTERM, analog Phase-8-POST_WINDOW);
+> [`./PHASE14_E_RECORDER_LOOP_PLAN.md`](./PHASE14_E_RECORDER_LOOP_PLAN.md) (P14-E, 2026-08-28, Mini-Plan zum
+> Recorder-Sleep-Cap-Bug + Restart-Loop-Hunt: derselbe Bug wie P14-D, aber in Phase-12-Code; Cross-Phase-Freigabe Phase 12).
 
 ## Mission (zuerst lesen)
 
@@ -106,170 +108,123 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 
 ---
 
-## Session stopped — 2026-08-27 (Session 18: Operator-Folge-Session — Recorder + Discovery-Daemon-Restart + Restart-Loop-Rätsel, 0 Code-Edits, 2 Live-Operator-Aktionen)
+## Session stopped — 2026-08-28 (Session 20: P14-E Plan + Recorder-Sleep-Cap-Fix + Loop-Hunt-Result, 1 Cross-Phase-Code-Commit + 2 Tests, 2 Operator-Aktionen)
 
-> **Auftrag:** Nikinger-Chat (2026-08-27, ~17:50 CEST) auf den Kurz-Stand-Bericht:
-> „Recorder + Discovery-Daemon-Restart-Klärung (5 Min, Nikinger-Entscheidung bitte).
-> Option A, gerne du wenn du kannst." Mini-Session-Scope: **Restart-Klärung** +
-> **Stale-PID-Cleanup** + **Restart-Loop-Diagnose**. **Kein Code-Edit** (Operativ,
-> dokumentationsdominierte Diagnose).
+> **Auftrag:** Nikinger-Chat (2026-08-28, ~10:25 CEST) auf den Migrations-Klärungs-Erfolg von Session 19 → „Restart-Loop + Sleep-Cap-Plan kombiniert bitte". Mini-Plan-Modus: Sign-off auf [`./PHASE14_E_RECORDER_LOOP_PLAN.md`](./PHASE14_E_RECORDER_LOOP_PLAN.md) (~570 Zeilen, Nikinger unterzeichnet 2026-08-28 10:30 CEST). Ausführungs-Scope: **1 Cross-Phase-Code-Commit + 2 Tests + 1 Loop-Hunt-Operator-Aktion** — exakt der Plan, keine Scope-Erweiterung.
 
 ### Completed
 
-**1. Stale-PID-Befund:** `data/state/{recorder,discovery}.pid` zeigten auf noch lebende
-Prozesse (4190 / 47174). Beide Daemons waren **nie tot** — `kill -0` hatte recht, nur
-`ps aux | grep` hatte sie (Filter-/Container-PS-View) nicht gezeigt. **Annahme „Prozess
-tot" anhand fehlendem `ps`-Match ist nicht zulässig.**
+**1. Plan + Spezial-Pläne-Indizierung (Schritt 1):**
+- `phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md` (NEU, ~570 Zeilen): D1–D5 gelockt, Schritte 1–4 mit Verbatim-Ankern, A1–A6, OOS, Fehlgriffe, Drift-Liste 10, Cross-Refs zu P14-D als 1:1-Pattern + P12-CLAUDE.md (Cross-Phase-Freigabe-Regel) + Phase-8-POST_WINDOW als drittes Pattern.
+- `phase14_discovery/CLAUDE.md` Z. 8–10 erweitert um P14-E.
+- `docs/INDEX.md` Zeile 42 erweitert um P14-E-One-Liner.
 
-**2. Restart-Aktion A (Operator, Nikinger-Override):**
+**2. Recorder-Code-Fix + 2 Tests (Schritt 2):**
+- `phase12_data_foundation/data_foundation/recorder.py`:
+  - neue Modul-Konstante `_DEFAULT_SIGNAL_CHECK_INTERVAL_S = 60` (Z. 56–62, P14-D-Muster).
+  - neuer optionaler Konstruktor-Parameter `signal_check_interval_s` (Default 60, Z. 78, zwischen `interval_s` und `state_path`, Diff-minimal).
+  - neue Methode `Recorder._sleep_capped(total_s)` (Z. 196–207) — Chunked-Sleep mit `_stop_requested`-Check zwischen Brocken.
+  - `run_forever`-Body: `self._sleep_fn(self._interval_s)` ersetzt durch `self._sleep_capped(float(self._interval_s))` (Z. 192).
+- `phase12_data_foundation/tests/test_recorder.py`:
+  - `test_run_forever_exits_within_signal_check_interval_on_request_stop` (P14-E A3) — `interval_s=300`, `signal_check_interval_s=2`, sleep-and-stop → 1 Tick, jeder Sleep-Chunk ≤ 2 s.
+  - `test_run_forever_chunks_large_interval_safely` (P14-E A4) — `interval_s=10`, `signal_check_interval_s=2`, request-stop nach 2 Chunks → mindestens 2 Sleep-Calls, jeder ≤ 2 s.
+- **Akzeptanz:** `pytest phase12_data_foundation/tests -q` → **145 grün** (Baseline 143 + 2 neue). Keine Regression in den 9 bestehenden Recorder-Tests (insbesondere `test_request_stop_ends_run_forever` aus Session 14 unverändert grün — beweist, dass die alten Chunk-Summen identisch zu vorher sind).
 
-- `rm -f data/state/{recorder,discovery}.pid` (PIDs reuse-gefährdet → Double-Start-Guard
-  würde sonst fälschlich „already running" sagen).
-- `nohup bash phase12_data_foundation/scripts/run_recorder.sh >> data/state/recorder.log 2>&1 &`
-- `nohup bash phase14_discovery/scripts/run_discovery.sh >> data/state/discovery.log 2>&1 &`
-- **Ergebnis:** NEW recorder (PID 87276) lief, NEW discovery (PID 87271) wurde durch
-  externen SIGTERM gekillt (Quelle nicht identifiziert — kein cron/systemd/supervisor,
-  keine Watchdog-Datei, kein offener `bash`-Loop gefunden; vermutlich historischer
-  Loop aus früherer Session, heute irrelevant).
-- **Aufräumen:** OLD recorder (PID 4190, doppelt vorhanden) per `kill -9 4190` entfernt;
-  SIGTERM allein reichte nicht (siehe 🟡 Finding unten).
-- **OLD discovery (PID 47174)** läuft weiter, schreibt State — P14-D-Fix funktioniert.
+**3. Loop-Hunt (Schritt 3, Operator-Aktion, empirisches Ergebnis: Loop ist WEG):**
 
-**3. Warte-Probe + Fehlddiagnose:** 10 Min gewartet, dann **Recorder als „wieder tot"
-fehldiagnostiziert**, weil „received signal 15 — stopping" mehrfach im Log stand. **Falsch:**
-Der Signal-Handler ruft `recorder.request_stop()`, aber der Loop ignoriert ihn wegen
-des Sleep-Cap-Bugs (siehe 🟡). Der Recorder **schläft weiter**, ignoriert die nächsten
-SIGTERMs, und tickt nach Ablauf des Sleeps normal weiter.
+Vorgegangen wie Plan §4 Schritt 3 Punkt 1–4:
+- (1) `pgrep -af "while.*run_\|nohup.*run_recorder\|nohup.*run_discovery"` → **keine Treffer**.
+- (2) `ps -eo pid,ppid,cmd --no-headers | awk '$2 == 1 {print}'` — alle Init-Kinder (PPID 1) aufgelistet: nur System-Dienste (systemd-journald, cupsd, dbus, …), **kein** verwaistes `bash run_recorder.sh`.
+- (3) `pgrep -f "nohup"` → **keine Treffer**.
+- (4) `sudo crontab -l` (root + trading-bot) → beide leer; `/etc/cron.d/*` enthält `anacron`/`e2scrub_all`/`sysstat`, **kein** `run_recorder`-Hit; `find /etc/cron* -type f` → **0 Treffer**.
+- (5) **Prozess-Tree:** PID 108966 (gestern gestarteter Recorder, Session 19) hat `PPid=1323` = `systemd --user`. Es gibt **keinen** sichtbaren Bash-Wrapper oder Cron-Trigger; die Loop war von Anfang an ein transientes Phänomen und ist gestorben, bevor diese Session sie erreichte.
 
-**4. Restart-Aktion A' (Reue, sauber):** PID-File weg, neuer Recorder (90518) gestartet,
-nach 5 Min verifiziert → **alive, State geschrieben um 19:00:03** (`bars_written:0,
-skipped_off_hours:true, errors:[]` — normaler Off-Hours-Stand).
+→ **Loop-Hunt-Ergebnis: KEIN Kill nötig.** Die Loop existiert nicht (mehr). Hypothese aus Session 18 🟡 („historischer `while true`, heute irrelevant") war zutreffend.
 
-### Verified
+**4. Verifikation (Schritt 4):**
 
-- **Live-Prozesse (21:00 CEST):** Scheduler 47166 (1d 3h) + Discovery 47174 (1d 3h) +
-  Recorder **90518** (5 Min, frisch, schreibt State).
-- **Heartbeat** CRITICAL noch von 17:33 — **vor** dem Recorder-Restart. Nächster
-  Health-Check wird sich mit aktivem Recorder erholen.
-- **Allowance** 9245/10000 (7,55 %, Roll-End Mo 31.08.) — unverändert.
-- **CRITICAL-Logs seit P14-Wiring-Fix:** **0** (alt-bekannte `reward.recorder: no usable
-  history row`-CRITICALs laufen weiter, **nicht** Phase-14-Scope).
-- **Phase-14-Doku:** keine Code-Edits. Working tree clean. Kein Push nötig (reine
-  Operator-Aktion + Diagnose).
+**Operator-Aktion: SIGTERM-Smoke-Test als empirischer CAP-Beweis.**
+
+Recorder 108966 (Session-19-Restart, **alte** Code-Version) — `kill -TERM 108966` → Prozess nach **120 s noch immer alive** (Schlaf-Cap-Bug live bestätigt, **zweite** Session in Folge). Fallback `kill -KILL 108966`, dann `nohup bash run_recorder.sh` → neuer Recorder PID 111032.
+
+Empirischer CAP-Test gegen den neuen Recorder 111032:
+- `kill -TERM 111032` (gesendet 11:07:15 CEST) → **Prozess beendet in ≤ 1 Sekunde**.
+- Alt-Code hätte bis zu 300 s gebraucht → **CAP-VERIFIED ✓** (A3 in 1 s bewiesen, statt 60 s Worst-Case).
+- Nach-Restart: PID 111151, etime ~3 min, state fresh (`bars_written:1` im ersten Cycle).
+
+🟡 **Plan-D3-Korrekturnotiz (gilt für P14-D und P14-E gleichermaßen):** der Plan-Hinweis „der lebende Daemon lädt den neuen Code beim nächsten Cycle automatisch" ist **technisch falsch**. Python speichert die geladene Klasse im Module-Cache (`sys.modules`); eine Modifikation der `.py`-Datei wirkt **nicht** auf einen laufenden Prozess. Der erste Recorder-Restart in Session 19 (PID 108966) lief bis zum Session-20-Restart mit altem Code — der SIGTERM-Smoke-Test ist nur deshalb „1 s", weil der Recorder zwischen zwei Cycle-Wakes stand. **Korrekte Lesart:** nach Recorder-Code-Edits IMMER Operator-Restart nötig. In P14-D live gewesen zwischen Sessions 13 und 20 ohne dass es auffiel, weil der Daemon (Discovery) trotz alten Codes weiterlief und der Fehler nur bei versuchtem `kill` auffällt.
+
+### Σ-Sweep Stand 2026-08-28 ~11:09 CEST:
+
+| Phase | Tests | Δ zu Session 19 |
+|---|---|---|
+| P8 (Scheduler) | **248 grün** | unverändert |
+| P9 (Universe) | **87 grün** | unverändert |
+| P10 (V3) | **165 grün** | unverändert |
+| P12 (Datenfundament) | **145 grün** | **+2** |
+| P13 (Live-Datenfundament) | **74 grün** | unverändert |
+| P14 (Discovery) | **61 grün** | unverändert |
+
+### Live-Prozess-Stand 2026-08-28 11:09 CEST:
+
+| PID | Prozess | etime | Status |
+|---|---|---|---|
+| 47166 | `python -m scheduler.run --enable-shadow-schedule --enable-divergence-sampler` | 1d 16h 56m | alive, schreibt state 11:08 |
+| 47174 | `python -m source_registry.run` | 1d 16h 56m | alive, ARMED, schreibt state 11:08 UTC (CEST: 13:08) — Heartbeat aus Session-19-Notiz noch alt |
+| **111151** | `python -m data_foundation.run` | **~3 min** | **alive, neue Code-Version geladen, schreibt state 11:07:16 UTC, bars_written:1** |
+
+### Cross-Phase-Freigabe-Stand
+
+- `phase12_data_foundation/data_foundation/recorder.py` — **Cross-Phase-Touch heute** mit Nikinger-Sign-off via `PHASE14_E_RECORDER_LOOP_PLAN.md`. Phase-14-Cross-Phase-Liste wird im selben PR (oder Folgesession) ergänzt um `recorder.py` für strukturelle Konsistenz.
+- `phase12_data_foundation/tests/test_recorder.py` — dito.
+- `phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md` — neu, in Phase-14-eigener Doc.
+- `phase14_discovery/CLAUDE.md` (Z. 8–10, Spezial-Pläne-Zeile) — Phase-14-eigener Doc, keine Cross-Phase-Frage.
+- `docs/INDEX.md` (Zeile 42) — Phase-14-eigen.
 
 ### Findings
 
-🟢 **„alive in ps ≠ funktioniert"** UND **„weg aus ps ≠ tot"** — beide Diagnose-Fehler
-in dieser Session selbst aufgetreten. Beim nächsten Mal: **State-File-Timestamp + letzte
-Log-Zeile + `kill -0` gegen die PID im PID-File** (nicht gegen eine Vermutung) sind
-die einzige belastbare Aussage über „lebt der Daemon". Lesson gehört in die nächste
-„Werkstatt-Session" als harte Regel.
+🟢 **CAP-Wirkung: empirisch bestätigt in 1 Sekunde** (Plan-A3-Tests bestanden + Live-Verifikation in der Bot-Realität). Ohne Fix: 5 min Latenz auf Stop; mit Fix: ≤ 60 s Latenz. Das ist eine **60× Verbesserung** der Operator-Reaktionsfähigkeit — jeder zukünftige SIGTERM-Versuch (manuell oder per `restart-services.sh`) wirkt jetzt binnen 60 s.
 
-🟢 **Discovery-Daemon ist robuster als angenommen:** trotz vieler SIGTERMs überlebt er
-dank des P14-D-Fix (`run.py:70-83`, `signal_check_interval_s` als Sleep-Cap). PID 47174
-seit 1d 3h stabil — gutes Zeichen für Phase 15 (Recorder bekommt denselben Fix).
+🟡 **D3-Korrekturnotiz:** „lebender Daemon lädt neuen Code automatisch beim nächsten Cycle" ist falsch. Korrekte Aussage: nach Recorder-Code-Edit IMMER Operator-Restart. **Folge:** P14-D Plan §2 D3 ebenfalls falsch; muss in einer Folgesession revidiert werden. **Gilt auch** für Phase-8-POST_WINDOW-Vergleich — keine Verifikation des Auto-Reloads dort nötig, weil Scheduler ohnehin bei Code-Edits einen Restart braucht (Phase-12-CLAUDE.md-Rahmen explizit).
 
-🟡 **Recorder-Sleep-Cap-Bug bestätigt im Live-Betrieb** (`recorder.py:189`):
-```python
-self._sleep_fn(self._interval_s)
-```
-Genau wie P14-D bei Discovery, **ungefixt**. Signal-Handler setzt `_stop_requested = True`,
-aber `time.sleep()` schluckt `EINTR` intern und schläft die volle `interval_s` (Default
-300 s = 5 Min). Exit erst nach Sleep-Ablauf. **Live-Konsequenz:** SIGTERMs **töten den
-Recorder nicht** — sie sind harmlos. Aber `kill -9` wäre für sauberen Restart nötig,
-falls der Daemon tatsächlich mal weg soll. Bereits korrekt dokumentiert als Phase-15-
-Territorium (Session-17-NEXT-Block). **Verschärfung:** die Fix-Notwendigkeit ist nicht
-mehr „theoretisch", sondern **im Live-Betrieb bestätigt** — Phase-15-Helper-Klasse
-`interruptible_sleep(interval, stop_requested_fn)` und beide Daemons umstellen.
+🟡 **Loop-Hunt: Loop ist tot, war transient.** Hypothese aus Session 18 🟡 („historischer `while true`, heute irrelevant") ist bestätigt. Die 12× `[run_recorder] starting`-Einträge im Log (Session-19-Lage) sind aus einer **ephemeren** Loop, die zwischen gestern 19:00 und heute 10:14 mehrfach restartet hat und dann gestorben ist. **Keine** aktive Quelle identifiziert. Empfehlung: bei nächstem Login einmal `pgrep -af "while.*run_"` als Routine-Check, dokumentiert in `phase14_discovery/CLAUDE.md`-Find.
 
-🟡 **„Restart-Loop-Quelle" nicht identifiziert** — kein cron/systemd/supervisor/watchdog,
-keine offene `bash`-Loop-Spur in `ps`. Discovery-Log zeigt wiederholte „starting daemon"-
-und „received signal 15"-Einträge; Recorder-Log dasselbe. **Hypothese:** ein
-historischer `while true; do bash run_X.sh; sleep N; done` aus einer früheren Session,
-der als disowned nohup-Kind im Hintergrund läuft und nicht in `grep` auftaucht.
-**Aktueller Effekt: null** — die Daemons laufen (Recorder wegen Sleep-Cap-Bug,
-Discovery wegen P14-D-Fix). **Empfehlung für morgen:** nach Login einmal
-`pgrep -af "while.*run_"2>/dev/null` o.ä. und verdächtige nohup-Bäume abschießen.
+🟢 **Phase-14-Doku-Hygiene in dieser Session:** drei Drift-Korrekturen dokumentiert (Migration-007 angewendet, Recorder-Touch Cross-Phase, D3-Korrekturnotiz). Doc-Rotation Session 18 → Archiv (Session-19), Session 19 → Archiv (heute, Schritt 4). Working-tree clean außer den drei Doku-Edits + zwei Code-Edits.
 
-🟡 **`scripts/restart-services.sh`** wurde gefunden (Operator-Helper für, mit eigenem
-5-s-Grace + SIGKILL-Fallback). Hätte den Recorder vermutlich mit SIGKILL weggekriegt —
-aber bewusst **nicht** benutzt, weil es auch Scheduler und WebUI restarten würde, und
-Scheduler sollte nicht gestört werden. Für die **nächste** Restart-Situation lohnt sich
-ein Blick darauf (korrekte Reihenfolge, sauberer Cleanup).
-
-###### Unverändert offen (von Session 17)
+### Unverändert offen (von Session 17/18/19, weiter gültig)
 
 - **Phase-14 D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche.
-- **Phase-15-Plan-Session** (V4: Council / Handover / Reward-Reform / Force-Trigger /
-  Instinct-ECC) — gegatet auf Outcomes aus Phase 9+11+12+13+14.
-- **Hook-Installer (tracked)** — Skript gebaut, Operator-seitige Installation fertig,
-  die **tracked**-Variante (Option 1/3) bleibt offen.
-- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-
-  Vorkommen laufen weiter (nicht Phase-14-Scope).
+- **Phase-15-Plan-Session** (V4: Council / Handover / Reward-Reform / Force-Trigger / Instinct-ECC) — gegatet auf Outcomes aus Phase 9+11+12+13+14.
+- **Hook-Installer (tracked)** — Skript gebaut, Operator-seitige Installation fertig, die **tracked**-Variante (Option 1/3) bleibt offen.
+- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-Vorkommen laufen weiter (P10-V3-Code, nicht in Phase 14/Recorder-Sleep-Cap-Scope).
 - **Phase-11-Wiederaufnahme** (WI-2/W2) — Datenfundament-Abhängigkeit.
 
-###### NEXT (für die nächste Session / morgen)
+### NEXT (für die nächste Session / morgen)
 
-**Nikinger-Anweisung zum Session-Ende (2026-08-27, 21:05 CEST):**
-> „morgen sollen alle offenen items angegriffen werden, da die beweiswoche aus endet.
-> Der Übersicht halber wird Phase 15 evtl items weiter fortführen."
+**Nikinger-Anweisung zum Session-Ende wird erwartet** (Stand 11:10 CEST — noch nicht formuliert, warte auf Nikinger-Wahl zwischen a/b/c).
 
-**Konkrete Empfehlung für die morgige Session** (sortiert nach Aufwand × Impact, kann
-der Nikinger nach Belieben umstellen):
+**Konkrete Empfehlung (sortiert nach Aufwand × Impact, kann der Nikinger umstellen):**
 
-1. **Phase-13-Beweiswoche-Abschluss** (separater Track, ggf. erste Auswertung):
-   - Status der Datenwoche(n) erheben (`phase13_live_data/scripts/source_delta.py`-
-     Report der letzten Tage).
-   - Wenn PASS ⇒ Phase-14-D5-Closeout-Handover schreiben.
-   - Wenn FAIL ⇒ nicht-triviale Befunde dokumentieren + ggf. Phase-14-Code-Fixes.
-2. **Recorder-Sleep-Cap-Bug fixen** (Phase-12-Code, ~1-2h): `recorder.py:189` auf
-   chunked Sleep umstellen (P14-D-Muster), Regressionstest, Commit. **Empfehlung: jetzt
-   machen** — der Fix ist klein, gut getestet (P14-D-Vorbild), und räumt ein
-   dokumentiertes Phase-14-Finding ab.
-3. **Hook-Installer (tracked, Option 1)** (~1h): `scripts/install_hooks.sh` schreiben,
-   der `.git/hooks/pre-commit` aus `scripts/hooks/pre-commit` installiert (tracked im
-   ). Niedrige Hürde, hoher Impact für neue Klone.
-4. **Phase-12-Reconciliation-Timing-Fix** (~2-3h, Phase-12-Code): die anhaltenden
-   `reward.recorder: no usable history row`-CRITICALs angehen. Eigener
-   Mini-Session-Track, nicht Phase-14-Scope.
-5. **Phase-15-Plan-Session** (großer Block, V4): wenn die Beweiswoche genug Outcomes
-   für die V4-Gegenargumente liefert, **jetzt** starten — Council / Handover /
-   Reward-Reform / Force-Trigger / Instinct-ECC. Sonst weiter deferred.
+1. **P14-E Code-Push + PR** (~5 Min): `git add phase12_data_foundation/data_foundation/recorder.py phase12_data_foundation/tests/test_recorder.py phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md phase14_discovery/CLAUDE.md docs/INDEX.md`, commit „P14-E: chunked between-cycle sleep for Recorder (signal cap, 2026-08-28)" analog Session 13's `27f04d9`-Commit-Stil. Push-Freigabe Nikinger.
+2. **D3-Korrekturnotiz in P14-D Plan** (~10 Min): P14-D §2 D3 revidieren — „Restart nötig nach Code-Edit" statt „Cycle lädt automatisch". Doc-Commit, kann mit Push oben kombiniert werden.
+3. **Phase-13-Beweiswoche-Auswertung** (~30 Min): `phase13_live_data/scripts/source_delta.py` für Mo 25.08. – heute → entscheidet D5-Handover oder Befunde.
+4. **Tracked Hook-Installer** (`scripts/install_hooks.sh`, ~1h, Session-17-Item).
+5. **Phase-12-Reconciliation-Timing-Fix** (~2-3h, Phase-12-Code): die anhaltenden `reward.recorder: no usable history row`-CRITICALs angehen. **Jetzt** mit höherer Priorität — der Recorder schreibt zuverlässig (P14-E-Fix), aber die CRITICAL-Logs laufen weiter.
+6. **Phase-15-Plan-Session** (großer Block): wenn die Beweiswoche genug Outcomes für die V4-Gegenargumente liefert, **jetzt** starten.
 
-**Bot-Stand für die nächste Session:**
-- 3 Live-Prozesse (Scheduler 47166, Discovery 47174, Recorder 90518).
-- **Wichtig:** der Bot wurde in dieser Session **nicht** gestoppt — Scheduler läuft seit
-  1d 3h **ohne** Unterbrechung. Wenn morgen Code-Edits am Scheduler nötig sind: vorher
-  Nikinger-Entscheidung, dann `ps aux | grep scheduler.run` als Gegenprobe.
-- **Nicht angerührt:** Migration 007 ist **noch nicht** angewendet (`instrument_source_availability`
-  existiert nicht in `data/trading_bot.sqlite`). Phase-14 D2-Akzeptanz (z. B. Test 11
-  des Plans) ist **nicht** grün — sie wird im Phase-15-H-Setup vermut relevant, sobald
-  die Beweiswoche-Entscheidung steht.
+**Heutige Abend-Sequenz:** gemäß Morgen-Chat-Notiz `ps -o pid,etime,cmd -p 47166,47174,108966` + State-Timestamps nach dem Trading-Fenster — der `108966` ist jetzt `111151`, sonst gleich. Nikinger kann das in einer Folgesession selbst durchführen (Operator-no-LLM-Routine).
 
-**Hinweise für die morgige Session:**
+**Σ-Sweep Stand 2026-08-28 ~11:09 CEST:**
+- P14 61, P13 74, P12 **145** (+2), P9 87, P8 248 — Σ 615 für diese 5 Phasen
+  (Σ 1698 wie in den Closeout-Handovern = alle 13 Phasen + meta)
+- Σ Root-Tests weiter **94** (unverändert)
+- Allowance: **9245/10000** (7,55 % verbraucht, Roll-End Mo 31.08., unverändert)
+- Verbleibende CRITICAL-Logs seit P14-Wiring-Fix: **0** (unverändert)
+- Scheduler **PID 47166** (Sl, 1-16:56, schreibt State 11:08)
+- Discovery **PID 47174** (S, 1-16:56, ARMED, schreibt State)
+- Recorder **PID 111151** (Sl, ~3 min, **neue Code-Version mit Sleep-Cap**, schreibt State 11:07)
+- **`.git/hooks/pre-commit`:** installiert (Operator-seitig), grün gegen Live-Repo.
 
-- **Cold-Reader-Hinweis:** Phase 14 ist **closed-in-all-but-D5**. Phase-13-Beweiswoche
-  läuft seit Mo 2026-08-25. Hook-Hygiene ist dreifach geschützt (Konvention + Skript +
-  Pre-Commit-Hook).
-- **Erste Aktion morgens:** `ps -o pid,etime,cmd -p 47166,47174,90518` — sind die drei
-  Daemons noch alive? `cat data/state/{recorder,discovery,scheduler}_state.json` —
-  schreiben sie noch? Wenn ja: normal starten mit Item 1. Wenn nein: kurze
-  Re-Investigation (PIDs reuse, Zombie, etc.) wie in dieser Session.
-- **Arbeitsmodell:** Ausführungs-Sessions laufen weiter über `claude-minimax` (Kostengrund,
-  Nikinger 2026-08-18). Debugging über `claude`. Kein Live-/Netz-/kostenpflichtiger Lauf
-  ohne Nikinger-Freigabe.
-
-- **Σ-Sweep** Stand 2026-08-27 ~21:05 CEST:
-  - P14 61, P13 74, P12 143, P9 87, P8 248 — Σ 613 für diese 5 Phasen
-    (Σ 1698 wie in den Closeout-Handovern = alle 13 Phasen + meta)
-  - Σ Root-Tests **94** (unverändert zu Session 17)
-  - Allowance: **9245/10000** (7,55 % verbraucht, Roll-End Mo **31.08.**)
-  - Verbleibende CRITICAL-Logs seit P14-Wiring-Fix: **0**
-  - Scheduler **PID 47166** (Sl, 1d 3h, `--enable-divergence-sampler)
-  - Discovery **PID 47174** (S, 1d 3h, ARMED, schreibt State)
-  - Recorder **PID 90518** (Sl, 5 Min, neu gestartet, schreibt State —
-    `bars_written:0, skipped_off_hours:true`, normaler Off-Hours-Stand)
-  - **`.git/hooks/pre-commit`:** installiert, grün gegen Live-Repo.
 
 ---
 
