@@ -53,6 +53,14 @@ def _default_market_open() -> bool:
     return is_market_open()
 
 
+# P14-E plan §2 D2: cap the between-cycle sleep so SIGTERM is honored within at most
+# this many seconds (analog to P14-D for the Discovery daemon, and to Phase-8's
+# POST_WINDOW idle_poll_s hotfix 2026-07-11). Default 60s ≪ interval_s=300 default,
+# so a stop is responsive without hammering the loop. Testable via the same
+# _sleep_fn injection as the cycle sleep itself.
+_DEFAULT_SIGNAL_CHECK_INTERVAL_S = 60
+
+
 class Recorder:
     """Polls ``epics_fn()``'s epics for fresh bars and write-throughs them (D15).
 
@@ -73,6 +81,7 @@ class Recorder:
         resolution: str = "1m",
         count: int = 30,
         interval_s: int = 300,
+        signal_check_interval_s: int = _DEFAULT_SIGNAL_CHECK_INTERVAL_S,
         state_path: str = "data/state/recorder_state.json",
         health_sink: Callable[[dict], None] | None = None,
         market_open_fn: Callable[[], bool] = _default_market_open,
@@ -85,6 +94,7 @@ class Recorder:
         self._resolution = resolution
         self._count = count
         self._interval_s = interval_s
+        self._signal_check_interval_s = signal_check_interval_s
         self._state_path = Path(state_path)
         self._health_sink = health_sink
         self._market_open_fn = market_open_fn
@@ -178,6 +188,14 @@ class Recorder:
         fail-soft per epic; this is only a backstop against a bug in the loop
         plumbing itself) — the loop must survive one bad iteration, exactly like
         every other P8 daemon loop in this repo.
+
+        The between-cycle sleep is **capped** at ``signal_check_interval_s``
+        (P14-E plan D2, analog to Phase-8 POST_WINDOW hotfix 2026-07-11 and to
+        P14-D for the Discovery daemon): without the cap, ``time.sleep(interval_s)``
+        blocks SIGTERM for up to ``interval_s`` seconds (Python PEP 475 retries
+        interrupted syscalls; the ``self._stop_requested`` flag is only checked
+        at the top of each iteration). With the cap, a Ctrl+C / SIGTERM during
+        sleep is honored within at most ``signal_check_interval_s`` seconds.
         """
         while not self._stop_requested:
             try:
@@ -186,7 +204,24 @@ class Recorder:
                 logger.exception("Recorder tick failed")
             if self._stop_requested:
                 break
-            self._sleep_fn(self._interval_s)
+            self._sleep_capped(float(self._interval_s))
+
+    def _sleep_capped(self, total_s: float) -> None:
+        """Sleep ``total_s`` in chunks of at most ``signal_check_interval_s``.
+
+        Each chunk re-checks ``self._stop_requested`` so a SIGTERM /
+        :meth:`request_stop` during sleep short-circuits the loop within at most
+        one chunk. Mirrors the POST_WINDOW fix pattern: ``min(seconds_until(...),
+        idle_poll_s)`` (Phase 8, 2026-07-11). P14-D applies the same shape to the
+        Discovery daemon; Phase 15 will consolidate the two into a shared helper
+        module.
+        """
+        remaining = max(0.0, float(total_s))
+        chunk = min(remaining, float(self._signal_check_interval_s))
+        while remaining > 0.0 and not self._stop_requested:
+            sleep_for = min(chunk, remaining)
+            self._sleep_fn(sleep_for)
+            remaining -= sleep_for
 
     def request_stop(self) -> None:
         self._stop_requested = True
