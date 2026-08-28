@@ -5,6 +5,276 @@ carries exactly one `## Session stopped` block; the previously-newest block move
 verbatim when a new one is appended.
 
 
+## Session stopped — 2026-08-28 (Session 19: Morgen-Cold-Reader — Lage + Recorder-Restart + Migration-007-Drift, 0 Code-Edits, 1 Operator-Aktion)
+
+> **Auftrag:** Nikinger-Chat (2026-08-28, ~10:05 CEST) auf den Morgen-Cold-Reader-Hinweis
+> aus dem Session-18-NEXT-Block („Erster Auftrag: erst mal nur ein kurzer Lage-Bericht …" ).
+> Mini-Session-Scope: **Lage-Bericht** + **Recorder operativ restarten** (Option A gewählt,
+> wie im Frage gestellt) + **Drift-Korrektur** auf Session-18-Stand. **Kein Code-Edit**,
+> eine Operator-Aktion + zwei Doc-Edits.
+
+### Completed
+
+**1. Lage-Bericht erstattet** (vor Trading-Fenster, 10:12 CEST):
+- Scheduler **47166** (etime `1-16:45`, etime-korrigiert 40h 45m) — **alive**, schreibt State 10:08.
+- Discovery **47174** (etime `1-16:45`) — **alive**, ARMED, Heartbeat 09:27 UTC (= 11:27 CEST oder 45 min alt bei Lesung 10:12 CEST — separate Beobachtung unten).
+- **Recorder fehlt** — `ps -p 90518` zeigt „not found", `recorder_state.json` stuck 2026-08-27 19:00:03 UTC (= ~15h alt). Restart-Loop im `recorder.log` mit **11× `[run_recorder] starting…`**-Lines, jeweils gefolgt von `signal 15 — stopping` — Session-18-🟡-Hypothese erneut live bestätigt.
+- Phase-14-Code-Stand: unverändert seit Session 9; **A1–A8 weiter grün** (nicht gegengeprüft, kein Edit, kein Risiko).
+- ⚠️ **Drift-Fund:** Tabelle `instrument_source_availability` ist **jetzt in `data/trading_bot.sqlite` vorhanden** — Session-18-Bot-Stand („Migration 007 noch nicht angewendet") ist **outdated**.
+
+**2. Operator-Aktion (Option A, Nikinger-Override):**
+- `nohup bash phase12_data_foundation/scripts/run_recorder.sh >> data/state/recorder.log 2>&1 &` + `disown`.
+- Neuer Recorder **PID 108966**, alive nach 35 s (`STAT=Sl`).
+- `recorder_state.json` = `2026-08-28T08:14:53.725Z` (CEST 10:14:53) — **fresh**, `bars_written: 150`, `skipped_off_hours: false`, `errors: []` → Live-Bar-Writing greift, EU-Indizes liefern Daten (DAX/Wall-Street-Substitute).
+- Scheduler **ungestört** (40h+ ohne Unterbrechung). Discovery ebenfalls ungestört.
+
+### Drift-Korrekturen
+
+🟡 **Migration 007 ist angewendet** — Tabelle `instrument_source_availability` existiert in
+`data/trading_bot.sqlite`. Schema-Snippet:
+```sql
+CREATE TABLE instrument_source_availability (
+    epic              TEXT NOT NULL,
+    source            TEXT NOT NULL,   -- 'ig'|'yf'|'ls'|'capital'|… (D17: table gattet NICHT, Archiv-Schreibpfad gattet)
+    resolution        TEXT NOT NULL,   -- '1m'|'5m'|'1h'|'1d'
+    source_symbol     TEXT,            -- D2: 'DE40' | '^GDAXI' | NULL (Quelle nutzt die Epic selbst)
+```
+
+**Klärung Session 19, ~10:30 CEST** (Inspect-Track):
+- ✅ SQL-File committed (`4ef7535 phase14: schema+code+tests -- A2 Migration 007 + SourceAvailabilityStore`), reachable from current HEAD `51cb1a6`.
+- ✅ yF-Backfill-Stück **gelaufen**: 22 yF-Zeilen = voller `instrument_universe`-Stand, befüllt aus `yf_ticker` (`^GDAXI`, `^FCHI`, `^IBEX`, …); `origin='registry'`.
+- ✅ Initial-Discovery gelaufen: 16 derived Zeilen (8 `ig` + 8 `ls`), `origin='derived'`. `last_verified_utc` = `2026-08-28T07:27:09.380Z` (= genau der Discovery-State-Write von heute morgen).
+- Status-Vokabular (D18): `ok` 13 / `unverified` 14 / `no_source` 8 / `no_intraday_source` 3 — gemischt, **keine roten Counts**; `unverified` ist erwartet (Quellen noch nicht vom Operator freigegeben).
+- A2-Akzeptanz (Schema) und das stille Done für A4 (yF-Backfill im Grundbestand der Migration) gelten beide. **Verbleibend offen ist nur Phase-14 D5** (Closeout-Handover, gegatet auf Phase-13-Beweiswoche).
+
+🟡 **Phase-14-Akzeptanz `grep EPIC_MAP`** — Session-9-Befund „leer" heute **nicht** gegen-
+geprüft (kein Edit, kein Risiko einer Regression), aber für die nächste Verifikation vormerken.
+
+### Findings
+
+🟢 **„Recorder lebt ~15 h nach Restart, dann doch tot."** Session-18-Bot-Stand war
+„alive + State geschrieben um 19:00:03". Heute morgen (~10:08 CEST, geschätzt 10:00–10:05
+aus Logger-Aktivität) war er weg. Recorder-Log zeigt: Restart-Loop hat in der Zwischenzeit
+10+ Restarts versucht, jeder endete mit SIGTERM. Der letzte erfolgreiche Run (PID 90518) lief
+stabil bis zu **einem** externen Kill — vermutlich erwischt zwischen zwei Sleep-Zyklen
+(`time.sleep(300)` wurde vom SIGTERM verschluckt, der nächste Wake war zu spät).
+
+🟡 **Recorder-Sleep-Cap-Bug erneut im Live-Betrieb bestätigt** — derselbe Bug wie
+gestern Session 18, **jetzt zum zweiten Mal** in Folge. **Verschärfung:** der gestrige
+„harmlos"-Befund („SIGTERMs sind harmlos, kill -9 wäre nötig") stimmt **nur eingeschränkt**:
+harmlos für Stabilität, **tödlich** für die Restart-Loop-Quelle, die genau dieses SIGTERM-
+Verhalten ausnutzt und den Recorder nach spätestens wenigen Stunden re-killt. **Empfehlung
+an Nikinger:** Sleep-Cap-Fix sollte **vor** dem Restart-Loop-Cleanup kommen — sonst jagt
+die Loop dem Recorder weiter hinterher.
+
+🟡 **Discovery-Heartbeat 09:27 UTC ist ~45 min alt** — `ps` zeigt den Daemon alive,
+aber `discovery_state.json` wurde nicht aktualisiert. Discovery-Daemon schreibt State
+**nur** alle N Minuten (Plan-D8 — `interval_s=3600` + Heartbeat-Granularität); 45 min
+sind innerhalb der Norm. **Kein** neues Finding, aber Beobachtung dokumentiert, damit
+morgen niemand Fehlalarm schlägt.
+
+🟡 **Defunct PID 47173 (python zombie)** — `ps` zeigt `47173 (defunct)`, Child von
+Scheduler. Alter Zombie, fast 2 Tage. Cleanup-Tasks im nächsten Maintenance-Fenster.
+
+### Verbleibend offen (NEXT für die nächste Session / heute EOD)
+
+**Nikinger-Override Option A** umgesetzt → Items 2/4 (Sleep-Cap-Fix, Reconciliation) sind
+**nicht** in dieser Session gemacht worden, bleiben offen und **steigen** in der Priorität
+(siehe 🟡 Finding oben):
+
+1. **Phase-13-Beweiswoche-Auswertung** (`phase13_live_data/scripts/source_delta.py` für
+   Mo 25.08. – heute) → **Phase-14-D5-Handover** oder Befunde.
+2. **Recorder-Sleep-Cap-Fix** (Phase-12-Code, ~1-2h) — **Priorität steigt**, siehe
+   🟡 Finding oben. Vor dem Restart-Loop-Cleanup. Plan + Regressionstest + Commit.
+3. **Migration-007-Anwendungs-Stand verifizieren** (Drift-Korrektur aus Session 19):
+   SQL-File in Git? yF-Backfill-Stück der Migration ausgeführt? — **nächster Session-Track**.
+4. **Tracked Hook-Installer** (`scripts/install_hooks.sh`) — Session-17-Item, ~1h.
+5. **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-CRITICALs.
+6. **Phase-15-Plan-Session** (V4) — gegatet auf Beweiswoche-Outcomes.
+7. **Restart-Loop-Quelle suchen und abschießen** — heute Nachmittag / morgen früh, sobald
+   Sleep-Cap-Fix den Recorder gegen externe SIGTERMs härtet (sonst jagt die Loop weiter).
+
+**Σ-Sweep Stand 2026-08-28 ~10:14 CEST:**
+- Scheduler **PID 47166** (Sl, 1-16:45, alive, schreibt State 10:08).
+- Discovery **PID 47174** (S, 1-16:45, ARMED, schreibt State 09:27 UTC).
+- Recorder **PID 108966** (Sl, ~1 min, frisch, **150 bars** im ersten Cycle, schreibt State 10:14).
+- **Erste grüne Morgen-Lage seit Tagen** — alle drei Daemons alive + schreibend.
+- Allowance **9245/10000** (unverändert zu Session 18, Roll-End Mo 31.08.).
+- CRITICAL-Logs seit P14-Wiring-Fix: **0** (unverändert).
+- `.git/hooks/pre-commit`: installiert (Operator-seitig, untracked), grün.
+- Zombie: PID 47173 `[python] <defunct>`, alt — siehe 🟡 Finding.
+
+**Post-Trading-Fenster-Aktion (heute ≥17:30 CEST):**
+> `ps -o pid,etime,cmd -p 47166,47174,108966` + `cat data/state/{recorder,discovery,scheduler}_state.json` —
+> gemäß Morgen-Chat-Notiz (dieser Auftrag steht noch aus und ist der zweite Teil der Session).
+
+
+## Session stopped — 2026-08-27 (Session 18: Operator-Folge-Session — Recorder + Discovery-Daemon-Restart + Restart-Loop-Rätsel, 0 Code-Edits, 2 Live-Operator-Aktionen)
+
+> **Auftrag:** Nikinger-Chat (2026-08-27, ~17:50 CEST) auf den Kurz-Stand-Bericht:
+> „Recorder + Discovery-Daemon-Restart-Klärung (5 Min, Nikinger-Entscheidung bitte).
+> Option A, gerne du wenn du kannst." Mini-Session-Scope: **Restart-Klärung** +
+> **Stale-PID-Cleanup** + **Restart-Loop-Diagnose**. **Kein Code-Edit** (Operativ,
+> dokumentationsdominierte Diagnose).
+
+### Completed
+
+**1. Stale-PID-Befund:** `data/state/{recorder,discovery}.pid` zeigten auf noch lebende
+Prozesse (4190 / 47174). Beide Daemons waren **nie tot** — `kill -0` hatte recht, nur
+`ps aux | grep` hatte sie (Filter-/Container-PS-View) nicht gezeigt. **Annahme „Prozess
+tot" anhand fehlendem `ps`-Match ist nicht zulässig.**
+
+**2. Restart-Aktion A (Operator, Nikinger-Override):**
+
+- `rm -f data/state/{recorder,discovery}.pid` (PIDs reuse-gefährdet → Double-Start-Guard
+  würde sonst fälschlich „already running" sagen).
+- `nohup bash phase12_data_foundation/scripts/run_recorder.sh >> data/state/recorder.log 2>&1 &`
+- `nohup bash phase14_discovery/scripts/run_discovery.sh >> data/state/discovery.log 2>&1 &`
+- **Ergebnis:** NEW recorder (PID 87276) lief, NEW discovery (PID 87271) wurde durch
+  externen SIGTERM gekillt (Quelle nicht identifiziert — kein cron/systemd/supervisor,
+  keine Watchdog-Datei, kein offener `bash`-Loop gefunden; vermutlich historischer
+  Loop aus früherer Session, heute irrelevant).
+- **Aufräumen:** OLD recorder (PID 4190, doppelt vorhanden) per `kill -9 4190` entfernt;
+  SIGTERM allein reichte nicht (siehe 🟡 Finding unten).
+- **OLD discovery (PID 47174)** läuft weiter, schreibt State — P14-D-Fix funktioniert.
+
+**3. Warte-Probe + Fehlddiagnose:** 10 Min gewartet, dann **Recorder als „wieder tot"
+fehldiagnostiziert**, weil „received signal 15 — stopping" mehrfach im Log stand. **Falsch:**
+Der Signal-Handler ruft `recorder.request_stop()`, aber der Loop ignoriert ihn wegen
+des Sleep-Cap-Bugs (siehe 🟡). Der Recorder **schläft weiter**, ignoriert die nächsten
+SIGTERMs, und tickt nach Ablauf des Sleeps normal weiter.
+
+**4. Restart-Aktion A' (Reue, sauber):** PID-File weg, neuer Recorder (90518) gestartet,
+nach 5 Min verifiziert → **alive, State geschrieben um 19:00:03** (`bars_written:0,
+skipped_off_hours:true, errors:[]` — normaler Off-Hours-Stand).
+
+### Verified
+
+- **Live-Prozesse (21:00 CEST):** Scheduler 47166 (1d 3h) + Discovery 47174 (1d 3h) +
+  Recorder **90518** (5 Min, frisch, schreibt State).
+- **Heartbeat** CRITICAL noch von 17:33 — **vor** dem Recorder-Restart. Nächster
+  Health-Check wird sich mit aktivem Recorder erholen.
+- **Allowance** 9245/10000 (7,55 %, Roll-End Mo 31.08.) — unverändert.
+- **CRITICAL-Logs seit P14-Wiring-Fix:** **0** (alt-bekannte `reward.recorder: no usable
+  history row`-CRITICALs laufen weiter, **nicht** Phase-14-Scope).
+- **Phase-14-Doku:** keine Code-Edits. Working tree clean. Kein Push nötig (reine
+  Operator-Aktion + Diagnose).
+
+### Findings
+
+🟢 **„alive in ps ≠ funktioniert"** UND **„weg aus ps ≠ tot"** — beide Diagnose-Fehler
+in dieser Session selbst aufgetreten. Beim nächsten Mal: **State-File-Timestamp + letzte
+Log-Zeile + `kill -0` gegen die PID im PID-File** (nicht gegen eine Vermutung) sind
+die einzige belastbare Aussage über „lebt der Daemon". Lesson gehört in die nächste
+„Werkstatt-Session" als harte Regel.
+
+🟢 **Discovery-Daemon ist robuster als angenommen:** trotz vieler SIGTERMs überlebt er
+dank des P14-D-Fix (`run.py:70-83`, `signal_check_interval_s` als Sleep-Cap). PID 47174
+seit 1d 3h stabil — gutes Zeichen für Phase 15 (Recorder bekommt denselben Fix).
+
+🟡 **Recorder-Sleep-Cap-Bug bestätigt im Live-Betrieb** (`recorder.py:189`):
+```python
+self._sleep_fn(self._interval_s)
+```
+Genau wie P14-D bei Discovery, **ungefixt**. Signal-Handler setzt `_stop_requested = True`,
+aber `time.sleep()` schluckt `EINTR` intern und schläft die volle `interval_s` (Default
+300 s = 5 Min). Exit erst nach Sleep-Ablauf. **Live-Konsequenz:** SIGTERMs **töten den
+Recorder nicht** — sie sind harmlos. Aber `kill -9` wäre für sauberen Restart nötig,
+falls der Daemon tatsächlich mal weg soll. Bereits korrekt dokumentiert als Phase-15-
+Territorium (Session-17-NEXT-Block). **Verschärfung:** die Fix-Notwendigkeit ist nicht
+mehr „theoretisch", sondern **im Live-Betrieb bestätigt** — Phase-15-Helper-Klasse
+`interruptible_sleep(interval, stop_requested_fn)` und beide Daemons umstellen.
+
+🟡 **„Restart-Loop-Quelle" nicht identifiziert** — kein cron/systemd/supervisor/watchdog,
+keine offene `bash`-Loop-Spur in `ps`. Discovery-Log zeigt wiederholte „starting daemon"-
+und „received signal 15"-Einträge; Recorder-Log dasselbe. **Hypothese:** ein
+historischer `while true; do bash run_X.sh; sleep N; done` aus einer früheren Session,
+der als disowned nohup-Kind im Hintergrund läuft und nicht in `grep` auftaucht.
+**Aktueller Effekt: null** — die Daemons laufen (Recorder wegen Sleep-Cap-Bug,
+Discovery wegen P14-D-Fix). **Empfehlung für morgen:** nach Login einmal
+`pgrep -af "while.*run_"2>/dev/null` o.ä. und verdächtige nohup-Bäume abschießen.
+
+🟡 **`scripts/restart-services.sh`** wurde gefunden (Operator-Helper für, mit eigenem
+5-s-Grace + SIGKILL-Fallback). Hätte den Recorder vermutlich mit SIGKILL weggekriegt —
+aber bewusst **nicht** benutzt, weil es auch Scheduler und WebUI restarten würde, und
+Scheduler sollte nicht gestört werden. Für die **nächste** Restart-Situation lohnt sich
+ein Blick darauf (korrekte Reihenfolge, sauberer Cleanup).
+
+###### Unverändert offen (von Session 17)
+
+- **Phase-14 D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche.
+- **Phase-15-Plan-Session** (V4: Council / Handover / Reward-Reform / Force-Trigger /
+  Instinct-ECC) — gegatet auf Outcomes aus Phase 9+11+12+13+14.
+- **Hook-Installer (tracked)** — Skript gebaut, Operator-seitige Installation fertig,
+  die **tracked**-Variante (Option 1/3) bleibt offen.
+- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-
+  Vorkommen laufen weiter (nicht Phase-14-Scope).
+- **Phase-11-Wiederaufnahme** (WI-2/W2) — Datenfundament-Abhängigkeit.
+
+###### NEXT (für die nächste Session / morgen)
+
+**Nikinger-Anweisung zum Session-Ende (2026-08-27, 21:05 CEST):**
+> „morgen sollen alle offenen items angegriffen werden, da die beweiswoche aus endet.
+> Der Übersicht halber wird Phase 15 evtl items weiter fortführen."
+
+**Konkrete Empfehlung für die morgige Session** (sortiert nach Aufwand × Impact, kann
+der Nikinger nach Belieben umstellen):
+
+1. **Phase-13-Beweiswoche-Abschluss** (separater Track, ggf. erste Auswertung):
+   - Status der Datenwoche(n) erheben (`phase13_live_data/scripts/source_delta.py`-
+     Report der letzten Tage).
+   - Wenn PASS ⇒ Phase-14-D5-Closeout-Handover schreiben.
+   - Wenn FAIL ⇒ nicht-triviale Befunde dokumentieren + ggf. Phase-14-Code-Fixes.
+2. **Recorder-Sleep-Cap-Bug fixen** (Phase-12-Code, ~1-2h): `recorder.py:189` auf
+   chunked Sleep umstellen (P14-D-Muster), Regressionstest, Commit. **Empfehlung: jetzt
+   machen** — der Fix ist klein, gut getestet (P14-D-Vorbild), und räumt ein
+   dokumentiertes Phase-14-Finding ab.
+3. **Hook-Installer (tracked, Option 1)** (~1h): `scripts/install_hooks.sh` schreiben,
+   der `.git/hooks/pre-commit` aus `scripts/hooks/pre-commit` installiert (tracked im
+   ). Niedrige Hürde, hoher Impact für neue Klone.
+4. **Phase-12-Reconciliation-Timing-Fix** (~2-3h, Phase-12-Code): die anhaltenden
+   `reward.recorder: no usable history row`-CRITICALs angehen. Eigener
+   Mini-Session-Track, nicht Phase-14-Scope.
+5. **Phase-15-Plan-Session** (großer Block, V4): wenn die Beweiswoche genug Outcomes
+   für die V4-Gegenargumente liefert, **jetzt** starten — Council / Handover /
+   Reward-Reform / Force-Trigger / Instinct-ECC. Sonst weiter deferred.
+
+**Bot-Stand für die nächste Session:**
+- 3 Live-Prozesse (Scheduler 47166, Discovery 47174, Recorder 90518).
+- **Wichtig:** der Bot wurde in dieser Session **nicht** gestoppt — Scheduler läuft seit
+  1d 3h **ohne** Unterbrechung. Wenn morgen Code-Edits am Scheduler nötig sind: vorher
+  Nikinger-Entscheidung, dann `ps aux | grep scheduler.run` als Gegenprobe.
+- **Nicht angerührt:** Migration 007 ist **noch nicht** angewendet (`instrument_source_availability`
+  existiert nicht in `data/trading_bot.sqlite`). Phase-14 D2-Akzeptanz (z. B. Test 11
+  des Plans) ist **nicht** grün — sie wird im Phase-15-H-Setup vermut relevant, sobald
+  die Beweiswoche-Entscheidung steht.
+
+**Hinweise für die morgige Session:**
+
+- **Cold-Reader-Hinweis:** Phase 14 ist **closed-in-all-but-D5**. Phase-13-Beweiswoche
+  läuft seit Mo 2026-08-25. Hook-Hygiene ist dreifach geschützt (Konvention + Skript +
+  Pre-Commit-Hook).
+- **Erste Aktion morgens:** `ps -o pid,etime,cmd -p 47166,47174,90518` — sind die drei
+  Daemons noch alive? `cat data/state/{recorder,discovery,scheduler}_state.json` —
+  schreiben sie noch? Wenn ja: normal starten mit Item 1. Wenn nein: kurze
+  Re-Investigation (PIDs reuse, Zombie, etc.) wie in dieser Session.
+- **Arbeitsmodell:** Ausführungs-Sessions laufen weiter über `claude-minimax` (Kostengrund,
+  Nikinger 2026-08-18). Debugging über `claude`. Kein Live-/Netz-/kostenpflichtiger Lauf
+  ohne Nikinger-Freigabe.
+
+- **Σ-Sweep** Stand 2026-08-27 ~21:05 CEST:
+  - P14 61, P13 74, P12 143, P9 87, P8 248 — Σ 613 für diese 5 Phasen
+    (Σ 1698 wie in den Closeout-Handovern = alle 13 Phasen + meta)
+  - Σ Root-Tests **94** (unverändert zu Session 17)
+  - Allowance: **9245/10000** (7,55 % verbraucht, Roll-End Mo **31.08.**)
+  - Verbleibende CRITICAL-Logs seit P14-Wiring-Fix: **0**
+  - Scheduler **PID 47166** (Sl, 1d 3h, `--enable-divergence-sampler)
+  - Discovery **PID 47174** (S, 1d 3h, ARMED, schreibt State)
+  - Recorder **PID 90518** (Sl, 5 Min, neu gestartet, schreibt State —
+    `bars_written:0, skipped_off_hours:true`, normaler Off-Hours-Stand)
+  - **`.git/hooks/pre-commit`:** installiert, grün gegen Live-Repo.
+
+
 ## Session stopped — 2026-08-27 (Session 17: Mini-Session — Push-Status-Check + Pre-Commit-Hook-Install, 0 Code-Edits, 1 Hook + 2 Doc-Edits)
 
 > **Auftrag:** Nikinger-Chat (2026-08-27, ~17:35 CEST) auf den Kurz-Stand-Bericht:
