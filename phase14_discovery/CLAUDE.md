@@ -10,7 +10,12 @@
 > [`./PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`](./PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md) (P14-D, 2026-08-26, Mini-Plan zum
 > Discovery-Daemon-Signal-Response-Bug: `interval_s=3600`-Sleep verschluckt SIGTERM, analog Phase-8-POST_WINDOW);
 > [`./PHASE14_E_RECORDER_LOOP_PLAN.md`](./PHASE14_E_RECORDER_LOOP_PLAN.md) (P14-E, 2026-08-28, Mini-Plan zum
-> Recorder-Sleep-Cap-Bug + Restart-Loop-Hunt: derselbe Bug wie P14-D, aber in Phase-12-Code; Cross-Phase-Freigabe Phase 12).
+> Recorder-Sleep-Cap-Bug + Restart-Loop-Hunt: derselbe Bug wie P14-D, aber in Phase-12-Code; Cross-Phase-Freigabe Phase 12);
+> [`./PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md`](./PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md) (P14-F, 2026-08-31, Mini-Plan zum
+> Doc-Rotation-Hook-Schritt-2: bestehender `scripts/check_doc_rotation.py` fängt Inline-Duplicates, aber **nicht** die Klasse von
+> Drift, die Mini-Session 21 operativ aufgedeckt hat — neue Session in Phasenkopf geschrieben **bevor** die alte ins Archiv rotiert wurde.
+> Step-2-Logik (`head-N == archive-max-(N-1)`) + Tracked-Installer `scripts/install_hooks.sh` + `dev_install.sh`-Anbindung;
+> Cross-Phase-Freigabe `scripts/dev_install.sh` (eine Zeile), D1–D5 gelockt, A1–A6 Akzeptanz; vom Folgesession-Subplan übernommen).
 
 ## Mission (zuerst lesen)
 
