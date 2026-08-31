@@ -10,7 +10,7 @@ down:
   - ../phase10_v3/PHASE11_DEFERRAL_HANDOVER.md # 📕 H3 ist offen; Block B *ist* H3
   - ../phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md # 📕 §7 D5-H.-B, §9 Konsistenz-Regeln
   - ./SESSIONS_ARCHIVE.md                     # 📦 verbatim Session-Historie, newest-first
-updated: 2026-08-31
+updated: 2026-08-31 (A-1 + A-2 + A-3 protokolliert, MiniMax-M3)
 ---
 
 # Phase 15 — V4: Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock
@@ -53,6 +53,150 @@ Auto-Gap-Fill-Scheduler (D16) · Dukascopy echt (D15). Begründungen: Plan §10.
 | Modul | Zweck | Tests |
 |---|---|---|
 | — | *noch nichts gebaut; die Exec-Session füllt diese Tabelle (Plan Step A-0)* | — |
+
+---
+
+## Step A-1 — Step-0-Ritual (2026-08-31, MiniMax-M3 Exec-Session)
+
+> **Plan-Anker:** [`docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md) §6 A-1 (S. 344-353).
+> **Konvention:** Ritual wird **auch als No-Op** protokolliert (Plan §2.6).
+
+### Turbo-Grep — `grep -rni "turbo" --include="*.py" --include="*.sql" --include="*.sh" .`
+
+**Repo-Treffer (eigener Code): 14 Zeilen** — ausnahmslos Verweise auf den
+**bewusst behaltenen** Legacy-Dateinamen `turbo_candidates.json`. Beleg-Satzerklärung:
+`phase2_persistence/persistence/state.py:27-30` sagt wörtlich *"Legacy name; content =
+DAX-CFD candidates, not turbos/options. Do NOT rename"*. Betroffene Dateien:
+
+| Datei | Zeilen | Inhalt |
+|---|---|---|
+| `phase2_persistence/persistence/state.py` | 8, 27, 30, 114 | Konstante `CANDIDATES_FILE = "turbo_candidates.json"`, TTL-Logik |
+| `phase2_persistence/tests/test_state.py` | 77 | Test-Beschreibung der Legacy-Datei |
+| `phase4_research/research/models.py` | 6 | Persistenz-Hinweis |
+| `phase4_research/scripts/live_test.py` | 7, 12 | Live-Test-Beschreibung |
+| `phase4_research/scripts/smoke_test.py` | 8 | Smoke-Test-Beschreibung |
+| `phase5_execution/execution/config.py` | 128 | Vertrag-Hinweis im Doc-Kommentar |
+| `phase5_execution/scripts/wiring.py` | 18 | Wiring-Doku |
+| `phase5_execution/scripts/seed_candidate.py` | 7, 101 | Seed-Script-Doku + Echo |
+| `phase6_debate/scripts/smoke_test.py` | 68 | Smoke-Test-Fehlermeldung |
+| `phase8_scheduler/webui/api.py` | 311, 319 | WebUI-Read des Legacy-Files |
+| `phase8_scheduler/scheduler/research_tick.py` | 6, 234 | Research-Tick-Doku |
+| `phase8_scheduler/tests/test_webui.py` | 370 | Test-Fixture |
+| `phase8_scheduler/scripts/wiring.py` | 105 | Wiring-Doku |
+
+**VENV-Treffer (Site-Packages, NICHT Repo-Code):** ~12 Zeilen aus
+`phase1_broker_wrapper/.venv/lib/python3.12/site-packages/PIL/features.py`
+(`libjpeg_turbo`) und `pygments/lexers/{asm,pascal,matlab}.py`
+(`Turbo Assembler`, `Turbo Pascal`). Werden vom `--include="*.py"` mitgenommen,
+sind aber nicht aus unserem Code. **Korrekturhinweis für Plan §2.6:**
+die Aussage *"ausnahmslos"* gilt nur für die Repo-Treffer; die `.venv`-Treffer
+sind zu ignorieren.
+
+**Verdienst: No-Op, 5. Mal bestätigt** (vorherige Ausführungen laut §2.6:
+2026-06-27, 2026-07-10, 2026-08-18, 2026-08-22). **Phase 15 führt keine neue
+Turbo-Referenz ein** — Plan-Garantie eingehalten.
+
+### EPIC_MAP-Grep — `grep -rn "EPIC_MAP" --include="*.py" .`
+
+**3 Treffer, alle in `phase14_discovery/`** (Doc-Kommentare + Test-Beschreibung):
+
+| Datei | Zeile | Inhalt |
+|---|---|---|
+| `phase14_discovery/source_registry/models.py` | 121 | Doku: *"the column whose absence in the Concept schema made `EPIC_MAP` structurally…"* |
+| `phase14_discovery/source_registry/store.py` | 194 | Doku: *"Replaces `EPIC_MAP.get(epic)` in `live_data/backfill.py:180` (Phase-14…"* |
+| `phase14_discovery/tests/test_store.py` | 239 | Test-Doku: *"value that replaces `EPIC_MAP.get(epic)` in `live_data/backfill.py:180`"* |
+
+**Lesart:** aktiver `EPIC_MAP`-Code existiert **nicht** mehr im Repo (Phase-14 A2-Akzeptanz
+seit Session 9 grün, `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` ist leer —
+durch Phase-14 ersetzt via `instrument_source_availability.source_symbol`). Die 3 Treffer
+dokumentieren die Ablösung und sind **kein** Stop-und-Melde-Befund für Phase 15.
+
+**Verdienst: bestätigt** — `EPIC_MAP` ist Geschichte, Dokumentation in Phase-14-Tests
+bleibt stehen. Plan §8 (Phase 14 §9.12) sieht `EPIC_MAP` als durchgestrichenen Kasten
+im `phase13_14_15.svg` vor.
+
+---
+
+## Step A-2 — Σ-Baseline (2026-08-31, MiniMax-M3 Exec-Session)
+
+> **Plan-Anker:** [`docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md) §6 A-2 (S. 356-359).
+> **Erwartung:** Σ = **1703** (Plan §2.1, selbst gemessen 2026-08-31 in der Plan-Session).
+> **Kommandoform (verifiziert):** `cd <phaseN> && ../phase1_broker_wrapper/.venv/bin/python -m pytest tests/ -q`
+
+### Sweep-Ergebnis — Σ = 1703 grün, exakt Erwartung
+
+| Phase | Tests grün | Σ-Sweep-Laufzeit | Anmerkung |
+|---|---:|---|---|
+| phase1_broker_wrapper | **95** | 0,36 s | — |
+| phase2_persistence | **77** | 11,34 s | langsamster (DB-Fixture-Setup) |
+| phase3_external_data | **104** | 0,21 s | — |
+| phase4_research | **155** | 0,19 s | — |
+| phase5_execution | **173** | 0,19 s | — |
+| phase6_debate | **76** | 0,08 s | — |
+| phase7_reward | **142** | 0,10 s | — |
+| phase8_scheduler | **248** | 1,51 s | 1 Warning (`httpx`-Deprecation in starlette testclient) — pre-existing, nicht Phase-15-relevant |
+| phase9_universe | **87** | 4,36 s | — |
+| phase10_v3 | **165** | 0,98 s | — |
+| phase12_data_foundation | **145** | 2,85 s | — |
+| phase13_live_data | **74** | 2,64 s | — |
+| phase14_discovery | **61** | 1,13 s | — |
+| root `tests/` | **101** | 2,91 s | — |
+| **Σ repo-weit** | **1703** | ~29 s | = Plan-Erwartung exakt ✅ |
+
+> **Phase 11 hat kein eigenes `tests/`-Verzeichnis** (lebt in `phase10_v3/`),
+> Phase 15 bekommt in Step C1 eins. Beide Zeilen fehlen deshalb in der Σ-Tabelle
+> — konsistent mit Plan §2.1.
+
+**Drift-Finding (gemessen 2026-08-31 14:44 UTC):** HEAD = `aad1d00`, 1 Commit
+**ahead** of `origin/main = d1dd26b`. Commit-Message `aad1d00` (16:21 CEST)
+behauptet *"Push erledigt: origin/main = d1dd26b, 0 ahead / 0 behind"* —
+**inkonsistent** mit `git status` (1 ahead). Mögliche Lesarten: Push nach
+Commit fehlgeschlagen, oder Commit/Push-Reihenfolge vertauscht. **Kein Phase-15-Edit
+hier**, kein Push-Versuch meinerseits (kein expliziter Auftrag). Sichtung an Nikinger
+zur Klärung, ob `git push origin main` gewünscht ist — siehe Findings-Block am
+Session-Ende.
+
+**Phase-15-Bereitschaft:** Σ-Baseline steht **vor** dem ersten Fix (Plan §6 A-2: *"vor
+dem ersten Fix"*). Jede Abweichung vom Σ ≥ 1703 nach einem Phase-15-Schritt ist ein
+**Befund von Phase 15**, nicht von vorher.
+
+---
+
+## Step A-3 — ROADMAP-Wahrheit hergestellt (2026-08-31, MiniMax-M3 Exec-Session)
+
+> **Plan-Anker:** [`docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md) §6 A-3 (S. 361-394).
+> **Scope:** drei Edits in `ROADMAP.md`, jeder mit datiertem Vermerk
+> „*korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3)*".
+
+### 15b — Handover-Logik (Bull/Bear/Judge) — `ROADMAP.md:691-694`
+
+| Item | Vorher | Nachher | Beleg |
+|---|---|---|---|
+| Context-window monitoring (~60–70 %) | `[ ]` | `[x]` | `phase6_debate/debate/debate.py:172` (`cfg.compression_trigger_pct * cfg.max_cumulative_input_tokens`). **„gebaut"**, nicht „live-verifiziert" (Plan §9 #4). |
+| Compression of B/B/J state into summary | `[ ]` | `[x]` | `phase6_debate/debate/debate.py:187-195` (deterministischer Latch). **„gebaut"**, nicht „live-verifiziert". |
+| New session continuation | `[ ]` | `[ ]` *gegenstandslos* | — durch laufende Compression ersetzt; keine neue Session nötig |
+
+### 15c — Reward/Punishment Reform — `ROADMAP.md:696-698`
+
+| Item | Vorher | Nachher | Beleg |
+|---|---|---|---|
+| `+ process_quality_score` (VETOs, confidence, debate quality, gate path) | `[ ]` | `[ ]` *partial* | „VETOs"/„gate path" = **gegenstandslos** (P4, 0/1902 `abstain_records` mit `stage='veto'/'gate'`); „confidence"/„debate quality" = **gebaut** (`phase7_reward/reward/scorer.py:122-131` — `entry_signal` aus `spread_at_entry_pct`, `debate_signal` aus `debate_confidence`) |
+| Anti-emotionality: separate process score from outcome score | `[ ]` | `[x]` | `phase7_reward/reward/scorer.py:114-133` (`outcome_delta` Z. 112 + `process_delta` Z. 133 unabhängig). **Kalibrierung** in Block B (P1/P2) — die strukturelle Trennung steht, der Score stimmt noch nicht. |
+
+### 15d — Force Trigger Safeguard — `ROADMAP.md:700-701`
+
+| Item | Vorher | Nachher | Beleg |
+|---|---|---|---|
+| Lock force trigger when daily PNL < 0 | `[ ]` | `[ ]` *gegenstandslos* | `grep -rn "force_trigger" --include="*.py" --exclude-dir=.venv --exclude-dir=.git .` → **3 Treffer, alle in `phase2_persistence/`**: Schema-Default (`defaults.py:27`) + 2 Test-Beweise (`test_migrations.py:103`, `test_db.py:204`). Kein Code-Aufrufer, kein Wiring. CLAUDE.md Hard Rule 5 bleibt wörtlich stehen — Vorschrift für den Tag, an dem jemand einen Force-Trigger baut. |
+
+**Verdienst:** ROADMAP 15b/15c/15d stimmen jetzt **mit dem Code überein** (Plan-Akzeptanzkriterium
+AK3 erfüllt). Drei „gebaut"-Vermerke ehrlich — keine live-verify-Behauptungen, die Plan §9 #4 nicht
+trägt (Compression-Latch). Eine „gegenstandslos"-Erklärung für 15b Zeile 3 + 15d vollständig —
+15c Zeile 1 als „partial" markiert, weil 2/4 Sub-Signale gebaut und 2/4 gegenstandslos sind.
+
+**Nicht angefasst (Phase-15-Scope-Grenze):**
+- 15a (Council-Integration) — Nikinger-Entscheidung 2026-08-31, Runde 1 (Plan §10)
+- 15e (Instinct-Promotion + Longterm VETO) — bleibt Block C (Plan §6)
 
 ---
 
