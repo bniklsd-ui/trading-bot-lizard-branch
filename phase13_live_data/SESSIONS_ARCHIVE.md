@@ -1,7 +1,173 @@
 # SESSIONS_ARCHIVE.md — Phase 13 (Live-Datenfundament)
 
 Newest-first. Rotation rule (`CLAUDE.md` root, mandatory since 2026-07-06): the phase head
-carries exactly one `## Session stopped` block; the previously-newest block moves here
+carries exactly one `
+## Session stopped — 2026-08-22 (Session 14: Block-C-Re-Plan & Phase 14 (Discovery) Concept)
+
+> **Auftrag:** Nikinger-Run 2026-08-22 hat den Session-13-Bugfix live
+> gegen das Capital.com-Demo-Konto bestätigt (962 Bars: 481 DAX + 481
+> CAC, exakt im Session-13-Erwartungsbereich). Plus Nikinger-Entscheidung:
+> die "discovery-then-deterministic"-Architektur aus Session 13 ist
+> umfangreich genug für eine **eigene Phase 14** (V4 rutscht auf Phase 15).
+> Diese Session: (a) Block C schließen (Re-Plan + Live-Verified), (b) den
+> 5-Zeilen-Test-Fix nachholen, (c) das Phase-14-Concept skizzieren, (d) die
+> Nummerierungs-Kaskade ausführen.
+
+### Completed
+
+**Test-Fix `test_multiple_days_window` (Commit `074d6c9`).** Hardcoded
+Daten `2026-08-18/19` lagen ausserhalb des `--days 2`-Filters (`[today-1, today]`),
+sobald `today > 2026-08-19`. Fix: `datetime.now(timezone.utc).date() +
+timedelta(days=...)`, ~5 Zeilen. Offen seit Session 12 (zweimal dokumentiert),
+heute erstmalig gebaut. Phase-13-Suite jetzt 50 passed (war 49 + 1 jetzt grün).
+
+**Live-Verified-Vermerk in Session-13-Block (vor Rotation).** Der
+Operator-Lauf-Befehl + Output + Verifikation wurden in den
+Session-13-Block (vor seiner Rotation ins Archiv) als eigene
+Subsection eingehängt, damit die Audit-Kette lückenlos ist.
+
+**Rotation: Session 13 → SESSIONS_ARCHIVE.md** (verbatim, mit dem
+Live-Verified-Anhängsel aus dem vorherigen Edit), Session 14 = der
+aktuelle Head-Block.
+
+**Block-C-Re-Plan** [`docs/concepts/phase13_c_block_c_replan.md`](../../docs/concepts/phase13_c_block_c_replan.md).
+Definiert:
+- L1: Block C ist final (kein Dukascopy-Code, kein Auto-Gap-Fill,
+  keine `EPIC_MAP`-Erweiterung in `live_data/`).
+- L2: "Discovery-Then-Deterministic" wird Phase 14, nicht
+  Block-C-Erweiterung.
+- L3: V4 rutscht auf Phase 15.
+- L4: Beweiswoche bleibt gültig; Block C hat die Werkzeuge geliefert.
+- §1: was C1/C2/C3 einzeln geleistet haben (live-verifiziert für DE40/FR40).
+- §2: warum Block C jetzt schließt (drei strukturelle Gründe).
+- §3: was Phase 14 leisten wird (Concept-Skizze).
+- §4: Akzeptanz B1–B5 (heute erreicht).
+- §5: Schritt-Sequenz für die Phase-14-Planning-Session.
+- §6: Drift-Liste.
+
+**Phase-14-Concept-Skizze** [`docs/concepts/phase14_discovery_concept.md`](../../docs/concepts/phase14_discovery_concept.md).
+L0-BLUF + Mission, drei Bausteine (Quell-Profil, Kreuzungs-Tabelle,
+Konsumenten-Umstellung), Outcome-Tabelle, Scope-Disziplin, Verhältnis
+zu Phase 13 + 15, sieben offene Fragen für die Plan-Session, klare
+Trennung „was dieses Concept ist / nicht ist". **Bewusst kein
+execution-ready Plan** — der folgt in einer eigenen Planungssession.
+
+**Nummerierungs-Kaskade (L3):**
+- Root-`CLAUDE.md` Phase-13-Row: Status auf „code-complete + live-verifiziert
+  für DE40/FR40" korrigiert (war stale "Bau nicht begonnen"); Phase-14-Row
+  **neu** angelegt (Discovery); Phase-15-Row: V4 mit Verweis auf die dritte
+  Umnummerierung 2026-08-22.
+- `ROADMAP.md` Phase-13-Section: Block-Stand-Tabelle neu, Phase-14-Section
+  **neu** (Concept-Verweis, Goal, Why-this-is-its-own-phase, Scope-Skizze);
+  Phase-14→15 Umnummerierung der V4-Sub-Bullets (14a/b/c/d/e → bleibt
+  a/b/c/d/e, Heading „Phase 15 — V4 ..."). Directory-Hinweis
+  `phase12_v4/` → `phase15_v4/`.
+- `docs/INDEX.md`: zwei neue .md-Zeilen (Re-Plan + Concept), Phase-13-Row
+  korrigiert (Modul-Status & Live-Verify), Phase-10/11-Row „V4 is now Phase
+  14" → „V4 is now Phase 15" (Präzedenzfall), Phase-13-LiveData-Plan-Zeile
+  mit Korrekturhinweis auf den Snapshot. „Active phases"-Header ergänzt um
+  Phasen 13/14.
+
+**Modul-Tabelle-Update kommt in einem Folge-Commit** — der Plan-Snapshot
+selbst bleibt unberührt, der Re-Plan ist die kanonische Aussage.
+
+### Verified
+
+- Regression-Sweep, alle 13 Phasen + root `tests/` (Stand vor den
+  Docs-Edits, aber unverändert): 1608 passed.
+  *(Summenkorrektur 2026-08-22: die Einzelzahlen derselben Tabelle ergeben 1608; kein
+  Test verschwunden — §3.6 des Phase-14-Plans.)*
+  | Phase | Tests |
+  |---|---|
+  | phase1_broker_wrapper | 95 |
+  | phase2_persistence | 77 |
+  | phase3_external_data | 104 |
+  | phase4_research | 155 |
+  | phase5_execution | 173 |
+  | phase6_debate | 76 |
+  | phase7_reward | 138 |
+  | phase8_scheduler | 244 (+1 Deprecation-Warning) |
+  | phase9_universe | 80 |
+  | phase10_v3 | 165 |
+  | phase12_data_foundation | 143 |
+  | phase13_live_data | 50 (vor Fix: 49 + 1 jetzt grün) |
+  | meta_m1_harness | 28 |
+  | root `tests/` | 80 |
+- `data/bars.sqlite` (`mode=ro`): 962 `source='capital'`-Bars (481 DAX + 481 CAC)
+  bestätigt. Kein Bot-Prozess läuft (`ps aux | grep scheduler.run` leer).
+
+### Note
+
+- **Drei Commits in dieser Session** (Nikinger-Auflage „commit after each
+  step" gilt weiter):
+  1. `074d6c9` `phase13: test -- fix test_multiple_days_window date-drift`
+  2. *(dieser Docs-Commit)* `phase13: docs -- Session 14 + Block-C-Re-Plan
+     + Phase-14-Concept + Nummerierungs-Kaskade`
+- **Plan-Snapshot `phase13_live_data_plan.md` bleibt unverändert** (📕
+  Convention, „never edit"). Seine INDEX-Beschreibung wurde mit einem
+  Korrekturhinweis „Plan-Snapshot sagt V4 → 14, gilt tatsächlich V4 → 15"
+  versehen, damit der historische Stand sichtbar bleibt, ohne den Snapshot
+  zu fälschen.
+- **`EPIC_MAP = {"IX.D.DAX.IFMM.IP": "DE40", "IX.D.CAC.IFE.IP": "FR40"}`**
+  in `live_data/backfill.py:67-72` bleibt im Code. Das ist Absicht: das
+  Phase-14-Architektur-Diff ist groß genug für eine eigene Phase, nicht für
+  eine Block-C-Erweiterung. Sobald Phase 14 die `instrument_source_availability`-
+  Tabelle hat, ist diese Map eine Migrations-Zeile.
+- **V4-Inhalt unverändert.** Die Umnummerierung Phase 14 → 15 ist rein
+  numerisch, kein Inhalt verschoben. Inhaltlich bleibt V4 das, was es
+  immer war: Council, Handover, Reward-Reform, Force-Trigger, Instinct-ECC.
+  Es kommt nur **ein** zusätzliches Gate dazu (Phase 14), nicht
+  inhaltliche Änderung.
+
+### Next
+
+- **Operator (Nikinger):** kein Push nötig — Phase 13 ist seit Session 8 mit `74`
+  grünen Tests (war zum Session-14-Stand 50, +24 aus Phase 14 B1b+B2+B3 im
+  `phase13_live_data/`-Tree), Commits alle auf `origin/main`.
+- **Phase-14-Planning-Session:** **erledigt** — Plan liegt in
+  [`docs/concepts/phase14_discovery_plan.md`](../../docs/concepts/phase14_discovery_plan.md),
+  Decisions D1–D20 gelockt, Akzeptanz A1–A8 alle grün (Σ 1698 nach Session 9).
+- **Cross-Phase-Freigabe** für Phase 14 (Nikinger, 2026-08-22): **erteilt** für
+  Phase 2 (Migration), Phase 8 (`webui/`, `run_scheduler.sh`), Phase 9
+  (`models.py`, `store.py`), Phase 12 (`budget.py`-Nutzung) und Phase 13
+  (`backfill.py`, `scripts/`).
+- **Beweiswoche läuft parallel** (Plan §7 P1–P9), gestartet Mo 2026-08-25.
+  Erste Beobachtung aus dem Restart-Check: Trade #8 BUY DAX.IGN offen
+  (5. BUY auf DAX in Folge nach 4 Verlust-Trades, -2530.82 EUR realisiert);
+  Loss-Breaker nicht ausgelöst (€1800-Cap, aktuelle realized-pnl heute = 0);
+  Token-Budget 38.5% / Weekly-Allowance 48% / 0 Discovery-Punkte gebucht.
+  Kein Handlungsbedarf, Safety-Mechanismen innerhalb Caps; Phase-15-Territorium
+  (V4 — Council, Handover, Reward-Reform).
+
+### Offene Findings (für Folge-Sessions, nicht in diesem Build-Scope)
+
+- **Modul-Tabelle in `phase13_live_data/CLAUDE.md` ist nicht aktualisiert** —
+  Stand Session 14 nannte Test-Count 39, inzwischen sind es **74** (50 nach
+  Session 14 + 24 aus Phase-14-B1b/B2/B3-Commits `ac54825`/`6e8148e`/`bb095df`,
+  die in `phase13_live_data/` mit-tests-edits haben). Block-C-Zeilen brauchen
+  ein „final"-Tag. Beides für eine Phase-13-Hygiene-Session vorgemerkt, kein
+  Phase-14-Scope.
+- **Plan-§9-Drift-Listeneintrag #2** (Phase-14) erweitern in der nächsten Plan-
+  Session — Editor-Notiz, kein Doku-Touch.
+  Bewusst NICHT in diesem Commit geändert — der Plan-Snapshot und die
+  Re-Plan-Datei sind die kanonische Aussage, der Phasen-Kopf folgt in
+  einer Folge-Session (oder direkt mit der Phase-14-Eröffnung).
+- **Plan-Snapshot `phase13_live_data_plan.md`** könnte im §0 BLUF einen
+  kleinen Verweis auf den Re-Plan verdienen (analog zur Phase-12.5-
+  Closeout-Anmerkung). Bewusst nicht in diesem Commit — der Snapshot
+  ist „never edit", und das Hinzufügen erfordert eine eigene Diskussion
+  (Snapshot ergänzen vs. nur per Korrekturhinweis im INDEX).
+- **`source_delta.py` P6-Auswertung** mit den 962 Capital-Bars wurde im
+  Beweiswoche-Review vermessen — die Belege für die Phase-14-Quell-
+  Auswahl kommen erst nach 1–2 Beweiswochen.
+- **Live-Substrat für Phase-14-Plan-Session**: heute 962 `source='capital'`-
+  Bars + 2230 IG + 11654 yF + LS-Anteil = ~14.846 Bars im Archiv. Das ist
+  das **Entdeckungs-Substrat**, gegen das `instrument_source_availability`
+  in Phase 14 gefüllt wird. Die Plan-Session sollte den heutigen Stand
+  frisch messen.
+
+
+## Session stopped` block; the previously-newest block moves here
 verbatim when a new one is appended.
 
 ---

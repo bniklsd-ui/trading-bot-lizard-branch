@@ -95,166 +95,103 @@ P6-Debatte und die Lessons rufen unverändert Anthropic mit dem Key aus dem
 
 ---
 
-## Session stopped — 2026-08-22 (Session 14: Block-C-Re-Plan & Phase 14 (Discovery) Concept)
+## Session stopped — 2026-08-31 (Session 15: Phase-13-Beweiswoche-Auswertung, 2 Commits, 0 Operator-Aktionen)
 
-> **Auftrag:** Nikinger-Run 2026-08-22 hat den Session-13-Bugfix live
-> gegen das Capital.com-Demo-Konto bestätigt (962 Bars: 481 DAX + 481
-> CAC, exakt im Session-13-Erwartungsbereich). Plus Nikinger-Entscheidung:
-> die "discovery-then-deterministic"-Architektur aus Session 13 ist
-> umfangreich genug für eine **eigene Phase 14** (V4 rutscht auf Phase 15).
-> Diese Session: (a) Block C schließen (Re-Plan + Live-Verified), (b) den
-> 5-Zeilen-Test-Fix nachholen, (c) das Phase-14-Concept skizzieren, (d) die
-> Nummerierungs-Kaskade ausführen.
+> **Auftrag:** Nikinger-Chat 2026-08-31 nach P14-F-Push (~09:30 UTC): „Arbeite an item #5
+> weiter" (= Phase-13-Beweiswoche-Auswertung, NEXT-Item aus Mini-Session 22). Mini-Plan-Modus:
+> bestehendes source_delta.py-Skript (Block C3, 7 Tests grün) reicht — keine Plan-Session,
+> direkte Diagnose. Ausführungs-Scope: **1 Findings-Doc + 2 JSON-Outputs + 3 Phasenkopf-Updates**,
+> exakt der Plan, keine Scope-Erweiterung.
 
 ### Completed
 
-**Test-Fix `test_multiple_days_window` (Commit `074d6c9`).** Hardcoded
-Daten `2026-08-18/19` lagen ausserhalb des `--days 2`-Filters (`[today-1, today]`),
-sobald `today > 2026-08-19`. Fix: `datetime.now(timezone.utc).date() +
-timedelta(days=...)`, ~5 Zeilen. Offen seit Session 12 (zweimal dokumentiert),
-heute erstmalig gebaut. Phase-13-Suite jetzt 50 passed (war 49 + 1 jetzt grün).
+**1. Diagnose-Lauf (Schritt 0, read-only):**
+- `python3 phase13_live_data/scripts/source_delta.py --days 7` → 244 RESOLVED trades, alle `available_but_empty`.
+- `python3 phase13_live_data/scripts/source_delta.py --days 14` → 332 RESOLVED trades (70 + 262), 56 `compared` (alle am 2026-08-18) + 276 `available_but_empty`, divergence_rate=53.57%.
+- Beide Läufe gegen `data/trading_bot.sqlite?mode=ro` + `data/bars.sqlite?mode=ro` (Phase-13-CLAUDE.md Working-Style).
 
-**Live-Verified-Vermerk in Session-13-Block (vor Rotation).** Der
-Operator-Lauf-Befehl + Output + Verifikation wurden in den
-Session-13-Block (vor seiner Rotation ins Archiv) als eigene
-Subsection eingehängt, damit die Audit-Kette lückenlos ist.
+**2. Substrat-Cross-Check (Schritt 1):**
+- IG-Bars im Archiv: 2083 bars, **nur an 2 von 13 Handelstagen** (2026-07-17: 306 bars IBEX.FWM2 + 2026-08-18: 1782 bars 5 Epics). **13-Tage-Lücke seit 2026-08-18 15:41 UTC bis heute (31.08.).**
+- yF-Bars: 24284 bars, 11 Tage kontinuierlich (2026-08-17 → 2026-08-28).
+- Capital-Bars: 962 bars, 1 Tag (2026-08-21, Operator-Live-Verify-Run).
+- `instrument_source_availability` IG-Rows: 8 (status='ok', origin='derived', history_min_days=30, last_verified_utc=2026-08-31T06:47Z). Realität: 0 Epics haben 30 Tage Bars.
 
-**Rotation: Session 13 → SESSIONS_ARCHIVE.md** (verbatim, mit dem
-Live-Verified-Anhängsel aus dem vorherigen Edit), Session 14 = der
-aktuelle Head-Block.
+**3. Findings-Doc** [`./PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](./PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md) (NEU, ~316 Zeilen):
+- §0 BLUF: drei Befunde B1/B2/B3 als Tabelle + D5-Handover-Konsequenz.
+- §1 Methodik (was, wie, womit).
+- §2 Empirische Befunde im Detail: §2.1 Bars-Substrat-Tabelle (3 Quellen, IG-Lücke explizit), §2.2 `instrument_source_availability` vs. Realität (8 IG-Rows, alle behaupten 30 Tage), §2.3 Source-Delta-Ergebnis 14-Tage-Fenster (332 trades, 56 compared, 30 davon divergent, 18/30 TP↔SL-Gegensatz).
+- §3 Was funktioniert (Block C3 Source-Delta-Mechanik, 7 Tests grün, live-verify-bestätigt).
+- §4 Was nicht funktioniert (Phase-14-Drift B3: `last_verified_utc` reflektiert instrument_universe-Ableitung, NICHT Bars-Substrat).
+- §5 Empfohlene Entscheidungen: D5-Handover **TEILWEISE** (architektonisch ja, operativ nein), Phase-13-Folge-Initiative (Recorder-Mapping-Bug-Hypothesen-Test), Phase-15-Plan-Vorbereitung.
+- §6 Empfehlung an den Nikinger (4-Punkte-Liste).
+- §7 Cross-Refs (Block-C-Re-Plan, P14-CLAUDE.md, Mini-Session-21-Findings).
+- **Commit:** `8aa569f phase13: docs -- Beweiswoche-Findings 2026-08-31 (source_delta-Diagnose, B1/B2/B3)`.
 
-**Block-C-Re-Plan** [`docs/concepts/phase13_c_block_c_replan.md`](../../docs/concepts/phase13_c_block_c_replan.md).
-Definiert:
-- L1: Block C ist final (kein Dukascopy-Code, kein Auto-Gap-Fill,
-  keine `EPIC_MAP`-Erweiterung in `live_data/`).
-- L2: "Discovery-Then-Deterministic" wird Phase 14, nicht
-  Block-C-Erweiterung.
-- L3: V4 rutscht auf Phase 15.
-- L4: Beweiswoche bleibt gültig; Block C hat die Werkzeuge geliefert.
-- §1: was C1/C2/C3 einzeln geleistet haben (live-verifiziert für DE40/FR40).
-- §2: warum Block C jetzt schließt (drei strukturelle Gründe).
-- §3: was Phase 14 leisten wird (Concept-Skizze).
-- §4: Akzeptanz B1–B5 (heute erreicht).
-- §5: Schritt-Sequenz für die Phase-14-Planning-Session.
-- §6: Drift-Liste.
+**4. JSON-Outputs (machine-readable, Audit-Trail):**
+- `docs/diagnostics/2026-08-31-beweiswoche/source_delta_7d.json` (78KB, 244 trades)
+- `docs/diagnostics/2026-08-31-beweiswoche/source_delta_14d.json` (106KB, 332 trades)
+- Beide reproduzierbar via `python3 phase13_live_data/scripts/source_delta.py --days N`.
 
-**Phase-14-Concept-Skizze** [`docs/concepts/phase14_discovery_concept.md`](../../docs/concepts/phase14_discovery_concept.md).
-L0-BLUF + Mission, drei Bausteine (Quell-Profil, Kreuzungs-Tabelle,
-Konsumenten-Umstellung), Outcome-Tabelle, Scope-Disziplin, Verhältnis
-zu Phase 13 + 15, sieben offene Fragen für die Plan-Session, klare
-Trennung „was dieses Concept ist / nicht ist". **Bewusst kein
-execution-ready Plan** — der folgt in einer eigenen Planungssession.
+**5. Phasenkopf-Indizierung (3 Docs-Updates):**
+- `phase13_live_data/CLAUDE.md` Header-Card: Spezial-Pläne-Zeile erweitert um „Beweiswoche-Auswertung" mit Verweis-Zeile + 3-Befund-Summary + D5-Handover-Status.
+- `phase14_discovery/CLAUDE.md` Header-Card: Spezial-Pläne-Zeile erweitert um Phase-13-Beweiswoche-Befund-Verweis + D5-Status-Vermerk.
+- `docs/INDEX.md`: 2 neue Einträge — Findings-Doc + Diagnostic-Outputs-Verzeichnis.
+- **Commit:** `5af060d docs: index + phasenköpfe -- Phase-13-Findings-Indizierung (Mini-Session 23)`.
 
-**Nummerierungs-Kaskade (L3):**
-- Root-`CLAUDE.md` Phase-13-Row: Status auf „code-complete + live-verifiziert
-  für DE40/FR40" korrigiert (war stale "Bau nicht begonnen"); Phase-14-Row
-  **neu** angelegt (Discovery); Phase-15-Row: V4 mit Verweis auf die dritte
-  Umnummerierung 2026-08-22.
-- `ROADMAP.md` Phase-13-Section: Block-Stand-Tabelle neu, Phase-14-Section
-  **neu** (Concept-Verweis, Goal, Why-this-is-its-own-phase, Scope-Skizze);
-  Phase-14→15 Umnummerierung der V4-Sub-Bullets (14a/b/c/d/e → bleibt
-  a/b/c/d/e, Heading „Phase 15 — V4 ..."). Directory-Hinweis
-  `phase12_v4/` → `phase15_v4/`.
-- `docs/INDEX.md`: zwei neue .md-Zeilen (Re-Plan + Concept), Phase-13-Row
-  korrigiert (Modul-Status & Live-Verify), Phase-10/11-Row „V4 is now Phase
-  14" → „V4 is now Phase 15" (Präzedenzfall), Phase-13-LiveData-Plan-Zeile
-  mit Korrekturhinweis auf den Snapshot. „Active phases"-Header ergänzt um
-  Phasen 13/14.
+**6. Doc-Rotation (gemäß Doc-Layers-Konvention):**
+- Session 14 verbatim aus dem Phasenkopf (Z. 98–259) oben ins `SESSIONS_ARCHIVE.md` verschoben (vor Session 13).
+- Phasenkopf trägt jetzt genau einen `## Session stopped`-Block (Session 15).
+- Pre-Commit-Hook war aktiv (`--strict`); vor der Rotation war head=14, archive-newest=13 → expected 13 → OK, nach der Rotation head=15, archive-newest=14 → OK. Drift wäre gefangen worden.
 
-**Modul-Tabelle-Update kommt in einem Folge-Commit** — der Plan-Snapshot
-selbst bleibt unberührt, der Re-Plan ist die kanonische Aussage.
+### Σ-Sweep Stand 2026-08-31 ~10:30 UTC (Mini-Session 23, selbst nachgemessen):
 
-### Verified
+| Phase | Tests grün | Δ zu Mini-Session 22 |
+|---|---:|---|
+| P1 (Broker Wrapper) | 95 | unverändert |
+| P2 (Persistence) | 77 | unverändert |
+| P3 (External Data) | 104 | unverändert |
+| P4 (Research) | 155 | unverändert |
+| P5 (Execution) | 173 | unverändert |
+| P6 (Debate) | 76 | unverändert |
+| P7 (Reward) | 138 | unverändert |
+| **P8 (Scheduler)** | **248** | unverändert |
+| **P9 (Universe)** | **87** | unverändert |
+| P10 (V3) | 165 | unverändert |
+| **P12 (Datenfundament)** | **145** | unverändert |
+| **P13 (Live-Datenfundament)** | **74** | unverändert |
+| **P14 (Discovery)** | **61** | unverändert |
+| meta_m1_harness | 28 | unverändert |
+| **root tests/** | **101** | unverändert (P14-F Schritt-2-Tests) |
+| **Σ** | **1705** | unverändert |
 
-- Regression-Sweep, alle 13 Phasen + root `tests/` (Stand vor den
-  Docs-Edits, aber unverändert): 1608 passed.
-  *(Summenkorrektur 2026-08-22: die Einzelzahlen derselben Tabelle ergeben 1608; kein
-  Test verschwunden — §3.6 des Phase-14-Plans.)*
-  | Phase | Tests |
-  |---|---|
-  | phase1_broker_wrapper | 95 |
-  | phase2_persistence | 77 |
-  | phase3_external_data | 104 |
-  | phase4_research | 155 |
-  | phase5_execution | 173 |
-  | phase6_debate | 76 |
-  | phase7_reward | 138 |
-  | phase8_scheduler | 244 (+1 Deprecation-Warning) |
-  | phase9_universe | 80 |
-  | phase10_v3 | 165 |
-  | phase12_data_foundation | 143 |
-  | phase13_live_data | 50 (vor Fix: 49 + 1 jetzt grün) |
-  | meta_m1_harness | 28 |
-  | root `tests/` | 80 |
-- `data/bars.sqlite` (`mode=ro`): 962 `source='capital'`-Bars (481 DAX + 481 CAC)
-  bestätigt. Kein Bot-Prozess läuft (`ps aux | grep scheduler.run` leer).
+### Findings
 
-### Note
+🟢 **Source-Delta-Mechanik funktioniert wie designed** (Block C3, 7 Tests grün, live-verify-bestätigt in dieser Session mit 332 trades). Das Tool macht die Beschaffungslücke **sichtbar**, nicht unsichtbar — genau der Phase-13-Antwort auf P12.5.
 
-- **Drei Commits in dieser Session** (Nikinger-Auflage „commit after each
-  step" gilt weiter):
-  1. `074d6c9` `phase13: test -- fix test_multiple_days_window date-drift`
-  2. *(dieser Docs-Commit)* `phase13: docs -- Session 14 + Block-C-Re-Plan
-     + Phase-14-Concept + Nummerierungs-Kaskade`
-- **Plan-Snapshot `phase13_live_data_plan.md` bleibt unverändert** (📕
-  Convention, „never edit"). Seine INDEX-Beschreibung wurde mit einem
-  Korrekturhinweis „Plan-Snapshot sagt V4 → 14, gilt tatsächlich V4 → 15"
-  versehen, damit der historische Stand sichtbar bleibt, ohne den Snapshot
-  zu fälschen.
-- **`EPIC_MAP = {"IX.D.DAX.IFMM.IP": "DE40", "IX.D.CAC.IFE.IP": "FR40"}`**
-  in `live_data/backfill.py:67-72` bleibt im Code. Das ist Absicht: das
-  Phase-14-Architektur-Diff ist groß genug für eine eigene Phase, nicht für
-  eine Block-C-Erweiterung. Sobald Phase 14 die `instrument_source_availability`-
-  Tabelle hat, ist diese Map eine Migrations-Zeile.
-- **V4-Inhalt unverändert.** Die Umnummerierung Phase 14 → 15 ist rein
-  numerisch, kein Inhalt verschoben. Inhaltlich bleibt V4 das, was es
-  immer war: Council, Handover, Reward-Reform, Force-Trigger, Instinct-ECC.
-  Es kommt nur **ein** zusätzliches Gate dazu (Phase 14), nicht
-  inhaltliche Änderung.
+🟢 **Block-C-Re-Plan-These empirisch vollständig bestätigt:** drei Befunde (B1: IG-Bars-Lücke 2/13 Tage; B2: 53.6 % Divergenzrate am letzten Tag mit Bars; B3: `last_verified_utc` reflektiert nur Discovery-Ableitung, nicht Substrat-Validität). Der Plan war richtig, die Realität ist schlimmer als die Plan-Annahme.
 
-### Next
+🟡 **Phase-14 D5-Handover: TEILWEISE freigegeben** — architektonisch ja (Tabelle + Discovery + Source-Delta arbeiten wie designed), operativ nein (IG-Spalte lügt, bis Phase-13-Recorder-Mapping-Initiative abgeschlossen ist). Findings-Notiz dokumentiert das; Phase-14-Phasenkopf trägt den Vermerk.
 
-- **Operator (Nikinger):** kein Push nötig — Phase 13 ist seit Session 8 mit `74`
-  grünen Tests (war zum Session-14-Stand 50, +24 aus Phase 14 B1b+B2+B3 im
-  `phase13_live_data/`-Tree), Commits alle auf `origin/main`.
-- **Phase-14-Planning-Session:** **erledigt** — Plan liegt in
-  [`docs/concepts/phase14_discovery_plan.md`](../../docs/concepts/phase14_discovery_plan.md),
-  Decisions D1–D20 gelockt, Akzeptanz A1–A8 alle grün (Σ 1698 nach Session 9).
-- **Cross-Phase-Freigabe** für Phase 14 (Nikinger, 2026-08-22): **erteilt** für
-  Phase 2 (Migration), Phase 8 (`webui/`, `run_scheduler.sh`), Phase 9
-  (`models.py`, `store.py`), Phase 12 (`budget.py`-Nutzung) und Phase 13
-  (`backfill.py`, `scripts/`).
-- **Beweiswoche läuft parallel** (Plan §7 P1–P9), gestartet Mo 2026-08-25.
-  Erste Beobachtung aus dem Restart-Check: Trade #8 BUY DAX.IGN offen
-  (5. BUY auf DAX in Folge nach 4 Verlust-Trades, -2530.82 EUR realisiert);
-  Loss-Breaker nicht ausgelöst (€1800-Cap, aktuelle realized-pnl heute = 0);
-  Token-Budget 38.5% / Weekly-Allowance 48% / 0 Discovery-Punkte gebucht.
-  Kein Handlungsbedarf, Safety-Mechanismen innerhalb Caps; Phase-15-Territorium
-  (V4 — Council, Handover, Reward-Reform).
+🟡 **Phase-13-Recorder-Mapping-Investigations-Pflicht** — die Hypothesen aus §5.2 der Findings (Stream-Disconnect / Source-Filter / Tick-Aggregation-Bug) sind ungeprüft, müssen in einer Phase-13-Folge-Session geklärt werden. **Nicht in dieser Session** (Phase-14-Scope).
 
-### Offene Findings (für Folge-Sessions, nicht in diesem Build-Scope)
+🟢 **Phase-15-Plan-Material** — die heutige Empirie verstärkt den V4-„Quellen-Vertrauens-Modell"-Vorschlag strukturell. Konkrete Forderung: jede `status='ok'`-Zeile in `instrument_source_availability` braucht eine **tatsächliche** Substrat-Coverage-Messung. Phase-15-Territorium, nicht Phase-14.
 
-- **Modul-Tabelle in `phase13_live_data/CLAUDE.md` ist nicht aktualisiert** —
-  Stand Session 14 nannte Test-Count 39, inzwischen sind es **74** (50 nach
-  Session 14 + 24 aus Phase-14-B1b/B2/B3-Commits `ac54825`/`6e8148e`/`bb095df`,
-  die in `phase13_live_data/` mit-tests-edits haben). Block-C-Zeilen brauchen
-  ein „final"-Tag. Beides für eine Phase-13-Hygiene-Session vorgemerkt, kein
-  Phase-14-Scope.
-- **Plan-§9-Drift-Listeneintrag #2** (Phase-14) erweitern in der nächsten Plan-
-  Session — Editor-Notiz, kein Doku-Touch.
-  Bewusst NICHT in diesem Commit geändert — der Plan-Snapshot und die
-  Re-Plan-Datei sind die kanonische Aussage, der Phasen-Kopf folgt in
-  einer Folge-Session (oder direkt mit der Phase-14-Eröffnung).
-- **Plan-Snapshot `phase13_live_data_plan.md`** könnte im §0 BLUF einen
-  kleinen Verweis auf den Re-Plan verdienen (analog zur Phase-12.5-
-  Closeout-Anmerkung). Bewusst nicht in diesem Commit — der Snapshot
-  ist „never edit", und das Hinzufügen erfordert eine eigene Diskussion
-  (Snapshot ergänzen vs. nur per Korrekturhinweis im INDEX).
-- **`source_delta.py` P6-Auswertung** mit den 962 Capital-Bars wurde im
-  Beweiswoche-Review vermessen — die Belege für die Phase-14-Quell-
-  Auswahl kommen erst nach 1–2 Beweiswochen.
-- **Live-Substrat für Phase-14-Plan-Session**: heute 962 `source='capital'`-
-  Bars + 2230 IG + 11654 yF + LS-Anteil = ~14.846 Bars im Archiv. Das ist
-  das **Entdeckungs-Substrat**, gegen das `instrument_source_availability`
-  in Phase 14 gefüllt wird. Die Plan-Session sollte den heutigen Stand
-  frisch messen.
+### Unverändert offen (von Mini-Session 22, weiter gültig)
+
+- **Hook-Verschärfung auf `--strict`-Default** — D5-Beweis erbracht (alle 14 Archive Step-2-konform, diese Session verifiziert: head=15, archive-newest=14 → OK). 15-Min-Folge-Session.
+- **Phase-12-Reconciliation-Timing-Fix** — die `reward.recorder: no usable history row`-CRITICALs laufen weiter (P10-V3-Code, nicht in Phase 13/14-Scope).
+- **Phase-11-Wiederaufnahme (WI-2/W2)** — Datenfundament-Abhängigkeit.
+- **Phase-15-Plan-Session (V4)** — Phase-13-Diagnose-Material jetzt vollständig.
+
+### NEXT (für die nächste Session / morgen)
+
+**Nikinger-Anweisung zum Session-Ende wird erwartet** (Stand ~10:30 UTC = 12:30 CEST — warte auf Nikinger-Wahl).
+
+**Konkrete Empfehlung (sortiert nach Aufwand × Impact, kann der Nikinger umstellen):**
+
+1. **Phase-13-Recorder-Mapping-Investigations-Session** (~1-2h): Hypothesen aus Findings §5.2 verifizieren (Stream-Disconnect / Source-Filter / Tick-Aggregation-Bug), Recorder ggf. neu starten oder Source-Filter korrigieren. **Höchste Priorität** — ohne IG-Bars bleibt die Phase-14-Tabelle operativ unzuverlässig.
+2. **Hook-Verschärfung auf `--strict`-Default** (~15 Min): `bash scripts/install_hooks.sh --strict`. D5-Beweis erbracht; das ist eine sichere 15-Min-Session.
+3. **Doku-Updates synchronisieren** (~10 Min): root-`CLAUDE.md` Phase-13-Row auf Mini-Session-23-Stand (D5-Status-Vermerk); `ROADMAP.md` Phase-13-Block ggf. Status der Findings; `docs/INDEX.md` Mini-Session-23-One-Liner (optional).
+4. **Phase-15-Plan-Session** (großer Block): wenn die Recorder-Initiative (Item 1) IG-Bars zurückbringt, sind die Phase-15-Voraussetzungen vollständig.
+
+**Push-Freigabe:** diese Session hat 2 Commits lokal (`8aa569f`, `5af060d`); Doc-Rotation folgt separat (1 Commit). 3 Commits total, pushbar nach Nikinger-Sign-off.
