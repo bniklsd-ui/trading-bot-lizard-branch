@@ -547,7 +547,8 @@ statt CRITICAL (persistent-fail).
    abgeschlossen (Session 18, …)` — 6 Dateien, 593 insertions, 246 deletions.
 3. **Push an `origin/main`:** beide Commits gepusht (`d2a5692..2923096 main -> main`).
 4. **Status-Verify post-push:** `git log origin/main --grep='^phase7:'` zeigt jetzt
-   36 Phase-7-Commits (war 35 vor Session 26; +1 für den Plan-Track-Commit).
+   **16 Phase-7-Commits** (war 8 vor Mini-Session 26; +6 Session-26-Implementierung
+   + 1 Plan-Track-Commit + 1 Mini-Session-26⅔-Doku = +8).
 
 **Dokumentation (genau dieser Block hier):**
 - ✅ `phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md` ist **jetzt getracked, committed
