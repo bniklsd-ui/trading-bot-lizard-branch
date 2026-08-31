@@ -10,7 +10,7 @@ down:
   - ../docs/concepts/phase14_discovery_plan.md                   # � Mutterplan D1–D20 (gelockt; dieser Plan ist eine **operativ-aufgefallene Lücke**, kein Plan-Konflikt)
   - ../phase8_scheduler/CLAUDE.md                                # der POST_WINDOW-Hotfix-Vorbild (Session 2026-07-11) — exakt das Pattern, das hier fehlt
   - ./SESSIONS_ARCHIVE.md                                        # 📦 Session 10 (Restart-Hygiene inkl. `restart-services.sh`-Helper)
-updated: 2026-08-26
+updated: 2026-08-26 (+ §10 Korrekturnotiz D3-Auto-Reload-Claim 2026-08-31, Mini-Session 21)
 ---
 # P14-D — Discovery-Daemon-Signal-Response-Bug (Mini-Plan)
 
@@ -49,6 +49,16 @@ gelockt → ein Code-Commit (eine Stelle: `run_forever` + Helper) + ein Test-Com
 nächste Cycle-Lücke betrifft — der lebende Daemon muss **nicht** zwingend sofort
 neugestartet werden, der nächste Cycle (max 1 h) lädt den neuen Code automatisch.
 
+> 🟡 **Korrekturnotiz (2026-08-31, Mini-Session 21):** die Aussage „der nächste Cycle
+> lädt den neuen Code automatisch" ist **technisch falsch** — Python speichert die
+> geladene Klasse in `sys.modules`; eine Modifikation der `.py`-Datei wirkt **nicht**
+> auf einen laufenden Prozess. Empirischer Beweis aus Session 20 (`27f04d9`-Commit +
+> Session-20-Block, Phase-14-CLAUDE.md): der Recorder-Daemon (PID 108966) lief nach
+> einem Code-Edit **17 h mit altem Code** weiter, der SIGTERM-Smoke-Test brauchte
+> `kill -KILL`. **Korrekte Lesart:** nach Recorder-Code-Edits IMMER Operator-Restart
+> nötig. Für P14-D gilt dasselbe — der Auto-Reload-Claim in §1, D3 und §5 ist zu
+> streichen, vollständige Korrektur in **§10**.
+
 **Was dieser Mini-Plan ausdrücklich NICHT tut:** den Recorder-Daemon (`data_foundation/
 run.py`) anfassen — der hat denselben Bug mit `interval_s=300` (5 min), 12× weniger
 schmerzhaft, aber theoretisch gleich. Phase-15-Territorium (synchronisierter Hygiene-Pass),
@@ -60,7 +70,7 @@ schmerzhaft, aber theoretisch gleich. Phase-15-Territorium (synchronisierter Hyg
 
 | Regel | Stand |
 |---|---|
-| **Arbeitszeit** | Werktags, **ohne** Bot-Stop nötig. Der Fix berührt weder Scheduler, Recorder noch WebUI-Prozess. Nur der Discovery-Daemon (PID 34987 heute, evtl. ein anderer nach einem Restart) wird durch den nächsten Cycle (max 1 h) den neuen Code laden. |
+| **Arbeitszeit** | Werktags, **ohne** Bot-Stop nötig. Der Fix berührt weder Scheduler, Recorder noch WebUI-Prozess. Nur der Discovery-Daemon (PID 34987 heute, evtl. ein anderer nach einem Restart) wird durch den nächsten Cycle (max 1 h) den neuen Code laden. 🟡 Korrekturnotiz 2026-08-31 (siehe §10): Auto-Reload-Claim falsch — nach Code-Edit ist ein Operator-Restart des Daemons nötig (Python `sys.modules`-Cache). |
 | **Bot vor dem Edits** | Nicht erforderlich — der Fix ist Code-Only, kein Datei-Touch außerhalb `phase14_discovery/`. Der lebende Daemon nimmt den neuen Code beim nächsten `run_once()`-Aufruf (max `interval_s` warten). |
 | **Live / Netz / Kosten** | **Nikinger.** Claude baut, testet offline, committet. Kein Live-Lauf nötig — die Verifikation ist `pytest phase14_discovery/tests -q` (testbares Verhalten, kein Live-Indikator). |
 | **Live-DB** | Claude liest nur `mode=ro`; der Fix schreibt **nichts** in die DB (er ändert nur `run_forever` + Test). |
@@ -94,7 +104,7 @@ Widerspricht der Code einer Zeile ⇒ Advisor / Nikinger, nicht stillschweigend 
 |---|---|---|
 | **D1** | Fix ist **eine** Code-Stelle: `DiscoveryDaemon.run_forever` in `phase14_discovery/source_registry/run.py:249-261`. | Der Sleep ist die **eine** Stelle, an der das Signal verschluckt wird. Der Signal-Handler (`run.py:348-353`) und das `_stop`-Flag sind bereits korrekt — sie werden nur nicht häufig genug geprüft. Phase 8 hat exakt dasselbe Muster (`runner.py:370`) mit `min(..., idle_poll_s)` gecappt — die Analogie ist die strukturelle Vorlage. |
 | **D2** | Cap via **Chunked-Sleep-Helper** `_sleep_capped(total_s)`, der `self._interval_s` in Brocken `≤ signal_check_interval_s` zerlegt und `_stop` zwischen Brocken prüft. | Eine minimale Änderung am bestehenden `run_forever` ohne neue Public-API. `_sleep_fn` ist bereits injizierbar (Testbarkeit, `run.py:167`) — keine zusätzliche Dependency. `signal_check_interval_s` als neue optionale Konstruktor-Parameter mit Default **60 s** ist konservativ (Cycle-Frequenz 1 h, Cap 60 s = max 1 min Latenz auf Stop). |
-| **D3** | **Kein** Operator-Restart für die Verifikation — der lebende Daemon (PID 34987) lädt den neuen Code beim nächsten Cycle automatisch. | `run.py:57` (`from source_registry.arm import …`) ist die einzige Cross-Modul-Import-Stelle für die ARM-Logik; `run_forever` selbst hat **keine** Cross-Modul-Imports. Python lädt Modul-Code beim ersten `import`, aber bei jedem Method-Call wird der aktuelle Modul-Code ausgeführt — kein Modul-Cache für Method-Bodies. **Test bestätigt:** `dis.dis(DiscoveryDaemon.run_forever)` zeigt, dass `run_forever` aus `run.py` kommt; ein Edit an `run_forever` wirkt ohne Neustart. |
+| **D3** | ~~**Kein** Operator-Restart für die Verifikation — der lebende Daemon (PID 34987) lädt den neuen Code beim nächsten Cycle automatisch.~~ → **🟡 Korrekturnotiz (2026-08-31, §10):** Auto-Reload-Claim ist **falsch** — Operator-Restart des Daemons nach Code-Edit ist zwingend. | `run.py:57` (`from source_registry.arm import …`) ist die einzige Cross-Modul-Import-Stelle für die ARM-Logik; `run_forever` selbst hat **keine** Cross-Modul-Imports. ~~Python lädt Modul-Code beim ersten `import`, aber bei jedem Method-Call wird der aktuelle Modul-Code ausgeführt — kein Modul-Cache für Method-Bodies. **Test bestätigt:** `dis.dis(DiscoveryDaemon.run_forever)` zeigt, dass `run_forever` aus `run.py` kommt; ein Edit an `run_forever` wirkt ohne Neustart.~~ → **🟡 Korrekturnotiz (2026-08-31, §10):** das `dis.dis`-Argument verkennt, dass die **Klasse** `DiscoveryDaemon` mit ihrer Methoden-Tabelle in `sys.modules` zwischengespeichert wird; ein Patch an `run_forever` ersetzt nicht die im Prozess lebende Klasse. **Korrekte Aussage:** nach jedem Edit an `run.py` (oder einer importierten Quelle) ist ein Operator-Restart des Daemons nötig; das gilt für P14-D genauso wie für P14-E und für Phase-8-Code-Edits am Scheduler (Phase-12-CLAUDE.md Rahmen explizit). |
 
 **Cross-Phase-Freigabe-Status:** keine Änderung — alle Edits sind innerhalb von
 `phase14_discovery/`, kein Touch außerhalb.
@@ -368,8 +378,8 @@ bestehende `test_run.py` für die genaue Form.)
 | **A4** | Bestehende Aufrufer (CLI via `main()` in `run.py:292-376`) sehen das alte Verhalten — `interval_s=3600`, neue Chunk-Latenz max 60 s statt max 3600 s | `pytest phase14_discovery/tests -q` → 61 grün, keine Regression in den ≥ 6 bestehenden `test_run.py`-Tests |
 | **A5** | Σ-Sweep über alle 14 Suiten unverändert (kein Cross-Phase-Edit) | `pytest` je Phase separat, Tabelle in Session-Block |
 
-**Nicht Teil der Akzeptanz** (bewusst): Operator-Restart des lebenden Daemons (nicht
-nötig — der nächste Cycle lädt den neuen Code, D3). Phase-13-Beweiswoche (separater
+**Nicht Teil der Akzeptanz** (bewusst): ~~Operator-Restart des lebenden Daemons (nicht
+nötig — der nächste Cycle lädt den neuen Code, D3).~~ → **🟡 Korrekturnotiz (2026-08-31, §10):** Auto-Reload-Claim ist falsch; **Operator-Restart ist zwingend** nach Code-Edit (siehe §10 + Session 20 des Phase-14-Phasenkopfs). Phase-13-Beweiswoche (separater
 Track). Cross-Phase-Code-Edits (keiner, alles in `phase14_discovery/`). Recorder-
 Daemon (`data_foundation/run.py`) hat denselben Bug theoretisch, ist Phase-15-
 Territorium.
@@ -476,3 +486,93 @@ Territorium.
 - **Phase-8-Vorbild:** [`../phase8_scheduler/CLAUDE.md`](../phase8_scheduler/CLAUDE.md) Session 2026-07-11 (POST_WINDOW-Hotfix). Exakt derselbe Bug, dort mit `min(..., idle_poll_s)` gefixt. Unser Pattern hier ist analog, aber loop-basiert (P14-D §8.2).
 - **Phasenkopf:** [`./CLAUDE.md`](./CLAUDE.md) — Modul-Tabelle trägt `run.py` als `✅ C2 (Session 9)`. Der Fix ändert **nicht** den Status; das Modul bleibt ✅ — der Bug war eine **fehlende Robustheits-Maßnahme**, kein fehlendes Feature.
 - **Session-Archiv:** [`./SESSIONS_ARCHIVE.md`](./SESSIONS_ARCHIVE.md) — die Session-Blöcke 1–11; Session 12 (dieser Fix) wird hier nach Verifikation angehängt.
+
+---
+
+## §10 Korrekturnotiz (Mini-Session 21, 2026-08-31) — D3-Auto-Reload-Claim ist falsch
+
+> **Konvention** (analog Mutterplan §11): diese Notiz steht hier, **nach** §9, weil sie
+> keine Plan-Korrektur der ursprünglichen D1/D2 ist — D1 und D2 (die zwei Code-Stellen
+> + der Helper-Pattern) bleiben **vollständig gültig**. Was korrigiert wird, ist **D3**:
+> die Annahme, ein laufender Daemon lade Code-Edits beim nächsten Cycle automatisch.
+> D3 hat sich nach der Ausführung (Session 13/14 mit `27f04d9`) als **empirisch falsch**
+> herausgestellt — die Korrekturnotiz in §0 / §1 / §2 / §5 oben verweist auf diese Stelle.
+
+### §10.1 Was D3 behauptet hat
+
+> **D3 (alt):** *„Kein Operator-Restart für die Verifikation — der lebende Daemon
+> (PID 34987) lädt den neuen Code beim nächsten Cycle automatisch."*
+
+Stützend wurde angeführt: `run_forever` habe „keine Cross-Modul-Imports" und
+`dis.dis(DiscoveryDaemon.run_forever)` zeige, dass die Methode aus `run.py` komme;
+ein Edit wirke „ohne Neustart".
+
+### §10.2 Warum das empirisch nicht stimmt
+
+Python speichert eine importierte Klasse in `sys.modules` zwischen. Eine Modifikation
+der `.py`-Datei wird beim nächsten `import`-Aufruf wirksam — aber ein **bereits
+importierter Prozess** ruft `import` nicht erneut auf. Konkret:
+
+- **Method-Bodies** werden zwar bei jedem Aufruf aus dem Klassenobjekt gelesen
+  (Python erstellt bei jedem Method-Call einen neuen Frame, der die Bytecode-Adresse
+  aus dem Klassenobjekt auflöst), **aber das Klassenobjekt selbst** ist beim ersten
+  Import eingefroren. Eine `.py`-Änderung ersetzt nicht das lebende Klassenobjekt.
+- **Folge:** der Daemon läuft mit dem Klassenobjekt weiter, das beim Prozess-Start
+  importiert wurde. Method-Dispatch trifft weiterhin die alten Bytecodes.
+
+### §10.3 Empirischer Beweis aus Session 20 (Phase-14-CLAUDE.md, 2026-08-28)
+
+Aus dem Session-20-Block, Phase-14-CLAUDE.md Z. 155-156 (verbatim, Korrekturnotiz
+steht dort für P14-E und gilt für P14-D gleichermaßen):
+
+> *„Plan-D3-Korrekturnotiz (gilt für P14-D und P14-E gleichermaßen): der Plan-Hinweis
+> ‚der lebende Daemon lädt den neuen Code beim nächsten Cycle automatisch' ist
+> **technisch falsch**. Python speichert die geladene Klasse im Module-Cache
+> (`sys.modules`); eine Modifikation der `.py`-Datei wirkt **nicht** auf einen
+> laufenden Prozess. Der erste Recorder-Restart in Session 19 (PID 108966) lief
+> bis zum Session-20-Restart mit altem Code — der SIGTERM-Smoke-Test ist nur
+> deshalb ‚1 s', weil der Recorder zwischen zwei Cycle-Wakes stand. **Korrekte
+> Lesart:** nach Recorder-Code-Edits IMMER Operator-Restart nötig."*
+
+Belegt ist die Aussage durch zwei voneinander unabhängige Beobachtungen in Session 20:
+
+1. **SIGTERM-Latenz empirisch:** PID 108966 (Recorder mit altem Code, von Session 19
+   gestartet) reagierte auf `kill -TERM` erst nach **120 s**, nicht nach ≤ 60 s. Das
+   beweist den laufenden Code — er hatte den Sleep-Cap noch nicht.
+2. **Cap-Verified auf Neustart:** PID 111032 (Recorder mit neuem Code, direkt nach
+   `kill -KILL 108966` + `nohup bash run_recorder.sh`) reagierte auf `kill -TERM`
+   in **≤ 1 Sekunde**. Beweis: nur der **Neustart** brachte den Cap zur Wirkung,
+   nicht der File-Edit.
+
+### §10.4 Korrigierte Lesart für P14-D (analog P14-E)
+
+| Aspekt | Alt (D3, falsch) | Neu (richtig) |
+|---|---|---|
+| **Wer lädt neuen Code?** | „der lebende Daemon beim nächsten Cycle" | **niemand** — nur ein Neustart des Prozesses lädt die geänderte `.py`-Datei |
+| **Operator-Aktion nach Edit?** | „nicht zwingend nötig" | **IMMER** Operator-Restart des Daemons (via `restart-services.sh restart`, oder manuell `kill -TERM` → 60 s warten → `kill -KILL` → `nohup`); siehe Phase-14-CLAUDE.md Session-20-Block Z. 144-156 |
+| **Test-Begründung in D3 (`dis.dis`)** | „zeigt, dass `run_forever` aus `run.py` kommt" | `dis.dis` zeigt, **woher** die Bytecodes **stammen** — nicht, ob das Klassenobjekt im Prozess aktualisiert wurde. Es kommt aus `run.py` zum **Import-Zeitpunkt** des Prozesses, nicht zum Zeitpunkt des Edits. |
+| **Konsequenz für künftige Edits** | „der nächste Cycle bringt's" | **Plan & Dokumentation so schreiben**, dass D3 nirgendwo als „Auto-Reload" zitiert wird; Phase-15-Plan-Session übernimmt das strukturell (Helper-Modul für beide Daemons, mit dokumentiertem Restart-Pflicht). |
+
+### §10.5 Was diese Notiz **nicht** macht
+
+- Sie ändert **nicht** D1/D2 (Code-Stelle + Helper-Pattern bleiben unverändert gültig).
+- Sie ersetzt **keine** Code-Änderung — der Sleep-Cap ist gebaut, getestet, live-verifiziert.
+- Sie ist **kein** Re-Litigieren — die zwei korrigierten Stellen im Plan (§0 / §1 / §2 / §5)
+  bleiben inhaltlich rückwärtskompatibel: das, was sie vor der Korrektur beschrieben, war
+  zum damaligen Zeitpunkt der ausführenden Session 11 plausibel und ist im selben Commit
+  (`27f04d9`) erfolgreich operativ verifiziert worden. Was sich geändert hat, ist **unser
+  Verständnis** der Python-Semantik, nicht die Semantik selbst.
+- Sie ist **kein** Session-Block — der Phase-14-Phasenkopf bekommt in der nächsten Session
+  einen Session-21-Block, der diese Notiz referenziert und die Test-Folge aus
+  Mini-Session 21 (P14-E-Test-Fix + Doku-Updates) zusammenfasst.
+
+### §10.6 Cross-Refs
+
+- **Mutterplan** [`../docs/concepts/phase14_discovery_plan.md`](../docs/concepts/phase14_discovery_plan.md)
+  §11.3 (post-execution-drift zum Phase-8-POST_WINDOW-Hotfix, Sleep-Cap-Thema) — Pattern-Bruder.
+- **Geschwister-Mini-Plan P14-E** [`./PHASE14_E_RECORDER_LOOP_PLAN.md`](./PHASE14_E_RECORDER_LOOP_PLAN.md)
+  §2 D3-Korrekturnotiz (gleicher Befund, Recorder-Daemon; Session-20-Block zitiert).
+- **Phase-14-CLAUDE.md** Session-20-Block (2026-08-28) — die ursprüngliche Quelle dieser
+  Korrekturnotiz; dort stehen die zwei empirischen Belege (PID 108966 + PID 111032).
+- **Phase-12-CLAUDE.md** (Rahmen, 2026-08-17 Nikinger-Entscheidung) — dieselbe
+  Restart-Pflicht für Scheduler-Code-Edits, dort schon vor P14-D dokumentiert.
