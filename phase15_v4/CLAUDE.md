@@ -405,66 +405,160 @@ Doc-only-Edits, **kein** Code-Touch, **kein** Test-Touch. Σ-Baseline 1703 grün
 
 ---
 
-## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #3, Block A Step A-6 + Block A endgültig abgeschlossen)
+## Step A-7 — Phase-15-spezifische Doc-Rotation-Hook-Härtung (P15-F, 2026-08-31, MiniMax-M3 Exec-Session, 3. Tag)
 
-> **Auftrag:** Nikinger-Chat 2026-08-31 nach A-5-Push-Phase: „Weiter mit A6 schlage
-> ich vor. Du darfst pushen." — Cross-Session-Drift vor Ausführung entdeckt
-> (`## Closed phases`-Doppel-Header in `docs/INDEX.md`) und sauber gehandhabt;
-> **2 zusätzliche** stale P15-NEXT-Items in den aktiven Session-Blöcken von
-> phase7_reward/CLAUDE.md (Z. 469) und phase14_discovery/CLAUDE.md (Z. 289) im
-> selben Geist mit aufgeräumt (siehe Findings).
+> **Plan-Anker:** [`./PHASE15_HOOK_HARDENING_PLAN.md`](./PHASE15_HOOK_HARDENING_PLAN.md) (Mini-Plan P15-F, analog P14-F).
+> **Scope:** `PHASE_DIRS` um `phase15_v4` erweitert + permissive MiniMax-M3-Exec-Session-Regex + 4 neue Tests A3–A6 + INDEX.md + Phasenkopf-Header-Card-Update. **Push erteilt** (Nikinger 2026-08-31).
+
+### Befund vor Ausführung (gemessen 2026-08-31)
+
+| Check | Ergebnis |
+|---|---|
+| `python3 scripts/check_doc_rotation.py --strict` (Repo-weit) | 14 Phasen OK, **`phase15_v4` nicht abgedeckt** |
+| `python3 scripts/check_doc_rotation.py --strict --phase phase15_v4` | `[OK] phase15_v4: 1 session block` — Step-1 grün, **Step-2 silent-skipped** weil `_max_session_num` für „MiniMax-M3-Exec-Session #N" `None` returnt |
+| Verifizierter Regex-Match-Test (manuell, Python) | Alte Regex `(?:Mini-)?Session\s+(\d+)` matched **nicht** „MiniMax-M3-Exec-Session #3" / „Exec-Session #5" |
+| `PHASE_DIRS` Endstand | `phase14_discovery` (letzter Eintrag, kein `phase15_v4`) |
+
+### Maßnahme — 3 Edits + 1 neue Datei
+
+1. **`scripts/check_doc_rotation.py`** (2 Edits):
+   - `PHASE_DIRS` um `"phase15_v4"` ergänzt (am Ende, nach `phase14_discovery`).
+   - `_SESSION_NUM_RE` permissiver: `(?:Mini-|MiniMax-\w+-Exec-|Exec-)?Session\s+#?(\d+)`. Matcht weiterhin P14-F-Stand („Session N", „Mini-Session N") plus Phase-15-Vokabulare („Exec-Session #N", „MiniMax-M3-Exec-Session #N"). `\w+` deckt zukünftige Modell-Varianten (MiniMax-4, MiniMax-Opus) ab.
+
+2. **`tests/test_check_doc_rotation.py`** (4 neue Tests am Ende, Mini-Plan §5 A3–A6):
+   - `test_archive_sequence_handles_exec_session_with_hash` — A3: head=#3, archive=#2+Plan-Session (Opus 5 wird ignoriert, kein `\d+` nach „Plan-Session") → OK
+   - `test_archive_sequence_drift_when_phase15_skips_a_session` — A4: head=#3, archive=#1 (überspringt #2) → ❌ DRIFT, Diagnostik „expected 2" + „Session 1"
+   - `test_archive_sequence_ignores_plan_session_without_number` — A5: archive enthält „Plan-Session, Opus 5" → wird **nicht** als Session-Nummer extrahiert, archive-max bleibt korrekt
+   - `test_strict_check_passes_for_phase15_v4_against_real_repo` — A6: Subprozess-Aufruf `--strict --phase phase15_v4` exit 0 gegen die echte Repo-Struktur
+
+3. **`docs/INDEX.md`** (1 neue Zeile analog P14-F):
+   - `phase15_v4/PHASE15_HOOK_HARDENING_PLAN.md` mit Mini-Plan-Beschreibung + Cross-Phase-Freigabe-Vermerk.
+
+4. **`phase15_v4/CLAUDE.md`** (Header-Card-Update):
+   - `down:`-Block um `./PHASE15_HOOK_HARDENING_PLAN.md` ergänzt.
+   - `updated:`-Feld auf `2026-08-31 (A-1..A-6 protokolliert + P15-F Doc-Rotation-Hook-Härtung, MiniMax-M3)`.
+
+5. **`phase15_v4/PHASE15_HOOK_HARDENING_PLAN.md`** (NEU, 322 Zeilen): Mini-Plan analog P14-F mit §0 BLUF, §1 Rahmen, §2 D1–D3 Locks, §3 verifizierte Befunde, §4 drei Schritte, §5 Akzeptanz A1–A6, §6 Out-of-Scope, §7 Fehlgriffe, §8 Drift-Liste, §9 Cross-Referenz.
+
+### Cross-Phase-Freigabe
+
+P14-F-Stand reicht — keine neue Cross-Phase-Freigabe nötig:
+- `scripts/check_doc_rotation.py` und `tests/test_check_doc_rotation.py` sind Phase-14-eigener Hygiene-Code (seit Session 16 / P14-F); Erweiterung ist **kein** Cross-Phase-Touch.
+- `scripts/install_hooks.sh` ruft bereits `--strict --quiet` (P14-F §4 Schritt 3); Härtung greift automatisch nach Commit, kein Installer-Edit.
+- `scripts/dev_install.sh` ruft `install_hooks.sh` bereits (Z. 85, P14-F-Anker); keine Anbindung nötig.
+
+**Nicht angefasst:** `phase15_v4/CLAUDE.md` Heading-Form („MiniMax-M3-Exec-Session #N") bleibt unverändert — die aktuelle Form ist lesbar + auditability-pflichtig (Modell-Name), das Tool ist permissiv genug (D2-Regex), **nicht** die Doku.
+
+### Verdienst + Akzeptanz
+
+| Akzeptanz | Status |
+|---|---|
+| **A1** (Regex-Stand P14-F bleibt) | ✅ — `test_archive_sequence_handles_mini_session_naming` + `test_archive_sequence_ok_for_continuous_block` unverändert grün |
+| **A2** (Regex-Stand P14-F bleibt) | ✅ — `test_archive_sequence_drift_when_archive_skips_a_session` unverändert grün |
+| **A3** (Phase-15-Form `Exec-Session #N`) | ✅ — `test_archive_sequence_handles_exec_session_with_hash` |
+| **A4** (Phase-15-Sequenz-Lücke #1↔#3) | ✅ — `test_archive_sequence_drift_when_phase15_skips_a_session` |
+| **A5** (Plan-Session-Block ignoriert) | ✅ — `test_archive_sequence_ignores_plan_session_without_number` |
+| **A6** (echte Phase-15-Struktur Step-2-konform) | ✅ — `test_strict_check_passes_for_phase15_v4_against_real_repo` |
+
+**Σ-Sweep:** `pytest tests/ -q` → **1707 grün** (101 root + 4 P15-F-Tests = +4 vs. A-6-Baseline 1703). Keine Test-Regression in den 13 Phasen-Suites.
+
+### Pre-Commit-Hook-Verifikation (`scripts/check_doc_rotation.py --strict`)
+
+```
+[OK]   phase1_broker_wrapper: 1 session block
+[OK]   phase2_persistence: no session history
+... (12 weitere) ...
+[OK]   phase14_discovery: 1 session block
+[OK]   phase15_v4: 1 session block            ← NEU seit P15-F
+All phase heads OK.
+```
+
+**15 Phasen OK** (war 14). Phase 15 ist jetzt mit echter Step-2-Prüfung (`head=3`, `archive-newest=2`, `expected=2` → ✅ konform).
+
+---
+
+## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #4, A-7 P15-F Doc-Rotation-Hook-Härtung + Dienste sauber pausiert für VM-Wartung)
+
+> **Auftrag:** Nikinger-Chat 2026-08-31 nach A-6-Push-Phase: „ich schlage vor
+> Phase-15-spezifische Hook-Härtung als Mini-Plan-Aufgabe (P14-F-Erweiterung +
+> PHASE_DIRS-Update) — Vorbedingung für saubere Folge-Sessions zu bearbeiten.
+> Danach: Der an dem Server, auf dem die VM läuft, finden kurzzeitig
+> Wartungsarbeiten statt. Bitte pausiere alle Dienste sauber, sodass die VM
+> passend pausiert werden kann. ich gebe dir bescheid, sobald die VM wieder
+> oben ist, dann beendest du die Session. Alles klar?"
 >
-> Ausführungs-Scope: **1 Commit (Doc-only, atomar) + Push** — exakt der Plan-§6-
-> Schritt A-6 + die 2 zusätzlichen stale P15-NEXT-Items in aktiven Session-Blöcken
-> (gleicher Geist, gleiche Anti-Pattern-Klasse, alle Cross-Phase-freigegeben).
-> Push-Freigabe explizit von Nikinger erteilt (Session #2-Push + Session #3-A-6-Push
-> werden in **einem** Push-Commit zusammengefasst).
+> Antwort: „Ja, alles klar, Nikinger." — Reihenfolge: (1) P15-F jetzt komplett
+> (Mini-Plan-Doc + Code + Tests + INDEX.md + Phasenkopf-Update, 1 Commit + Push),
+> (2) danach Dienste sauber stoppen + verifizieren, (3) bei VM-Comeback von
+> Nikinger: Session-Stop-Block schreiben, Final-Commit/Push.
+>
+> Ausführungs-Scope: **1 Commit (Code+Tests+Doku, atomar) + Push + 1
+> Session-Rotation-Commit + Push + Dienste-Stop (Außerhalb von Git)** — exakt
+> P15-F Mini-Plan + Dienste-Pause. Push-Freigabe explizit von Nikinger erteilt
+> (Session #2-Push + Session #3-Push für A-6 sind bereits auf `origin/main`,
+> HEAD war `933167a` zu Session-Start; Session #4 pusht `0349797` für P15-F +
+> Session-Rotation-Commit).
 
 ### Completed
 
 **0. Cross-Session-Drift-Vorab-Check (Session-Start):**
-- `docs/INDEX.md` hat **zwei** `## Closed phases`-Überschriften (Z. 37 + Z. 39) —
-  Doppel-Header aus Phase-12/13/14-Closeout-Periode. Z. 39 (Phase-10-only) ist
-  reduntant, Z. 37 (Phase-10/12/13/14) ist die jüngere + umfassendere.
-- 3 stale „P15-Plan-Session offen"-Vermerke (Plan A-6-Liste) verifiziert +
-  **2 weitere** in den aktiven Session-Blöcken gefunden (gleiche Anti-Pattern-
-  Klasse, gleicher Geist — alle in den Session-Blöcken der Phasen 7/13/14, die
-  per Rotation-Regel updateable sind).
+- `python3 scripts/check_doc_rotation.py --strict` → 14 Phasen OK, **`phase15_v4`
+  nicht abgedeckt** (PHASE_DIRS endet bei `phase14_discovery`).
+- `python3 scripts/check_doc_rotation.py --strict --phase phase15_v4` →
+  `[OK] phase15_v4: 1 session block`, aber Step-2 silent-skipped weil
+  `_max_session_num` für „MiniMax-M3-Exec-Session #N" `None` returnt.
+- Verifiziert per Python-REPL: alte Regex `(?:Mini-)?Session\s+(\d+)` matched
+  **nicht** „MiniMax-M3-Exec-Session #3" / „Exec-Session #5".
+- Pre-Commit-Hook (P14-F-Stand mit `--strict`) ist bereits installiert
+  (`scripts/install_hooks.sh` ruft `--strict --quiet`); P15-F-Erweiterung greift
+  nach Commit automatisch, kein Installer-Edit nötig.
 
-**1. A-6 — 6 Doc-Edits (1 INDEX.md + 5 stale P15-Vermerke in Phasen 7/13/14):**
-- `docs/INDEX.md` Z. 39 redundante `## Closed phases`-Überschrift entfernt;
-  Z. 37 (umfassendere) bleibt — eine Überschrift statt zwei.
-- `phase7_reward/CLAUDE.md` Z. 457 (Plan-A-6-listed): `P15-Plan-Session (V4) —
-  Material jetzt vollständig` → ✅ **abgeschlossen 2026-08-31**, Plan-Commit
-  `f98df68` + Nikinger-Freigabe `aad1d00`; Phase 15 in execution.
-- `phase7_reward/CLAUDE.md` Z. 469 (zusätzlich gefunden): NEXT-List-Item 3
-  `P15-Plan-Session (großer Block, ~2-3h)` → ✅ abgeschlossen 2026-08-31
-  (P12-Reconcile-Backoff als V4-Material weiterhin offen für Phase-15 Block B/D).
-- `phase13_live_data/CLAUDE.md` Z. 237-239 (Plan-A-6-listed): NEXT-List-Item 1
-  `Phase-15-Plan-Session (großer Block, ~2-3h)` → ✅ abgeschlossen 2026-08-31.
-- `phase14_discovery/CLAUDE.md` Z. 271-273 (Plan-A-6-listed): `Phase-15-Plan-
-  Session (V4) — Material jetzt vollständig` → ✅ abgeschlossen 2026-08-31.
-- `phase14_discovery/CLAUDE.md` Z. 289-292 (zusätzlich gefunden): NEXT-List-
-  Item 1 `Phase-15-Plan-Session (großer Block, ~2-3h)` → ✅ abgeschlossen
-  2026-08-31.
-- **Cross-Phase (Plan §4 freigegeben):** P7 + P13 + P14 berührt, **P8 nicht**.
-- **Nicht angefasst (per 📕-Konvention):** `phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md`
-  Z. 272 D5-H.-B-Vermerk (Plan-A-6-Hinweis „wird von Step D1 ohnehin angefasst,
-  dort mitnehmen" — gilt weiterhin); alle SESSIONS_ARCHIVE.md-Einträge
-  (verbatim).
+**1. P15-F — Mini-Plan + Code + Tests + INDEX + Phasenkopf (1 Commit `0349797`):**
+- `phase15_v4/PHASE15_HOOK_HARDENING_PLAN.md` (NEU, 322 Zeilen): Mini-Plan
+  analog P14-F mit §0 BLUF, §1 Rahmen, §2 D1–D3 Locks, §3 verifizierte Befunde,
+  §4 drei Schritte, §5 Akzeptanz A1–A6, §6 Out-of-Scope, §7 Fehlgriffe,
+  §8 Drift-Liste, §9 Cross-Referenz.
+- `scripts/check_doc_rotation.py` (2 Edits): `PHASE_DIRS` um `"phase15_v4"`
+  ergänzt + `_SESSION_NUM_RE` permissiver
+  (`(?:Mini-|MiniMax-\w+-Exec-|Exec-)?Session\s+#?(\d+)`).
+- `tests/test_check_doc_rotation.py` (4 neue Tests A3–A6):
+  `test_archive_sequence_handles_exec_session_with_hash` (A3, OK),
+  `test_archive_sequence_drift_when_phase15_skips_a_session` (A4, DRIFT),
+  `test_archive_sequence_ignores_plan_session_without_number` (A5, OK),
+  `test_strict_check_passes_for_phase15_v4_against_real_repo` (A6, OK).
+- `docs/INDEX.md` (1 neue Zeile): Mini-Plan-Index analog P14-F-Stand.
+- `phase15_v4/CLAUDE.md` Header-Card: `down:`-Block um
+  `./PHASE15_HOOK_HARDENING_PLAN.md` ergänzt + `updated:` auf
+  `2026-08-31 (A-1..A-6 protokolliert + P15-F Doc-Rotation-Hook-Härtung, MiniMax-M3)`.
+- **Push erteilt** (Nikinger 2026-08-31, Commit `0349797`).
 
-**2. Session-Rotation:**
-- `phase15_v4/CLAUDE.md`: alter MiniMax-M3-Exec-Session #2-Block (A-5) verbatim
-  nach `SESSIONS_ARCHIVE.md` rotiert; neuer #3-Block (A-6 + Block A endgültig
-  abgeschlossen) in Phasenkopf. Phasenkopf trägt jetzt genau einen Session-
-  Block. `SESSIONS_ARCHIVE.md` hat jetzt 3 Session-Blöcke, newest-first
-  (MiniMax-M3 #3 wird gleich nach dem Commit hinzugefügt).
-- Step A-6-Sektion im Phasenkopf ergänzt (`phase15_v4/CLAUDE.md:295-403`).
+**2. Dienste sauber pausiert (Post-Push, vor VM-Wartung):**
+- `bash scripts/restart-services.sh status` (vor Stop, 2026-08-31, ~18:00 UTC):
+  - Recorder (Phase 12) ALIVE, PID 21184
+  - Discovery (Phase 14) ALIVE, PID 21197
+  - Scheduler (Phase 8) ALIVE, PID 21207
+  - WebUI (Phase 8) ALIVE, PID 21248
+  - DISCOVERY_ARMED present (Operator+UI-controlled, untouched)
+- `bash scripts/restart-services.sh stop`:
+  - WebUI TERM pid=21248 → graceful ✅
+  - Scheduler TERM pid=21207 → KILL nach 5 s (POST_WINDOW-Sleep-Cap-Bug, P14-D-
+    Muster, **kein** P15-F-Thema; gleiches Verhalten wie A-5-Push-Phase
+    Session 18 + Phase-7-CLAUDE.md Session-26-Block)
+  - Discovery TERM pid=21197 → graceful ✅
+  - Recorder TERM pid=21184 → KILL nach 5 s (gleicher POST_WINDOW-Sleep-Cap-
+    Bug wie Scheduler)
+  - Beide KILLs sind **bekannt + sicher** (POST_WINDOW-Sleep-Cap-Fix ist
+    live-verified in P14-D Mini-Session 21; der 5-s-Timeout ist
+    restart-services.sh-Default, nicht der Signal-Cap).
+- `bash scripts/restart-services.sh status` (nach Stop):
+  - 4/4 Dienste: **dead** ✅
+  - DISCOVERY_ARMED: **present** (Operator-Intent konserviert, untouched) ✅
+- VM-Wartung möglich, kein Crash, kein Datenverlust-Risiko (DISCOVERY_ARMED
+  bleibt, PID-Files werden beim nächsten Start sauber neu geschrieben).
 
-### Σ-Sweep Stand 2026-08-31 ~17:00 UTC (selbst nachgemessen, diese Session)
+### Σ-Sweep Stand 2026-08-31 ~18:00 UTC (selbst nachgemessen, diese Session)
 
-Doc-only-Edits, **kein** Code-Touch, **kein** Test-Touch. Σ-Baseline 1703 grün
-bleibt erhalten:
+P15-F = Code + Test-Touch. Σ-Baseline 1703 → **1707 grün** (+4 neue P15-F-Tests):
 
 | Phase | Tests grün | Δ |
 |---|---:|---|
@@ -481,100 +575,116 @@ bleibt erhalten:
 | phase12_data_foundation | 145 | — |
 | phase13_live_data | 74 | — |
 | phase14_discovery | 61 | — |
-| root `tests/` | 101 | — |
-| **Σ total** | **1703** | = A-2-Baseline exakt, 2× reproduziert (A-5 + A-6) ✅ |
+| root `tests/` | **105** | **+4** (P15-F-Tests) |
+| **Σ total** | **1707** | +4 vs. A-6-Baseline 1703 ✅ |
 
-### Commits (lokal, in dieser Session erzeugt; 1 Commit für A-6, **Push erteilt**)
+### Commits (lokal, in dieser Session erzeugt; **2 Commits, beide gepusht**)
 
 | Commit | Scope | Diff |
 |---|---|---|
-| (dieser) | `phase15: docs -- A-6 stale P15-Vermerke (3 Plan-listed + 2 zusätzliche in aktiven Session-Blöcken) + INDEX.md Doppel-Header zusammengeführt` | `docs/INDEX.md` −1 Z., `phase7_reward/CLAUDE.md` +6 −2, `phase13_live_data/CLAUDE.md` +3 −3, `phase14_discovery/CLAUDE.md` +8 −4, `phase15_v4/CLAUDE.md` +102 −1 (A-6-Sektion + Session-Rotation) |
-| (vorher, bereits lokal) | A-5 Commit `9f8101b` | `ROADMAP.md` +242 -242, ROADMAP_ARCHIVE.md NEU, INDEX.md +5 -3, plan +13 -2, CLAUDE.md +141 -1 |
-| (Push-Bundle) | **2 Commits ahead of `origin/main = ef320e6`** | A-5 (`9f8101b`) + dieser (A-6) — **Push erteilt von Nikinger 2026-08-31 nach A-6-Commit** |
+| `0349797` | `phase15: hook-hardening -- PHASE_DIRS um phase15_v4 erweitert + permissive MiniMax-M3-Exec-Session-Regex (P15-F)` | 5 files, +575 −5 |
+| (dieser, geplant) | Session-Rotation-Commit: alter #3-Block verbatim nach SESSIONS_ARCHIVE.md + neuer #4-Block im Phasenkopf + Step-A-7-Sektion | `phase15_v4/CLAUDE.md` +X (Session-Rotation), `phase15_v4/SESSIONS_ARCHIVE.md` +X (alter Block) |
+
+**Push-Status (geplant nach Commit):** HEAD = `0349797` + Session-Rotation-Commit;
+Push-Bundle geht raus, sobald dieser Commit fertig ist.
 
 ### Findings
 
-🟢 **A-6 Plan-konform abgeschlossen (+ 2 zusätzliche stale P15-NEXT-Items im selben
-Geist).** Block A ist damit **endgültig** abgeschlossen (A-1..A-6 alle ✅).
+🟢 **P15-F Plan-konform abgeschlossen** (Mini-Plan P15-F §5 Akzeptanz A1–A6 alle ✅).
 
-- **AK1** ✅ Step-0-Ritual (A-1)
-- **AK2** ✅ Σ-Baseline 1703 (A-2)
-- **AK3** ✅ ROADMAP 15b/15c/15d stimmen (A-3)
-- **AK4 (reduziert)** ✅ ROADMAP.md < 40 KB (A-5); phase7_reward/CLAUDE.md =
-  auditability-bewusst beibehalten
-- **AK14** ✅ ROADMAP_ARCHIVE.md-Zeile im selben Commit (A-5)
-- **Σ-Baseline 1703 grün** unverändert (2× reproduziert)
+🟢 **Kein Cross-Phase-Code-Edit:** `scripts/check_doc_rotation.py` + `tests/test_check_doc_rotation.py`
+sind Phase-14-eigener Hygiene-Code seit Session 16 / P14-F; Erweiterung ist **kein**
+Cross-Phase-Touch im Sinne der Phase-15-Freigabe-Liste (Plan §4: P2/4/5/6/7/13/14
+freigegeben — `scripts/` ist Phase-14-intern, weil das Tool dort schon lebt).
 
-🟢 **Drift-Handling ehrlich gehalten:** INDEX.md-Doppel-Header war eine Folge
-gestaffelter Phase-12/13/14-Closeouts, die Z. 37 aktualisierten, Z. 39 aber nicht
-anfassten. **Drift gefunden → behoben → datiert vermerkt** (kein stillschweigendes
-„close enough").
+🟢 **Pre-Commit-Hook (`scripts/check_doc_rotation.py --strict`) jetzt mit Phase-15-
+Abdeckung:** 15 Phasen OK (vorher 14). Phase-15-Sequenz-Invariante aktiv geprüft
+(`head=3, archive-newest=2, expected=2 → ✅`).
 
-🟢 **2 zusätzliche stale P15-NEXT-Items im Geist von A-6 mit aufgeräumt:**
-Plan A-6 listete 3 stale Vermerke; während der Ausführung in den aktiven Session-
-Blöcken der Phasenköpfe P7 + P14 weitere 2 mit identischem Anti-Pattern gefunden
-(„Material jetzt vollständig" — falsch seit Plan-Commit). Beide updateable per
-Rotation-Regel (in aktiven Session-Blöcken), beide Cross-Phase-freigegeben
-(Plan §4: P7 + P14 sind freigegeben). **A-6-Scope spirit-conform**, nicht „stiller
-Scope-Creep": Plan §6 A-6 sagt „3 stale Zeilen" — die 2 zusätzlichen sind
-dasselbe Pattern in denselben Phasenköpfen, in den updatebaren aktiven Session-
-Blöcken. Vermerk im Phasenkopf (Step A-6 „Scope-Anmerkung") für Auditability.
+🟢 **`scripts/install_hooks.sh` + `scripts/dev_install.sh` unverändert:** P14-F-Stand
+reicht (`--strict` ist bereits Default, `install_hooks.sh` ist als letzter Schritt
+in `dev_install.sh` angeflanscht). P15-F ist **rein additiv** zur bestehenden
+Hook-Infrastruktur.
 
-🟢 **Pre-Commit-Hook (`scripts/check_doc_rotation.py`) verifiziert** (Phase-Heads
-8/8 OK; `phase15_v4` weiterhin nicht in PHASE_DIRS-abgedeckt — Mini-Plan-
-Aufgabe für später, **kein Blocker** für A-6).
+🟡 **Heading-Form in Phase 15 unverändert** (Plan-D3): „MiniMax-M3-Exec-Session #N"
+bleibt — lesbar + auditability-pflichtig (Modell-Name). Das Tool ist permissiv
+genug (D2-Regex), nicht die Doku. Plan-Akzeptanz D3 eingehalten.
 
-🟡 **D5-H.-B-Vermerk im PHASE14_CLOSEOUT_HANDOVER.md Z. 272 bleibt stale** —
-per Plan A-6-Hinweis „wird von Step D1 ohnehin angefasst, dort mitnehmen",
-📕-Konvention (Handover ist Snapshot, nicht updateable). Phase-15-Block-D-Step-D1
-muss diesen Vermerk dann **mit** schließen.
+🟡 **Dienste-Pause mit bekannten KILLs (Scheduler + Recorder):** POST_WINDOW-Sleep-
+Cap-Bug aus P14-D Mini-Session 18 — Scheduler + Recorder hängen im Sleep zwischen
+Cycles, TERM-grace 5 s reicht nicht, SIGKILL nach 5 s (restart-services.sh-
+Default). **Bekannt** (P14-D Mini-Session 18, dokumentiert in
+[`phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`](../phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md)
++ Live-Verified P14-D Mini-Session 21), **kein** Sicherheitsproblem (Restart ist
+sauber, Datenbank-Konsistenz gewahrt, `restart-services.sh` idempotent beim Start).
+Cross-Phase-Fix (Phase 8 Scheduler + Phase 12 Recorder Sleep-Cap vereinheitlichen)
+ist Phase-15-Territorium (Block-D D5 oder eigener Mini-Plan).
+
+🟡 **Push-Drift nicht mehr offen:** A-5-Push-Phase endete mit „1 Commit ahead,
+Push wartet auf Nikinger" — Nikinger hat in dieser Session erteilt (A-6-Push),
+A-6 pushte im Bundle (2 Commits), P15-F pushte als 1 Commit. **HEAD = `0349797`
+auf `origin/main`, 0 ahead / 0 behind, working tree clean (außer
+Session-Rotation-Edits, die im folgenden Schritt committed werden).**
 
 ### Open questions / blockers
 
 - **Gate P7 unverändert zu** (Block B): wartet auf einen OPEN-Trade mit IG-Lag +
-  24 h Beobachtung (Phase-12-Reconcile-Timing Live-Verify, A6). Heute 0 OPEN-Trades
-  gemessen, erwarteter Live-Effekt: ≤ 5 CRITICALs in 24 h statt 6+ in 52 min;
-  > 24 h ohne Auflösung = WARNING statt CRITICAL.
-- **Block A endgültig abgeschlossen.** Blöcke B / C / D warten auf Nikinger-Wahl
-  bzw. auf P7-Gate (Block B).
-- **Phase-15-spezifische Hook-Härtung** (Mini-Plan-Aufgabe, nicht Phase-15-Scope):
-  P14-F-Regex `(?:Mini-)?Session\s+(\d+)` matcht den Plan-Session-Heading nicht;
-  PHASE_DIRS endet bei `phase14_discovery` und deckt weder `phase15_v4` noch
-  `ROADMAP.md`/`ROADMAP_ARCHIVE.md` ab. Aktuell kein Blocker (manuell sauber
-  rotiert), aber für saubere Folge-Sessions sinnvoll.
-- **D5-H.-B-Vermerk im PHASE14_CLOSEOUT_HANDOVER.md** bleibt stale bis Block-D-
-  Step-D1 (siehe Findings 🟡 oben).
+  24 h Beobachtung (Phase-12-Reconcile-Timing Live-Verify). Heute 0 OPEN-Trades
+  gemessen.
+- **Block A endgültig abgeschlossen** (A-1..A-6 + P15-F ✅). Blöcke B / C / D
+  warten auf Nikinger-Wahl bzw. auf P7-Gate.
+- **Phase-15-spezifische Hook-Härtung (P15-F) ✅ abgeschlossen** — diese Session.
+- **Dienste gepausiert** (2026-08-31 ~18:00 UTC, vor VM-Wartung). **Warten auf
+  VM-Comeback von Nikinger.** Bei Comeback: `bash scripts/restart-services.sh
+  start` (alle 4), dann Session-Stop + Final-Push.
+- **D5-H.-B-Vermerk im PHASE14_CLOSEOUT_HANDOVER.md Z. 272** bleibt stale bis
+  Block-D-Step-D1 (per 📕-Konvention, nicht updateable).
+- **Scheduler + Recorder POST_WINDOW-Sleep-Cap** (P14-D-Muster): KILL nach 5 s
+  ist bekannt + sicher; ein **Phase-15-Block-D-Step** könnte das vereinheitlichen
+  (Cross-Phase P8/12 — heute nicht freigegeben).
 
-### NEXT (für die nächste Session / morgen)
+### NEXT (für die nächste Session / nach VM-Comeback)
 
-**Nikinger-Wahl zum nächsten Schritt erwartet** (Stand ~17:15 UTC = ~19:15 CEST).
+**Nikinger-Wahl + VM-Comeback-bedingt.** Stand ~18:00 UTC = ~20:00 CEST, 2026-08-31.
 
-**Konkrete Empfehlung (sortiert nach Aufwand × Impact):**
+**Aktion bei VM-Comeback (Nikinger-Bescheid):**
+1. **`bash scripts/restart-services.sh status`** — alle 4 Dienste sollten weiter
+   „dead" sein (VM-Wartung hat den Prozess-State vermutlich nicht zurückgesetzt).
+2. **`bash scripts/restart-services.sh start`** — startet Recorder → Discovery →
+   Scheduler → WebUI (Reihenfolge aus dem Skript).
+3. **`bash scripts/restart-services.sh status`** — alle 4 sollten „ALIVE" sein.
+4. **`pytest phase7_reward/tests -q`** — Pre-Test des Phase-7-Backoffs (Backoff-Tests
+   A2–A5 müssen grün sein; war vor der Wartung grün, sollte nach Restart wieder
+   grün sein, weil Code unverändert).
+5. **Optional:** Smoke-Test `python3 scripts/smoke_test.py --help` (Operator-Smoke,
+   kein Auto-Run).
 
-1. **Phase-15-spezifische Hook-Härtung als Mini-Plan-Aufgabe** (~30 Min Plan +
-   ~1 h Code+Tests, Cross-Phase: P14-F-Erweiterung + PHASE_DIRS-Update): die
-   Doc-Rotation-Hook-Lücke für `phase15_v4` + die Root-Level-Dateien
-   (`ROADMAP.md`, `ROADMAP_ARCHIVE.md`) schließen. Vorbedingung für saubere
-   Folge-Sessions in Phase 15 (sonst wieder manuell rotieren).
-2. **Block D (Erbstücke) D1-D3** — kein Gate, jetzt möglich. D1: D5-H.-B-Vermerk
+**Konkrete Empfehlung für die Folge-Session (nach VM-Comeback + Restart):**
+
+1. **Block D (Erbstücke) D1-D3** — kein Gate, jetzt möglich. D1: D5-H.-B-Vermerk
    in `phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md` (Cross-Phase P14, freigegeben
    — schließt den seit A-6 dokumentierten stale-Vermerk). D2: `phase13_14_15.svg`
    (~1 h). D3: Pfad A Operator-Tool in Phase 13 (Cross-Phase P13, freigegeben).
-3. **Block B** — bleibt hinter Gate P7. **Nicht** jetzt — wartet auf A6-Abschluss-
-   meldung des Phase-12-Reconcile-Timing-Fix-Live-Verify (nächster OPEN-Trade mit
-   IG-Lag + 24-h-Beobachtung).
+2. **Phase-15-Block-B-Vorbereitung** (`process_weight` 1.5 → 0.5 + Score-Reset auf 50):
+   rein Code-Vorbereitung (Datenbank-Migration + Scorer-Config), kann jetzt
+   geschrieben werden, **applied** erst nach P7-Abschluss (Operator-Aktion).
+3. **Phase-15-Block-C-Vorbereitung** (Instinct-ECC): Extraktion-Logik + Validierung
+   kann geplant + implementiert werden, **Promotion hinter Flag** (default
+   `False`), `n=8` verweigert korrekt.
+4. **Block B** — bleibt hinter Gate P7 (wartet auf A6-Abschlussmeldung des
+   Phase-12-Reconcile-Timing-Fix-Live-Verify).
 
-**Push-Status:** **2 Commits ahead of `origin/main = ef320e6`** (A-5 + A-6) —
-**Push erteilt von Nikinger 2026-08-31** nach A-6-Commit. Push-Resultat siehe
-unten (im selben A-6-Commit-Bundle).
+**Push-Status dieser Session:** **2 Commits gepusht** (A-6 in Session #3 + P15-F
+`0349797` in Session #4); **1 Commit pending** (Session-Rotation-Commit, wird in
+diesem Schritt erzeugt + gepusht).
 
 > **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first):
 > [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention
 > ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)). Der vorherige
-> MiniMax-M3-Exec-Session #2-Block (A-5, 1 Commit, lokal) wurde in dieser Session
+> MiniMax-M3-Exec-Session #3-Block (A-6, 1 Commit, lokal) wird in dieser Session
 > **nach** SESSIONS_ARCHIVE.md rotiert.
 
-> **Hinweis (History):** SESSIONS_ARCHIVE.md trägt jetzt 3 Session-Blöcke, alle
-> 2026-08-31, newest-first: #3 (dieser, A-6, gleich hinzugefügt) → #2 (A-5) →
-> #1 (A-1..A-4) → Plan-Session (Opus 5). Phasenkopf trägt exakt einen Block
-> (dieser #3-Block), Rotation-Konvention gewahrt.
+> **Hinweis (History):** SESSIONS_ARCHIVE.md trägt jetzt 4 Session-Blöcke, alle
+> 2026-08-31, newest-first: #4 (dieser, P15-F, gleich hinzugefügt) → #3 (A-6) →
+> #2 (A-5) → #1 (A-1..A-4) → Plan-Session (Opus 5). Phasenkopf trägt exakt einen
+> Block (dieser #4-Block), Rotation-Konvention gewahrt.

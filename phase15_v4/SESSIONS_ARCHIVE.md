@@ -8,6 +8,182 @@ the L0/L1/L2/L3 model.
 
 ---
 
+## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #3, Block A Step A-6 + Block A endgültig abgeschlossen)
+
+> **Auftrag:** Nikinger-Chat 2026-08-31 nach A-5-Push-Phase: „Weiter mit A6 schlage
+> ich vor. Du darfst pushen." — Cross-Session-Drift vor Ausführung entdeckt
+> (`## Closed phases`-Doppel-Header in `docs/INDEX.md`) und sauber gehandhabt;
+> **2 zusätzliche** stale P15-NEXT-Items in den aktiven Session-Blöcken von
+> phase7_reward/CLAUDE.md (Z. 469) und phase14_discovery/CLAUDE.md (Z. 289) im
+> selben Geist mit aufgeräumt (siehe Findings).
+>
+> Ausführungs-Scope: **1 Commit (Doc-only, atomar) + Push** — exakt der Plan-§6-
+> Schritt A-6 + die 2 zusätzlichen stale P15-NEXT-Items in aktiven Session-Blöcken
+> (gleicher Geist, gleiche Anti-Pattern-Klasse, alle Cross-Phase-freigegeben).
+> Push-Freigabe explizit von Nikinger erteilt (Session #2-Push + Session #3-A-6-Push
+> werden in **einem** Push-Commit zusammengefasst).
+
+### Completed
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start):**
+- `docs/INDEX.md` hat **zwei** `## Closed phases`-Überschriften (Z. 37 + Z. 39) —
+  Doppel-Header aus Phase-12/13/14-Closeout-Periode. Z. 39 (Phase-10-only) ist
+  reduntant, Z. 37 (Phase-10/12/13/14) ist die jüngere + umfassendere.
+- 3 stale „P15-Plan-Session offen"-Vermerke (Plan A-6-Liste) verifiziert +
+  **2 weitere** in den aktiven Session-Blöcken gefunden (gleiche Anti-Pattern-
+  Klasse, gleicher Geist — alle in den Session-Blöcken der Phasen 7/13/14, die
+  per Rotation-Regel updateable sind).
+
+**1. A-6 — 6 Doc-Edits (1 INDEX.md + 5 stale P15-Vermerke in Phasen 7/13/14):**
+- `docs/INDEX.md` Z. 39 redundante `## Closed phases`-Überschrift entfernt;
+  Z. 37 (umfassendere) bleibt — eine Überschrift statt zwei.
+- `phase7_reward/CLAUDE.md` Z. 457 (Plan-A-6-listed): `P15-Plan-Session (V4) —
+  Material jetzt vollständig` → ✅ **abgeschlossen 2026-08-31**, Plan-Commit
+  `f98df68` + Nikinger-Freigabe `aad1d00`; Phase 15 in execution.
+- `phase7_reward/CLAUDE.md` Z. 469 (zusätzlich gefunden): NEXT-List-Item 3
+  `P15-Plan-Session (großer Block, ~2-3h)` → ✅ abgeschlossen 2026-08-31
+  (P12-Reconcile-Backoff als V4-Material weiterhin offen für Phase-15 Block B/D).
+- `phase13_live_data/CLAUDE.md` Z. 237-239 (Plan-A-6-listed): NEXT-List-Item 1
+  `Phase-15-Plan-Session (großer Block, ~2-3h)` → ✅ abgeschlossen 2026-08-31.
+- `phase14_discovery/CLAUDE.md` Z. 271-273 (Plan-A-6-listed): `Phase-15-Plan-
+  Session (V4) — Material jetzt vollständig` → ✅ abgeschlossen 2026-08-31.
+- `phase14_discovery/CLAUDE.md` Z. 289-292 (zusätzlich gefunden): NEXT-List-
+  Item 1 `Phase-15-Plan-Session (großer Block, ~2-3h)` → ✅ abgeschlossen
+  2026-08-31.
+- **Cross-Phase (Plan §4 freigegeben):** P7 + P13 + P14 berührt, **P8 nicht**.
+- **Nicht angefasst (per 📕-Konvention):** `phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md`
+  Z. 272 D5-H.-B-Vermerk (Plan-A-6-Hinweis „wird von Step D1 ohnehin angefasst,
+  dort mitnehmen" — gilt weiterhin); alle SESSIONS_ARCHIVE.md-Einträge
+  (verbatim).
+
+**2. Session-Rotation:**
+- `phase15_v4/CLAUDE.md`: alter MiniMax-M3-Exec-Session #2-Block (A-5) verbatim
+  nach `SESSIONS_ARCHIVE.md` rotiert; neuer #3-Block (A-6 + Block A endgültig
+  abgeschlossen) in Phasenkopf. Phasenkopf trägt jetzt genau einen Session-
+  Block. `SESSIONS_ARCHIVE.md` hat jetzt 3 Session-Blöcke, newest-first
+  (MiniMax-M3 #3 wird gleich nach dem Commit hinzugefügt).
+- Step A-6-Sektion im Phasenkopf ergänzt (`phase15_v4/CLAUDE.md:295-403`).
+
+### Σ-Sweep Stand 2026-08-31 ~17:00 UTC (selbst nachgemessen, diese Session)
+
+Doc-only-Edits, **kein** Code-Touch, **kein** Test-Touch. Σ-Baseline 1703 grün
+bleibt erhalten:
+
+| Phase | Tests grün | Δ |
+|---|---:|---|
+| phase1_broker_wrapper | 95 | — |
+| phase2_persistence | 77 | — |
+| phase3_external_data | 104 | — |
+| phase4_research | 155 | — |
+| phase5_execution | 173 | — |
+| phase6_debate | 76 | — |
+| phase7_reward | 142 | — |
+| phase8_scheduler | 248 | — |
+| phase9_universe | 87 | — |
+| phase10_v3 | 165 | — |
+| phase12_data_foundation | 145 | — |
+| phase13_live_data | 74 | — |
+| phase14_discovery | 61 | — |
+| root `tests/` | 101 | — |
+| **Σ total** | **1703** | = A-2-Baseline exakt, 2× reproduziert (A-5 + A-6) ✅ |
+
+### Commits (lokal, in dieser Session erzeugt; 1 Commit für A-6, **Push erteilt**)
+
+| Commit | Scope | Diff |
+|---|---|---|
+| `933167a` | `phase15: docs -- A-6 stale P15-Vermerke (3 Plan-listed + 2 zusätzliche in aktiven Session-Blöcken) + INDEX.md Doppel-Header zusammengeführt` | `docs/INDEX.md` −1 Z., `phase7_reward/CLAUDE.md` +6 −2, `phase13_live_data/CLAUDE.md` +3 −3, `phase14_discovery/CLAUDE.md` +8 −4, `phase15_v4/CLAUDE.md` +102 −1 (A-6-Sektion + Session-Rotation) |
+| (vorher, bereits gepusht) | A-5 Commit `9f8101b` | `ROADMAP.md` +242 -242, ROADMAP_ARCHIVE.md NEU, INDEX.md +5 -3, plan +13 -2, CLAUDE.md +141 -1 |
+| (Push-Bundle) | **2 Commits ahead of `origin/main = ef320e6`** | A-5 (`9f8101b`) + dieser (A-6) — **Push erteilt von Nikinger 2026-08-31 nach A-6-Commit** |
+
+### Findings
+
+🟢 **A-6 Plan-konform abgeschlossen (+ 2 zusätzliche stale P15-NEXT-Items im selben
+Geist).** Block A ist damit **endgültig** abgeschlossen (A-1..A-6 alle ✅).
+
+- **AK1** ✅ Step-0-Ritual (A-1)
+- **AK2** ✅ Σ-Baseline 1703 (A-2)
+- **AK3** ✅ ROADMAP 15b/15c/15d stimmen (A-3)
+- **AK4 (reduziert)** ✅ ROADMAP.md < 40 KB (A-5); phase7_reward/CLAUDE.md =
+  auditability-bewusst beibehalten
+- **AK14** ✅ ROADMAP_ARCHIVE.md-Zeile im selben Commit (A-5)
+- **Σ-Baseline 1703 grün** unverändert (2× reproduziert)
+
+🟢 **Drift-Handling ehrlich gehalten:** INDEX.md-Doppel-Header war eine Folge
+gestaffelter Phase-12/13/14-Closeouts, die Z. 37 aktualisierten, Z. 39 aber nicht
+anfassten. **Drift gefunden → behoben → datiert vermerkt** (kein stillschweigendes
+„close enough").
+
+🟢 **2 zusätzliche stale P15-NEXT-Items im Geist von A-6 mit aufgeräumt:**
+Plan A-6 listete 3 stale Vermerke; während der Ausführung in den aktiven Session-
+Blöcken der Phasenköpfe P7 + P14 weitere 2 mit identischem Anti-Pattern gefunden
+(„Material jetzt vollständig" — falsch seit Plan-Commit). Beide updateable per
+Rotation-Regel (in aktiven Session-Blöcken), beide Cross-Phase-freigegeben
+(Plan §4: P7 + P14 sind freigegeben). **A-6-Scope spirit-conform**, nicht „stiller
+Scope-Creep": Plan §6 A-6 sagt „3 stale Zeilen" — die 2 zusätzlichen sind
+dasselbe Pattern in denselben Phasenköpfen, in den updatebaren aktiven Session-
+Blöcken. Vermerk im Phasenkopf (Step A-6 „Scope-Anmerkung") für Auditability.
+
+🟢 **Pre-Commit-Hook (`scripts/check_doc_rotation.py`) verifiziert** (Phase-Heads
+8/8 OK; `phase15_v4` weiterhin nicht in PHASE_DIRS-abgedeckt — Mini-Plan-
+Aufgabe für später, **kein Blocker** für A-6).
+
+🟡 **D5-H.-B-Vermerk im PHASE14_CLOSEOUT_HANDOVER.md Z. 272 bleibt stale** —
+per Plan A-6-Hinweis „wird von Step D1 ohnehin angefasst, dort mitnehmen",
+📕-Konvention (Handover ist Snapshot, nicht updateable). Phase-15-Block-D-Step-D1
+muss diesen Vermerk dann **mit** schließen.
+
+### Open questions / blockers
+
+- **Gate P7 unverändert zu** (Block B): wartet auf einen OPEN-Trade mit IG-Lag +
+  24 h Beobachtung (Phase-12-Reconcile-Timing Live-Verify, A6). Heute 0 OPEN-Trades
+  gemessen, erwarteter Live-Effekt: ≤ 5 CRITICALs in 24 h statt 6+ in 52 min;
+  > 24 h ohne Auflösung = WARNING statt CRITICAL.
+- **Block A endgültig abgeschlossen.** Blöcke B / C / D warten auf Nikinger-Wahl
+  bzw. auf P7-Gate (Block B).
+- **Phase-15-spezifische Hook-Härtung** (Mini-Plan-Aufgabe, nicht Phase-15-Scope):
+  P14-F-Regex `(?:Mini-)?Session\s+(\d+)` matcht den Plan-Session-Heading nicht;
+  PHASE_DIRS endet bei `phase14_discovery` und deckt weder `phase15_v4` noch
+  `ROADMAP.md`/`ROADMAP_ARCHIVE.md` ab. Aktuell kein Blocker (manuell sauber
+  rotiert), aber für saubere Folge-Sessions sinnvoll.
+- **D5-H.-B-Vermerk im PHASE14_CLOSEOUT_HANDOVER.md** bleibt stale bis Block-D-
+  Step-D1 (siehe Findings 🟡 oben).
+
+### NEXT (für die nächste Session / morgen)
+
+**Nikinger-Wahl zum nächsten Schritt erwartet** (Stand ~17:15 UTC = ~19:15 CEST).
+
+**Konkrete Empfehlung (sortiert nach Aufwand × Impact):**
+
+1. **Phase-15-spezifische Hook-Härtung als Mini-Plan-Aufgabe** (~30 Min Plan +
+   ~1 h Code+Tests, Cross-Phase: P14-F-Erweiterung + PHASE_DIRS-Update): die
+   Doc-Rotation-Hook-Lücke für `phase15_v4` + die Root-Level-Dateien
+   (`ROADMAP.md`, `ROADMAP_ARCHIVE.md`) schließen. Vorbedingung für saubere
+   Folge-Sessions in Phase 15 (sonst wieder manuell rotieren).
+2. **Block D (Erbstücke) D1-D3** — kein Gate, jetzt möglich. D1: D5-H.-B-Vermerk
+   in `phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md` (Cross-Phase P14, freigegeben
+   — schließt den seit A-6 dokumentierten stale-Vermerk). D2: `phase13_14_15.svg`
+   (~1 h). D3: Pfad A Operator-Tool in Phase 13 (Cross-Phase P13, freigegeben).
+3. **Block B** — bleibt hinter Gate P7. **Nicht** jetzt — wartet auf A6-Abschluss-
+   meldung des Phase-12-Reconcile-Timing-Fix-Live-Verify (nächster OPEN-Trade mit
+   IG-Lag + 24-h-Beobachtung).
+
+**Push-Status:** **2 Commits ahead of `origin/main = ef320e6`** (A-5 + A-6) —
+**Push erteilt von Nikinger 2026-08-31** nach A-6-Commit. Push-Resultat siehe
+unten (im selben A-6-Commit-Bundle).
+
+> **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first):
+> [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention
+> ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)). Der vorherige
+> MiniMax-M3-Exec-Session #2-Block (A-5, 1 Commit, lokal) wurde in dieser Session
+> **nach** SESSIONS_ARCHIVE.md rotiert.
+
+> **Hinweis (History):** SESSIONS_ARCHIVE.md trägt jetzt 3 Session-Blöcke, alle
+> 2026-08-31, newest-first: #3 (dieser, A-6, gleich hinzugefügt) → #2 (A-5) →
+> #1 (A-1..A-4) → Plan-Session (Opus 5). Phasenkopf trägt exakt einen Block
+> (dieser #3-Block), Rotation-Konvention gewahrt.
+
+---
+
 ## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #2, Block A Step A-5 + Session-Rotation)
 
 > **Auftrag:** Nikinger-Chat 2026-08-31 nach Session-Ende der ersten Exec-Session
