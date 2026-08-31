@@ -10,7 +10,7 @@ down:
   - ../phase10_v3/PHASE11_DEFERRAL_HANDOVER.md # 📕 H3 ist offen; Block B *ist* H3
   - ../phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md # 📕 §7 D5-H.-B, §9 Konsistenz-Regeln
   - ./SESSIONS_ARCHIVE.md                     # 📦 verbatim Session-Historie, newest-first
-updated: 2026-08-31 (A-1 + A-2 + A-3 protokolliert, MiniMax-M3)
+updated: 2026-08-31 (A-1 + A-2 + A-3 + A-4 protokolliert, MiniMax-M3)
 ---
 
 # Phase 15 — V4: Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock
@@ -197,6 +197,36 @@ trägt (Compression-Latch). Eine „gegenstandslos"-Erklärung für 15b Zeile 3 
 **Nicht angefasst (Phase-15-Scope-Grenze):**
 - 15a (Council-Integration) — Nikinger-Entscheidung 2026-08-31, Runde 1 (Plan §10)
 - 15e (Instinct-Promotion + Longterm VETO) — bleibt Block C (Plan §6)
+
+---
+
+## Step A-4 — root-CLAUDE.md Statuspflege (2026-08-31, MiniMax-M3 Exec-Session)
+
+> **Plan-Anker:** [`docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md) §6 A-4 (S. 396-410).
+> **Scope:** zwei Anker-Edits im root `CLAUDE.md`, jeder mit datiertem Vermerk.
+
+### Anker 1 — `CLAUDE.md:93` (Status-Absatz voranstellen)
+
+> **✅ 2026-08-31 — Phase 13 + Phase 14 ABGESCHLOSSEN (Sessions 18 + 23).** … **Phase 15
+> (V4) eröffnet 2026-08-31** — Mission: „bevor der Bot mehr lernt, muss das, was er lernt,
+> stimmen" …
+
+Der existierende Phase-8-Block bleibt **unangetastet** (Auditability). Der neue Absatz steht
+**davor** und fasst zusammen, was seitdem passiert ist.
+
+### Anker 2 — `CLAUDE.md:148` (Phase-15-Row flippen)
+
+| Spalte | Vorher | Nachher |
+|---|---|---|
+| Status | `Deferred, gegatet auf Phase 9+11+12+13+14 + reale Outcomes` | `🔄 **in Arbeit seit 2026-08-31** — execution-ready Plan (P1–P16, AK1–AK14). Phasenkopf mit Block A in Ausführung. Blöcke A/B/C/D mit Gate-Logik.` |
+
+**Verdienst:** root-CLAUDE.md spiegelt den aktuellen Stand (Plan-Akzeptanzkriterium AK3 ist
+mit A-3 erfüllt; die Status-Pflege ist die logische Folge für AK-Lesbarkeit). Die alte
+„Deferred"-Formulierung hätte für die nächste Cold-Reader-Session fälschlich „Phase 15 ist noch
+nicht angefangen" gesagt — das ist nach Commit `f98df68` + den Folge-Commits `a2d4a15` /
+`d1dd26b` / `aad1d00` (Plan + Phasenkopf + Nikinger-Freigaben) nicht mehr wahr.
+
+**Nicht angefasst:** Phasen 1–14 Rows der Status-Tabelle (alle aktuell), Phasen-8-Block (Auditability).
 
 ---
 
