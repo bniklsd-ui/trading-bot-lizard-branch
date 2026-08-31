@@ -28,14 +28,16 @@ below Session 13 → two ``## Session stopped`` blocks in one phasenkopf).
 
 Usage::
 
-    python3 scripts/check_doc_rotation.py                  # all phases
+    python3 scripts/check_doc_rotation.py                       # Step-1 only (default)
+    python3 scripts/check_doc_rotation.py --strict             # Step-1 + Step-2 (P14-F)
     python3 scripts/check_doc_rotation.py --phase phase14_discovery
-    python3 scripts/check_doc_rotation.py --quiet          # suppress OK rows
+    python3 scripts/check_doc_rotation.py --quiet              # suppress OK rows
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -64,6 +66,77 @@ PHASE_DIRS: tuple[str, ...] = (
 )
 
 SESSION_HEADING = "## Session stopped"
+
+# P14-F plan §2 D4: tolerant gegen „Session N" und „Mini-Session N" (eingeführt
+# in Phase 14 für Hygiene-Mini-Sessions). Matcht auch künftige Permutationen
+# mit Whitespace-Toleranz.
+_SESSION_NUM_RE = re.compile(r"(?:Mini-)?Session\s+(\d+)")
+
+
+def _max_session_num(md_text: str) -> int | None:
+    """Return the largest ``Session N``-number found in ``## Session stopped``
+    heading lines of the Markdown body, or ``None`` if no session heading
+    carries one.
+
+    Robust gegen die aktuellen zwei Namensvarianten („Session N", „Mini-Session N")
+    via ``(?:Mini-)?Session\\s+(\\d+)``. Eine Phasenkopf-Datei hat per Konvention
+    nur einen Block; ``max`` ist trotzdem sicherer als ``first`` (defensive).
+
+    Nur H2-Heading-Zeilen werden gescannt (nicht Body-Prose) — sonst fängt die
+    Regex False-Positives wie „Folge-Session 2026-07-17" (Jahr) oder
+    „Session 12/13" (Kommentar). Plan §8.5 hatte das False-Positive-Risiko als
+    „gering" eingestuft; die Realität (mehrere Phasen mit Body-Erwähnungen)
+    macht die Einschränkung auf die Heading-Zeile strukturell nötig.
+    """
+    nums: list[int] = []
+    for line in md_text.splitlines():
+        if not line.startswith(SESSION_HEADING):
+            continue
+        for m in _SESSION_NUM_RE.finditer(line):
+            nums.append(int(m.group(1)))
+    return max(nums) if nums else None
+
+
+def check_archive_sequence(phase_dir: Path) -> tuple[str, str] | None:
+    """P14-F Step 2: prüfe, dass ``head-N == archive-max-(N-1)``.
+
+    Returns:
+        ``None`` wenn OK, sonst ``(phase_name, diagnostic)`` für die FAIL-Zeile.
+
+    Invariante: Wenn ein Phasenkopf genau einen ``Session N``-Block hat, muss das
+    Archiv (sofern existent) einen Block mit Session-Number ``N-1`` enthalten,
+    oder leer sein wenn ``N == 1`` (erste Session der Phase). Eine Lücke ist
+    ein Doc-Rotation-Drift, der in Mini-Session 21 (Commit ``5d587a0``)
+    operativ aufgetreten ist.
+    """
+    head = phase_dir / "CLAUDE.md"
+    if not head.exists():
+        return None  # kein Phasenkopf → kein Step-2-Check
+    head_max = _max_session_num(head.read_text(encoding="utf-8"))
+    if head_max is None:
+        return None  # keine Sessions im Phasenkopf → nichts zu prüfen
+
+    archive = phase_dir / "SESSIONS_ARCHIVE.md"
+    if not archive.exists():
+        if head_max == 1:
+            return None  # erste Session der Phase, Archiv ist erwartet leer
+        return (phase_dir.name,
+                f"head has Session {head_max} but no SESSIONS_ARCHIVE.md "
+                f"(expected Sessions 1..{head_max - 1})")
+
+    arch_max = _max_session_num(archive.read_text(encoding="utf-8"))
+    expected = head_max - 1
+    if arch_max is None:
+        if head_max == 1:
+            return None  # erste Session der Phase, Archiv darf leer sein
+        return (phase_dir.name,
+                f"head has Session {head_max} but SESSIONS_ARCHIVE.md has "
+                f"no parseable session numbers (expected Session {expected})")
+    if arch_max != expected:
+        return (phase_dir.name,
+                f"head has Session {head_max} but archive newest is Session "
+                f"{arch_max} (expected {expected}) — sequence gap")
+    return None
 
 
 def count_session_blocks(md_text: str) -> int:
@@ -109,6 +182,16 @@ def main() -> int:
         action="store_true",
         help="Suppress per-phase output on success; print only failures.",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "Enable Step-2 archive-sequence check in addition to Step-1 "
+            "duplicate-block check (P14-F). Default: Step-1 only — "
+            "the pre-commit hook should only be hardened once the new "
+            "check has been proved against the current archive state."
+        ),
+    )
     args = parser.parse_args()
     selected = args.phase if args.phase else list(PHASE_DIRS)
 
@@ -131,6 +214,22 @@ def main() -> int:
             "(at most one '## Session stopped' block per phasenkopf)."
         )
         return 1
+
+    # P14-F Step 2: Archive-Sequenz-Integrität (default off, opt-in via
+    # --strict). D5: bewusste Trennung Tool-Bau vs. Tool-Verschärfung —
+    # die Folgesession (oder --strict-Flag, falls Beweis-Skript grün)
+    # aktiviert das im Pre-Commit-Hook.
+    if getattr(args, "strict", False):
+        seq_bad: list[tuple[str, str]] = []
+        for name in selected:
+            result = check_archive_sequence(REPO_ROOT / name)
+            if result is not None:
+                seq_bad.append(result)
+                label, diagnostic = result
+                print(f"[FAIL] {label}: {diagnostic}")
+        if seq_bad:
+            return 1  # keine Inline-Duplicates, aber Sequenz-Lücke → fail
+
     if not args.quiet:
         print("\nAll phase heads OK.")
     return 0
