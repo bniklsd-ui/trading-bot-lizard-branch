@@ -5,6 +5,7 @@
 > **Quelle der Wahrheit ist der Plan + der Code, nicht dieses Dokument.**
 > Vollständiger Plan: [`../docs/concepts/phase13_live_data_plan.md`](../docs/concepts/phase13_live_data_plan.md).
 > Vorgeschichte: [`../phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md`](../phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md).
+> Beweiswoche-Auswertung: [`./PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](./PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md) (Mini-Session 23, 2026-08-31) — empirischer Befund: IG-Bars-Lücke seit 2026-08-18, 53.6 % Divergenzrate am letzten Tag mit Bars; Phase-14 D5-Handover **architektonisch freigegeben, operativ vorbehaltlich** Phase-13-Recorder-Mapping-Initiative.
 
 ## Mission (zuerst lesen)
 

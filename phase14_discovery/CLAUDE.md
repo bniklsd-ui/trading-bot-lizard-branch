@@ -16,6 +16,7 @@
 > Drift, die Mini-Session 21 operativ aufgedeckt hat — neue Session in Phasenkopf geschrieben **bevor** die alte ins Archiv rotiert wurde.
 > Step-2-Logik (`head-N == archive-max-(N-1)`) + Tracked-Installer `scripts/install_hooks.sh` + `dev_install.sh`-Anbindung;
 > Cross-Phase-Freigabe `scripts/dev_install.sh` (eine Zeile), D1–D5 gelockt, A1–A6 Akzeptanz; vom Folgesession-Subplan übernommen).
+> Phase-13-Beweiswoche-Befund 2026-08-31: [`../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md) — Phase-14 D5-Handover **architektonisch freigegeben** (Tabelle + Discovery + Source-Delta funktionieren wie designed), **operativ vorbehaltlich** der Phase-13-Recorder-Mapping-Initiative (IG-Bars-Lücke seit 2026-08-18, 53.6 % Divergenzrate am letzten Tag mit Bars).
 
 ## Mission (zuerst lesen)
 
