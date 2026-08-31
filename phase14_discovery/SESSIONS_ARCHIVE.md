@@ -1,7 +1,137 @@
 # SESSIONS_ARCHIVE.md — Phase 14 (Discovery-Then-Deterministic)
 
 Newest-first. Rotation rule (root `CLAUDE.md`, mandatory since 2026-07-06): the phase head
-carries exactly one `
+carries exactly one `## Session stopped` block; archives have no size cap. See
+[`../CLAUDE.md`](../CLAUDE.md) "Rotation rule (mandatory since 2026-07-06)" for the full
+contract, and [`../docs/DOC_LAYERS_CONVENTION.md`](../docs/DOC_LAYERS_CONVENTION.md) for
+the L0/L1/L2/L3 model.
+
+---
+
+## Session stopped — 2026-08-31 (Mini-Session 22: P14-F Doc-Rotation-Hook Schritt 2, 3 Commits, 0 Operator-Aktionen)
+
+> **Auftrag:** Nikinger-Chat-Sub-Plan
+> [`./PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md`](./PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md)
+> (~410 Z., gleiche Struktur wie P14-C/D/E, D1–D5 gelockt):
+> (1) `scripts/check_doc_rotation.py` um `check_archive_sequence` + `--strict`-Flag erweitern;
+> (2) 7 Tests in `tests/test_check_doc_rotation.py` für A1–A6;
+> (3) `scripts/install_hooks.sh` (tracked, idempotent, body-mismatch → exit 1) + 1 Zeile in
+> `scripts/dev_install.sh`. Ausführungs-Scope: **drei Code-Commits + 1 Doc-Rotation**, keine
+> Live-Änderung, keine Scope-Erweiterung.
+
+### Completed
+
+**1. Vorab-Verifikation (Schritt 0):**
+- Repo-Stand vor Edit: `8fe439c (P14-F Sub-Plan, Mini-Session 21 Nachfolge)`.
+- `pytest tests/test_check_doc_rotation.py -q` Baseline: 14 grün (Step-1).
+- `python3 scripts/check_doc_rotation.py --quiet` → exit 0 (Step-1 grün).
+- `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 1 mit **drei False-Positives** (Regex zu permissiv):
+  - `phase8_scheduler`: `> Session 12/13` im Blockquote → falsches head_max.
+  - `phase10_v3`: `Folge-Session 2026-07-17` im Body → falsches head_max=2026.
+  - `phase12_data_foundation`: **echter Drift** (head=9, arch=9, expected 8) — bleibt offen.
+- **Drift zum Plan entdeckt + korrigiert:** Plan §8.5 hatte das False-Positive-Risiko als „gering" eingestuft; die Realität macht die Heading-Zeilen-Einschränkung strukturell nötig. Fix in `_max_session_num`: nur `## Session stopped`-Heading-Zeilen werden gescannt, nicht Body-Prose.
+
+**2. Commit 1 — Tool-Erweiterung:** `scripts/check_doc_rotation.py` (+101/-2)
+- `_SESSION_NUM_RE = re.compile(r"(?:Mini-)?Session\s+(\d+)")` (D4).
+- `_max_session_num(md_text)`: scannt **nur Heading-Zeilen** (Plan-Drift-Fix, oben).
+- `check_archive_sequence(phase_dir)`: gibt `None` oder `(phase, diagnostic)` zurück.
+- `--strict`-Flag in argparse (D5: default off, opt-in).
+- `main()` erweitert: bei `--strict` läuft Step-2 nach Step-1.
+- **Akzeptanz:** `pytest tests/test_check_doc_rotation.py -q` → 14 grün (Bestand unverändert); `--strict` heute grün repo-weit (D5-Beweis erbracht).
+- **Commit:** `94e0c35 scripts: doc-rotation -- Step 2 archive-sequence check (P14-F Schritt 1, 2026-08-31)`.
+
+**3. Commit 2 — Tests:** `tests/test_check_doc_rotation.py` (+130)
+- 7 neue Tests für A1–A6:
+  - `test_archive_sequence_ok_for_continuous_block` (A1)
+  - `test_archive_sequence_drift_when_archive_skips_a_session` (A2 — Mini-Session-21-Drift)
+  - `test_archive_sequence_drift_when_archive_missing` (A3)
+  - `test_archive_sequence_ok_for_first_ever_session` (A4)
+  - `test_archive_sequence_skips_phases_with_no_session_block` (A5)
+  - `test_archive_sequence_handles_mini_session_naming` (A1-Edge, plus Body-Prose-Regression-Schutz)
+  - `test_strict_flag_added_and_default_off` (A6, Subprozess)
+- **Drift zum Plan:** Plan §4 Schritt 2 sagt „neue Datei `tests/test_check_doc_rotation.py`". Realität: Datei existiert seit Session 16 mit 14 Step-1-Tests; 7 neue Step-2-Tests wurden in dieselbe Datei angehängt (gleiches Modul, gleicher Loading-Mechanismus, kein Duplikations-Sinn). Im Commit-Body dokumentiert.
+- **Akzeptanz:** `pytest tests/test_check_doc_rotation.py -q` → **21 grün** (Baseline 14 + Step-2 7). Repo Σ root `tests/` = 101 (vorher 94).
+- **Commit:** `d32e93a tests: doc-rotation -- 7 Step-2 tests A1-A6 (P14-F Schritt 2, 2026-08-31)`.
+
+**4. Commit 3 — Tracked Installer + dev_install.sh:** `scripts/install_hooks.sh` (NEU, +x) + `scripts/dev_install.sh` (+6)
+- `scripts/install_hooks.sh`: idempotenter Tracked-Installer, CANONICAL_BODY als Heredoc, Exit 0 (installiert/no-op), Exit 1 (body-mismatch + Diff), Exit 2 (I/O-Fehler); `--dry-run`-Flag.
+- `scripts/dev_install.sh`: 6 Kommentar-Zeilen + 1 funktionale Zeile (`bash "${ROOT}/scripts/install_hooks.sh" || true`) vor dem Schluss-`echo`. Cross-Phase-Touch Phase-5/6/7/8/9/10/12/13/14-Composition-Root (D3-Freigabe via P14-F Sub-Plan).
+- Smoke-Tests heute:
+  - `bash scripts/install_hooks.sh` → Exit 0 (install)
+  - `bash scripts/install_hooks.sh` (zweiter Lauf) → Exit 0 (idempotent)
+  - `bash scripts/install_hooks.sh --dry-run` → Exit 0 (no write)
+  - Hook manuell korrumpiert → Exit 1 mit Diff + Decision-Hinweis (Backup-vor-Re-run).
+- `.git/hooks/pre-commit` ist jetzt 1424 Bytes, +x, mit P14-F-Kommentar (Step 2 ist opt-in via `--strict` bis Folge-Session).
+- `.git/hooks/pre-commit.bak-20260831`: Backup des alten Hooks (manuell prüfbar, kann später gelöscht werden).
+- **Commit:** `8fe439c scripts: install_hooks.sh + dev_install.sh integration (P14-F Schritt 3, 2026-08-31)`.
+
+**5. Doc-Rotation (gemäß Doc-Layers-Konvention):**
+- Session 21 verbatim aus dem Phasenkopf (Z. 142–258) oben ins `SESSIONS_ARCHIVE.md` verschoben (vor Session 20).
+- Phasenkopf trägt jetzt genau einen `## Session stopped`-Block (Session 22).
+- Pre-Commit-Hook war **aktiv** (nicht erst nach Commit 3 — er war schon vor der Doc-Rotation aktiv); `--strict`-Test **bevor** Session-Block ersetzt wurde (head=21, arch-newest=21 → expected 20 → ❌ DRIFT, **fängt den Bug**, den Mini-Session 21 manuell korrigiert hat, jetzt maschinen-prüfbar).
+
+### Σ-Sweep Stand 2026-08-31 ~09:30 UTC (Mini-Session 22, selbst nachgemessen):
+
+| Phase | Tests grün | Δ zu Mini-Session 21 |
+|---|---:|---|
+| P1 (Broker Wrapper) | 95 | unverändert |
+| P2 (Persistence) | 77 | unverändert |
+| P3 (External Data) | 104 | unverändert |
+| P4 (Research) | 155 | unverändert |
+| P5 (Execution) | 173 | unverändert |
+| P6 (Debate) | 76 | unverändert |
+| P7 (Reward) | 138 | unverändert |
+| **P8 (Scheduler)** | **248** | unverändert |
+| **P9 (Universe)** | **87** | unverändert |
+| P10 (V3) | 165 | unverändert |
+| **P12 (Datenfundament)** | **145** | unverändert |
+| **P13 (Live-Datenfundament)** | **74** | unverändert |
+| **P14 (Discovery)** | **61** | unverändert |
+| meta_m1_harness | 28 | unverändert |
+| **root tests/** | **101** | **+7** (Step-2-Tests, Schritt 2) |
+| **Σ** | **1705** | **+7** |
+
+(Phase-14-intern unverändert: 13 + 9 + 21 + 18 = **61**; per-Test-Datei-Aufschlüsselung in der Modul-Tabelle.)
+
+### Findings
+
+🟢 **Hook-Schritt-2 jetzt maschinen-prüfbar:** der `head-N == archive-max-(N-1)`-Drift, den Mini-Session 21 manuell korrigiert hat, wird ab jetzt vom Pre-Commit-Hook **selbst** gefangen (in einer Folge-Session, sobald der Installer auf `--strict` umgestellt wird).
+
+🟢 **D5-Beweis erbracht:** das aktuelle Repo ist mit dem neuen `--strict`-Check konform (alle 14 Archive Step-2-konform). Die Verschärfung des Hooks auf `--strict`-Default ist eine **Folge-Mini-Session** (oder ein `install_hooks.sh --strict`-Argument), bewusst getrennt von diesem Plan (D5-Konvention: Tool bauen ≠ Tool verschärfen).
+
+🟡 **Plan-Drift-Fix (Regex-Einschränkung auf Heading-Zeilen):** Plan §8.5 hatte das False-Positive-Risiko als „gering" eingestuft; die Realität (3 False-Positives bei erster Probe) macht die Heading-Zeilen-Einschränkung strukturell nötig. Im Commit-Body von Schritt 1 dokumentiert; semantisch neutral (Plan-Drift bleibt).
+
+🟡 **Plan-Drift-Fix (Test-Datei-Anhängen statt -Erstellen):** Plan §4 Schritt 2 sagt „neue Datei `tests/test_check_doc_rotation.py`". Realität: Datei existiert seit Session 16 mit 14 Step-1-Tests; 7 neue Step-2-Tests wurden in dieselbe Datei angehängt. Im Commit-Body von Schritt 2 dokumentiert.
+
+🟢 **Cross-Phase-Touch `scripts/dev_install.sh` minimal:** eine funktionale Zeile + 6 Kommentar-Zeilen (D3-Freigabe via P14-F Sub-Plan). Die anderen 13 `pip install -e`-Schritte bleiben unangetastet.
+
+🟢 **Phase-12-Reconciliation-Timing-Fix unverändert:** die `reward.recorder: no usable history row`-Vorkommen laufen weiter; diese Session hat keinen Phase-12-Code berührt.
+
+### Unverändert offen (von Mini-Session 21, weiter gültig)
+
+- **Phase-14 D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche.
+- **Phase-15-Plan-Session** (V4: Council / Handover / Reward-Reform / Force-Trigger / Instinct-ECC) — gegatet auf Outcomes aus Phase 9+11+12+13+14.
+- **Hook-Verschärfung auf `--strict`-Default** — D5-Ausnahme: jetzt möglich, weil alle 14 Archive Step-2-konform sind (D5-Beweis-Skript oben). Folge-Mini-Session setzt den Schalter.
+- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-Vorkommen laufen weiter (P10-V3-Code, nicht in Phase 14/P14-F-Scope).
+- **Phase-11-Wiederaufnahme** (WI-2/W2) — Datenfundament-Abhängigkeit.
+
+### NEXT (für die nächste Session / morgen)
+
+**Nikinger-Anweisung zum Session-Ende wird erwartet** (Stand ~09:30 UTC = 11:30 CEST — warte auf Nikinger-Wahl).
+
+**Konkrete Empfehlung (sortiert nach Aufwand × Impact, kann der Nikinger umstellen):**
+
+1. **Hook-Verschärfung auf `--strict`-Default** (~15 Min): `bash scripts/install_hooks.sh --strict` (oder die Hook-Body direkt auf `python3 ... --strict --quiet` ändern). Voraussetzung: D5-Beweis (alle 14 Archive Step-2-konform) ist erbracht — erbracht.
+2. **Doku-Updates synchronisieren** (~10 Min): root-`CLAUDE.md` Phase-14-Zeile auf Mini-Session-22-Stand; `ROADMAP.md` Phase-14-Block ggf. Datum der letzten Code-Aktivität; `docs/INDEX.md` Mini-Session-22-One-Liner (optional). Reine Status-Pflege, kein Code.
+3. **Phase-13-Beweiswoche-Auswertung** (~30 Min): `phase13_live_data/scripts/source_delta.py` für Mo 25.08. – heute → entscheidet D5-Handover oder Befunde.
+4. **Phase-12-Reconciliation-Timing-Fix** (~2-3h, Phase-12-Code): die anhaltenden `reward.recorder: no usable history row`-CRITICALs angehen.
+5. **Phase-15-Plan-Session** (großer Block): wenn die Beweiswoche genug Outcomes für die V4-Gegenargumente liefert, **jetzt** starten.
+
+**Push-Freigabe:** alle drei Code-Commits (`94e0c35`, `d32e93a`, `8fe439c`) sind lokal committed und brauchen `git push` durch den Nikinger (Working-Style-Regel).
+
+---
+
+
 ## Session stopped — 2026-08-31 (Mini-Session 21: VM-Migrations-Check + Doku-Hygiene + P14-E-Test-Fix + D3-Korrekturnotiz, 3 Commits, 1 Operator-Aktion)
 
 > **Auftrag:** Nikinger-Chat (2026-08-31, ~07:50 CEST) auf Phase-14-Wiederaufnahme

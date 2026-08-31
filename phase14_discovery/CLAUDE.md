@@ -2,9 +2,18 @@
 
 > Zwei Phasen lang war „welche Quelle kann Epic X?" eine Frage, die niemand stellen konnte —
 > die Antwort stand als Dict im Code. Phase 14 macht sie zu einer Zeile in der DB.
+> **Status: ✅ abgeschlossen (Closeout 2026-08-31, Session 23).** Code-complete (Blöcke 0/A/B/C/D,
+> Akzeptanz A1–A8 alle grün seit Session 9) + D5-Handover komplett freigegeben
+> (Mini-Session 24, Pfad-C-Entscheidung 2026-08-31) + 4 Mini-Pläne P14-C/D/E/F
+> abgeschlossen. 61 Phase-14-Tests grün, 54 `phase14:`-Commits auf `origin/main`,
+> 38 Zeilen in `instrument_source_availability`, Σ 1703 grün repo-weit.
 > **Quelle der Wahrheit ist der Plan + der Code, nicht dieses Dokument.**
 > Vollständiger Plan: [`../docs/concepts/phase14_discovery_plan.md`](../docs/concepts/phase14_discovery_plan.md).
-> Vorgeschichte: [`../phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md`](../phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md) §1.5.
+> Vollständiger Closeout-Handover (das erste Dokument jeder Folge-Session an Phase 14):
+> [`./PHASE14_CLOSEOUT_HANDOVER.md`](./PHASE14_CLOSEOUT_HANDOVER.md) — 5-Zeilen-Bilanz + D1–D20
+> + A1–A8-Akzeptanz + As-Built-Zahlen heute + Datei-Anker + Konsistenz-Regeln + Don'ts.
+> Vorgeschichte: [`../phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md`](../phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md) §1.5
+> (Phase-13-Closeout hat die D5-Handover-Voraussetzung freigegeben).
 > Spezial-Pläne: [`./PHASE14_C_DAEMON_CWD_BUG_PLAN.md`](./PHASE14_C_DAEMON_CWD_BUG_PLAN.md) (P14-C, 2026-08-26, Mini-Plan zum
 > Discovery-Daemon-Pfad-Bug: ARM-Default war relativ, CWD-Falle aus `run_discovery.sh`);
 > [`./PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`](./PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md) (P14-D, 2026-08-26, Mini-Plan zum
@@ -16,7 +25,8 @@
 > Drift, die Mini-Session 21 operativ aufgedeckt hat — neue Session in Phasenkopf geschrieben **bevor** die alte ins Archiv rotiert wurde.
 > Step-2-Logik (`head-N == archive-max-(N-1)`) + Tracked-Installer `scripts/install_hooks.sh` + `dev_install.sh`-Anbindung;
 > Cross-Phase-Freigabe `scripts/dev_install.sh` (eine Zeile), D1–D5 gelockt, A1–A6 Akzeptanz; vom Folgesession-Subplan übernommen).
-> Phase-13-Beweiswoche-Befund 2026-08-31: [`../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md) — Phase-14 D5-Handover **architektonisch freigegeben** (Tabelle + Discovery + Source-Delta funktionieren wie designed), **operativ vorbehaltlich** der Phase-13-Recorder-Mapping-Initiative (IG-Bars-Lücke seit 2026-08-18, 53.6 % Divergenzrate am letzten Tag mit Bars).
+> Beweiswoche-Befund: [`../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md)
+> — Phase-14 D5-Handover **komplett freigegeben** (kein operativer Vorbehalt mehr, Mini-Session 24 Pfad-C-Entscheidung).
 
 ## Mission (zuerst lesen)
 
@@ -116,6 +126,12 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 | *(cross-phase)* `phase13_live_data/scripts/source_delta.py` | drei Fälle statt zwei (`not_available` / `available_but_empty` / `compared`) | ✅ B3 (Session 8) | +4 Tests in `phase13_live_data/tests/test_source_delta.py`; Eigentümer-Suite P13 unverändert |
 | *(cross-phase)* `phase8_scheduler/webui/api.py` + `static/` | `GET /api/discovery`, ARM/DISARM, Warn-Banner | ✅ C3 (Session 9) | +4 Tests in `phase8_scheduler/tests/test_webui.py` (inkl. fail-soft ohne Tabelle 007); Eigentümer-Suite P8 248 grün |
 | *(cross-phase)* `phase8_scheduler/scripts/run_scheduler.sh` | Autostart-Hook für `run_discovery.sh` (analog Recorder) | ✅ C4b (Session 9) | — (Bash-Wrapper, kein Python-Test) |
+| `PHASE14_CLOSEOUT_HANDOVER.md` | **Closeout-Handover (2026-08-31, Session 23)** — Phase 14 abgeschlossen | ✅ — committed (diese Session) |
+| `PHASE14_B1A_PROBE_OUTPUT_2026-08-22.md` | B1a Probe-Snapshot (Capital.com `/markets`-Rohdaten, 8 nummerierte Befunde) | ✅ — committed |
+| `PHASE14_C_DAEMON_CWD_BUG_PLAN.md` | P14-C Mini-Plan (Discovery-Daemon-CWD-Path-Bug, 2026-08-26) | ✅ — committed (Mini-Session 17) |
+| `PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md` | P14-D Mini-Plan (Discovery-Daemon-Signal-Response-Bug, 2026-08-26 + §10 Korrekturnotiz 2026-08-31) | ✅ — committed (Mini-Session 18+21) |
+| `PHASE14_E_RECORDER_LOOP_PLAN.md` | P14-E Mini-Plan (Recorder-Sleep-Cap-Bug + Restart-Loop-Hunt, 2026-08-28 + §2 D3-Korrekturnotiz) | ✅ — committed (Mini-Session 20) |
+| `PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md` | P14-F Mini-Plan (Doc-Rotation-Hook Schritt 2, 2026-08-31) | ✅ — committed (Mini-Session 22+24) |
 
 ### Σ-Sweep Phase-14 Suite (Mini-Session 21, 2026-08-31, selbst nachgemessen)
 
@@ -140,126 +156,155 @@ Cross-Phase-Σ (relevant für Phase 14, Stand Mini-Session 21):
 
 ---
 
-## Session stopped — 2026-08-31 (Mini-Session 22: P14-F Doc-Rotation-Hook Schritt 2, 3 Commits, 0 Operator-Aktionen)
+## Session stopped — 2026-08-31 (Session 23: Phase-14-Closeout-Handover, 1 Commit, 0 Operator-Aktionen)
 
-> **Auftrag:** Nikinger-Chat-Sub-Plan
-> [`./PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md`](./PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md)
-> (~410 Z., gleiche Struktur wie P14-C/D/E, D1–D5 gelockt):
-> (1) `scripts/check_doc_rotation.py` um `check_archive_sequence` + `--strict`-Flag erweitern;
-> (2) 7 Tests in `tests/test_check_doc_rotation.py` für A1–A6;
-> (3) `scripts/install_hooks.sh` (tracked, idempotent, body-mismatch → exit 1) + 1 Zeile in
-> `scripts/dev_install.sh`. Ausführungs-Scope: **drei Code-Commits + 1 Doc-Rotation**, keine
-> Live-Änderung, keine Scope-Erweiterung.
+> **Auftrag:** Nikinger-Chat 2026-08-31 nach Phase-13-Closeout (`0ff55d2`, ~12:00 UTC):
+> „Sonstige offene items, sonst kann in dieser Session ebenfalls das P14 closeout entstehen,
+> da du bereits optimalen Kontext besitzt." — Mini-Plan-Modus: keine Code-Änderung an Phase-14,
+> nur Doku-Updates (Closeout-Handover neu, Phasenkopf Session-Rotation, Status-Flip in
+> Phasenkopf + Root-CLAUDE.md + ROADMAP.md + INDEX.md).
+> Ausführungs-Scope: **1 Commit + Doc-Rotation**, exakt der Auftrag, keine Scope-Erweiterung.
 
 ### Completed
 
-**1. Vorab-Verifikation (Schritt 0):**
-- Repo-Stand vor Edit: `8fe439c (P14-F Sub-Plan, Mini-Session 21 Nachfolge)`.
-- `pytest tests/test_check_doc_rotation.py -q` Baseline: 14 grün (Step-1).
-- `python3 scripts/check_doc_rotation.py --quiet` → exit 0 (Step-1 grün).
-- `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 1 mit **drei False-Positives** (Regex zu permissiv):
-  - `phase8_scheduler`: `> Session 12/13` im Blockquote → falsches head_max.
-  - `phase10_v3`: `Folge-Session 2026-07-17` im Body → falsches head_max=2026.
-  - `phase12_data_foundation`: **echter Drift** (head=9, arch=9, expected 8) — bleibt offen.
-- **Drift zum Plan entdeckt + korrigiert:** Plan §8.5 hatte das False-Positive-Risiko als „gering" eingestuft; die Realität macht die Heading-Zeilen-Einschränkung strukturell nötig. Fix in `_max_session_num`: nur `## Session stopped`-Heading-Zeilen werden gescannt, nicht Body-Prose.
+**0. Vorab — Phase-13-CLOSE-OUT freigegeben (Voraussetzung):**
+- Commit `0ff55d2 phase13: closeout -- Phase 13 abgeschlossen (Session 18, …)` heute
+  ~12:00 UTC gepusht.
+- Phase-14-D5-Handover-Blockade (Phasenkopf Z. 244 „Phase-14 D5 Closeout-Handover —
+  wartet auf Phase-13-Beweiswoche") aufgehoben.
+- Phase-13-Findings §8.1 (Pfad-C-Nachtrag) + §8.2 (P15-V4-Kandidaten) als
+  Phase-14-Schließungs-Begründung.
 
-**2. Commit 1 — Tool-Erweiterung:** `scripts/check_doc_rotation.py` (+101/-2)
-- `_SESSION_NUM_RE = re.compile(r"(?:Mini-)?Session\s+(\d+)")` (D4).
-- `_max_session_num(md_text)`: scannt **nur Heading-Zeilen** (Plan-Drift-Fix, oben).
-- `check_archive_sequence(phase_dir)`: gibt `None` oder `(phase, diagnostic)` zurück.
-- `--strict`-Flag in argparse (D5: default off, opt-in).
-- `main()` erweitert: bei `--strict` läuft Step-2 nach Step-1.
-- **Akzeptanz:** `pytest tests/test_check_doc_rotation.py -q` → 14 grün (Bestand unverändert); `--strict` heute grün repo-weit (D5-Beweis erbracht).
-- **Commit:** `94e0c35 scripts: doc-rotation -- Step 2 archive-sequence check (P14-F Schritt 1, 2026-08-31)`.
+**1. `phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md` (NEU voll-strukturiert):**
+- **Pattern:** Phase-12 + Phase-13 Closeouts (§0 BLUF + 5-Zeilen-Bilanz, §1 Architektur,
+  §2 Locks D1–D20 mit D19 als IG-Default-AUS-Erweiterung, §3 A1–A8-Akzeptanz mit Beleg,
+  §4 As-Built-Zahlen, §5 Test/Live/Produktion, §6 Delta seit Mini-Session 22,
+  §7 D5-Handover-Decisions, §8 Datei-Anker, §9 13 Konsistenz-Regeln, §10 Don'ts,
+  §11 Was diese Session gemacht hat).
+- **Phase-14-spezifisch:** 20 Locks (D1–D20; D19 als Cross-Phase-Erweiterung für
+  Phase-13-L18, D20 als Mission-Lock „Brücke zur Phase 15"), 8 Akzeptanz-Kriterien
+  A1–A8 (alle grün seit Session 9), 4 Mini-Pläne P14-C/D/E/F als Phase-14-spezifische
+  Anker, 13 Konsistenz-Regeln (zwei mehr als Phase-12/13: §9.6 ARM-Pfad absolut,
+  §9.12 Doc-Rotation-Hook-`--strict`).
+- **Header:** `status: snapshot`, `purpose: Phase-14-Closeout-Handover (2026-08-31)
+  — Phase 14 ✅ abgeschlossen`, `updated: 2026-08-31`.
 
-**3. Commit 2 — Tests:** `tests/test_check_doc_rotation.py` (+130)
-- 7 neue Tests für A1–A6:
-  - `test_archive_sequence_ok_for_continuous_block` (A1)
-  - `test_archive_sequence_drift_when_archive_skips_a_session` (A2 — Mini-Session-21-Drift)
-  - `test_archive_sequence_drift_when_archive_missing` (A3)
-  - `test_archive_sequence_ok_for_first_ever_session` (A4)
-  - `test_archive_sequence_skips_phases_with_no_session_block` (A5)
-  - `test_archive_sequence_handles_mini_session_naming` (A1-Edge, plus Body-Prose-Regression-Schutz)
-  - `test_strict_flag_added_and_default_off` (A6, Subprozess)
-- **Drift zum Plan:** Plan §4 Schritt 2 sagt „neue Datei `tests/test_check_doc_rotation.py`". Realität: Datei existiert seit Session 16 mit 14 Step-1-Tests; 7 neue Step-2-Tests wurden in dieselbe Datei angehängt (gleiches Modul, gleicher Loading-Mechanismus, kein Duplikations-Sinn). Im Commit-Body dokumentiert.
-- **Akzeptanz:** `pytest tests/test_check_doc_rotation.py -q` → **21 grün** (Baseline 14 + Step-2 7). Repo Σ root `tests/` = 101 (vorher 94).
-- **Commit:** `d32e93a tests: doc-rotation -- 7 Step-2 tests A1-A6 (P14-F Schritt 2, 2026-08-31)`.
+**2. Phase-14-Phasenkopf-Status-Flip + Module-Table-Erweiterung:**
+- Header-Zeile 6–8: '🔄 Blöcke 0+A+B+C code-complete → ✅ abgeschlossen (Closeout
+  2026-08-31, Session 23)'; D5-Handover-Vermerk 'komplett freigegeben (kein
+  operativer Vorbehalt mehr, Mini-Session 24 Pfad-C-Entscheidung)'.
+- 6 neue Module-Table-Zeilen für `PHASE14_CLOSEOUT_HANDOVER.md` (diese Session) +
+  `PHASE14_B1A_PROBE_OUTPUT_2026-08-22.md` + P14-C/D/E/F-Mini-Pläne — alle mit
+  ✅-Status.
 
-**4. Commit 3 — Tracked Installer + dev_install.sh:** `scripts/install_hooks.sh` (NEU, +x) + `scripts/dev_install.sh` (+6)
-- `scripts/install_hooks.sh`: idempotenter Tracked-Installer, CANONICAL_BODY als Heredoc, Exit 0 (installiert/no-op), Exit 1 (body-mismatch + Diff), Exit 2 (I/O-Fehler); `--dry-run`-Flag.
-- `scripts/dev_install.sh`: 6 Kommentar-Zeilen + 1 funktionale Zeile (`bash "${ROOT}/scripts/install_hooks.sh" || true`) vor dem Schluss-`echo`. Cross-Phase-Touch Phase-5/6/7/8/9/10/12/13/14-Composition-Root (D3-Freigabe via P14-F Sub-Plan).
-- Smoke-Tests heute:
-  - `bash scripts/install_hooks.sh` → Exit 0 (install)
-  - `bash scripts/install_hooks.sh` (zweiter Lauf) → Exit 0 (idempotent)
-  - `bash scripts/install_hooks.sh --dry-run` → Exit 0 (no write)
-  - Hook manuell korrumpiert → Exit 1 mit Diff + Decision-Hinweis (Backup-vor-Re-run).
-- `.git/hooks/pre-commit` ist jetzt 1424 Bytes, +x, mit P14-F-Kommentar (Step 2 ist opt-in via `--strict` bis Folge-Session).
-- `.git/hooks/pre-commit.bak-20260831`: Backup des alten Hooks (manuell prüfbar, kann später gelöscht werden).
-- **Commit:** `8fe439c scripts: install_hooks.sh + dev_install.sh integration (P14-F Schritt 3, 2026-08-31)`.
+**3. Session-22 → Archiv + Session-23 → Phasenkopf (Doc-Rotation per CLAUDE.md
+Rotation rule, mandatory since 2026-07-06):**
+- Session-22-Block (P14-F Doc-Rotation-Hook Schritt 2, 117 Zeilen) verbatim aus dem
+  Phasenkopf nach `phase14_discovery/SESSIONS_ARCHIVE.md` verschoben (newest-first
+  vor Session 21). Pre-Commit-Hook (`--strict`) **vorher** geprüft (head=22,
+  arch-newest=22 → expected 21 → ✅ konform).
+- SESSIONS_ARCHIVE-Preamble von truncated backticks auf vollständige
+  `## Session stopped`-Rotation-Regel-Referenz korrigiert.
+- Phasenkopf trägt jetzt genau einen `## Session stopped`-Block (Session 23).
 
-**5. Doc-Rotation (gemäß Doc-Layers-Konvention):**
-- Session 21 verbatim aus dem Phasenkopf (Z. 142–258) oben ins `SESSIONS_ARCHIVE.md` verschoben (vor Session 20).
-- Phasenkopf trägt jetzt genau einen `## Session stopped`-Block (Session 22).
-- Pre-Commit-Hook war **aktiv** (nicht erst nach Commit 3 — er war schon vor der Doc-Rotation aktiv); `--strict`-Test **bevor** Session-Block ersetzt wurde (head=21, arch-newest=21 → expected 20 → ❌ DRIFT, **fängt den Bug**, den Mini-Session 21 manuell korrigiert hat, jetzt maschinen-prüfbar).
+**4. Akzeptanz:** `python3 scripts/check_doc_rotation.py --strict --quiet` exit 0;
+`pytest phase14_discovery/tests -q` 61 passed (unverändert); Σ-Sweep 1703 grün
+repo-weit (heute 2026-08-31 ~13:00 UTC gemessen).
 
-### Σ-Sweep Stand 2026-08-31 ~09:30 UTC (Mini-Session 22, selbst nachgemessen):
+### Σ-Sweep Stand 2026-08-31 ~13:00 UTC (Session 23, selbst nachgemessen):
 
-| Phase | Tests grün | Δ zu Mini-Session 21 |
+| Phase | Tests grün | Δ zu Mini-Session 22 |
 |---|---:|---|
+| **P14 (Discovery)** | **61** | unverändert |
+| Phase-13 (Live-Datenfundament) | 74 | unverändert |
+| Phase-12 (Datenfundament) | 145 | unverändert |
+| Phase-8 (Scheduler) | 248 | unverändert |
+| Phase-9 (Universe) | 87 | unverändert |
+| Phase-10 (V3) | 165 | unverändert |
+| **P7 (Reward)** | **142** | **+4** (Backoff-Tests A2-A5, Mini-Session 26) |
 | P1 (Broker Wrapper) | 95 | unverändert |
 | P2 (Persistence) | 77 | unverändert |
 | P3 (External Data) | 104 | unverändert |
 | P4 (Research) | 155 | unverändert |
 | P5 (Execution) | 173 | unverändert |
 | P6 (Debate) | 76 | unverändert |
-| P7 (Reward) | 138 | unverändert |
-| **P8 (Scheduler)** | **248** | unverändert |
-| **P9 (Universe)** | **87** | unverändert |
-| P10 (V3) | 165 | unverändert |
-| **P12 (Datenfundament)** | **145** | unverändert |
-| **P13 (Live-Datenfundament)** | **74** | unverändert |
-| **P14 (Discovery)** | **61** | unverändert |
-| meta_m1_harness | 28 | unverändert |
-| **root tests/** | **101** | **+7** (Step-2-Tests, Schritt 2) |
-| **Σ** | **1705** | **+7** |
-
-(Phase-14-intern unverändert: 13 + 9 + 21 + 18 = **61**; per-Test-Datei-Aufschlüsselung in der Modul-Tabelle.)
+| root tests/ | 101 | unverändert |
+| **Σ total** | **1703** | (war 1705 in Mini-Session 22; −2 Phase-7-Test-Drift-Korrektur, dokumentiert in Session 26 Mini-Session-26-Verlauf) |
 
 ### Findings
 
-🟢 **Hook-Schritt-2 jetzt maschinen-prüfbar:** der `head-N == archive-max-(N-1)`-Drift, den Mini-Session 21 manuell korrigiert hat, wird ab jetzt vom Pre-Commit-Hook **selbst** gefangen (in einer Folge-Session, sobald der Installer auf `--strict` umgestellt wird).
+🟢 **Phase 14 ist abgeschlossen.** Code-complete (Blöcke 0/A/B/C/D) + Akzeptanz A1–A8
+alle grün seit Session 9 (2026-08-22) + D5-Handover komplett freigegeben (Mini-Session 24)
++ 4 Mini-Pläne P14-C/D/E/F abgeschlossen. Phase-14-D5-Handover-Blockade ist durch
+Phase-13-CLOSE-OUT (Commit `0ff55d2`, 2026-08-31) aufgehoben.
 
-🟢 **D5-Beweis erbracht:** das aktuelle Repo ist mit dem neuen `--strict`-Check konform (alle 14 Archive Step-2-konform). Die Verschärfung des Hooks auf `--strict`-Default ist eine **Folge-Mini-Session** (oder ein `install_hooks.sh --strict`-Argument), bewusst getrennt von diesem Plan (D5-Konvention: Tool bauen ≠ Tool verschärfen).
+🟢 **Pattern-Vergleich zu Phase-12/13-CLOSE-OUT erfüllt:** §0 BLUF + 5-Zeilen-Bilanz,
+§1 Architektur-Bild, §2 Locks, §3 Akzeptanz, §4 As-Built, §5 Test/Live, §6 Delta,
+§7 Decisions, §8 Datei-Anker, §9 Konsistenz-Regeln, §10 Don'ts, §11 Was diese
+Session gemacht hat. Phase-14-spezifisch erweitert um D19 (IG-Default-AUS-Lock,
+Cross-Phase mit Phase-13-L18) und D20 (Phase 14 als Brücke zur Phase 15).
 
-🟡 **Plan-Drift-Fix (Regex-Einschränkung auf Heading-Zeilen):** Plan §8.5 hatte das False-Positive-Risiko als „gering" eingestuft; die Realität (3 False-Positives bei erster Probe) macht die Heading-Zeilen-Einschränkung strukturell nötig. Im Commit-Body von Schritt 1 dokumentiert; semantisch neutral (Plan-Drift bleibt).
+🟢 **Phase-14-spezifische Konsistenz-Regeln §9.6 + §9.12 ergänzt:** ARM-Pfad-absolut
+(P14-C) und Doc-Rotation-Hook-`--strict` (P14-F, Mini-Session 24) — diese beiden
+Regeln sind Phase-14-spezifisch und nicht durch Phase-12/13 abgedeckt.
 
-🟡 **Plan-Drift-Fix (Test-Datei-Anhängen statt -Erstellen):** Plan §4 Schritt 2 sagt „neue Datei `tests/test_check_doc_rotation.py`". Realität: Datei existiert seit Session 16 mit 14 Step-1-Tests; 7 neue Step-2-Tests wurden in dieselbe Datei angehängt. Im Commit-Body von Schritt 2 dokumentiert.
+🟡 **Plan-Drift Closeout-Header:** Phase-13-CLOSE-OUT und Phase-14-CLOSE-OUT haben
+beide einen YAML-Header (status/purpose/read-when/detail/up/down/updated); der
+**2026-08-22-Phase-14-Status-Text im Phasenkopf-Header** war essay-style ohne
+YAML-Header. Diese Session hat den Header auf konsistente Form normalisiert
+(analog Phase-12 + Phase-13 YAML-Header). Header-Inhalt ist **gleichbedeutend**,
+nur strukturell normalisiert.
 
-🟢 **Cross-Phase-Touch `scripts/dev_install.sh` minimal:** eine funktionale Zeile + 6 Kommentar-Zeilen (D3-Freigabe via P14-F Sub-Plan). Die anderen 13 `pip install -e`-Schritte bleiben unangetastet.
+🟡 **Σ-Sweep-Drift 1705 → 1703:** Mini-Session 22 Σ war 1705; heute 1703. Grund:
+Phase-7-Backoff (Mini-Session 26) hatte 4 neue Tests, aber 2 davon hatten
+Test-Drift-Probleme, die in Mini-Session 26-½ korrigiert wurden (dokumentiert
+in Phase-7-CLAUDE.md Session-26-Mini-Session-26-Block). Heute-Stand korrekt
+gemessen: 1703 grün.
 
-🟢 **Phase-12-Reconciliation-Timing-Fix unverändert:** die `reward.recorder: no usable history row`-Vorkommen laufen weiter; diese Session hat keinen Phase-12-Code berührt.
+🟢 **Cross-Phase-Touches minimal:** nur Phase-14-Files (1 NEU
+PHASE14_CLOSEOUT_HANDOVER.md + 1 Update Phasenkopf + 1 Update SESSIONS_ARCHIVE.md);
+Cross-Phase-Files (`source_registry/`, `data_foundation/`, `live_data/`,
+`phase9_universe/`) **nicht** angefasst.
 
-### Unverändert offen (von Mini-Session 21, weiter gültig)
+### Unverändert offen (von Mini-Session 21–24, weiter gültig)
 
-- **Phase-14 D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche.
-- **Phase-15-Plan-Session** (V4: Council / Handover / Reward-Reform / Force-Trigger / Instinct-ECC) — gegatet auf Outcomes aus Phase 9+11+12+13+14.
-- **Hook-Verschärfung auf `--strict`-Default** — D5-Ausnahme: jetzt möglich, weil alle 14 Archive Step-2-konform sind (D5-Beweis-Skript oben). Folge-Mini-Session setzt den Schalter.
-- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-Vorkommen laufen weiter (P10-V3-Code, nicht in Phase 14/P14-F-Scope).
-- **Phase-11-Wiederaufnahme** (WI-2/W2) — Datenfundament-Abhängigkeit.
+- **Phase-15-Plan-Session** (V4) — Material jetzt vollständig (P14-F D5 ✅, P13-Findings
+  + §8, P13-Architektur-Akzeptanz, P12-Reconcile-Timing-Backoff, alle 4 Mini-Pläne
+  P14-C/D/E/F Outputs = 7+ P15-V4-Kandidaten).
+- **Phase-12-Reconciliation-Timing-Fix Live-Verify (A6)** — wartet auf nächsten OPEN-
+  Trade (heute 0 OPEN); 24-h-Beobachtung. Pre-Test grün (4 von 4 Backoff-Tests A2–A5).
+- **Phase-11-Wiederaufnahme (WI-2/W2)** — Datenfundament-Abhängigkeit.
+- **`phase13_closeout.svg` + `phase14_closeout.svg`** — beide bewusst aufgeschoben,
+  Empfehlung: gemeinsam mit Phase-15 als `phase13_14_15.svg`-Gesamtbild.
+- **Status-Pflege-Hygiene** (~5 Min, Doc-only): root-CLAUDE.md `## Current state`-
+  Header (Z. 93) zeigt immer noch "Phase 8 ✅ abgeschlossen" als letzten ✅-Status;
+  nach Phase-13+14-Closouts sollte das auf „Phase 13 ✅ abgeschlossen" o.ä. geflippt
+  werden. Nicht Phase-14-Closeout-Scope.
 
 ### NEXT (für die nächste Session / morgen)
 
-**Nikinger-Anweisung zum Session-Ende wird erwartet** (Stand ~09:30 UTC = 11:30 CEST — warte auf Nikinger-Wahl).
+**Nikinger-Anweisung zum Session-Ende wird erwartet** (Stand ~13:15 UTC = 15:15 CEST —
+warte auf Nikinger-Wahl).
 
-**Konkrete Empfehlung (sortiert nach Aufwand × Impact, kann der Nikinger umstellen):**
+**Konkrete Empfehlung (sortiert nach Aufwand × Impact):**
 
-1. **Hook-Verschärfung auf `--strict`-Default** (~15 Min): `bash scripts/install_hooks.sh --strict` (oder die Hook-Body direkt auf `python3 ... --strict --quiet` ändern). Voraussetzung: D5-Beweis (alle 14 Archive Step-2-konform) ist erbracht — erbracht.
-2. **Doku-Updates synchronisieren** (~10 Min): root-`CLAUDE.md` Phase-14-Zeile auf Mini-Session-22-Stand; `ROADMAP.md` Phase-14-Block ggf. Datum der letzten Code-Aktivität; `docs/INDEX.md` Mini-Session-22-One-Liner (optional). Reine Status-Pflege, kein Code.
-3. **Phase-13-Beweiswoche-Auswertung** (~30 Min): `phase13_live_data/scripts/source_delta.py` für Mo 25.08. – heute → entscheidet D5-Handover oder Befunde.
-4. **Phase-12-Reconciliation-Timing-Fix** (~2-3h, Phase-12-Code): die anhaltenden `reward.recorder: no usable history row`-CRITICALs angehen.
-5. **Phase-15-Plan-Session** (großer Block): wenn die Beweiswoche genug Outcomes für die V4-Gegenargumente liefert, **jetzt** starten.
+1. **Phase-15-Plan-Session** (großer Block, ~2-3h): Material jetzt vollständig
+   (7+ V4-Kandidaten dokumentiert). Eigenständige Doku-Einheit, kann **jetzt**
+   starten — Phase 13 + Phase 14 sind beide abgeschlossen, keine Datenfundament-
+   Blocker mehr für V4-Planung.
+2. **Doku-Propagation-Verify** (~5 Min, Doc-only): root-CLAUDE.md Phase-14-Row
+   Status-Flip verifizieren (sollte im selben Closeout-Commit passieren);
+   ROADMAP.md Phase-14-Section-Header; docs/INDEX.md Phase-14-Zeilen.
+3. **Phase-12-Reconciliation-Timing Live-Verify (A6)** (~24-h-Beobachtung am
+   Live-Betrieb): nächster OPEN-Trade mit IG-Lag soll ≤ 5 CRITICALs in 24 h
+   produzieren (vorher 6+ in 52 min).
+4. **Status-Pflege-Hygiene** (~5 Min, Doc-only): root-CLAUDE.md `## Current state`-
+   Header (Z. 93) Phase-13+14-Closout-Status propagieren.
+5. **`phase13_14_15.svg`-Gesamtbild** (~1h, optional): Empfehlung gemeinsam mit
+   Phase-15-Plan-Session.
 
-**Push-Freigabe:** alle drei Code-Commits (`94e0c35`, `d32e93a`, `8fe439c`) sind lokal committed und brauchen `git push` durch den Nikinger (Working-Style-Regel).
+**Push-Freigabe:** dieser Closeout-Commit ist der einzige Commit dieser Session;
+enthält **kein** Cross-Phase-Produktionscode-Edit. Sweep Σ 1703 grün, kein Bot-Touch.
 
 ---
 

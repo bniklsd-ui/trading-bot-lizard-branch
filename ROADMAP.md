@@ -600,48 +600,44 @@ statt Zählwert) bleibt gelockt — `test_get_window_never_fetches` ist der Bele
 
 ---
 
-## Phase 14 — Discovery-Then-Deterministic *(eröffnet 2026-08-22 aus dem Session-13-Architektur-Insight)*
+## Phase 14 — Discovery-Then-Deterministic *(eröffnet 2026-08-22 aus dem Session-13-Architektur-Insight, abgeschlossen 2026-08-31)*
 
-> **Status: 🔄 Blöcke 0 + A + B + C code-complete + Block-D-Doku-Updates ✅ (Stand 2026-08-31,
-> Mini-Sessions 21+22+23+24) — Phase-Final-Closeout: architektonisch freigegeben (Mini-Session 23, Beweiswoche-Befund), operativ vorbehaltlich der Phase-13-Recorder-Mapping-Initiative.**
+> **Status: ✅ abgeschlossen (Closeout 2026-08-31, Session 23).** Blöcke 0 + A + B + C code-complete + Block-D-Doku-Updates ✅ (Stand 2026-08-31, Mini-Sessions 21+22+23+24) + D5-Handover **komplett freigegeben** (Mini-Session 24, Pfad-C-Entscheidung 2026-08-31). **Phase-13-CLOSE-OUT (Commit `0ff55d2`) hat die D5-Handover-Voraussetzung freigegeben.** 61 Phase-14-Tests grün, 54 `phase14:`-Commits auf `origin/main`, 38 Zeilen in `instrument_source_availability`, Σ 1703 grün repo-weit.
 > **Plan:** [`docs/concepts/phase14_discovery_plan.md`](./docs/concepts/phase14_discovery_plan.md)
 > (D1–D20 gelockt, Blöcke 0/A/B/C/D mit Verbatim-Ankern, Akzeptanz A1–A8, Drift-Liste §9,
 > §11 Post-Execution-Korrekturnotizen).
-> **Phasenkopf:** [`phase14_discovery/CLAUDE.md`](./phase14_discovery/CLAUDE.md)
-> (Modul-Tabelle jetzt mit `Tests`-Spalte + Σ-Sweep-Tabelle, Session-21-Block). (Session-22-Block + Session-24-Block für Doc-Rotation-Hook-P14-F + D5-Hook-Verschärfung).
+> **Closeout-Handover (2026-08-31, Session 23):** [`phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md`](../phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md) — Pattern-Vergleich zu Phase-12/13 (§0 BLUF + 5-Zeilen-Bilanz, D1–D20 mit D19 = IG-Default-AUS + D20 = Brücke zur Phase 15, A1–A8-Akzeptanz mit Beleg, §9 13 Konsistenz-Regeln, §10 Don'ts).
+> **Phasenkopf:** [`phase14_discovery/CLAUDE.md`](../phase14_discovery/CLAUDE.md)
+> (Modul-Tabelle jetzt mit `Tests`-Spalte + Σ-Sweep-Tabelle + Phase-14-Closeout-Row, Session-23-Block).
 > **Concept-Skizze:** [`docs/concepts/phase14_discovery_concept.md`](./docs/concepts/phase14_discovery_concept.md)
 > (drei Bausteine: Quell-Profil + Kreuzungs-Tabelle + Konsumenten-Umstellung; sieben offene
 > Fragen für die Plan-Session — vom Plan Q1–Q7 beantwortet).
 > **Block-C-Handoff:** [`docs/concepts/phase13_c_block_c_replan.md`](./docs/concepts/phase13_c_block_c_replan.md)
 > §3 + §5 (warum die Architektur eine eigene Phase rechtfertigt; was Phase 14 implizit
 > absorbiert: hardcoded `EPIC_MAP`, Path C Dukascopy).
-> **Spezial-Pläne:** [`phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`](./phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md)
-> (P14-D, Discovery-Daemon-Signal-Response-Bug, §10 Korrekturnotiz 2026-08-31);
-> [`phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md`](./phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md); [`phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md`](./phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md) (P14-F, Doc-Rotation-Hook Step 2, in Mini-Session 22 ausgeführt; Mini-Session 24 setzt D5-Ausnahme um — `--strict` als Hook-Default)
-> (P14-E, Recorder-Sleep-Cap + Restart-Loop-Hunt, Cross-Phase-Phase-12).
+> **Spezial-Pläne (alle abgeschlossen, D5-Beweis erbracht):**
+>   - [`phase14_discovery/PHASE14_C_DAEMON_CWD_BUG_PLAN.md`](../phase14_discovery/PHASE14_C_DAEMON_CWD_BUG_PLAN.md) (P14-C, Discovery-Daemon-CWD-Path-Bug, Mini-Session 17, 2026-08-26) — ARM-Pfad absolut
+>   - [`phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`](../phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md) (P14-D, Discovery-Daemon-Signal-Response-Bug, Mini-Session 18, 2026-08-26 + §10 Korrekturnotiz 2026-08-31) — `signal_check_interval_s`-Cap
+>   - [`phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md`](../phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md) (P14-E, Recorder-Sleep-Cap + Restart-Loop-Hunt, Mini-Session 20, 2026-08-28 + §2 D3-Korrekturnotiz) — Cross-Phase-Phase-12
+>   - [`phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md`](../phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md) (P14-F, Doc-Rotation-Hook Step 2, Mini-Session 22+24, 2026-08-31) — `--strict` als Default nach D5-Beweis
 >
-> **Akzeptanz A1–A8 (Plan §7), Stand 2026-08-22 nach Session 9, A1–A8 alle grün:**
+> **Akzeptanz A1–A8 (Plan §7), Stand 2026-08-22 nach Session 9, A1–A8 alle grün (unverändert):**
 > A1 (Discovery 0 IG-Punkte strukturell), A2 (`grep EPIC_MAP phase13_live_data/*.py` leer),
 > A3 (`measurable_universe()`-Identität), A4 (yF-Projektion), A5 (Daemon unscharf = nichts),
 > A6 (UI warnt + scharf per Datei), A7 (`source_delta.py` Drei-Fälle-Trennung), A8 (Sweep
-> 1659→1698). Phase ist **strukturell fertig**.
+> 1659→1698→1703).
 >
-> **Block-D ✅ (Mini-Session 21, 2026-08-31):** drei Hygiene-Edits als 4 Commits auf `main`:
->   1. `362f4b9` — P14-D §10 Korrekturnotiz „Auto-Reload-Claim ist falsch" (analog P14-E
->      §2 D3 + Mutterplan §11.3): nach Recorder-/Discovery-/Scheduler-Code-Edit IMMER
->      Operator-Restart (Python `sys.modules`-Cache, `dis.dis`-Argument widerlegt).
->   2. `98cac57` — P14-E Test-Fix (Phase-12 Test, Cross-Phase-Sign-off via Session-20-Plan):
->      `market_open_fn=lambda: True` in den zwei neuen P14-E-Tests; macht sie deterministisch
->      zu jeder Wanduhr-Zeit (vor XETRA-Open um 09:00 CEST).
->   3. `b16aea8` — Phase-14-CLAUDE.md Modul-Tabelle auf As-Built-Stand: neue `Tests`-Spalte
->      (13+9+21+18 = 61 Phase-14-Tests), Σ-Sweep-Tabellen (P8 248, P9 87, P10 165, P12 145,
->      P13 74, P14 61, **Σ 1698**); Cross-Phase-Tests leben bei der Eigentümer-Phase.
->   4. `5d587a0` — Doc-Rotation Session 20 → Archiv + Session-21-Block neu im Phasenkopf.
-> CAP-Verify live (Mini-Session 21): SIGTERM auf Discovery 10741 → Exit in 46 s (≤ 60 s CAP).
+> **Block-D ✅ (Mini-Session 21, 2026-08-31) + P14-F ✅ (Mini-Session 22+24):**
+> Block-D Hygiene-Edits als 4 Commits + P14-F Doc-Rotation-Hook Step 2 als 5 Commits
+> (`94e0c35`/`d32e93a`/`8fe439c`/`8db5a1c`/`c4f7d9c`).
 >
-> Phase-Final-Closeout (D5) wird nach der Phase-13-Beweiswoche entschieden.
->
-> **D5-Handover-Status 2026-08-31 (Mini-Session 23 Befund):** architektonisch freigegeben — Tabelle + Discovery + Source-Delta arbeiten wie designed. Operativ vorbehaltlich Phase-13-Recorder-Mapping-Initiative (IG-Bars-Lücke seit 2026-08-18, [Findings-Notiz](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md)).
+> **D5-Handover-Status 2026-08-31 (Mini-Session 23 + 24):** **komplett freigegeben** —
+> architektonisch (Mini-Session 23: Tabelle + Discovery + Source-Delta arbeiten wie designed)
+> + operativ (Mini-Session 24: Pfad-C-Entscheidung, IG = S4-GapRescue Default AUS, by-design,
+> Phase-13-Recorder-Mapping-Initiative entfällt als architektur-konform — siehe
+> [Findings-Notiz §8.1](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md)).
+> **Phase-13-CLOSE-OUT (Commit `0ff55d2`) hat die formale Phase-14-D5-Handover-Voraussetzung
+> freigegeben** — Phase 14 ist abgeschlossen.
 
 **Goal:** jede Quelle (IG, yFinance, LS, Capital.com, später Dukascopy) **exponiert selbst**,
 was sie liefern kann. Eine DB-Tabelle (`instrument_source_availability`) hält die Kreuzung
