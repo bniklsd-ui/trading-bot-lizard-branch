@@ -28,9 +28,12 @@ HOOK_PATH="${REPO_ROOT}/.git/hooks/pre-commit"
 CANONICAL_BODY="$(cat <<'HOOK_BODY'
 #!/bin/sh
 # Pre-commit hook: doc-rotation hygiene check.
-# Verifies no phase CLAUDE.md carries more than one "## Session stopped" block
-# (Doc-Layers-Konvention, root CLAUDE.md "Rotation rule" section).
-# Also (with --strict flag) checks archive-sequence integrity (P14-F).
+# Two steps (P14-F, 2026-08-31):
+#   Step 1: no phase CLAUDE.md carries more than one "## Session stopped"
+#           block (Doc-Layers-Konvention, root CLAUDE.md "Rotation rule").
+#   Step 2: head-N == archive-max-(N-1) (archive-sequence integrity).
+# Step 2 became default in Mini-Session 24 (2026-08-31) after D5-Beweis
+# (Mini-Sessions 22+23 verifiziert: alle 14 Archive Step-2-konform).
 #
 # Installed by scripts/install_hooks.sh (P14-F, 2026-08-31). Tracked source:
 # scripts/install_hooks.sh — re-run after every ``git clone`` / fresh venv
@@ -49,11 +52,8 @@ if [ ! -f scripts/check_doc_rotation.py ]; then
     exit 0
 fi
 
-# Step 2 (archive-sequence integrity, P14-F) is opt-in via --strict until
-# the Folge-Mini-Session (or this script's --strict) has proved the new
-# check against the current archive state. The hook body here runs Step-1
-# only by default.
-python3 scripts/check_doc_rotation.py --quiet
+# Step 2 became default after D5-Beweis (Mini-Session 24, 2026-08-31).
+python3 scripts/check_doc_rotation.py --strict --quiet
 result=$?
 
 if [ $result -ne 0 ]; then
