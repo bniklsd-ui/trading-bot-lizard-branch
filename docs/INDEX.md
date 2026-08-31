@@ -5,7 +5,7 @@ read-when: locating any doc, or deciding whether a file is worth reading at all
 detail: L0
 up: ../CLAUDE.md
 down: every project doc (that is the point)
-updated: 2026-07-06
+updated: 2026-08-31
 ---
 # Doc Index (L0)
 
@@ -24,7 +24,8 @@ updated: 2026-07-06
 - [CLAUDE.md](../CLAUDE.md) — 📗 20KB · rules, conventions, working style, current state; auto-loaded every session
 - [AGENTS.md](../AGENTS.md) — 📗 1KB · harness-neutral entry point for non-Claude-Code agents; points to `CLAUDE.md` + doc-layers navigation (M1 Step 9)
 - [README.md](../README.md) — 📗 15KB · human overview + machine setup (venv, keyring, smoke test)
-- [ROADMAP.md](../ROADMAP.md) — 📗 **41KB** · Phase 1–14 plan + status per phase · ⚠ **über der 40KB-Grenze (gemessen 2026-08-18, die frühere „25KB"-Angabe war stale)** — die Phasen 1–8 sind abgeschlossen und gehören in ein `ROADMAP_ARCHIVE.md`; Rotation ist fällig, aber ein eigener Aufräum-Auftrag, nicht Teil von Phase 13
+- [ROADMAP.md](../ROADMAP.md) — 📗 **38 KB** · Phase 9–15 build plan + compact summary of closed phases 1–8 (Link ins Archiv); war 41 KB / 52 KB pre-A-5 — Phasen 1–8 verbatim nach `ROADMAP_ARCHIVE.md` rotiert (Phase-15 A-5, 2026-08-31)
+- [ROADMAP_ARCHIVE.md](../ROADMAP_ARCHIVE.md) — 📦 18 KB · Verbatim-Archiv der Phasen 1–8 (closed, live-verified) inkl. Goal, Done-When, Missions, v1.5/v1.6/v1.7-Hotfix-Tracks; rotiert 2026-08-31 per Phase-15 A-5 (Auditability-Regel: wortgleich, unverändert — selbe Konvention wie `SESSIONS_ARCHIVE.md`); `up: ../ROADMAP.md`
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — 📗 20KB · system layers, components, risks
 - [HANDOVER_PROMPT.md](./HANDOVER_PROMPT.md) — 📗 · wiederverwendbarer Auftragstext für Phasen-Abschluss/-Deferral; seit 2026-08-11 auf Claude Code umgeschrieben (Repo statt Google Drive)
 - [DOC_LAYERS_CONVENTION.md](./DOC_LAYERS_CONVENTION.md) — 📗 · generic (project-agnostic) doc-layers spec

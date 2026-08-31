@@ -421,6 +421,21 @@ Plan und auf `phase15_v4/CLAUDE.md`.
 > newest-first verletzt, bekommt einen **Hook-Abbruch beim Commit**, der wie ein
 > kaputter Hook aussieht. Erster Verdächtiger: `check_archive_sequence`, nicht der Hook selbst.
 
+> **🟡 Korrekturhinweis (2026-08-31, MiniMax-M3-Exec-Session, A-5-Execution):** Die
+> `phase7_reward/CLAUDE.md`-Zeile oben trifft empirisch **nicht zu** — die Datei hat
+> heute **bereits genau einen** `## Session stopped`-Block (Z. 358, Step 14 / Mini-Session 26
+> vom 2026-08-31); alle 14 älteren Session-Blöcke (Steps 1–13c) sind **bereits**
+> verbatim in `phase7_reward/SESSIONS_ARCHIVE.md` (newest-first, 70 KB). Die Rotationsregel
+> ist also für `phase7_reward/CLAUDE.md` **bereits erfüllt**. Die verbleibenden 49.855 B
+> kommen aus drei anderen Quellen: (a) Scope-Lock mit eingebetteten historischen Hotfix-
+> Notizen (Phase-8 v1.5/v1.6 + Phase-10 Bug-A + Bug-B2, ~104 Z.), (b) „Verifizierte Contracts
+> (Step 1 — gegen Live-Code gepinnt, 2026-06-18)" als historische Contract-Tabelle (~106 Z.),
+> (c) dem einzigen aktuellen Session-Block (~208 Z. inkl. 2 Mini-Sessions). **Beide Inhalte
+> sind auditability-pflichtig** (Hotfix-Notizen belegen Score-Inversion-Fix, Contract-Tabelle
+> ist gegen den damaligen Repo-Stand `49cda8a` gepinnt) und werden **bewusst beibehalten**.
+> Nikinger-Freigabe 2026-08-31 (MiniMax-M3-Exec-Session, Frage-Slot): „Nur ROADMAP + Drift-
+> Vermerk" — kein Eingriff in `phase7_reward/CLAUDE.md`. Konsequenz für **AK4** siehe unten.
+
 #### A-6 — `docs/INDEX.md` Doppel-Header + drei stale „P15-Plan-Session offen"-Zeilen
 
 `docs/INDEX.md` hat **zwei** `## Closed phases`-Überschriften (Zeile 34 und Zeile 36).
@@ -693,6 +708,15 @@ Das Umlegen ist eine getrennte, kostenpflichtige Nikinger-Aktion.
 | **AK2** | Σ-Baseline **vor** dem ersten Fix genommen | Tabelle in `phase15_v4/CLAUDE.md`, Erwartung 1703 |
 | **AK3** | ROADMAP 15b/15c/15d stimmen mit dem Code überein, datiert vermerkt | `ROADMAP.md:692-701`-Region |
 | **AK4** | `ROADMAP.md` und `phase7_reward/CLAUDE.md` **unter 40 KB** | `find . -name "*.md" -size +40k` listet beide **nicht** mehr |
+
+> **🟡 Korrekturhinweis (2026-08-31, MiniMax-M3-Exec-Session, A-5-Execution):**
+> AK4 wird nach A-5-Ausführung **reduziert auf `ROADMAP.md` allein**. Begründung steht
+> im §6-A-5-Korrekturhinweis oben: `phase7_reward/CLAUDE.md` ist bereits in der gewünschten
+> Rotationsform (genau 1 `## Session stopped`-Block, alle älteren im Archiv), die
+> verbleibenden 49.855 B sind auditability-pflichtige historische Inhalte (Hotfix-Notizen
+> + gepinnte Contract-Tabelle) und werden bewusst beibehalten. **Verifiziert nach A-5:**
+> `wc -c ROADMAP.md` = **39.109 B** (38,2 KB, unter 40 KB ✅). `phase7_reward/CLAUDE.md`
+> bleibt 49.855 B — neu definiert als **„auditability-bewusst beibehalten, kein AK4-Ziel"**.
 | **AK5** | **Ein Verlust senkt den Score.** Für `r_multiple ≤ −1.0` gilt `score_after < score_before` — über alle Signal-Kombinationen | `test_a_full_stop_loss_never_raises_the_score` grün; war vor B2 rot |
 | **AK6** | Score-Reset ist vorbereitet, `--dry-run`-Ausgabe liegt dem Nikinger vor | Audit-Block in `phase15_v4/CLAUDE.md`; `--apply` nur nach Freigabe |
 | **AK7** | **Der Promotion-Harness verweigert bei n=8 korrekt** | `test_promotion_refuses_below_n_min` grün — das ist das Phasen-Akzeptanzkriterium (P13) |
