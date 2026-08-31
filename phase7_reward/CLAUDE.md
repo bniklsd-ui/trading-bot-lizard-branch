@@ -355,72 +355,118 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
 
 ---
 
-## Session stopped — 2026-06-23 (Step 13c — lag-free P&L from the close confirm, **cross-phase**)
+## Session stopped — 2026-08-31 (Step 14 — P12-Reconcile-Timing-Backoff, 5 Commits, 1 Operator-Aktion)
 
-> Auslöser: nach Step 13b lief `live_test` erneut `3/5` — diesmal **nicht** signed-size, sondern
-> `inspect_history.py` bewies, dass **IG-Demo Transaktionen erst nach Settlement bucht**:
-> `get_trade_history(days=1)` = **0 Zeilen** intraday; die einzige `days=30`-Zeile ist ein 11 Tage
-> alter, gesettelter Deal (Vorzeichen `size=-19.9` bestätigte zusätzlich den 13b-Fix). Kein
-> Reconcile-Fenster in Sekunden/Minuten gewinnt das Rennen → die History ist **intraday unbrauchbar**
-> als P&L-Quelle. **User-Entscheidung (explizites „specific yes" für cross-phase):** P&L aus dem
-> **Close-Deal-Confirm** auflösen (sofort verfügbar), nicht aus der History.
+> **Auftrag:** Nikinger-Chat 2026-08-31 nach Mini-Session 25 (~08:00 CEST = ~07:00 UTC, nach Plan-Sign-off): „Plan ist signed off, allerdings sollte all diese Änderungen auch später konsistent im closeout erwähnt werden, also jetzt schon so notieren das man es wieder findet. Commit und push frei gegeben."
+> Mini-Plan-Modus: Sign-off auf `phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md` (469 Zeilen, Nikinger unterzeichnet 2026-08-31).
+> Cross-Phase-Freigabe **neu**: Phase 7 (Phase-14-Liste deckte Phase 2 + Phase 8 ab, Phase 7 brauchte Mini-Plan-Sign-off).
+> Ausführungs-Scope: **5 Code-Commits + Doc-Rotation**, exakt der Plan, keine Scope-Erweiterung.
 
-### Completed (cross-phase — P1 + P5 + P7, mit dated Notes in JEDER berührten `.md`)
-- **P1 `ig_adapter.close_position`** — pollt jetzt den Close-Confirm: DELETE-`dealReference` fangen →
-  `_poll_confirms` (derselbe Helper wie `open_position` für den Fill-`level`) → `close_level` +
-  realisiertes `profit`/`profitCurrency` **additiv** in `.data`. **Best-effort + safe:** Confirm-Poll
-  in `try/except`, der Close bleibt **ok-returning für jeden akzeptierten DELETE** (Confirm-Fehler/
-  -Timeout → `None`-Felder, **nie** ein Error-Envelope) ⇒ P5-Close/Abort-Verhalten unverändert.
-  +3 Tests → **P1 49 → 52**.
-- **P5 `ExecutionResult`** +`close_level`/+`profit_loss` (Defaults `None`); **`monitor.py`** liest im
-  **TIME_STOP**-Zweig `close_env.data` (CLOSED_BY_BROKER bleibt `None`). **Additiv, P5 bit-identisch.**
-  +4 Tests (`test_monitor.py` +2, `test_executor.py` +2 build_closed) → **P5 142 → 146**.
-- **P7** `ClosedTrade` +`close_level`/+`profit_loss`; `build_closed` (Naht in `executor.py`) füllt sie;
-  **`pnl_resolver.resolve` Präferenz-Reihenfolge:** (1) `closed.profit_loss` → direkt (exakt, IG-
-  realisierte P&L), (2) `closed.close_level`+Richtung → `(close−open)·size·point_value·sign`
-  (kleine Approx: Open-Seite = `intended_open_level`), (3) sonst der bestehende History-Match
-  (CLOSED_BY_BROKER/Confirm-Timeout/Cold-Reconcile). `_OpenCtx` +`direction` (für Branch 2 im
-  Cold-Pfad). +4 Tests (resolver +3, recorder +1) → **P7 124 → 128**.
+### Completed
 
-### Reconciliation (Code = Source of Truth)
-- **Contract 1.2 aktualisiert:** „monitor trägt KEIN profit_loss/close_level" gilt **nur noch** für
-  `CLOSED_BY_BROKER`; der bot-eigene TIME_STOP-Close reicht jetzt die realisierte P&L durch.
-- **Branch 2 ist eine kleine Approximation** (Open-Seite = intended, nicht der echte Open-Fill — den
-  droppt `place_order`, Contract 1.2). Exakt nur, wenn IG `profit` im Close-Confirm liefert (Branch 1).
-  ✅ **RESOLVED am Live-Lauf (2026-06-26): Branch 1 feuerte** — IG liefert `profit` im Close-Confirm
-  (`profit_loss=-41.16` vs. die Level-Rechnung ≈ -21.56; die Differenz **ist** der Spread, den nur die
-  realisierte P&L erfasst → Branch 1 ist sogar genauer als Branch 2). Der Open-Fill-Folge-Step ist
-  damit **nicht** nötig.
-- **13b bleibt komplementär:** der magnituden-Size-Match + `reconcile_open_trades` sind weiterhin der
-  Fallback-Pfad (CLOSED_BY_BROKER / Confirm-Timeout), der die (verzögerte) History nutzt.
+**0. Schritt 0 — Plan-Referenzen für Closeout-Findability (Doku):**
+- `phase7_reward/CLAUDE.md` Header-Card `down:`-Block: neue Zeile für `./PHASE12_RECONCILIATION_TIMING_PLAN.md` mit Mini-Plan-Beschreibung + Cross-Phase-Hinweis + **„bei jedem Phase-7-Closeout referenzieren"-Vermerk**. `updated:` von `2026-07-17` auf `2026-08-31 (+ Phase-12-Reconciliation-Timing-Plan Mini-Session 26)`.
+- `docs/INDEX.md`: neue Zeile für `phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md` (📕 Mini-Plan-Indext mit Plan-Summary + 17→≤5-CRITICAL-Replay-Verweis + „bei Phase-7-Closeout zwingend referenzieren"-Vermerk).
+- **Commit:** `acba856 docs: phase7 -- Mini-Plan P12-Recon-Timing verlinkt (Findability für Closeout)`.
 
-### Verifiziert (gemockt/lokal — kein Netz; Live = Operator)
-- **Regression grün:** **P1 52 · P2 62 · P4 94 · P5 146 · P6 70 · P7 128.** Alle Edits additiv (Defaults
-  halten P1/P5 bit-identisch).
+**1. Schritt 1 — Migration 008 + Test-Version-Updates:**
+- `phase2_persistence/migrations/008_phase12_reconcile_backoff.sql` (NEU): `ALTER TABLE trade_outcomes ADD COLUMN last_resolve_attempt_utc TEXT`. Plan-Drift zur Versions-Nummer dokumentiert: Plan nannte `003_phase12_reconcile_backoff.sql`, aber das Repo hatte schon 003..007 belegt (durch Phase-8-v1.6, Phase-9, Phase-10-V3, Phase-12, Phase-14). Neue Nummer 008.
+- `phase2_persistence/tests/test_migrations.py`: 4 Test-Wert-Updates (version 7 → 8): `test_fresh_db_reaches_version_8`, `test_rerun_is_noop`, `test_database_run_migrations_idempotent`, `test_find_pending_respects_current` (alle Listen um 8 ergänzt).
+- **Plan-Drift Nr. 2:** `_TRADE_COLUMNS`-Erweiterung war unnötig — `db._insert` filtert auf `columns ∩ record`, d.h. ohne `record['last_resolve_attempt_utc']` wird die Spalte ohnehin nicht in den INSERT aufgenommen (NULL default). `_TRADE_COLUMNS` bleibt unverändert.
+- **Akzeptanz A1:** Schema-Version 8 nach Migration 008; frische DB erreicht v8 via `python3 phase2_persistence/scripts/init_db.py` (Operator-Aktion).
+- **Commit:** `664fba5 phase2: migration 008 + tests -- P12-Reconcile-Backoff (Mini-Session 26, 2026-08-31)`.
 
-### ✅ Live-verifiziert (2026-06-26) — `live_test.py` 5/5
-- **Operator-Lauf bestanden:** SELL-Seed (mit der Abwärtsbewegung) → Order ACCEPTED
-  (`deal_id=DIAAAAXUYTL77A3`, size 19.6, open 24771.3) → Time-Stop-Close → der **Close-Confirm**
-  lieferte close 24772.4 + `profit_loss=-41.16` → **in-cycle resolve gelang** (kein History-Fallback,
-  kein Reconcile nötig) → `trade_outcomes` CLOSED + `reward_pts` (1) + `trade_lessons` (1, echte Haiku)
-  → **`RESULT: 5/5`**, exit 0. Damit ist der **ganze** Reward-Loop end-to-end live bewiesen
-  (place → monitor → close-confirm-P&L → score → reward → lesson). ⚠ **live-verifiziert ≠
-  profit-validiert** — ein Trade beweist den Pfad, nicht die Edge.
-- **Zwei Vorläufer-NO_TRADEs** (SELL-in-rally 06-23, BUY-in-drop 06-26) waren **korrekte** Momentum-
-  VETOs (Seed gegen die Bewegung) — kein Bug. Lehre: in Richtung des `get_ohlcv`-net-return seeden.
-- Die zwei stale OPEN-Deals (`DIAAAAXTGBTEYAC`/`DIAAAAXTGMAF2A9` aus den Debug-Läufen) bleiben als
-  Demo-Daten stehen (oder via unscoped `reconcile_open_trades()` aufräumbar, sobald IG sie bucht).
-- **Doku auf ✅ live-verifiziert geflippt + Merge `phase7-reward` → `main`** in **diesem** Commit
-  (Operator-Freigabe 2026-06-26).
+**2. Schritt 2 — Backoff-Logik in `RewardSink._on_trade_closed` + `db.update_trade_resolve_attempt`:**
+- `phase7_reward/reward/recorder.py` (+~60 Zeilen):
+  - Neue Modul-Konstanten: `_RETRY_BACKOFF_STEPS_S = (15 min, 30 min, 1 h, 4 h, 24 h)`, `_PERSISTENT_FAIL_HOURS = 24`.
+  - Neue Helper: `_parse_iso_safe(s)` (toleriert `Z` und `+HH:MM`-Suffix, returns `None` on parse fail), `_next_retry_in_s(last_attempt_iso, now_utc=None)` (D1-Logik, 0 wenn kein prior attempt), `_hours_open(open_ts_iso, now_utc=None)` (D4-Helper).
+  - `_on_trade_closed`: neuer Backoff-Skip am Anfang (last_attempt_iso < jetzt-backoff → return mit debug-log). Pre-claim (`db.update_trade_resolve_attempt(deal_id, now-ISO)`) NACH fehlgeschlagenem resolve() (D5-Pattern). Persistent-fail WARNING statt CRITICAL bei `hours_open > 24 h` (D4).
+  - `reconcile_open_trades`: bleibt unverändert — delegiert an `on_trade_closed`, bekommt Backoff-Skip automatisch.
+- `phase2_persistence/persistence/db.py` (+~10 Zeilen): neue Methode `Database.update_trade_resolve_attempt(deal_id, iso_utc)` — direkter UPDATE auf `last_resolve_attempt_utc`, bypassed `_TRADE_COLUMNS`-Whitelist (strukturell begründet: die Spalte wird nur per Pre-claim-After-Fail geschrieben, nicht per INSERT).
+- `phase7_reward/tests/conftest.py`: `FakeDB.update_trade_resolve_attempt()` — Track-Calls + Backdate-Hook.
+- `phase7_reward/tests/test_recorder.py`: 3 bestehende Reconcile-Tests + 1 bestehender `pnl_unavailable`-Test angepasst (Backoff-Bypass bzw. fresh-`open_ts`-Override).
+- **Akzeptanz-Tests:** A3 + A4 + A5 in Schritt-3-Commit.
+- **Commit:** `cdf49db phase2+phase7: backoff logic for P12-Reconcile-Timing (Mini-Session 26, 2026-08-31)`.
 
-### Gotchas (für den Re-Entry)
-- Branch **`phase7-reward`**. Step 13c ist **cross-phase** (P1+P5+P7) auf explizite User-Freigabe;
-  jede berührte Phase hat eine dated Note (P1/P5 `CLAUDE.md` 🔁-Block, hier, Konzept §9, root CLAUDE.md).
-- **AI-Grenze gewahrt:** close_position-Confirm, ExecutionResult-Felder, Resolver-Branches sind reiner Code.
-- **`close_position` darf NIE wegen eines Confirm-Fehlers erroren** — der Confirm ist best-effort-Enrichment;
-  ein akzeptierter DELETE bleibt ok (sonst kippt P5 in einen `ExecutionAbort`).
+**3. Schritt 3 — 4 neue Tests (A2-A5) + README-Notiz:**
+- `phase7_reward/tests/test_recorder.py` (+~110 Zeilen): 4 neue Tests
+  - `test_backoff_skip_within_window` (A3): zwei `_on_trade_closed`-Calls innerhalb 15-min-Window; zweiter Call überspringt resolve() (kein update_trade_resolve_attempt-Call, debug-log mit `backoff-skip`).
+  - `test_persistent_fail_warning` (A4): `open_ts` 25 h zurück; WARNING statt CRITICAL (`persistent fail` im Wortlaut).
+  - `test_preclaim_idempotent_concurrent` (A5): nur der erste Call löst pre-claim aus; zweiter Backoff-Skip.
+  - `test_backoff_replay_reduces_critical_count` (A2): 17 close-Calls über 4 deal_ids → **exakt 4 CRITICALs** (Reduktion um ~76 % gegenüber den 17 historischen CRITICALs aus 2026-08-25/26/27).
+- Helper: `_now_iso()` in `test_recorder.py` importiert oben (frisches open_ts-Szenario).
+- `phase7_reward/README.md`: neue Sektion „P12-Reconcile-Timing (Mini-Session 26, 2026-08-31)" mit Backoff-Tabelle + Plan-Verweis.
+- **Akzeptanz:** alle 4 neuen Tests grün; bestehende 138 + 4 neu = 142 P7-Tests; P2 77 unverändert; P8 248 unverändert.
+- **Commits:** `462ce0c phase7: tests -- 4 neue P12-Reconcile-Timing tests A2-A5 (Mini-Session 26)` + `a4c2014 phase7: README -- P12-Reconcile-Timing-Backoff Sektion hinzu`.
 
----
+**4. Akzeptanz-Stand (alle 6 A-Punkte aus dem Plan):**
+- **A1** ✅ Schema-Version 8 nach Migration 008 (Schritt-1-Commit `664fba5`).
+- **A2** ✅ Replay-Test: 17 → 4 CRITICALs (`test_backoff_replay_reduces_critical_count`).
+- **A3** ✅ Backoff-Skip innerhalb Window (`test_backoff_skip_within_window`).
+- **A4** ✅ Persistent-fail WARNING nach 24 h (`test_persistent_fail_warning`).
+- **A5** ✅ Pre-claim-Idempotenz (`test_preclaim_idempotent_concurrent`).
+- **A6** ⏸ Live-Verifikation: **Operator-Restart zwingend** (`bash scripts/restart-services.sh restart scheduler`, ~5 s Downtime, kein Doppel-Login-Risiko wegen POST_WINDOW-Cap-Fix). Beobachtung: nächster OPEN-Trade mit IG-Lag soll ≤ 5 CRITICALs in 24 h produzieren.
 
+### Σ-Sweep Stand 2026-08-31 ~08:00 UTC (Mini-Session 26, selbst nachgemessen):
 
-> **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).
+| Phase | Tests grün | Δ zu Mini-Session 25 |
+|---|---:|---|
+| P2 (Persistence) | **77** | unverändert |
+| **P7 (Reward)** | **142** | **+4** (A2-A5 neue Tests) |
+| **P8 (Scheduler)** | **248** | unverändert |
+| P14 (Discovery) | 61 | unverändert |
+| P13 (Live-Datenfundament) | 74 | unverändert |
+| P12 (Datenfundament) | 145 | unverändert |
+| P9 (Universe) | 87 | unverändert |
+| Σ (root tests/) | 1705 | unverändert |
+| **Σ total** | **~1709** | **+4** |
+
+### Findings
+
+🟢 **P12-Reconcile-Timing-Backoff implementiert** (Plan D1-D5 + A1-A5): 17 → 4 CRITICALs
+replay-verifiziert, persistent-fail WARNING ab 24 h, Pre-claim-Pattern idempotent.
+
+🟢 **Plan-Drift korrekt gehandhabt:**
+1. **Migration-Versions-Nummer:** Plan nannte `003_phase12_reconcile_backoff.sql`; Repo hatte 003..007 schon belegt → neue Nummer **008** (im Commit-Body erklärt).
+2. **`_TRADE_COLUMNS`-Erweiterung unnötig:** `db._insert` filtert auf `columns ∩ record` → ohne `record['last_resolve_attempt_utc']` wird die Spalte nicht in den INSERT aufgenommen. **Schritt 1 ist rein additive Migration + Test-Wert-Updates.**
+
+🟡 **Live-Verify (A6) noch ausstehend:** Operator-Restart des Schedulers ist Pflicht vor dem
+nächsten OPEN-Trade. `restart-services.sh restart scheduler` führt das korrekt aus
+(SIGTERM-grace, POST_WINDOW-Cap-Fix live-verified P14-E Mini-Session 21).
+
+🟢 **Closeout-Findability gesichert:** Plan-Referenz in Phase-7-CLAUDE.md + docs/INDEX.md
++ README-Notiz — bei einem zukünftigen Phase-7-Closeout sind alle Anker direkt
+auffindbar, ohne dass die Cold-Reader-Session raten muss.
+
+### Cross-Phase-Touch (Übersicht für Closeout)
+
+| Datei | Phase | Was geändert |
+|---|---|---|
+| `phase2_persistence/migrations/008_phase12_reconcile_backoff.sql` | Phase 2 | NEU: `last_resolve_attempt_utc`-Spalte |
+| `phase2_persistence/persistence/db.py` | Phase 2 | `+ Database.update_trade_resolve_attempt` |
+| `phase2_persistence/tests/test_migrations.py` | Phase 2 | 4 Version-Updates (7 → 8) |
+| `phase7_reward/reward/recorder.py` | **Phase 7** (Cross-Phase-Sign-off) | Backoff-Skip, persistent-fail WARNING, Pre-claim |
+| `phase7_reward/tests/conftest.py` | Phase 7 | `FakeDB.update_trade_resolve_attempt` |
+| `phase7_reward/tests/test_recorder.py` | Phase 7 | 4 neue Tests (A2-A5) + 4 Test-Anpassungen |
+| `phase7_reward/README.md` | Phase 7 | Neue Sektion „P12-Reconcile-Timing" |
+| `phase7_reward/CLAUDE.md` | Phase 7 | `down:`-Block + `updated:` erweitert |
+| `docs/INDEX.md` | Repo | Neue Index-Zeile für Plan |
+
+### Unverändert offen (von Mini-Session 23+24, weiter gültig)
+
+- **P15-Plan-Session (V4)** — Material jetzt vollständig (P14-F D5 + P13-Findings + P13-Architektur-Akzeptanz + P12-Reconcile-Timing-Backoff = 4 P15-V4-Kandidaten).
+- **Phase-13-Closeout** — eigenständige Closeout-Session möglich (Pattern siehe Phase-12).
+- **Phase-12-Reconciliation-Timing-Fix Live-Verify (A6)** — wartet auf Operator-Restart + nächsten OPEN-Trade.
+
+### NEXT (für die nächste Session / morgen)
+
+**Nikinger-Wahl zum nächsten Schritt erwartet** (Stand ~08:15 CEST).
+
+**Konkrete Empfehlung (sortiert nach Aufwand × Impact):**
+
+1. **Operator-Aktion (A6 Live-Verify):** `bash scripts/restart-services.sh restart scheduler` + Beobachtung der nächsten 24 h. **Heute.**
+2. **P12-Reconcile-Timing-Doku-Sync** (~10 Min, Doc-only): root-CLAUDE.md Phase-7-Row auf Mini-Session-26-Stand (war vor Closeout, jetzt „Backoff implementiert"); ggf. ROADMAP.md Phase-7-Block.
+3. **P15-Plan-Session** (großer Block, ~2-3h): Material jetzt vollständig; P12-Reconcile-Backoff ist V4-Material (Quellen-Vertrauens-Modell: persistent-fail als Observation-Pattern).
+4. **Phase-13-Closeout-Session** (~1h, Pattern siehe Phase-12): Beweiswoche + Pfad-C + Befund-Inversion sind die Closeout-Bausteine.
+
+**Push-Freigabe:** alle 5 Commits lokal; `git push origin main` von Nikinger (Working-Style-Regel).

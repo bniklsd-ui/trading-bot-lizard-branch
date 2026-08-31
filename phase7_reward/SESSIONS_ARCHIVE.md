@@ -12,7 +12,79 @@ updated: 2026-07-06
 > The blocks below were moved here **verbatim, unedited** from `CLAUDE.md` on 2026-07-06
 > (Doc-Layers rotation, Nikinger-approved — same auditability rule as the 2026-07-03 root
 > CLAUDE.md archive move). Source order preserved (newest-first unless noted). The newest
-> `## Session stopped` block always stays in the source file; at each session end, the
+> `
+## Session stopped — 2026-06-23 (Step 13c — lag-free P&L from the close confirm, **cross-phase**)
+
+> Auslöser: nach Step 13b lief `live_test` erneut `3/5` — diesmal **nicht** signed-size, sondern
+> `inspect_history.py` bewies, dass **IG-Demo Transaktionen erst nach Settlement bucht**:
+> `get_trade_history(days=1)` = **0 Zeilen** intraday; die einzige `days=30`-Zeile ist ein 11 Tage
+> alter, gesettelter Deal (Vorzeichen `size=-19.9` bestätigte zusätzlich den 13b-Fix). Kein
+> Reconcile-Fenster in Sekunden/Minuten gewinnt das Rennen → die History ist **intraday unbrauchbar**
+> als P&L-Quelle. **User-Entscheidung (explizites „specific yes" für cross-phase):** P&L aus dem
+> **Close-Deal-Confirm** auflösen (sofort verfügbar), nicht aus der History.
+
+### Completed (cross-phase — P1 + P5 + P7, mit dated Notes in JEDER berührten `.md`)
+- **P1 `ig_adapter.close_position`** — pollt jetzt den Close-Confirm: DELETE-`dealReference` fangen →
+  `_poll_confirms` (derselbe Helper wie `open_position` für den Fill-`level`) → `close_level` +
+  realisiertes `profit`/`profitCurrency` **additiv** in `.data`. **Best-effort + safe:** Confirm-Poll
+  in `try/except`, der Close bleibt **ok-returning für jeden akzeptierten DELETE** (Confirm-Fehler/
+  -Timeout → `None`-Felder, **nie** ein Error-Envelope) ⇒ P5-Close/Abort-Verhalten unverändert.
+  +3 Tests → **P1 49 → 52**.
+- **P5 `ExecutionResult`** +`close_level`/+`profit_loss` (Defaults `None`); **`monitor.py`** liest im
+  **TIME_STOP**-Zweig `close_env.data` (CLOSED_BY_BROKER bleibt `None`). **Additiv, P5 bit-identisch.**
+  +4 Tests (`test_monitor.py` +2, `test_executor.py` +2 build_closed) → **P5 142 → 146**.
+- **P7** `ClosedTrade` +`close_level`/+`profit_loss`; `build_closed` (Naht in `executor.py`) füllt sie;
+  **`pnl_resolver.resolve` Präferenz-Reihenfolge:** (1) `closed.profit_loss` → direkt (exakt, IG-
+  realisierte P&L), (2) `closed.close_level`+Richtung → `(close−open)·size·point_value·sign`
+  (kleine Approx: Open-Seite = `intended_open_level`), (3) sonst der bestehende History-Match
+  (CLOSED_BY_BROKER/Confirm-Timeout/Cold-Reconcile). `_OpenCtx` +`direction` (für Branch 2 im
+  Cold-Pfad). +4 Tests (resolver +3, recorder +1) → **P7 124 → 128**.
+
+### Reconciliation (Code = Source of Truth)
+- **Contract 1.2 aktualisiert:** „monitor trägt KEIN profit_loss/close_level" gilt **nur noch** für
+  `CLOSED_BY_BROKER`; der bot-eigene TIME_STOP-Close reicht jetzt die realisierte P&L durch.
+- **Branch 2 ist eine kleine Approximation** (Open-Seite = intended, nicht der echte Open-Fill — den
+  droppt `place_order`, Contract 1.2). Exakt nur, wenn IG `profit` im Close-Confirm liefert (Branch 1).
+  ✅ **RESOLVED am Live-Lauf (2026-06-26): Branch 1 feuerte** — IG liefert `profit` im Close-Confirm
+  (`profit_loss=-41.16` vs. die Level-Rechnung ≈ -21.56; die Differenz **ist** der Spread, den nur die
+  realisierte P&L erfasst → Branch 1 ist sogar genauer als Branch 2). Der Open-Fill-Folge-Step ist
+  damit **nicht** nötig.
+- **13b bleibt komplementär:** der magnituden-Size-Match + `reconcile_open_trades` sind weiterhin der
+  Fallback-Pfad (CLOSED_BY_BROKER / Confirm-Timeout), der die (verzögerte) History nutzt.
+
+### Verifiziert (gemockt/lokal — kein Netz; Live = Operator)
+- **Regression grün:** **P1 52 · P2 62 · P4 94 · P5 146 · P6 70 · P7 128.** Alle Edits additiv (Defaults
+  halten P1/P5 bit-identisch).
+
+### ✅ Live-verifiziert (2026-06-26) — `live_test.py` 5/5
+- **Operator-Lauf bestanden:** SELL-Seed (mit der Abwärtsbewegung) → Order ACCEPTED
+  (`deal_id=DIAAAAXUYTL77A3`, size 19.6, open 24771.3) → Time-Stop-Close → der **Close-Confirm**
+  lieferte close 24772.4 + `profit_loss=-41.16` → **in-cycle resolve gelang** (kein History-Fallback,
+  kein Reconcile nötig) → `trade_outcomes` CLOSED + `reward_pts` (1) + `trade_lessons` (1, echte Haiku)
+  → **`RESULT: 5/5`**, exit 0. Damit ist der **ganze** Reward-Loop end-to-end live bewiesen
+  (place → monitor → close-confirm-P&L → score → reward → lesson). ⚠ **live-verifiziert ≠
+  profit-validiert** — ein Trade beweist den Pfad, nicht die Edge.
+- **Zwei Vorläufer-NO_TRADEs** (SELL-in-rally 06-23, BUY-in-drop 06-26) waren **korrekte** Momentum-
+  VETOs (Seed gegen die Bewegung) — kein Bug. Lehre: in Richtung des `get_ohlcv`-net-return seeden.
+- Die zwei stale OPEN-Deals (`DIAAAAXTGBTEYAC`/`DIAAAAXTGMAF2A9` aus den Debug-Läufen) bleiben als
+  Demo-Daten stehen (oder via unscoped `reconcile_open_trades()` aufräumbar, sobald IG sie bucht).
+- **Doku auf ✅ live-verifiziert geflippt + Merge `phase7-reward` → `main`** in **diesem** Commit
+  (Operator-Freigabe 2026-06-26).
+
+### Gotchas (für den Re-Entry)
+- Branch **`phase7-reward`**. Step 13c ist **cross-phase** (P1+P5+P7) auf explizite User-Freigabe;
+  jede berührte Phase hat eine dated Note (P1/P5 `CLAUDE.md` 🔁-Block, hier, Konzept §9, root CLAUDE.md).
+- **AI-Grenze gewahrt:** close_position-Confirm, ExecutionResult-Felder, Resolver-Branches sind reiner Code.
+- **`close_position` darf NIE wegen eines Confirm-Fehlers erroren** — der Confirm ist best-effort-Enrichment;
+  ein akzeptierter DELETE bleibt ok (sonst kippt P5 in einen `ExecutionAbort`).
+
+---
+
+
+> **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).
+
+
+## Session stopped` block always stays in the source file; at each session end, the
 > previously-newest block rotates here.
 
 ---
