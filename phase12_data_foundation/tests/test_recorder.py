@@ -144,6 +144,7 @@ def test_run_forever_exits_within_signal_check_interval_on_request_stop(archive,
         state_path=str(tmp_path / "s.json"),
         interval_s=300,
         signal_check_interval_s=2,
+        market_open_fn=lambda: True,
         sleep_fn=lambda s: sleep_calls.append(s),
     )
 
@@ -169,6 +170,7 @@ def test_run_forever_chunks_large_interval_safely(archive, tmp_path):
         state_path=str(tmp_path / "s.json"),
         interval_s=10,
         signal_check_interval_s=2,
+        market_open_fn=lambda: True,
     )
 
     def stop_after_two_chunks(s):
