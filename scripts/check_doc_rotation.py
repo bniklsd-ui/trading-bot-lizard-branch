@@ -63,14 +63,19 @@ PHASE_DIRS: tuple[str, ...] = (
     "phase12_data_foundation",
     "phase13_live_data",
     "phase14_discovery",
+    "phase15_v4",
 )
 
 SESSION_HEADING = "## Session stopped"
 
-# P14-F plan §2 D4: tolerant gegen „Session N" und „Mini-Session N" (eingeführt
-# in Phase 14 für Hygiene-Mini-Sessions). Matcht auch künftige Permutationen
-# mit Whitespace-Toleranz.
-_SESSION_NUM_RE = re.compile(r"(?:Mini-)?Session\s+(\d+)")
+# P15-F plan §2 D2: permissiver gegen MiniMax-Vendor-Prefix und optionales '#'-Zeichen.
+# Matcht weiterhin P14-F-Stand („Session N", „Mini-Session N") plus die Phase-15-
+# Vokabulare („Exec-Session #N", „MiniMax-M3-Exec-Session #N"). \w+ im Prefix-
+# Block matched jeden Vendor-Prefix (MiniMax-M3, MiniMax-4, MiniMax-Opus, …),
+# sodass zukünftige Varianten ohne Mini-Plan-Anpassung laufen.
+_SESSION_NUM_RE = re.compile(
+    r"(?:Mini-|MiniMax-\w+-Exec-|Exec-)?Session\s+#?(\d+)"
+)
 
 
 def _max_session_num(md_text: str) -> int | None:

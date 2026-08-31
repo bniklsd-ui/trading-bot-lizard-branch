@@ -349,3 +349,94 @@ def test_strict_flag_added_and_default_off() -> None:
     )
     assert result_strict.returncode == 0  # aktuelles Repo ist auch Step-2-konform
     assert "sequence gap" not in result_strict.stdout.lower()  # kein FAIL
+
+
+# ---------------------------------------------------------------------------
+# P15-F Step 2 — Doc-Rotation-Hook für Phase 15 nachgeschärft (2026-08-31).
+#
+# Phase-15-Vokabular ist „MiniMax-M3-Exec-Session #N" statt „Session N" /
+# „Mini-Session N". Die P14-F-Regex wurde permissiver gemacht
+# (``(?:Mini-|MiniMax-\w+-Exec-|Exec-)?Session\s+#?(\d+)``), und PHASE_DIRS
+# wurde um „phase15_v4" erweitert. Die Tests unten verifizieren die neuen
+# Heading-Formen + den Probe-Aufruf gegen die echte Phase-15-Struktur.
+# Mini-Plan: phase15_v4/PHASE15_HOOK_HARDENING_PLAN.md §5 Akzeptanz A3–A6.
+# ---------------------------------------------------------------------------
+
+
+def test_archive_sequence_handles_exec_session_with_hash(tmp_path: Path) -> None:
+    """P15-F A3: head=MiniMax-M3-Exec-Session #3, archive=#2 → OK (Phase 15 Block A).
+
+    Reproduziert den aktuellen Phase-15-Stand (MiniMax-M3-Exec-Session #3 im
+    Phasenkopf, #2 + #1 im Archiv, Plan-Session mit Opus 5 wird ignoriert).
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #3, ...)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #2, ...)\n"
+        "## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session, ...)\n"
+        "## Session stopped — 2026-08-31 (Plan-Session, Opus 5)\n",
+        encoding="utf-8",
+    )
+    assert check_doc_rotation_mod.check_archive_sequence(tmp_path) is None
+
+
+def test_archive_sequence_drift_when_phase15_skips_a_session(tmp_path: Path) -> None:
+    """P15-F A4: head=#3, archive-newest=#1 (überspringt #2) → ❌ DRIFT.
+
+    Genau das Muster, das P14-F für Mini-Session 21 gefangen hat (Session 20
+    wurde nicht ins Archiv rotiert) — jetzt für die Phase-15-Sequenz getestet.
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #3, ...)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #1, ...)\n",
+        encoding="utf-8",
+    )
+    result = check_doc_rotation_mod.check_archive_sequence(tmp_path)
+    assert result is not None
+    label, diagnostic = result
+    # Die Diagnostik muss klar machen: head=3, archive-newest=1, expected=2.
+    assert "expected 2" in diagnostic
+    assert "Session 1" in diagnostic
+
+
+def test_archive_sequence_ignores_plan_session_without_number(tmp_path: Path) -> None:
+    """P15-F A5: archive enthält „Plan-Session, Opus 5" (kein \\d+) → ignoriert.
+
+    Pre-Phase-Session-Blocks sollen nicht in die Sequenz-Invariante einbezogen
+    werden. Ohne diese Asymmetrie würde archive_max=5 sein, was head=3 vs.
+    expected=2 fälschlich als DRIFT melden würde.
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #3, ...)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "## Session stopped — 2026-08-31 (Plan-Session, Opus 5)\n"
+        "## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #2, ...)\n",
+        encoding="utf-8",
+    )
+    assert check_doc_rotation_mod.check_archive_sequence(tmp_path) is None
+
+
+def test_strict_check_passes_for_phase15_v4_against_real_repo() -> None:
+    """P15-F A6: Echte Repo-Phase-15-Struktur ist Step-2-konform.
+
+    Subprozess-Aufruf gegen die echte Repo-Struktur (phase15_v4/CLAUDE.md +
+    phase15_v4/SESSIONS_ARCHIVE.md). Wenn dieser Test grün ist, deckt der
+    Pre-Commit-Hook Phase 15 ab und ist wirksam.
+    """
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPT_PATH), "--strict", "--phase", "phase15_v4"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT),
+    )
+    assert result.returncode == 0, (
+        f"check_doc_rotation.py --strict --phase phase15_v4 failed:\n"
+        f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
+    )
+    assert "phase15_v4" in result.stdout
+    assert "sequence gap" not in result.stdout.lower()  # kein FAIL
