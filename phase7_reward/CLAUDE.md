@@ -8,7 +8,8 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase7_reward_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-17
+  - ./PHASE12_RECONCILIATION_TIMING_PLAN.md    # 📕 Mini-Plan P12-Recon-Timing-Fix (2026-08-31, Mini-Session 26, Nikinger-signed-off): Backoff für `RewardSink.reconcile_open_trades` (Migration 003 `last_resolve_attempt_utc` + Exponential-Backoff 15 min → 30 min → 1 h → 4 h → 24 h + persistent-fail-WARNING nach 24 h); Cross-Phase-Freigabe Phase 7 + Phase 2; D1–D5 gelockt, A1–A6 Akzeptanz; **bei jedem Phase-7-Closeout referenzieren**
+updated: 2026-08-31 (+ Phase-12-Reconciliation-Timing-Plan Mini-Session 26)
 ---
 # CLAUDE.md — Phase 7: Reward/Brain (`phase7_reward/`)
 
