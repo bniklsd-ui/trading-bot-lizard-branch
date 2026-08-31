@@ -596,25 +596,44 @@ strukturelle Kostenzusicherung, kein Zählwert.
 
 ## Phase 14 — Discovery-Then-Deterministic *(eröffnet 2026-08-22 aus dem Session-13-Architektur-Insight)*
 
-> **Status: 🔄 Blöcke 0 + A + B + C code-complete (Stand 2026-08-22) — Block-D-Doku-Updates
-> ausstehend, Phase-Final-Closeout nach Phase-13-Beweiswoche (Plan §7 P1–P9).**
+> **Status: 🔄 Blöcke 0 + A + B + C code-complete + Block-D-Doku-Updates ✅ (Stand 2026-08-31,
+> Mini-Session 21) — Phase-Final-Closeout nach Phase-13-Beweiswoche (Plan §7 P1–P9).**
 > **Plan:** [`docs/concepts/phase14_discovery_plan.md`](./docs/concepts/phase14_discovery_plan.md)
-> (D1–D20 gelockt, Blöcke 0/A/B/C/D mit Verbatim-Ankern, Akzeptanz A1–A8, Drift-Liste §9).
+> (D1–D20 gelockt, Blöcke 0/A/B/C/D mit Verbatim-Ankern, Akzeptanz A1–A8, Drift-Liste §9,
+> §11 Post-Execution-Korrekturnotizen).
 > **Phasenkopf:** [`phase14_discovery/CLAUDE.md`](./phase14_discovery/CLAUDE.md)
-> (aktuelle Modul-Tabelle, Session-9-Block, A1–A8-Stand).
+> (Modul-Tabelle jetzt mit `Tests`-Spalte + Σ-Sweep-Tabelle, Session-21-Block).
 > **Concept-Skizze:** [`docs/concepts/phase14_discovery_concept.md`](./docs/concepts/phase14_discovery_concept.md)
 > (drei Bausteine: Quell-Profil + Kreuzungs-Tabelle + Konsumenten-Umstellung; sieben offene
 > Fragen für die Plan-Session — vom Plan Q1–Q7 beantwortet).
 > **Block-C-Handoff:** [`docs/concepts/phase13_c_block_c_replan.md`](./docs/concepts/phase13_c_block_c_replan.md)
 > §3 + §5 (warum die Architektur eine eigene Phase rechtfertigt; was Phase 14 implizit
 > absorbiert: hardcoded `EPIC_MAP`, Path C Dukascopy).
+> **Spezial-Pläne:** [`phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`](./phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md)
+> (P14-D, Discovery-Daemon-Signal-Response-Bug, §10 Korrekturnotiz 2026-08-31);
+> [`phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md`](./phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md)
+> (P14-E, Recorder-Sleep-Cap + Restart-Loop-Hunt, Cross-Phase-Phase-12).
 >
-> **Akzeptanz A1–A8 (Plan §7), Stand 2026-08-22 nach Session 9:**
+> **Akzeptanz A1–A8 (Plan §7), Stand 2026-08-22 nach Session 9, A1–A8 alle grün:**
 > A1 (Discovery 0 IG-Punkte strukturell), A2 (`grep EPIC_MAP phase13_live_data/*.py` leer),
 > A3 (`measurable_universe()`-Identität), A4 (yF-Projektion), A5 (Daemon unscharf = nichts),
-> A6 (UI warnt + scharf per Datei), A7 (`source_delta.py` Drei-Fälle-Trennung), A8 (Sweep)
-> — **alle grün**. Phase ist **strukturell fertig**, aber Block D und Phase-13-Beweiswoche
-> laufen separat; Phase-Final-Closeout (D5) wird nach der Beweiswoche entschieden.
+> A6 (UI warnt + scharf per Datei), A7 (`source_delta.py` Drei-Fälle-Trennung), A8 (Sweep
+> 1659→1698). Phase ist **strukturell fertig**.
+>
+> **Block-D ✅ (Mini-Session 21, 2026-08-31):** drei Hygiene-Edits als 4 Commits auf `main`:
+>   1. `362f4b9` — P14-D §10 Korrekturnotiz „Auto-Reload-Claim ist falsch" (analog P14-E
+>      §2 D3 + Mutterplan §11.3): nach Recorder-/Discovery-/Scheduler-Code-Edit IMMER
+>      Operator-Restart (Python `sys.modules`-Cache, `dis.dis`-Argument widerlegt).
+>   2. `98cac57` — P14-E Test-Fix (Phase-12 Test, Cross-Phase-Sign-off via Session-20-Plan):
+>      `market_open_fn=lambda: True` in den zwei neuen P14-E-Tests; macht sie deterministisch
+>      zu jeder Wanduhr-Zeit (vor XETRA-Open um 09:00 CEST).
+>   3. `b16aea8` — Phase-14-CLAUDE.md Modul-Tabelle auf As-Built-Stand: neue `Tests`-Spalte
+>      (13+9+21+18 = 61 Phase-14-Tests), Σ-Sweep-Tabellen (P8 248, P9 87, P10 165, P12 145,
+>      P13 74, P14 61, **Σ 1698**); Cross-Phase-Tests leben bei der Eigentümer-Phase.
+>   4. `5d587a0` — Doc-Rotation Session 20 → Archiv + Session-21-Block neu im Phasenkopf.
+> CAP-Verify live (Mini-Session 21): SIGTERM auf Discovery 10741 → Exit in 46 s (≤ 60 s CAP).
+>
+> Phase-Final-Closeout (D5) wird nach der Phase-13-Beweiswoche entschieden.
 
 **Goal:** jede Quelle (IG, yFinance, LS, Capital.com, später Dukascopy) **exponiert selbst**,
 was sie liefern kann. Eine DB-Tabelle (`instrument_source_availability`) hält die Kreuzung
