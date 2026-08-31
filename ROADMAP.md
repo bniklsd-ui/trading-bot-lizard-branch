@@ -557,12 +557,13 @@ Phase-11-Wiederaufnahme, nicht Teil dieser Phase.
 
 ## Phase 13 — Live-Datenfundament *(eröffnet 2026-08-18 nach dem Scheitern von P12.5)*
 
-> **Status: 🔄 Blöcke A + B + C code-complete (Stand 2026-08-22) — Block C re-planned &
-> live-verifiziert für DE40/FR40, Block A + B Done-Kriterien ausstehend (Beweiswoche).**
+> **Status: 🔄 Blöcke A + B + C code-complete (Stand 2026-08-22) — Beweiswoche ausgewertet 2026-08-31 (Mini-Session 23). Block A + B Done-Kriterien ausstehend (Recorder-Mapping-Initiative für IG-Bars-Lücke, 13 Tage).**
 > **Plan:** [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md)
 > (gelockte Entscheidungen L1–L16, Blöcke A/B/C, §9-Drift-Liste).
 > **Block-C-Closeout + Phase-14-Handoff (2026-08-22):**
 > [`docs/concepts/phase13_c_block_c_replan.md`](./docs/concepts/phase13_c_block_c_replan.md).
+> **Beweiswoche-Findings (2026-08-31, Mini-Session 23):**
+> [`phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md) — 14-Tage-Fenster source_delta-Diagnose, drei empirische Befunde (B1 IG-Bars-Lücke 2/13 Tage, B2 53.6 % Divergenzrate, B3 `last_verified_utc` lügt); Block-C-Re-Plan-These vollständig bestätigt.
 > **Vorgeschichte:** [`phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md).
 
 **Goal:** Beschaffung und Verbrauch von Kursdaten endgültig trennen. Kein Konsumentenpfad löst
@@ -597,12 +598,12 @@ strukturelle Kostenzusicherung, kein Zählwert.
 ## Phase 14 — Discovery-Then-Deterministic *(eröffnet 2026-08-22 aus dem Session-13-Architektur-Insight)*
 
 > **Status: 🔄 Blöcke 0 + A + B + C code-complete + Block-D-Doku-Updates ✅ (Stand 2026-08-31,
-> Mini-Session 21) — Phase-Final-Closeout nach Phase-13-Beweiswoche (Plan §7 P1–P9).**
+> Mini-Sessions 21+22+23+24) — Phase-Final-Closeout: architektonisch freigegeben (Mini-Session 23, Beweiswoche-Befund), operativ vorbehaltlich der Phase-13-Recorder-Mapping-Initiative.**
 > **Plan:** [`docs/concepts/phase14_discovery_plan.md`](./docs/concepts/phase14_discovery_plan.md)
 > (D1–D20 gelockt, Blöcke 0/A/B/C/D mit Verbatim-Ankern, Akzeptanz A1–A8, Drift-Liste §9,
 > §11 Post-Execution-Korrekturnotizen).
 > **Phasenkopf:** [`phase14_discovery/CLAUDE.md`](./phase14_discovery/CLAUDE.md)
-> (Modul-Tabelle jetzt mit `Tests`-Spalte + Σ-Sweep-Tabelle, Session-21-Block).
+> (Modul-Tabelle jetzt mit `Tests`-Spalte + Σ-Sweep-Tabelle, Session-21-Block). (Session-22-Block + Session-24-Block für Doc-Rotation-Hook-P14-F + D5-Hook-Verschärfung).
 > **Concept-Skizze:** [`docs/concepts/phase14_discovery_concept.md`](./docs/concepts/phase14_discovery_concept.md)
 > (drei Bausteine: Quell-Profil + Kreuzungs-Tabelle + Konsumenten-Umstellung; sieben offene
 > Fragen für die Plan-Session — vom Plan Q1–Q7 beantwortet).
@@ -611,7 +612,7 @@ strukturelle Kostenzusicherung, kein Zählwert.
 > absorbiert: hardcoded `EPIC_MAP`, Path C Dukascopy).
 > **Spezial-Pläne:** [`phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`](./phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md)
 > (P14-D, Discovery-Daemon-Signal-Response-Bug, §10 Korrekturnotiz 2026-08-31);
-> [`phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md`](./phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md)
+> [`phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md`](./phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md); [`phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md`](./phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md) (P14-F, Doc-Rotation-Hook Step 2, in Mini-Session 22 ausgeführt; Mini-Session 24 setzt D5-Ausnahme um — `--strict` als Hook-Default)
 > (P14-E, Recorder-Sleep-Cap + Restart-Loop-Hunt, Cross-Phase-Phase-12).
 >
 > **Akzeptanz A1–A8 (Plan §7), Stand 2026-08-22 nach Session 9, A1–A8 alle grün:**
@@ -634,6 +635,8 @@ strukturelle Kostenzusicherung, kein Zählwert.
 > CAP-Verify live (Mini-Session 21): SIGTERM auf Discovery 10741 → Exit in 46 s (≤ 60 s CAP).
 >
 > Phase-Final-Closeout (D5) wird nach der Phase-13-Beweiswoche entschieden.
+>
+> **D5-Handover-Status 2026-08-31 (Mini-Session 23 Befund):** architektonisch freigegeben — Tabelle + Discovery + Source-Delta arbeiten wie designed. Operativ vorbehaltlich Phase-13-Recorder-Mapping-Initiative (IG-Bars-Lücke seit 2026-08-18, [Findings-Notiz](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md)).
 
 **Goal:** jede Quelle (IG, yFinance, LS, Capital.com, später Dukascopy) **exponiert selbst**,
 was sie liefern kann. Eine DB-Tabelle (`instrument_source_availability`) hält die Kreuzung
