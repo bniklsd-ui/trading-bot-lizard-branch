@@ -77,4 +77,11 @@ do
     "$PY" -m pip install -e "$ROOT/$pkg"
 done
 
+# P14-F Mini-Plan §4 Schritt 3: install the doc-rotation pre-commit hook
+# (tracked installer — .git/hooks/pre-commit is untracked by git, so this
+# is the only way it survives a fresh clone). Idempotent: re-running this
+# script does not overwrite a hand-edited hook (install_hooks.sh fails
+# loudly on body-mismatch instead).
+bash "${ROOT}/scripts/install_hooks.sh" || true
+
 echo "dev_install: all thirteen packages installed editable. Run: pytest phase14_discovery/tests -v"
