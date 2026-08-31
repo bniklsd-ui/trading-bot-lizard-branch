@@ -30,6 +30,7 @@ updated: 2026-07-06
 - [DOC_LAYERS_CONVENTION.md](./DOC_LAYERS_CONVENTION.md) — 📗 · generic (project-agnostic) doc-layers spec
 
 ## Active phases (11 — V3-Fortsetzung: Funnel-/Mess-Fixes [🛑 deferred 2026-08-11], lives in the same directory)
+- [phase15_v4/CLAUDE.md](../phase15_v4/CLAUDE.md) — 🔄 phase head (Phase 15 / V4, eröffnet 2026-08-31); Mission = „bevor der Bot mehr lernt, muss das, was er lernt, stimmen". Trägt den Kern-Befund (der Reward-Loop belohnt Verluste: −1 972,87 EUR P&L bei +28,72 Score; `process_weight` 1.5 ist 1,875× der Outcome-Gewichtung — Phase-11 **H3**, seit 2026-07-31 im Code vermerkt, hier erstmals live gemessen), die Block-Tabelle A/B/C/D mit dem **Gate P7** auf Block B, die acht Nikinger-Entscheidungen der Plan-Session und den Plan-Session-`## Session stopped`-Block. Cross-Phase frei: P2/4/5/6/7/13/14 — **P8 nicht**. Plan: [phase15_v4_plan.md](./concepts/phase15_v4_plan.md).
 
 ## Closed phases (10 — V3 ✅ abgeschlossen 2026-08-25, Council-Paper-Call in mind P15; 12 — Datenfundament ✅ abgeschlossen 2026-08-25, Beweiswoche abgelöst durch Phase 13+14; 13 — Live-Datenfundament ✅ abgeschlossen 2026-08-31, Beweiswoche gelaufen + Pfad-C-Entscheidung + Befund-Inversion; 14 — Discovery-Then-Deterministic ✅ abgeschlossen 2026-08-31, D5-Handover komplett freigegeben durch Phase-13-Closeout-Voraussetzung)
 

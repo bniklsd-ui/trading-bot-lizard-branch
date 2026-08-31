@@ -39,7 +39,7 @@ Drei Blöcke, in dieser Reihenfolge:
 | Block | Inhalt | Gate |
 |---|---|---|
 | **A** | Haushalt: Step-0-Ritual, Σ-Baseline, ROADMAP-Wahrheit (15b/15c/15d), Doc-Rotation | keins |
-| **B** | Reward-Kalibrierung (= Phase-11 **H3**) + Score-Reset auf 50 | **A6 muss abgeschlossen sein** |
+| **B** | Reward-Kalibrierung (= Phase-11 **H3**) + Score-Reset auf 50 | **Gate P7: „Phase-12-Reconcile-Timing Live-Verify" muss abgeschlossen sein** |
 | **C** | Instinct-ECC: Extraktion + Validierung, Promotion hinter Flag | nach B |
 | **D** | Erbstücke: Quellen-Vertrauens-Lock, `phase13_14_15.svg`, Pfad A (Operator-S4) | nach A |
 
@@ -62,7 +62,7 @@ die auf einer Messung beruht, nicht auf einer Meinung.
 | **P4** | `veto_trigger_count` / `gate_fail_count` werden **nicht befüllt**, sondern als gegenstandslos dokumentiert (wie 15d). | Ein Trade, der eine `reward_pts`-Zeile bekommt, hat per Definition alle 5 Gates und alle 4 VETOs passiert. Belegt: **0 von 1902** `abstain_records` haben `stage='veto'` oder `'gate'` (§2.4). Code, der garantiert zweimal Null schreibt, ist kein Code. |
 | **P5** | Score-Reset auf 50,0 über **einen** `UPDATE` auf die **neueste** `reward_pts`-Zeile. Alle `outcome_score_delta`/`process_score_delta` der 8 Zeilen bleiben **unangetastet**. | Nikinger-Entscheidung 2026-08-31 (Runde 2). Die Deltas sind die eigentliche Messhistorie und bleiben; nur der Akkumulator wird re-basiert. `get_current_score()` liest genau diese eine Zelle (`db.py:280-284`). **Bekannte, bewusste Inkonsistenz:** Zeile 11 sagt danach `−2.017 + 3.15` aber `score_after = 50.0`. Das Script protokolliert das, der Phasenkopf trägt es. |
 | **P6** | Der Reset ist ein **einmaliges Script**, keine Migration, kein Feature. | Einmalige Korrektur einer Historie. Eine Migration würde es auf jeder frischen DB wiederholen, wo es nichts zu korrigieren gibt. |
-| **P7** | Block B und der Reset laufen **erst nach abgeschlossenem A6-Live-Verify**. | Nikinger-Entscheidung 2026-08-31 (Runde 1). A6 beobachtet 24 h `phase7_reward/reward/recorder.py`-Verhalten am laufenden Bot; `scorer.py` ist dessen direkte Abhängigkeit und der Reset schreibt in dieselbe DB. Ein Edit mitten im Fenster macht die Messung wertlos. |
+| **P7** | Block B und der Reset laufen **erst nach abgeschlossenem „Phase-12-Reconcile-Timing Live-Verify"** (in `phase7_reward/CLAUDE.md` „A6" genannt). | Nikinger-Entscheidung 2026-08-31 (Runde 1). Das „Phase-12-Reconcile-Timing Live-Verify" beobachtet 24 h `phase7_reward/reward/recorder.py`-Verhalten am laufenden Bot; `scorer.py` ist dessen direkte Abhängigkeit und der Reset schreibt in dieselbe DB. Ein Edit mitten im Fenster macht die Messung wertlos. |
 | **P8** | Instinct-Schema = **wörtlich** Concept §7b: `trigger` / `domain` ∈ {entry,exit,sizing,timing} / `confidence` / `evidence_trade_ids[]` / `contradictions_trade_ids[]`. | `docs/concepts/phase7_reward_concept.md:573-575`. Das Schema ist seit 2026-06-16 spezifiziert. Neu erfinden = Drift ohne Gewinn. |
 | **P9** | Der Instinct-Extraktor spiegelt **exakt** `phase7_reward/reward/brain.py`: `_LLMClientLike`-Protokoll, `ask_candidate(system, user, json_schema)`, best-effort, wirft **nie**. | Gleiche Familie, gleiche Datei-Nachbarschaft, gleicher Fehler-Vertrag. Ein zweiter LLM-Stack wäre Decision F aus Phase 7 rückgängig gemacht. |
 | **P10** | **Promotion ist per Default AUS** und erreicht die VETO-Schicht nur über deterministischen Code. `longterm_pre_trade_check()` ist eine gewöhnliche Funktion in `vetos.py`, kein AI-Call. | ROADMAP 15e Leitplanke + CLAUDE.md Hard Rule 2 + Hard Rule 3. Die AI schlägt vor, der Code entscheidet. |
@@ -180,7 +180,7 @@ Treffer sind ausnahmslos der **bewusst behaltene** Legacy-Dateiname `turbo_candi
 `phase2_persistence/persistence/state.py:27-30` sagt wörtlich: *„Legacy name; content =
 DAX-CFD candidates, not turbos/options. Do NOT rename"*. Vorherige Ausführungen:
 2026-06-27, 2026-07-10, 2026-08-18, 2026-08-22. **Phase 15 führt keine neue Turbo-Referenz ein.**
-Step A1 führt das Ritual erneut aus und protokolliert das Ergebnis — auch wenn es wieder No-Op ist.
+Step A-1 führt das Ritual erneut aus und protokolliert das Ergebnis — auch wenn es wieder No-Op ist.
 
 ---
 
@@ -257,8 +257,9 @@ D5 verlangt je Phase eine eigene Freigabe; die Phase-14-Liste gilt **nicht** aut
 Diese Liste ist die Phase-15-Liste. Alles außerhalb (Phase 1, 3, 8, 9, 10, 12) braucht eine
 neue Nikinger-Freigabe — **auch für einen Einzeiler.**
 
-> ⚠ Phase 8 ist **nicht** freigegeben. Step D3 (Pfad A) will ein Feld in
-> `phase8_scheduler/scheduler/config.py` — siehe §6 Step D3, dort steht der Ausweg.
+> ⚠ Phase 8 ist **nicht** freigegeben. Kein Step dieses Plans braucht sie — Step D3 ist
+> bewusst als Operator-Tool in Phase 13 geschnitten, gerade damit kein `SchedulerConfig`-Feld
+> nötig wird. Wer dort landet, hat D3 falsch gelesen.
 
 ---
 
@@ -288,6 +289,21 @@ Keine Erfindungen. Wer einen Namen ändern will, ändert ihn in diesem Abschnitt
 | `InstinctValidator.validate(instinct, trades)` | `phase15_v4/instinct/validator.py` | **NEU**, **rein deterministisch, kein LLM** |
 | `promote_eligible(instincts, n_closed, cfg)` | `phase15_v4/instinct/promotion.py` | **NEU**, gibt `[]` zurück solange `n_closed < cfg.instinct_n_min` |
 | `longterm_pre_trade_check(candidate, rules)` | `phase5_execution/execution/vetos.py` | **NEU**, VETO 5, gibt `VetoVerdict` |
+| `ExecutionConfig.longterm_rules: tuple[Any, ...] = ()` | `phase5_execution/execution/config.py` | **NEU** — so kommt `rules` in `pre_trade_check`, siehe unten |
+
+**Woher `rules` kommt — verifiziert 2026-08-31, keine Vermutung:** `pre_trade_check`s Signatur
+ist `(broker, candidate, now, config)` (`vetos.py:197-199`) und `config` ist bereits dabei.
+`rules` wird deshalb ein **Feld von `ExecutionConfig`**, nicht ein neuer Parameter. Das erfüllt
+drei Bedingungen gleichzeitig:
+
+- **Keine Signatur-Änderung** ⇒ der einzige Aufrufer `executor.py:332` bleibt unangetastet.
+- **Kein Cross-Phase-Import.** `vetos.py` importiert heute nur `execution.*` + stdlib
+  (`vetos.py:23-31`). `longterm_rules` ist als `tuple[Any, ...]` typisiert und trägt
+  **plain deterministische Prädikate**, kein `phase15_v4`-Typ. `phase5_execution` importiert
+  **nie** aus `phase15_v4` — die Regeln werden vom Wiring hineingegeben, nicht von Phase 5 geholt.
+- **`ExecutionConfig` ist `frozen=True`** (`config.py:30`) ⇒ Default muss ein **Tupel** sein
+  (`()`), keine Liste. Leeres Tupel ⇒ `ok=True` ⇒ bit-identisch zu heute.
+
 
 ### Block D
 
@@ -307,20 +323,25 @@ Keine Erfindungen. Wer einen Namen ändern will, ändert ihn in diesem Abschnitt
 
 ### Block A — Haushalt (kein Gate)
 
-#### A0 — Phasen-Verzeichnis anlegen
+#### A-0 — Phasenkopf lesen, Modul-Tabelle füllen
+
+`phase15_v4/CLAUDE.md` **existiert bereits** (Plan-Session, Commit nach `f98df68`) und trägt
+den `## Session stopped`-Block der Plan-Session. **Zuerst lesen** — er ist die Übergabe.
+
+Zu tun:
 
 ```bash
 mkdir -p phase15_v4/tests
 ```
 
-Dann `phase15_v4/CLAUDE.md` anlegen: YAML-Header-Card (≤ 15 Zeilen, Muster
-`phase14_discovery/CLAUDE.md`) + Mission-Satz + Modul-Tabelle (leer) + ein
-`## Session stopped`-Block. `phase15_v4/README.md` erst, wenn es eine öffentliche
-Oberfläche gibt — **nicht auf Vorrat**.
+Dann in `phase15_v4/CLAUDE.md`: die Modul-Tabelle mit den tatsächlich gebauten Modulen
+füllen (Spalten wie `phase14_discovery/CLAUDE.md`: Modul · Zweck · Tests) und am
+Session-Ende den eigenen `## Session stopped`-Block schreiben — den der Plan-Session
+**verbatim** nach `phase15_v4/SESSIONS_ARCHIVE.md` rotieren (Rotationsregel, newest-first).
 
-INDEX-Zeilen im selben Commit (`docs/INDEX.md`, Abschnitt **„## Active phases"**, Zeile 32).
+`phase15_v4/README.md` erst, wenn es eine öffentliche Oberfläche gibt — **nicht auf Vorrat**.
 
-#### A1 — Step-0-Ritual ausführen und protokollieren
+#### A-1 — Step-0-Ritual ausführen und protokollieren
 
 ```bash
 grep -rni "turbo" --include="*.py" --include="*.sql" --include="*.sh" .
@@ -331,13 +352,13 @@ Ergebnis in `phase15_v4/CLAUDE.md` protokollieren — **auch wenn No-Op** (Erwar
 siehe §2.6). Wenn ein Treffer auftaucht, der **nicht** `turbo_candidates.json` ist: stoppen
 und melden, nicht selbst umbenennen.
 
-#### A2 — Regression-Baseline VOR dem ersten Fix
+#### A-2 — Regression-Baseline VOR dem ersten Fix
 
 Sweep über alle 13 Phasen + root nach der Kommandoform aus §2.1. Ergebnis-Tabelle in
 `phase15_v4/CLAUDE.md`. **Erwartung: Σ = 1703.** Weicht es ab, ist das ein Befund von
 *vor* Phase 15 — dokumentieren, nicht stillschweigend als Phase-15-Effekt verbuchen.
 
-#### A3 — ROADMAP-Wahrheit herstellen (15b / 15c / 15d)
+#### A-3 — ROADMAP-Wahrheit herstellen (15b / 15c / 15d)
 
 `ROADMAP.md`, drei Edits. Jeder bekommt einen datierten Vermerk „korrigiert gegen Code
 2026-08-31 (Phase-15-Plan-Session §2/§3)".
@@ -372,7 +393,7 @@ Zusatz, dass die **Kalibrierung** in Block B gefixt wird (P1/P2). Erste Zeile: �
 `phase2_persistence/persistence/defaults.py:27`. CLAUDE.md Hard Rule 5 bleibt wörtlich stehen —
 sie ist die Vorschrift für den Tag, an dem jemand einen Force-Trigger baut.
 
-#### A4 — root-`CLAUDE.md` Statuspflege
+#### A-4 — root-`CLAUDE.md` Statuspflege
 
 **Anker** — `CLAUDE.md:93`, verbatim beginnend:
 ```
@@ -388,7 +409,7 @@ Status-Absatz: Phase 13 + 14 abgeschlossen 2026-08-31, Phase 15 eröffnet.
 → Status von `Deferred, gegatet auf …` auf **🔄 in Arbeit seit 2026-08-31** mit Link auf diesen
 Plan und auf `phase15_v4/CLAUDE.md`.
 
-#### A5 — Doc-Rotation der zwei Übergrößen
+#### A-5 — Doc-Rotation der zwei Übergrößen
 
 | Datei | Größe | Maßnahme |
 |---|---|---|
@@ -400,17 +421,31 @@ Plan und auf `phase15_v4/CLAUDE.md`.
 > newest-first verletzt, bekommt einen **Hook-Abbruch beim Commit**, der wie ein
 > kaputter Hook aussieht. Erster Verdächtiger: `check_archive_sequence`, nicht der Hook selbst.
 
-#### A6-DOC — `docs/INDEX.md` Doppel-Header
+#### A-6 — `docs/INDEX.md` Doppel-Header + drei stale „P15-Plan-Session offen"-Zeilen
 
 `docs/INDEX.md` hat **zwei** `## Closed phases`-Überschriften (Zeile 34 und Zeile 36).
-Zusammenführen. Reiner Doc-Fix, gehört in denselben Commit wie A5.
+Zusammenführen.
+
+Zusätzlich sind drei Phasenköpfe stale — sie führen „P15-Plan-Session — offen" als offenen
+Punkt, was seit dem Plan-Commit nicht mehr stimmt. Je **eine** Zeile, Cross-Phase ist
+freigegeben (§4):
+
+| Datei | Anker (verbatim, Stand 2026-08-31) |
+|---|---|
+| `phase7_reward/CLAUDE.md:457` | `- **P15-Plan-Session (V4)** — Material jetzt vollständig (P14-F D5 + P13-Findings` |
+| `phase13_live_data/CLAUDE.md:238` | `   Vier P15-V4-Kandidaten dokumentiert: Pfad A, Pfad B (aufgehoben solange C),` |
+| `phase14_discovery/CLAUDE.md` | die „D5-H.-B offen"-Zeile — wird von Step **D1** ohnehin angefasst, dort mitnehmen |
+
+Reiner Doc-Fix, gehört in denselben Commit wie A-5.
 
 ---
 
 ### Block B — Reward-Kalibrierung (= Phase-11 H3)
 
-> 🔒 **GATE P7: Dieser Block startet erst, wenn das A6-Live-Verify des
-> Phase-12-Reconcile-Backoffs abgeschlossen gemeldet ist.** Vorher: nicht anfangen,
+> 🔒 **GATE P7: Dieser Block startet erst, wenn das „Phase-12-Reconcile-Timing
+> Live-Verify" abgeschlossen gemeldet ist** — das ist die 24-h-Beobachtung am laufenden
+> Bot aus `phase7_reward/CLAUDE.md` (dort „A6" genannt; **nicht** zu verwechseln mit
+> einem Akzeptanzkriterium dieses Plans, die heißen AK1–AK14). Vorher: nicht anfangen,
 > auch nicht „nur den Test schon mal schreiben" — ein grüner Test auf `scorer.py`
 > lädt zum Edit ein.
 
@@ -430,7 +465,7 @@ Parametrisiert über **jede** Kombination: `status` ∈ {`CLOSED_BY_BROKER`, `TI
 × `spread_at_entry_pct` ∈ {tight, wide} × `debate_confidence` ∈ {None, 0, 50, 100}.
 Assertion: für `r_multiple = -1.0` ist `result.score_after < result.score_before`.
 
-**Dieser Test muss zuerst ROT sein.** Ist er beim ersten Lauf grün, stimmt etwas an den
+**Dieser Test muss zuerst ROT sein** (AK5). Ist er beim ersten Lauf grün, stimmt etwas an den
 Testparametern nicht — nicht am Code. Erster Verdächtiger: `score_before` wurde so niedrig
 gewählt, dass `score_min = 0.0` clampt.
 
@@ -553,8 +588,15 @@ Wer hier einen LLM-Call sieht, hat CLAUDE.md „Core principle" verletzt.
 → `longterm_pre_trade_check(candidate, rules)` als **VETO 5 danach**, vor dem
 abschließenden `return VetoVerdict(ok=True, ...)` in `vetos.py:228`.
 
-`rules` ist eine (möglicherweise leere) Liste promoteter, **deterministischer** Regeln.
-Leere Liste ⇒ `ok=True` ⇒ bit-identisches Verhalten zu heute. **Das ist der Default.**
+`rules` kommt aus `config.longterm_rules` (§5) — ein Tupel promoteter, **deterministischer**
+Prädikate. Leeres Tupel ⇒ `ok=True` ⇒ bit-identisches Verhalten zu heute. **Das ist der Default.**
+
+**Anker** — `phase5_execution/execution/config.py:107`, verbatim:
+```
+    max_spread_pct: float = 0.5            # percent of ask (VETO 2)
+```
+→ `longterm_rules: tuple[Any, ...] = ()` in denselben `# --- VETOs ---`-Block, mit Kommentar:
+leeres Tupel = VETO 5 inaktiv, Regeln kommen vom Wiring, **nie** ein Import aus `phase15_v4`.
 
 **Anker** — `phase5_execution/execution/vetos.py:10-14`, verbatim beginnend:
 ```
@@ -569,7 +611,7 @@ Mindestens diese Assertions:
 
 | Test | Was er pinnt |
 |---|---|
-| `test_promotion_refuses_below_n_min` | bei `n_closed=8` gibt `promote_eligible` **`[]`** zurück — **das ist P13, das Akzeptanzkriterium der Phase** |
+| `test_promotion_refuses_below_n_min` | bei `n_closed=8` gibt `promote_eligible` **`[]`** zurück — **das ist P13 = **AK7**, das Akzeptanzkriterium der Phase** |
 | `test_promotion_refuses_when_flag_off` | auch bei `n_closed=999` `[]`, solange `enable_instinct_promotion is False` |
 | `test_extractor_never_raises` | LLM-Fake wirft auf jeder Methode ⇒ Extractor gibt ein `ok=False`-Ergebnis, keine Exception |
 | `test_validator_has_no_llm` | `grep`-artige Zusicherung: `validator.py` importiert nichts aus `brain`/`llm` |
@@ -610,53 +652,57 @@ und dem geschlossenen Promotion-Gatter. Beides muss man sehen können, ohne den 
 
 INDEX-Zeile im selben Commit (`docs/INDEX.md`, Abschnitt Architektur).
 
-#### D3 — Pfad A: Operator-S4, gebaut aber AUS (P15)
+#### D3 — Pfad A: Operator-Tool, gebaut aber AUS (P15)
 
-Umfang nach §3 B4 — **die drei Teile, die fehlen**:
+**Pfad A ist ein Operator-Tool, kein Daemon-Feature.** P13-Findings §8.2 sagt wörtlich
+„GapRescue-Skript als Operator-Tool mit Schedule". Damit entfällt die Daemon-Wiring-Frage
+vollständig: das Script konstruiert `GapRescue` selbst, der Scheduler tut es nie.
 
-1. **Config-Flag `enable_gap_rescue: bool = False`.**
-   ⚠ **Phase 8 ist nicht cross-phase-freigegeben** (§4). `SchedulerConfig`
-   (`phase8_scheduler/scheduler/config.py:207` ist die Nachbarzeile
-   `enable_divergence_sampler: bool = False`) wäre der natürliche Ort.
-   **Die Exec-Session baut das Flag stattdessen in Phase 13** — als Feld der
-   `GapRescue`-Konstruktion bzw. einer `RescueConfig` in `phase13_live_data/`.
-   Wenn sich beim Bauen zeigt, dass es ohne `SchedulerConfig` nicht geht: **stoppen
-   und die Phase-8-Freigabe holen.** Nicht selbst entscheiden.
+> Der Docstring `phase13_live_data/live_data/rescue.py:17` („sonst ist die ganze Klasse nicht
+> im Wiring") **setzt Daemon-Wiring voraus.** Diese Prämisse gilt für das Operator-Tool nicht.
+> Wer sie trotzdem übernimmt, landet bei einem `SchedulerConfig`-Feld — und damit in
+> Phase 8, die **nicht** cross-phase-freigegeben ist (§4). Nicht dort hinlaufen.
 
-2. **Wiring.** Erst wenn Punkt 1 steht.
+Genau zwei Dinge, beide in Phase 13 (freigegeben):
 
-3. **`phase13_live_data/scripts/gap_rescue_operator.py`** — Operator-Tool, `--dry-run`
-   als Default, druckt die geplanten Epics + die geschätzten IG-Punkte **vor** dem Aufruf.
+1. **`RescueConfig`** in `phase13_live_data/live_data/rescue.py` (oder daneben) — trägt
+   `enable_gap_rescue: bool = False`, die Epic-Liste und den Punkte-Deckel pro Lauf.
+   **Kein** Feld in `SchedulerConfig`, **kein** Wiring in `phase8_scheduler/`.
 
-**Budget, aus §2.4 gerechnet:** der Ledger zeigt heute 5 156 Punkte über alle `kind`-Werte
-(158 Zeilen, längster Zeitraum bis 2026-08-31). Das Kontingent ist 10 000/Woche
-(P13-Findings §8.2). Ein täglicher 1-Tages-Backfill für 8 Epics ≈ 560 Punkte/Woche ≈ **5,6 %**.
-⚠ Diese 560 stammen aus P13-Findings §8.2 und sind in dieser Plan-Session **nicht**
-nachgerechnet — siehe §9.
+2. **`phase13_live_data/scripts/gap_rescue_operator.py`** — Operator-Tool.
+   `--dry-run` ist **Default**. Druckt vor jedem Aufruf die geplanten Epics und die
+   geschätzten IG-Punkte. Schreibt nur mit `--apply` **und** `enable_gap_rescue=True`
+   (beide Bedingungen, nicht eine — dieselbe Doppel-Sperre wie `promote_eligible`, P10).
+
+**Budget:** der Ledger zeigt heute 5 156 Punkte über alle `kind`-Werte (158 Zeilen, §2.4).
+Das Kontingent ist 10 000/Woche. Ein täglicher 1-Tages-Backfill für 8 Epics ≈ 560 Punkte/Woche
+≈ **5,6 %**. ⚠ Diese 560 stammen aus P13-Findings §8.2 und sind in dieser Plan-Session
+**nicht** nachgerechnet — siehe §9.
 
 **D19/L18 bleibt gelockt.** Dieser Step baut den Schalter, er legt ihn nicht um (P15).
 Das Umlegen ist eine getrennte, kostenpflichtige Nikinger-Aktion.
 
+
 ---
 
-## §7 Akzeptanzkriterien
+## §7 Akzeptanzkriterien (AK1–AK14)
 
 | # | Kriterium | Wie belegt |
 |---|---|---|
-| **A1** | Step-0-Ritual ausgeführt, Ergebnis protokolliert (auch als No-Op) | Absatz in `phase15_v4/CLAUDE.md` |
-| **A2** | Σ-Baseline **vor** dem ersten Fix genommen | Tabelle in `phase15_v4/CLAUDE.md`, Erwartung 1703 |
-| **A3** | ROADMAP 15b/15c/15d stimmen mit dem Code überein, datiert vermerkt | `ROADMAP.md:692-701`-Region |
-| **A4** | `ROADMAP.md` und `phase7_reward/CLAUDE.md` **unter 40 KB** | `find . -name "*.md" -size +40k` listet beide **nicht** mehr |
-| **A5** | **Ein Verlust senkt den Score.** Für `r_multiple ≤ −1.0` gilt `score_after < score_before` — über alle Signal-Kombinationen | `test_a_full_stop_loss_never_raises_the_score` grün; war vor B2 rot |
-| **A6** | Score-Reset ist vorbereitet, `--dry-run`-Ausgabe liegt dem Nikinger vor | Audit-Block in `phase15_v4/CLAUDE.md`; `--apply` nur nach Freigabe |
-| **A7** | **Der Promotion-Harness verweigert bei n=8 korrekt** | `test_promotion_refuses_below_n_min` grün — das ist das Phasen-Akzeptanzkriterium (P13) |
-| **A8** | Kein LLM im Validierungspfad | `test_validator_has_no_llm` grün |
-| **A9** | VETO 5 mit leerer Regelliste ist bit-identisch zu heute | `test_veto5_with_empty_rules_is_identity` grün + Phase-5-Sweep 173 unverändert grün |
-| **A10** | D5-H.-B geschlossen: Verfügbarkeits-Modell | Datierter Absatz in `phase14_discovery/CLAUDE.md` |
-| **A11** | `phase13_14_15.svg` existiert, zeigt den fehlenden Konsument→Quelle-Pfeil und das geschlossene Promotion-Gatter | Datei + INDEX-Zeile |
-| **A12** | `enable_gap_rescue` existiert als Config mit Default `False`; Operator-Script mit `--dry-run`-Default | `grep -rn "enable_gap_rescue" --include="*.py" .` findet ein **Feld**, nicht nur Prosa |
-| **A13** | Σ-Sweep am Ende ≥ 1703, **null** neue Fehler | Sweep-Tabelle |
-| **A14** | Jede neue `.md` hat ihre `docs/INDEX.md`-Zeile im selben Commit | `git show --stat` je Commit |
+| **AK1** | Step-0-Ritual ausgeführt, Ergebnis protokolliert (auch als No-Op) | Absatz in `phase15_v4/CLAUDE.md` |
+| **AK2** | Σ-Baseline **vor** dem ersten Fix genommen | Tabelle in `phase15_v4/CLAUDE.md`, Erwartung 1703 |
+| **AK3** | ROADMAP 15b/15c/15d stimmen mit dem Code überein, datiert vermerkt | `ROADMAP.md:692-701`-Region |
+| **AK4** | `ROADMAP.md` und `phase7_reward/CLAUDE.md` **unter 40 KB** | `find . -name "*.md" -size +40k` listet beide **nicht** mehr |
+| **AK5** | **Ein Verlust senkt den Score.** Für `r_multiple ≤ −1.0` gilt `score_after < score_before` — über alle Signal-Kombinationen | `test_a_full_stop_loss_never_raises_the_score` grün; war vor B2 rot |
+| **AK6** | Score-Reset ist vorbereitet, `--dry-run`-Ausgabe liegt dem Nikinger vor | Audit-Block in `phase15_v4/CLAUDE.md`; `--apply` nur nach Freigabe |
+| **AK7** | **Der Promotion-Harness verweigert bei n=8 korrekt** | `test_promotion_refuses_below_n_min` grün — das ist das Phasen-Akzeptanzkriterium (P13) |
+| **AK8** | Kein LLM im Validierungspfad | `test_validator_has_no_llm` grün |
+| **AK9** | VETO 5 mit leerer Regelliste ist bit-identisch zu heute | `test_veto5_with_empty_rules_is_identity` grün + Phase-5-Sweep 173 unverändert grün |
+| **AK10** | D5-H.-B geschlossen: Verfügbarkeits-Modell | Datierter Absatz in `phase14_discovery/CLAUDE.md` |
+| **AK11** | `phase13_14_15.svg` existiert, zeigt den fehlenden Konsument→Quelle-Pfeil und das geschlossene Promotion-Gatter | Datei + INDEX-Zeile |
+| **AK12** | `enable_gap_rescue` existiert als **Feld einer `RescueConfig` in Phase 13** mit Default `False`; Operator-Script mit `--dry-run`-Default; **kein** `SchedulerConfig`-Feld, **kein** `phase8_scheduler/`-Diff | `grep -rn "enable_gap_rescue" --include="*.py" .` findet ein Feld, nicht nur Prosa; `git diff --stat` nennt kein `phase8_scheduler/` |
+| **AK13** | Σ-Sweep am Ende ≥ 1703, **null** neue Fehler | Sweep-Tabelle |
+| **AK14** | Jede neue `.md` hat ihre `docs/INDEX.md`-Zeile im selben Commit | `git show --stat` je Commit |
 
 ---
 
@@ -671,7 +717,7 @@ Das Umlegen ist eine getrennte, kostenpflichtige Nikinger-Aktion.
 | IG-Auth-Fehler während eines Live-Schritts | Credentials kaputt | Zwei parallele IG-Logins, die sich den Token überschreiben. Bot stoppen, `ps aux \| grep scheduler.run`. Kein Reboot nötig. |
 | `get_current_score()` liefert nach B6 nicht 50,0 | Reset hat nicht gegriffen | `get_current_score()` liest `ORDER BY id DESC LIMIT 1` — also die höchste **`id`**, nicht den neuesten `trade_id`. Beide zeigen heute auf dieselbe Zeile; das muss so bleiben. |
 | Nach D3 taucht `kind='rescue'` im Ledger auf, obwohl AUS | Das Flag wirkt nicht | Der Ledger hatte vorher **0** `rescue`-Zeilen (§2.4). Jeder Eintrag heißt: S4 lief. Sofort stoppen — das kostet IG-Kontingent. |
-| Phase-5-Tests fallen nach C3 | VETO 5 ist falsch | Die leere Regelliste ist **nicht** der Default irgendwo im Aufrufpfad — `pre_trade_check`s Signatur hat sich geändert und ein Aufrufer übergibt nichts. Es gibt genau **einen** Aufrufer: `executor.py:332`. |
+| Phase-5-Tests fallen nach C3 | VETO 5 ist falsch | Fast immer: jemand hat `pre_trade_check` **doch** einen `rules`-Parameter gegeben statt das `ExecutionConfig`-Feld zu nutzen (§5). Es gibt genau **einen** Aufrufer, `executor.py:332` — und der übergibt keinen. Zweiter Verdächtiger: mutable Default (`[]` statt `()`) in einem `frozen=True`-Dataclass. |
 
 ---
 
@@ -684,9 +730,11 @@ oder Live-DB geprüft und darf als Fakt behandelt werden.**
    nachsehen, ob ein zweiter Schreibpfad Bruch statt Prozent-vom-Ask liefert.
 2. **Die 560 IG-Punkte/Woche für Pfad A** (§6 D3). Stammt aus P13-Findings §8.2,
    **nicht nachgerechnet**. Vor dem Scharfschalten gegen `source_spend` verifizieren.
-3. **Ob `enable_gap_rescue` ohne `SchedulerConfig` verdrahtbar ist** (§6 D3 Punkt 1).
-   Wenn nein: Phase-8-Freigabe holen, nicht selbst entscheiden.
-4. **`compression_trigger_pct`-Default und ob der Latch je gefeuert hat.** Für A3 wurde
+3. **Der nachgerechnete Score „≈ 63,35"** (§3 B3). **Von Hand gerechnet, nicht ausgeführt.**
+   Die tragende Aussage (kein Risiko-Modus-Flip, weil jede Nachrechnung deutlich über 50 landet)
+   ist davon unabhängig robust — die Zahl selbst ist es nicht. Wer sie zitiert, rechnet sie
+   vorher nach oder schreibt „nicht nachgerechnet" dazu.
+4. **`compression_trigger_pct`-Default und ob der Latch je gefeuert hat.** Für A-3 wurde
    die **Existenz** des Mechanismus verifiziert (`debate.py:172`, `:187-195`), **nicht**
    sein Live-Verhalten. Die ROADMAP-Korrektur darf deshalb „gebaut" sagen, aber **nicht**
    „live-verifiziert".
@@ -707,7 +755,7 @@ oder Live-DB geprüft und darf als Fakt behandelt werden.**
 | Was | Warum nicht |
 |---|---|
 | **15a Council-Integration** | Nikinger-Entscheidung 2026-08-31, Runde 1 |
-| **15d als Code** (Force-Trigger bauen) | moot-by-absence (P4-Analogie, A3-Anker 3). CLAUDE.md Hard Rule 5 bleibt für den Tag stehen, an dem jemand einen baut |
+| **15d als Code** (Force-Trigger bauen) | moot-by-absence (P4-Analogie, Step A-3 Anker 3). CLAUDE.md Hard Rule 5 bleibt für den Tag stehen, an dem jemand einen baut |
 | **Auto-Gap-Fill-Scheduler (D16)** | Nikinger-Entscheidung 2026-08-31, Runde 2 |
 | **Dukascopy echt (D15)** | dito — bleibt Mock-only mit `NotImplementedError` |
 | **Pfad B — Schema-Reinterpretation** (`status='gap_rescue_only'`) | aufgehoben solange Pfad C gilt (P14 §10) |
@@ -717,6 +765,7 @@ oder Live-DB geprüft und darf als Fakt behandelt werden.**
 | **Backfill der Trades 4–7** | P5 — die Deltas sind Messhistorie und bleiben |
 | **`Database.get_risk_mode()` löschen** (toter Code, §2.5) | außerhalb des Scopes; hier nur vermerkt |
 | **Die zwei Zombie-Prozesse** | §9.5, kein beobachteter Schaden |
+| **Jeder Diff in `phase8_scheduler/`** | Phase 8 ist nicht cross-phase-freigegeben (§4); kein Step braucht sie |
 
 ---
 
@@ -724,7 +773,7 @@ oder Live-DB geprüft und darf als Fakt behandelt werden.**
 
 | # | Aktion | Wann | Kosten |
 |---|---|---|---|
-| 1 | **A6-Live-Verify abschließen** — 24-h-Beobachtung, nächster OPEN-Trade mit IG-Lag soll ≤ 5 CRITICALs in 24 h liefern (statt 6+ in 52 min) | **vor Block B** (Gate P7) | keine |
+| 1 | **„Phase-12-Reconcile-Timing Live-Verify" abschließen** (in `phase7_reward/CLAUDE.md` „A6") — 24-h-Beobachtung, nächster OPEN-Trade mit IG-Lag soll ≤ 5 CRITICALs in 24 h liefern (statt 6+ in 52 min) | **vor Block B** (Gate P7) | keine |
 | 2 | Bot stoppen vor Block B, danach `bash scripts/restart-services.sh restart scheduler` | Block B | keine |
 | 3 | `reset_score_baseline.py --apply` freigeben, nachdem die `--dry-run`-Ausgabe vorliegt | Step B6 | keine |
 | 4 | `git push origin main` | nach jedem Block | keine |
@@ -742,5 +791,5 @@ Blockweise Commits, nicht schrittweise: A ist 3–4 Commits, B ist 2–3, C ist 
 ---
 
 > **Stand:** 2026-08-31, Plan-Session (Claude Code, Opus 5).
-> **Nächste Aktion:** Nikinger gibt Operator-Aktion 1 (A6) frei; die Exec-Session (Sonnet 5)
-> kann **Block A und Block D sofort** starten — sie hängen nicht am Gate.
+> **Nächste Aktion:** Nikinger gibt Operator-Aktion 1 („Phase-12-Reconcile-Timing Live-Verify") frei; die Exec-Session (Sonnet 5)
+> kann **Block A und Block D sofort** starten — sie hängen nicht am Gate P7.
