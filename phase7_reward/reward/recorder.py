@@ -59,6 +59,62 @@ from reward.models import ClosedTrade, OpenedTrade, RewardConfig
 
 logger = logging.getLogger(__name__)
 
+
+# P12-Reconcile-Timing (Mini-Session 26, 2026-08-31,
+# PHASE12_RECONCILIATION_TIMING_PLAN.md): exponential backoff for unresolved
+# trade P&L retries. D1: 15 min -> 30 min -> 1 h -> 4 h -> 24 h cap. D4: WARNING
+# (not CRITICAL) after 24 h without resolution (persistent-fail alarm).
+_RETRY_BACKOFF_STEPS_S: tuple[int, ...] = (
+    15 * 60, 30 * 60, 60 * 60, 4 * 60 * 60, 24 * 60 * 60,
+)
+_PERSISTENT_FAIL_HOURS = 24
+
+
+def _parse_iso_safe(s: str | None) -> datetime | None:
+    """Parse ISO-8601 string to tz-aware UTC datetime, or None on failure.
+
+    Tolerates the two timestamp shapes the codebase uses: ``...Z`` (UTC suffix,
+    SQLite-stored format) and ``+02:00`` (offset suffix, IG-style history rows).
+    Returns None for None, '', or any unparseable input — never raises.
+    """
+    if not s:
+        return None
+    try:
+        normalized = s.replace("Z", "+00:00") if s.endswith("Z") else s
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError):
+        return None
+
+
+def _next_retry_in_s(last_attempt_iso: str | None, now_utc: datetime | None = None) -> int:
+    """Return seconds until next retry is allowed (D1).
+
+    ``0`` means 'proceed immediately' (no prior attempt). Otherwise: pick the
+    largest step whose duration has passed since the last attempt. Caps at 24 h
+    (D1); after that, return 0 (= always retry, caller decides severity per D4).
+    """
+    last = _parse_iso_safe(last_attempt_iso)
+    if last is None:
+        return 0
+    now = now_utc if now_utc is not None else datetime.now(timezone.utc)
+    elapsed = (now - last).total_seconds()
+    for step in _RETRY_BACKOFF_STEPS_S:
+        if elapsed < step:
+            return int(step - elapsed)
+    return 0
+
+
+def _hours_open(open_ts_iso: str | None, now_utc: datetime | None = None) -> float | None:
+    """Return hours since ``open_ts``, or None if unparseable."""
+    opened = _parse_iso_safe(open_ts_iso)
+    if opened is None:
+        return None
+    now = now_utc if now_utc is not None else datetime.now(timezone.utc)
+    return (now - opened).total_seconds() / 3600.0
+
 # Process-signal defaults used only when the open context is cold (no stash, e.g. a
 # restart): a spread that earns no clean-entry bonus, and no debate signal. The durable
 # signals (R-multiple, exit status) still score normally from the resolved P&L + close.
@@ -260,6 +316,17 @@ class RewardSink:
         trade_id = row.get("id")
         opened = self._opened.get(deal_id)
 
+        # P12-Reconcile-Timing (Mini-Session 26, D5): backoff-skip if a recent attempt
+        # happened within the next-step window. NULL last_attempt_iso => proceed
+        # immediately (first attempt). Caps at 24 h (D1).
+        last_attempt_iso = row.get("last_resolve_attempt_utc")
+        retry_in_s = _next_retry_in_s(last_attempt_iso)
+        if retry_in_s > 0:
+            logger.debug(
+                "reward: deal_id=%s backoff-skip (retry in %ds)", deal_id, retry_in_s
+            )
+            return
+
         # (1) resolve P&L BEFORE closing, so PnLUnavailable leaves the trade OPEN.
         ctx = opened if opened is not None else _OpenCtx(
             size=float(row.get("size") or 0.0),
@@ -273,10 +340,30 @@ class RewardSink:
                 closed, self.broker, ctx, self.cfg
             )
         except Exception as exc:  # noqa: BLE001 - includes PnLUnavailable
-            logger.critical(
-                "reward: P&L unresolved for deal_id=%s: %s — trade stays OPEN, retry later",
-                deal_id, exc,
-            )
+            # P12-Reconcile-Timing (D5): pre-claim AFTER resolve() failed (so a
+            # successful resolve does not stamp the slot). persistent-fail (D4):
+            # WARNING instead of CRITICAL after 24 h without resolution.
+            try:
+                self.db.update_trade_resolve_attempt(
+                    deal_id, datetime.now(timezone.utc).isoformat()
+                )
+            except Exception as claim_exc:  # noqa: BLE001 - claim failure is best-effort
+                logger.debug(
+                    "reward: deal_id=%s pre-claim failed: %s", deal_id, claim_exc
+                )
+            open_ts_iso = row.get("open_ts")
+            hours = _hours_open(open_ts_iso)
+            if hours is not None and hours > _PERSISTENT_FAIL_HOURS:
+                logger.warning(
+                    "reward: P&L unresolved for deal_id=%s (%.1fh open): %s — "
+                    "persistent fail, investigate",
+                    deal_id, hours, exc,
+                )
+            else:
+                logger.critical(
+                    "reward: P&L unresolved for deal_id=%s: %s — trade stays OPEN, retry later",
+                    deal_id, exc,
+                )
             return
 
         # (2) close the trade row (close fact).

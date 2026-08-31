@@ -190,7 +190,12 @@ def test_pnl_unavailable_logs_critical_no_reward_trade_stays_open(make_opened, m
     db = FakeDB()
     broker = FakeBroker([])  # empty history -> resolver raises PnLUnavailable
     sink = _sink(db, broker=broker)
-    opened = make_opened()
+    # P12-Reconcile-Timing (Mini-Session 26): override open_ts to "now" so the test
+    # exercises the fresh-trade CRITICAL path (D4 persistent-fail WARNING kicks in
+    # only after >24 h). Real fresh trades are <1 min old.
+    from datetime import datetime, timezone
+    fresh_open_ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    opened = make_opened(open_ts=fresh_open_ts)
     sink.on_trade_opened(opened)
 
     with caplog.at_level(logging.CRITICAL):
@@ -341,6 +346,13 @@ def test_reconcile_resolves_after_history_catches_up(make_opened, make_closed):
     assert db.closes == []
     assert db.get_trade_by_deal_id(opened.deal_id)["status"] == "OPEN"
 
+    # P12-Reconcile-Timing (Mini-Session 26): backoff window is elapsed in production
+    # (next scheduler cycle is 5 min after the first attempt; backoff is 15 min so
+    # 5 min is still within — the tests simulate that the reconcile *cycle* runs
+    # later, e.g. after 20 min). Backdate the last_resolve_attempt_utc so the
+    # backoff-skip is bypassed.
+    db._trades[opened.deal_id]["last_resolve_attempt_utc"] = "2026-01-01T00:00:00.000Z"
+
     resolved = sink.reconcile_open_trades([opened.deal_id])
 
     assert resolved == [opened.deal_id]
@@ -358,6 +370,12 @@ def test_reconcile_reuses_retained_closed_trade_status(make_opened, make_closed)
     sink.on_trade_opened(make_opened())
     sink.on_trade_closed(make_closed(status="CLOSED_BY_BROKER"))  # in-cycle fails
 
+    # P12-Reconcile-Timing: backoff bypass (see test_reconcile_resolves_after_history_catches_up).
+    # There is only one row in this test.
+    for row in db._trades.values():
+        row["last_resolve_attempt_utc"] = "2026-01-01T00:00:00.000Z"
+        break
+
     sink.reconcile_open_trades()
 
     assert brain.calls  # reflect ran on the reconcile pass
@@ -372,6 +390,10 @@ def test_reconcile_is_idempotent(make_opened, make_closed):
     sink = _sink(db, broker=broker)
     sink.on_trade_opened(make_opened())
     sink.on_trade_closed(make_closed())
+
+    # P12-Reconcile-Timing: backoff bypass
+    for row in db._trades.values():
+        row["last_resolve_attempt_utc"] = "2026-01-01T00:00:00.000Z"
 
     sink.reconcile_open_trades()
     assert len(db.rewards) == 1

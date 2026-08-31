@@ -182,6 +182,20 @@ class Database:
         )
         return self._rows(cur)
 
+    def update_trade_resolve_attempt(self, deal_id: str, iso_utc: str) -> None:
+        """P12-Reconcile-Timing (Mini-Session 26, 2026-08-31): stamp
+        ``last_resolve_attempt_utc`` for backoff-skip. Direct UPDATE on
+        ``trade_outcomes`` — bypasses ``_TRADE_COLUMNS`` whitelist because
+        this column is not INSERTed (it's only written after a failed
+        resolve attempt, see recorder.py D5 pre-claim).
+        """
+        self.conn.execute(
+            "UPDATE trade_outcomes SET last_resolve_attempt_utc = ?, "
+            "updated_at = ? WHERE deal_id = ?",
+            (iso_utc, iso_utc, deal_id),
+        )
+        self.conn.commit()
+
     def get_trade_by_deal_id(self, deal_id: str) -> dict[str, Any] | None:
         """Most recent trade for ``deal_id``, or None."""
         cur = self.conn.execute(

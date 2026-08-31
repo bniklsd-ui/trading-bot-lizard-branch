@@ -253,6 +253,13 @@ class FakeDB:
         self.lessons.append((trade_id, dict(lesson)))
         return len(self.lessons)
 
+    def update_trade_resolve_attempt(self, deal_id: str, iso_utc: str) -> None:
+        """P12-Reconcile-Timing (Mini-Session 26): stamp the backoff slot."""
+        self._maybe_fail("update_trade_resolve_attempt")
+        row = self._trades.get(deal_id)
+        if row is not None:
+            row["last_resolve_attempt_utc"] = iso_utc
+
 
 class FakeBrain:
     """Scripted lesson extractor (the recorder's ``brain`` collaborator, Step 7 surface).
