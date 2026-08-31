@@ -5,7 +5,7 @@ read-when: vor jedem Phase-15-Schritt; danach nur noch als Snapshot beim Auditie
 detail: L3
 up: ../../CLAUDE.md
 down:
-  - ../../phase15_v4/CLAUDE.md                                   # Phasenkopf (legt Step A0 an)
+  - ../../phase15_v4/CLAUDE.md                                   # Phasenkopf — trägt den Plan-Session-Session-stopped-Block; Step A-0 liest ihn
   - ../../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md   # §8.2 P15-V4-Kandidaten
   - ../../phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md         # §7 D5-H.-B / D5-H.-C, §9 Konsistenz-Regeln
   - ../../phase10_v3/PHASE11_DEFERRAL_HANDOVER.md                # H3 ist offen; Block B ist H3
