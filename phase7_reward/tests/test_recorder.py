@@ -11,6 +11,7 @@ J): any failure logs ``critical`` and the cycle continues — a reward/lesson fa
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -18,6 +19,11 @@ from reward.models import LessonResult, RewardConfig
 from reward.recorder import RewardSink
 from reward.scorer import Scorer
 from tests.conftest import FakeBroker, FakeBrain, FakeDB, make_tx
+
+
+def _now_iso() -> str:
+    """ISO-8601 UTC timestamp with Z (not +00:00) — P12-Reconcile-Timing helper."""
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 CFG = RewardConfig()
 
@@ -194,7 +200,7 @@ def test_pnl_unavailable_logs_critical_no_reward_trade_stays_open(make_opened, m
     # exercises the fresh-trade CRITICAL path (D4 persistent-fail WARNING kicks in
     # only after >24 h). Real fresh trades are <1 min old.
     from datetime import datetime, timezone
-    fresh_open_ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    fresh_open_ts = _now_iso()
     opened = make_opened(open_ts=fresh_open_ts)
     sink.on_trade_opened(opened)
 
@@ -434,3 +440,106 @@ def test_reconcile_scoped_to_deal_ids_leaves_others_open(make_opened):
     assert resolved == ["DEAL-A"]
     assert db.get_trade_by_deal_id("DEAL-A")["status"] == "CLOSED"
     assert db.get_trade_by_deal_id("DEAL-B")["status"] == "OPEN"
+
+
+# --- P12-Reconcile-Timing (Mini-Session 26, 2026-08-31) --------------------
+
+
+def test_backoff_skip_within_window(make_opened, make_closed, caplog):
+    """A3: backoff-skip wenn last_resolve_attempt_utc innerhalb der naechsten Stufe liegt."""
+    from datetime import datetime, timezone, timedelta
+    db = FakeDB()
+    broker = FakeBroker([])  # empty history -> in-cycle fail
+    sink = _sink(db, broker=broker)
+    opened = make_opened(open_ts=_now_iso())
+    sink.on_trade_opened(opened)
+
+    # In-cycle fail (stamps last_resolve_attempt_utc)
+    sink.on_trade_closed(make_closed())
+    assert db.get_trade_by_deal_id(opened.deal_id)["last_resolve_attempt_utc"] is not None
+
+    # Manuelle Aufzeichnung der Aufrufe VOR dem zweiten Close
+    calls_before = list(db.calls)
+
+    # Zweiter close-Call innerhalb des 15-min-Fensters: Backoff-Skip
+    with caplog.at_level(logging.DEBUG):
+        sink.on_trade_closed(make_closed())
+
+    # Kein update_trade_resolve_attempt-Call (pre-claim nicht ausgeloest)
+    new_calls = [c for c in db.calls if c not in calls_before]
+    assert "update_trade_resolve_attempt" not in new_calls
+    # Debug-Log wurde emittiert
+    assert any(r.levelno == logging.DEBUG and "backoff-skip" in r.getMessage() for r in caplog.records)
+
+
+def test_persistent_fail_warning(make_opened, make_closed, caplog):
+    """A4: WARNING statt CRITICAL wenn open_ts > 24 h zurueckliegt."""
+    from datetime import datetime, timezone, timedelta
+    db = FakeDB()
+    broker = FakeBroker([])
+    sink = _sink(db, broker=broker)
+    # open_ts > 24 h zurueck
+    old_open_ts = (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat().replace("+00:00", "Z")
+    opened = make_opened(open_ts=old_open_ts)
+    sink.on_trade_opened(opened)
+
+    with caplog.at_level(logging.WARNING):
+        sink.on_trade_closed(make_closed())
+
+    # WARNING emittiert (persistent-fail)
+    warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("persistent fail" in r.getMessage() for r in warning_records)
+    # Keine CRITICAL in diesem Pfad
+    assert not any(r.levelno == logging.CRITICAL
+                   for r in caplog.records)
+
+
+def test_preclaim_idempotent_concurrent(make_opened, make_closed):
+    """A5: zwei aufeinanderfolgende _on_trade_closed-Calls in der Backoff-Window
+    lassen nur einen den resolve() ausfuehren."""
+    db = FakeDB()
+    broker = FakeBroker([])  # immer PnLUnavailable
+    sink = _sink(db, broker=broker)
+    opened = make_opened(open_ts=_now_iso())
+    sink.on_trade_opened(opened)
+
+    # Erster close: pre-claim + CRITICAL
+    sink.on_trade_closed(make_closed())
+    calls_after_first = list(db.calls)
+
+    # Zweiter close innerhalb Backoff-Window: Backoff-Skip, kein pre-claim
+    sink.on_trade_closed(make_closed())
+    new_calls = [c for c in db.calls if c not in calls_after_first]
+
+    # Nur update_trade_resolve_attempt-Count: genau 1 (nur der erste)
+    preclaim_calls = [c for c in new_calls if c == "update_trade_resolve_attempt"]
+    assert len(preclaim_calls) == 0  # zweiter wurde ueberhaupt nicht aufgerufen (backoff-skip)
+
+
+def test_backoff_replay_reduces_critical_count(make_opened, make_closed, caplog):
+    """A2: replay-test — 17 historische CRITICALs aus 2026-08-25/26/27 haetten
+    mit Backoff nur 4-5 produziert (einer pro Stufe)."""
+    from datetime import datetime, timezone, timedelta
+    db = FakeDB()
+    broker = FakeBroker([])  # immer PnLUnavailable
+    sink = _sink(db, broker=broker)
+
+    # Simuliere 4 Deals (genau die aus dem historischen Log: 17 CRITICALs ueber
+    # 4 deals = 2-7 retries pro deal). Mit Backoff: ein attempt pro Stufe = 5.
+    deal_ids = ["DIAAAAYCHTSTGA3", "DIAAAAYCN87PCAT", "DIAAAAYCPU28MA4", "DIAAAAYCT67N8AU"]
+    fresh_open_ts = _now_iso()
+    for did in deal_ids:
+        sink.on_trade_opened(make_opened(deal_id=did, open_ts=fresh_open_ts))
+
+    # 17 close-Calls (genau die Anzahl aus scheduler.log)
+    caplog.clear()
+    with caplog.at_level(logging.CRITICAL):
+        for i in range(17):
+            sink.on_trade_closed(make_closed(deal_id=deal_ids[i % 4]))
+            # Native backoff (no override needed; per-deal_id last_resolve_attempt_utc
+            # grows monotonically and gates the 15-min first-step).
+
+    # Die ersten 4 Aufrufe (einer pro deal_id) loesen pre-claim + CRITICAL aus
+    # (frisch, kein prior attempt). Alle weiteren 13 fallen in den Backoff-Skip.
+    critical_count = sum(1 for r in caplog.records if r.levelno == logging.CRITICAL)
+    assert critical_count == 4  # genau die 4 deal-ids, jeweils 1 CRITICAL beim ersten Attempt
