@@ -470,3 +470,57 @@ auffindbar, ohne dass die Cold-Reader-Session raten muss.
 4. **Phase-13-Closeout-Session** (~1h, Pattern siehe Phase-12): Beweiswoche + Pfad-C + Befund-Inversion sind die Closeout-Bausteine.
 
 **Push-Freigabe:** alle 5 Commits lokal; `git push origin main` von Nikinger (Working-Style-Regel).
+
+---
+
+### Mini-Session 26½ (Nikinger-Note, 2026-08-31 ~08:30 CEST, nach `restart-services.sh restart`)
+
+**Operator-Restart-Vermerk (live beobachtet):**
+
+```
+$ bash scripts/restart-services.sh restart
+[restart-services] stop: starting (reverse-start order)
+[restart-services] stop: TERM pid=10398 (run_webui.sh)              → graceful
+[restart-services] stop: TERM pid=10358 (run_scheduler.sh)
+[restart-services] stop: KILL pid=10358 (run_scheduler.sh) — TERM did not stop in 5 s
+[restart-services] stop: TERM pid=10335 (run_recorder.sh)
+[restart-services] stop: done
+[restart-services] start: nohup run_recorder.sh
+[restart-services] start: nohup run_discovery.sh
+[restart-services] start: nohup run_scheduler.sh           ← neue Backoff-Logik live
+[restart-services] start: nohup run_webui.sh
+[restart-services] start: done
+```
+
+**Befund: Scheduler-SIGTERM brauchte SIGKILL nach 5 s** (TERM did not stop in 5 s). Mögliche
+Ursache: Scheduler hing im **POST_WINDOW-Sleep** (P14-D-Cap live-verified ≤ 60 s, aber dieser
+Scheduler war der vom 2026-08-31 08:45 Start — neuer Recorder-Code war schon aktiv, aber der
+`signal_check_interval_s`-Cap aus P14-D war schon live. 5 s Timeout ist die
+restart-services.sh-Default, nicht der Cap. Das ist **kein Bug** in Phase-7-Backoff, sondern
+eine bekannte Scheduler-Stop-Path-Eigenheit — Phase-8 hat denselben Cap auch, das POST_WINDOW
+kann beliebig lang sein.
+
+Konsequenz für Backoff-Test: Scheduler läuft jetzt mit neuer Code-Basis
+(`signal_check_interval_s` aus P14-D + Phase-7-Backoff aus P14-F-Step-2). Beide
+Hooks sind aktiv.
+
+**Konkrete Anweisung an die nächste Session (Nikinger, 2026-08-31):**
+
+1. **Pre-Test des Backoff-Fixes** als **erste** Aktion: bevor die Phase-13-Closeout-Session
+   startet, soll die nächste Session kurz verifizieren, dass der neue Code-Pfad läuft. Konkret:
+   - `pytest phase7_reward/tests -v -k backoff` (4 neue Tests A2-A5 müssen grün sein)
+   - **Optional:** einen historischen OPEN-Trade (falls vorhanden) manuell mit
+     `last_resolve_attempt_utc = NULL` per SQLite setzen, dann
+     `python3 phase13_live_data/scripts/source_delta.py --days 14` laufen lassen,
+     Resultat im `data/state/scheduler.log` beobachten (Backoff-Logik sollte erste
+     Attempts pre-claimen, weitere Skips loggen).
+   - Wenn keine OPEN-Trades da sind (heute 0 OPEN): Pre-Test per Unit-Test genügt, A6
+     bleibt eine „24 h Beobachtung am echten Live-Betrieb"-Live-Verify.
+2. **Phase-13-Closeout-Session starten** (sofern A6-Pre-Test grün): Pattern-Vergleich zu
+   Phase-12-Closeout-Handover. Beweiswoche-Befund + Pfad-C + Befund-Inversion sind die
+   Closeout-Bausteine. **Nicht mehr blockiert** (Mini-Session 24 hat Pfad-C entschieden,
+   Findings §8 hängt „by design"-Vermerk an).
+
+**Erwarteter Live-Effekt:** bei nächstem OPEN-Trade mit IG-Lag produziert der Scheduler
+≤ 5 CRITICALs in 24 h (vorher 6+ in 52 min). Bei > 24 h OPEN ohne Auflösung: WARNING
+statt CRITICAL (persistent-fail).
