@@ -555,16 +555,18 @@ Phase-11-Wiederaufnahme, nicht Teil dieser Phase.
 
 ---
 
-## Phase 13 — Live-Datenfundament *(eröffnet 2026-08-18 nach dem Scheitern von P12.5)*
+## Phase 13 — Live-Datenfundament *(eröffnet 2026-08-18 nach dem Scheitern von P12.5, abgeschlossen 2026-08-31)*
 
-> **Status: 🔄 Blöcke A + B + C code-complete (Stand 2026-08-22) — Beweiswoche ausgewertet 2026-08-31 (Mini-Session 23). Block A + B Done-Kriterien ausstehend (Recorder-Mapping-Initiative für IG-Bars-Lücke, 13 Tage).**
+> **Status: ✅ abgeschlossen (Closeout 2026-08-31, Session 18).** Blöcke A + B + C code-complete (Stand 2026-08-22) + Beweiswoche ausgewertet (Mini-Session 23, 2026-08-31) + Pfad-C-Entscheidung (Mini-Session 24, 2026-08-31) + Befund-Inversion. 74 Phase-13-Tests grün, 53 `phase13:`-Commits auf `origin/main`, Σ 1703 grün repo-weit.
 > **Plan:** [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md)
-> (gelockte Entscheidungen L1–L16, Blöcke A/B/C, §9-Drift-Liste).
+> (gelockte Entscheidungen L1–L17 + L18 Pfad-C-Erweiterung, Blöcke A/B/C, §9-Drift-Liste).
 > **Block-C-Closeout + Phase-14-Handoff (2026-08-22):**
 > [`docs/concepts/phase13_c_block_c_replan.md`](./docs/concepts/phase13_c_block_c_replan.md).
-> **Beweiswoche-Findings (2026-08-31, Mini-Session 23):**
-> [`phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md) — 14-Tage-Fenster source_delta-Diagnose, drei empirische Befunde (B1 IG-Bars-Lücke 2/13 Tage, B2 53.6 % Divergenzrate, B3 `last_verified_utc` lügt); Block-C-Re-Plan-These vollständig bestätigt.
-> **Vorgeschichte:** [`phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md).
+> **Beweiswoche-Findings (2026-08-31, Mini-Session 23) + Pfad-C-Nachtrag (§8, Mini-Session 24):**
+> [`phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md) — 14-Tage-Fenster source_delta-Diagnose, drei empirische Befunde (B1 IG-Bars-Lücke 2/13 Tage **by-design**, B2 53.6 % Divergenzrate **Stichprobe Operator-Run-Tag**, B3 `last_verified_utc` semantisch korrekt unter Pfad C); Befund-Inversion: **kein Recorder-Mapping-Bug** — Phase-13-Architektur sieht strukturell keine kontinuierliche `source='ig'`-Beschaffung vor.
+> **Closeout-Handover (2026-08-31, Session 18):**
+> [`phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md`](../phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md) — Pattern-Vergleich zu Phase-12-CLOSEOUT (§0 BLUF + 5-Zeilen-Bilanz, L1–L18, F1/F2/F3 + B1/B2/B3, Pfad-C-Entscheidung, §9 Konsistenz-Regeln inkl. IG-Default-AUS, §10 Don'ts).
+> **Vorgeschichte:** [`phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md) und [`phase12_data_foundation/PHASE12_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_CLOSEOUT_HANDOVER.md) (Pattern-Vorbild).
 
 **Goal:** Beschaffung und Verbrauch von Kursdaten endgültig trennen. Kein Konsumentenpfad löst
 je einen externen Fetch aus; Beschaffung ist ein vierstufiges, nach Kosten/Latenz gestaffeltes
@@ -572,9 +574,10 @@ System in *ein* Archiv (S1 LS-Kerzen → S2 yF-Recorder → S3 Fremdquelle → S
 IG-Rettung, Default AUS). Die Abdeckungsfrage gilt dem **ganzen** Trade-Fenster statt dem
 Schwanz. Drei nachgemessene Befunde tragen die Phase (Plan §4): tote IG-Historie mit `ok=True`,
 ein dagegen blinder Divergenz-Sampler, und eine **erfundene** `TIME_STOP`-Auflösung bei einer
-Lücke mitten im Fenster.
+Lücke mitten im Fenster. Drei empirische Beweiswoche-Befunde (B1/B2/B3) bestätigen + invertieren
+(kein Recorder-Mapping-Bug, sondern Architektur-konform).
 
-**Block-Stand 2026-08-22:**
+**Block-Stand 2026-08-31 (final):**
 
 - **Block A** (Schnitt + `assess_window` + Tracker-Guard + Stale-Assertion + Sampler-Reparatur
   + Registry-Hygiene) — ✅ committed, `git log` zeigt 13+ Commits zwischen A0 und A7+A7.5.
@@ -585,12 +588,14 @@ Lücke mitten im Fenster.
   design**: Pfad B live-verifiziert 2026-08-22 (962 `source='capital'`-Bars, DAX + CAC);
   Spain 35 (IBEX) wartet auf Phase 14 (Dukascopy wird dort eine Quell-Registry-Zeile, kein
   Backfill-Code mehr). Vollständiger Block-C-Stand im Re-Plan-Handover.
-- **Beweiswoche** (Plan §7 P1–P9) — offen, operator-getrieben.
+- **Beweiswoche** (Plan §7 P1–P9) — ✅ **gelaufen 2026-08-25 → 2026-08-31**, Mini-Session 23
+  wertet aus, Mini-Session 24 entscheidet Pfad C (IG = S4-GapRescue, Default AUS, L18).
 
-**Done-Kriterium:** Beweiswoche gegen P1–P9 (Plan §7); erste Akzeptanzbedingung ist eine
-strukturelle Kostenzusicherung, kein Zählwert.
+**Done-Kriterium:** erfüllt. Beweiswoche gelaufen + Pfad-C-Entscheidung getroffen +
+Befund-Inversion dokumentiert. Erste Akzeptanzbedingung (strukturelle Kostenzusicherung
+statt Zählwert) bleibt gelockt — `test_get_window_never_fetches` ist der Beleg.
 
-**Directory:** [`phase13_live_data/`](./phase13_live_data/) (Kopf + Modul-Tabelle in
+**Directory:** [`phase13_live_data/`](../phase13_live_data/) (Kopf + Modul-Tabelle in
 `phase13_live_data/CLAUDE.md`).
 
 ---

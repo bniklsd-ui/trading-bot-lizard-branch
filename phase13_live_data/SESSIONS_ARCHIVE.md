@@ -1,7 +1,112 @@
 # SESSIONS_ARCHIVE.md — Phase 13 (Live-Datenfundament)
 
 Newest-first. Rotation rule (`CLAUDE.md` root, mandatory since 2026-07-06): the phase head
-carries exactly one `
+carries exactly one `## Session stopped` block; archives have no size cap. See
+[`../CLAUDE.md`](../CLAUDE.md) "Rotation rule (mandatory since 2026-07-06)" for the full
+contract, and [`../docs/DOC_LAYERS_CONVENTION.md`](../docs/DOC_LAYERS_CONVENTION.md) for
+the L0/L1/L2/L3 model.
+
+---
+
+## Session stopped — 2026-08-31 (Session 17: Pfad-C-Entscheidung + Findings §8-Nachtrag, 1 Commit, 0 Operator-Aktionen)
+
+> **Auftrag:** Nikinger-Chat 2026-08-31 nach Mini-Session 24 / Mini-Session 25-Phase-14 (~13:00 UTC): „Gehe erst
+> mal mit C, und vermerke das das ein mögliches P15 v4 item ist". Mini-Plan-Modus:
+> keine Code-Änderung, nur Doku-Updates (Findings-§8-Nachtrag + Phasenkopf + root-CLAUDE.md).
+> Ausführungs-Scope: **1 Commit + Doc-Rotation**, exakt der Auftrag, keine Scope-Erweiterung.
+
+### Completed
+
+**1. Findings-Notiz §8-Nachtrag (Pfad-C-Lesart):**
+- **§8.1 "by design"-Vermerk:** B1 (IG-Bars-Lücke 2/13 Tage) ist **kein Defekt**,
+  sondern **Architektur-konform** — Phase-13-Architektur sieht **strukturell keine
+  kontinuierliche `source='ig'`-Beschaffung** vor; IG ist als **S4-GapRescue-Pfad**
+  designed (Default AUS, Budget-bound). B2 (53.6 % Divergenzrate) bleibt ein
+  Stichproben-Befund, eingeschränkt auf den Operator-Run-Tag 2026-08-18. B3
+  (`last_verified_utc`) ist **semantisch korrekt** unter Pfad C (zeigt
+  "Discovery-Ableitung", nicht "kontinuierliche Live-Coverage"). **Phase-14 D5-Handover
+  ist jetzt komplett freigegeben** (kein operativer Vorbehalt mehr).
+- **§8.2 P15-V4-Kandidatenliste:** drei Items wandern explizit in die P15-V4-Plan-Session:
+  - **Pfad A** (Operator-S4-Aktivierung, ~2-3h Phase-13-Code) — wenn echte IG-Coverage
+    für Divergenz-Vergleich gebraucht wird. IG-Budget: ~5.6 % (täglicher 1-Tages-Backfill
+    der 8 IG-Epics) + ~1.2 % (enable_divergence_sampler) = ~6.8 % des 10 000/Woche-
+    Kontingents. **V4 entscheidet.**
+  - **Pfad B** (Schema-Reinterpretation, ~1-2h Phase-14-Code, **aufgehoben solange C gilt**)
+    — neuer `status='gap_rescue_only'`-Wert, IG-Rows umklassifiziert.
+  - **P15-Quellen-Vertrauens-Modell** (Findings §5.3, mit Befund-Inversion neu gerahmt)
+    — V4-Frage: "Quellen-**Verfügbarkeit**-Modell" (was die Tabelle heute ist) statt
+    "Quellen-**Aktualität**-Modell" (was der ursprüngliche V4-Vorschlag war). Konkret:
+    soll V4 die `last_verified_utc`-Semantik umstellen?
+- **§8.3 Update-Liste** für die nächste Session: Pfad C ist umgesetzt; P15-Plan-Material
+  ist um drei Items erweitert; **Phase-13 ist close-out-fähig** mit Pfad C + §8-Nachtrag
+  (eigenständige Closeout-Session jetzt möglich, Pattern siehe Phase-12-Closeout).
+- Header `updated:` von `2026-08-31` auf `2026-08-31 (+ §8 Pfad-C-Nachtrag 2026-08-31,
+  Mini-Session 24)` erweitert.
+- **Dateiwachstum:** 316 → 395 Zeilen (+79).
+
+**2. Phase-13-Phasenkopf Session-16-Block Update:**
+- Mein-Vorschlag-Block (Pfad C + Beobachtungs-Periode) durch
+  Nikinger-Entscheidung 2026-08-31 (= Pfad C angenommen) ersetzt.
+- Verweis auf §8-Nachtrag in Findings-Notiz + P15-V4-Kandidaten-Vermerk.
+
+**3. Root-CLAUDE.md Phase-13 + Phase-14 Rows Update:**
+- Phase-13-Row: 'IG-Bars-Lücke (2/13 Tage, by design — IG = S4-GapRescue-Pfad, Default AUS)'
+  + 'Phase-14 D5-Handover ist damit komplett freigegeben (kein operativer Vorbehalt mehr)'
+  + 'Pfad A und Pfad B sind als P15-V4-Kandidaten in Findings §8.2 dokumentiert'.
+- Phase-14-Status-Zeile: 'architektonisch + operativ komplett freigegeben' (vorher
+  'operativ vorbehaltlich der Phase-13-Recorder-Mapping-Initiative').
+- Phase-14-D5-Handover-Status-Zeile: 'komplett freigegeben (Mini-Session 24, Pfad-C-
+  Entscheidung)' + 'IG-Bars-Lücke seit 2026-08-18 ist architektur-konform und als
+  P15-V4-Kandidat (Pfad A/B) in §8.2 dokumentiert'.
+
+**4. Akzeptanz:** `python3 scripts/check_doc_rotation.py --strict --quiet` exit 0;
+`pytest tests/ -q` 101 passed (unverändert).
+- **Commit:** `9600d79 docs: sync -- Pfad-C-Entscheidung Mini-Session 24 (Phase-14 D5 komplett freigegeben)`.
+
+### Findings
+
+🟢 **Pfad C umgesetzt:** keine Code-Änderung, nur Doku. Findings-Notiz §8 hängt jetzt
+die by-design-Lesart an; Phase-14 D5-Handover ist **komplett freigegeben** (kein
+operativer Vorbehalt).
+
+🟢 **P15-V4-Plan-Session-Material erweitert:** drei konkrete Items (Pfad A, Pfad B,
+Quellen-Vertrauens-Modell-Neu-Framing) sind in Findings §8.2 dokumentiert. V4 kann
+direkt mit der Quellen-Vertrauens-Diskussion starten.
+
+🟢 **Phase-13 ist close-out-fähig:** mit Pfad C + §8-Nachtrag ist Phase 13 strukturell
+fertig (Beweiswoche abgelöst durch Architektur-Akzeptanz). Eine eigenständige
+Phase-13-Closeout-Session ist jetzt möglich — Pattern siehe Phase-12-Closeout-Handover.
+
+### Unverändert offen (von Mini-Session 23+24, weiter gültig)
+
+- **Phase-15-Plan-Session** (V4) — Material jetzt vollständig (P14-F D5 ✅, P13-Findings
+  + §8, P13-Architektur-Akzeptanz).
+- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-CRITICALs
+  laufen weiter (P10-V3-Code, nicht in Phase 13/14-Scope).
+- **Phase-11-Wiederaufnahme (WI-2/W2)** — Datenfundament-Abhängigkeit.
+- **Phase-13-Closeout (optional)** — Pattern siehe Phase-12; kann eigenständige Session werden.
+
+### NEXT (für die nächste Session / morgen)
+
+**Nikinger-Anweisung zum Session-Ende wird erwartet** (Stand ~13:30 UTC = 15:30 CEST —
+warte auf Nikinger-Wahl).
+
+**Konkrete Empfehlung (sortiert nach Aufwand × Impact):**
+
+1. **Phase-13-Closeout-Session** (~1h, Pattern-Vergleich zu Phase-12): die Pfad-C-
+   Entscheidung + §8-Nachtrag ist strukturell der letzte fehlende Baustein für
+   einen Phase-13-Closeout. Eigenständige Doku-Einheit.
+2. **Phase-15-Plan-Session** (großer Block): wenn die Beweiswoche genug Outcomes +
+   jetzt das P15-V4-Kandidaten-Material für die Quellen-Vertrauens-Diskussion liefert.
+3. **Doku-Updates synchronisieren** (~10 Min): root-CLAUDE.md Phase-13/14 Rows
+   bereits aktualisiert; ggf. ROADMAP Phase-13-Status auf 'close-out-fähig'.
+4. **Phase-12-Reconciliation-Timing-Fix** (~2-3h, Phase-12-Code): die anhaltenden
+   `reward.recorder: no usable history row`-CRITICALs angehen.
+
+**Push-Freigabe:** dieser Doc-Rotations-Commit folgt (1 Commit, Session-16 → Archiv +
+Session-17 → Kopf); 9600d79 bereits gepusht.
+
+---
 
 
 ## Session stopped — 2026-08-31 (Session 16: P14-F D5 Hook-Verschärfung + Doku-Sync + IG-Architektur-Sondierung, 3 Commits, 0 Operator-Aktionen)
