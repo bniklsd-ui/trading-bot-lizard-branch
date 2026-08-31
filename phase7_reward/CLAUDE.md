@@ -524,3 +524,43 @@ Hooks sind aktiv.
 **Erwarteter Live-Effekt:** bei nächstem OPEN-Trade mit IG-Lag produziert der Scheduler
 ≤ 5 CRITICALs in 24 h (vorher 6+ in 52 min). Bei > 24 h OPEN ohne Auflösung: WARNING
 statt CRITICAL (persistent-fail).
+
+---
+
+### Mini-Session 26⅔ (Nikinger-Anweisung 2026-08-31 ~12:30 UTC, Phase-13-Closeout-Session 18)
+
+**Operator-Aktion-Nachreich zum Phase-7-Backoff-Code-Stand:**
+
+> **Auftrag (Nikinger, 2026-08-31 ~12:30 UTC):** „Commite und pushe, und dokumentiere
+> das das Phase 7 Dokument der Einfachheit halber jetzt getracked, commited und gepushed
+> wurde." — bezogen auf `phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md`, das
+> seit Mini-Session 26 (Commit `acba856`, 2026-08-31 ~07:30 UTC) als
+> **working-tree-Leftover** auf der Platte lag: Cross-Refs in Phase-7-CLAUDE.md +
+> docs/INDEX.md waren committed, das Plan-File selbst aber nicht.
+
+**Completed:**
+
+1. **Plan-File-Track-Commit:** `2923096 phase7: docs -- P12-Reconciliation-Timing-Plan
+   endlich tracked (Mini-Session 26 Leftover)` — 1 NEU-Datei, 470 Zeilen (Plan-Snapshot
+   unverändert; nur Tracking nachgeholt).
+2. **Phase-13-Closeout-Commit (gleicher Push):** `0ff55d2 phase13: closeout -- Phase 13
+   abgeschlossen (Session 18, …)` — 6 Dateien, 593 insertions, 246 deletions.
+3. **Push an `origin/main`:** beide Commits gepusht (`d2a5692..2923096 main -> main`).
+4. **Status-Verify post-push:** `git log origin/main --grep='^phase7:'` zeigt jetzt
+   36 Phase-7-Commits (war 35 vor Session 26; +1 für den Plan-Track-Commit).
+
+**Dokumentation (genau dieser Block hier):**
+- ✅ `phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md` ist **jetzt getracked, committed
+  und gepusht** (Commit `2923096`).
+- ✅ Inhalt unverändert (469 Zeilen + 1 Frontmatter = 470; `status: snapshot`,
+  `updated: 2026-08-31`).
+- ✅ Cross-Refs funktionieren jetzt auf GitHub:
+  - `phase7_reward/CLAUDE.md` Z. 11 (`down:`-Block der YAML-Header-Card)
+  - `phase7_reward/CLAUDE.md` Session-14-Block (Z. 358, diese Session-Doku)
+  - `phase7_reward/README.md` P12-Reconcile-Timing-Sektion (Z. 130 ff.)
+  - `docs/INDEX.md` Mini-Plan-Indext mit Plan-Summary + „bei Phase-7-Closeout zwingend
+    referenzieren"-Vermerk
+- ✅ Plan-File-Pfade zeigen jetzt auf echte Git-Commits, nicht working-tree-Leftovers.
+
+**Push-Freigabe-Status:** beide Commits lokal committed UND gepusht (`origin/main` aktuell
+bei `2923096`).
