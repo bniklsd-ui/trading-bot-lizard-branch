@@ -268,9 +268,7 @@ Cross-Phase-Files (`source_registry/`, `data_foundation/`, `live_data/`,
 
 ### Unverändert offen (von Mini-Session 21–24, weiter gültig)
 
-- **Phase-15-Plan-Session** (V4) — Material jetzt vollständig (P14-F D5 ✅, P13-Findings
-  + §8, P13-Architektur-Akzeptanz, P12-Reconcile-Timing-Backoff, alle 4 Mini-Pläne
-  P14-C/D/E/F Outputs = 7+ P15-V4-Kandidaten).
+- **Phase-15-Plan-Session** (V4) — ✅ **abgeschlossen 2026-08-31** (Plan-Commit `f98df68`, Nikinger-Freigabe `aad1d00`); Phase 15 in execution seit 2026-08-31, Block A in Ausführung (A-1..A-5 ✅), Blöcke B/C/D danach — siehe [`../phase15_v4/CLAUDE.md`](../phase15_v4/CLAUDE.md) + Plan [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md). *korrigiert 2026-08-31 (Phase-15 A-6):* „Material jetzt vollständig" war seit Plan-Commit stale.
 - **Phase-12-Reconciliation-Timing-Fix Live-Verify (A6)** — wartet auf nächsten OPEN-
   Trade (heute 0 OPEN); 24-h-Beobachtung. Pre-Test grün (4 von 4 Backoff-Tests A2–A5).
 - **Phase-11-Wiederaufnahme (WI-2/W2)** — Datenfundament-Abhängigkeit.
@@ -288,10 +286,11 @@ warte auf Nikinger-Wahl).
 
 **Konkrete Empfehlung (sortiert nach Aufwand × Impact):**
 
-1. **Phase-15-Plan-Session** (großer Block, ~2-3h): Material jetzt vollständig
-   (7+ V4-Kandidaten dokumentiert). Eigenständige Doku-Einheit, kann **jetzt**
-   starten — Phase 13 + Phase 14 sind beide abgeschlossen, keine Datenfundament-
-   Blocker mehr für V4-Planung.
+1. **Phase-15-Plan-Session** (V4) — ✅ **abgeschlossen 2026-08-31** (Plan-Commit
+   `f98df68`, Nikinger-Freigabe `aad1d00`); Phase 15 in execution seit 2026-08-31
+   (Block A in Ausführung: A-1..A-5 ✅) — siehe [`../phase15_v4/CLAUDE.md`](../phase15_v4/CLAUDE.md).
+   *korrigiert 2026-08-31 (Phase-15 A-6):* „Material jetzt vollständig" + „kann jetzt
+   starten" war seit Plan-Commit stale; V4 ist nicht nur geplant, sondern in execution.
 2. **Doku-Propagation-Verify** (~5 Min, Doc-only): root-CLAUDE.md Phase-14-Row
    Status-Flip verifizieren (sollte im selben Closeout-Commit passieren);
    ROADMAP.md Phase-14-Section-Header; docs/INDEX.md Phase-14-Zeilen.

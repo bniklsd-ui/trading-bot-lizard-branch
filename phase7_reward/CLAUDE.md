@@ -454,7 +454,7 @@ auffindbar, ohne dass die Cold-Reader-Session raten muss.
 
 ### Unverändert offen (von Mini-Session 23+24, weiter gültig)
 
-- **P15-Plan-Session (V4)** — Material jetzt vollständig (P14-F D5 + P13-Findings + P13-Architektur-Akzeptanz + P12-Reconcile-Timing-Backoff = 4 P15-V4-Kandidaten).
+- **P15-Plan-Session (V4)** — ✅ **abgeschlossen 2026-08-31** (Plan-Commit `f98df68`, Nikinger-Freigabe `aad1d00`); Phase 15 in execution seit 2026-08-31 — siehe [`../phase15_v4/CLAUDE.md`](../phase15_v4/CLAUDE.md) + Plan [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md). *korrigiert 2026-08-31 (Phase-15 A-6):* dieser Vermerk war seit Plan-Commit stale.
 - **Phase-13-Closeout** — eigenständige Closeout-Session möglich (Pattern siehe Phase-12).
 - **Phase-12-Reconciliation-Timing-Fix Live-Verify (A6)** — wartet auf Operator-Restart + nächsten OPEN-Trade.
 
@@ -466,7 +466,12 @@ auffindbar, ohne dass die Cold-Reader-Session raten muss.
 
 1. **Operator-Aktion (A6 Live-Verify):** `bash scripts/restart-services.sh restart scheduler` + Beobachtung der nächsten 24 h. **Heute.**
 2. **P12-Reconcile-Timing-Doku-Sync** (~10 Min, Doc-only): root-CLAUDE.md Phase-7-Row auf Mini-Session-26-Stand (war vor Closeout, jetzt „Backoff implementiert"); ggf. ROADMAP.md Phase-7-Block.
-3. **P15-Plan-Session** (großer Block, ~2-3h): Material jetzt vollständig; P12-Reconcile-Backoff ist V4-Material (Quellen-Vertrauens-Modell: persistent-fail als Observation-Pattern).
+3. **P15-Plan-Session** (V4) — ✅ **abgeschlossen 2026-08-31** (Plan-Commit
+   `f98df68`, Nikinger-Freigabe `aad1d00`); Phase 15 in execution seit 2026-08-31,
+   Block A in Ausführung — siehe [`../phase15_v4/CLAUDE.md`](../phase15_v4/CLAUDE.md).
+   *korrigiert 2026-08-31 (Phase-15 A-6):* „Material jetzt vollständig" war seit
+   Plan-Commit stale; P12-Reconcile-Backoff (Quellen-Vertrauens-Modell-Anteil) ist
+   als V4-Material weiterhin offen für Phase-15 Block B/D.
 4. **Phase-13-Closeout-Session** (~1h, Pattern siehe Phase-12): Beweiswoche + Pfad-C + Befund-Inversion sind die Closeout-Bausteine.
 
 **Push-Freigabe:** alle 5 Commits lokal; `git push origin main` von Nikinger (Working-Style-Regel).

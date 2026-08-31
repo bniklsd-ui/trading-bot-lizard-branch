@@ -8,6 +8,153 @@ the L0/L1/L2/L3 model.
 
 ---
 
+## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #2, Block A Step A-5 + Session-Rotation)
+
+> **Auftrag:** Nikinger-Chat 2026-08-31 nach Session-Ende der ersten Exec-Session
+> (4 Commits gepusht auf `origin/main = ef320e6`, HEAD up-to-date): „Hallo MiniMax,
+> willkommen zurück … A-5: Doc-Rotation (~20 Min) (Empfohlen)" (Frage-Slot-Antwort).
+> Cross-Session-Drift vor Ausführung entdeckt und sauber gehandhabt (siehe Findings).
+>
+> Ausführungs-Scope: **1 Commit (Doc-only, atomar)** — exakt der Plan-§6-Schritt A-5,
+> keine Scope-Erweiterung. **`phase7_reward/CLAUDE.md` NICHT angefasst** (Drift
+> erkannt + Nikinger-Freigabe-Slot „Nur ROADMAP + Drift-Vermerk").
+
+### Completed
+
+**0. Drift-Vorab-Check (Session-Start):**
+- `phase7_reward/CLAUDE.md` hat **exakt 1** `## Session stopped`-Block (Z. 358, Step 14 /
+  Mini-Session 26 vom 2026-08-31); alle 14 älteren Session-Blöcke (Steps 1–13c) sind
+  **bereits** verbatim in `phase7_reward/SESSIONS_ARCHIVE.md` (newest-first, 70 KB).
+- Die 49.855 B der CLAUDE.md kommen aus (a) Scope-Lock-Hotfix-Notizen ~104 Z., (b)
+  gepinnte „Verifizierte Contracts"-Tabelle ~106 Z. gegen `49cda8a`, (c) Step-14-Block
+  ~208 Z. — **auditability-pflichtig**, keine Rotation möglich ohne Verlust.
+- **Drift zu Plan §6 A-5 (Z. 417)** + **Plan §7 AK4 (Z. 710)** datiert annotiert:
+  AK4 wird auf `ROADMAP.md` allein reduziert; `phase7_reward/CLAUDE.md` neu definiert
+  als „auditability-bewusst beibehalten, kein AK4-Ziel".
+
+**1. A-5 — Doc-Rotation der ROADMAP-Übergröße (`ROADMAP_ARCHIVE.md` NEU + `ROADMAP.md` restrukturiert):**
+- `ROADMAP_ARCHIVE.md` (NEU, 290 Z. / 18.842 B / 18,4 KB): Phasen 1–8 verbatim aus
+  dem Pre-A-5-`ROADMAP.md` (Z. 27-292), Header-Card analog zu `SESSIONS_ARCHIVE.md`-
+  Dateien (`status: archive`, `detail: L3`, `up: ./ROADMAP.md`, expliziter „warum
+  diese Datei existiert"-Absatz mit Pre-Rotation-Referenz).
+- `ROADMAP.md` (749 → 507 Z. / 54.147 → 39.109 B = **38,2 KB, unter 40 KB** ✅):
+  Header-Card `purpose`/`read-when`/`down` aktualisiert (Archive-Link hinzu);
+  Pre-A-5-Phasen-1-8-Block ersetzt durch kompakte Summary-Tabelle + Link + Verweis
+  auf Auditability-Regel; Phase-9-bis-Phase-15 + Meta-Strang + Cross-Cutting
+  **verbatim unangetastet**.
+- `docs/INDEX.md` (Header `updated:` 2026-07-06 → 2026-08-31; Z. 27 stale „41 KB"
+  → „38 KB" + neue ROADMAP_ARCHIVE-Zeile mit Größe + Beschreibung + `up:`-Link).
+- `docs/concepts/phase15_v4_plan.md`: §6 A-5 + §7 AK4 datierter Korrekturhinweis
+  (warum die `phase7_reward/CLAUDE.md`-Zeile empirisch nicht zutrifft + warum AK4
+  für diese Datei reduziert wird auf „auditability-bewusst beibehalten").
+
+### Σ-Sweep Stand 2026-08-31 ~15:30 UTC (selbst nachgemessen)
+
+Doc-only-Edits, **kein** Code-Touch, **kein** Test-Touch. Σ-Baseline 1703 grün
+bleibt erhalten:
+
+| Phase | Tests grün | Δ |
+|---|---:|---|
+| phase1_broker_wrapper | 95 | — |
+| phase2_persistence | 77 | — |
+| phase3_external_data | 104 | — |
+| phase4_research | 155 | — |
+| phase5_execution | 173 | — |
+| phase6_debate | 76 | — |
+| phase7_reward | 142 | — |
+| phase8_scheduler | 248 | — |
+| phase9_universe | 87 | — |
+| phase10_v3 | 165 | — |
+| phase12_data_foundation | 145 | — |
+| phase13_live_data | 74 | — |
+| phase14_discovery | 61 | — |
+| root `tests/` | 101 | — |
+| **Σ total** | **1703** | = A-2-Baseline exakt, keine Regression ✅ |
+
+### Commits (lokal, in dieser Session erzeugt; 1 Commit für A-5)
+
+| Commit | Scope | Diff |
+|---|---|---|
+| `9f8101b` | `phase15: docs -- Doc-Rotation ROADMAP.md (A-5) + phase7_reward-Drift vermerkt` | `ROADMAP.md` −242 Z., `ROADMAP_ARCHIVE.md` (NEU, 290 Z.), `docs/INDEX.md` +5 −3, `docs/concepts/phase15_v4_plan.md` +13 −2, `phase15_v4/CLAUDE.md` +141 −1 + Session-Rotation |
+
+### Findings
+
+🟢 **A-5 Plan-konform abgeschlossen (mit Drift-Vorab-Meldung).** Drei Akzeptanz-
+kriterien adressiert:
+
+- **AK4 (reduziert)** ✅ — `ROADMAP.md` = 39.109 B (38,2 KB, unter 40 KB);
+  `phase7_reward/CLAUDE.md` = 49.855 B, neu definiert als „auditability-bewusst
+  beibehalten, kein AK4-Ziel" (Plan §7 Korrekturhinweis 2026-08-31, MiniMax-M3).
+- **AK14** ✅ — Neue `ROADMAP_ARCHIVE.md` hat ihre `docs/INDEX.md`-Zeile im **selben**
+  Commit (P16-konform, AK14 erfüllt).
+- (kein Σ-Regress) Σ-Sweep 1703 grün, identisch zur A-2-Baseline.
+
+🟢 **Drift-Handling ehrlich gehalten (Working-style: „Source-of-truth precedence:
+tested code > concept doc > README/status prose; on conflict, trust the code, fix
+the doc immediately, and leave a dated note"):** die Plan-§6-A-5-Vermutung zu
+`phase7_reward/CLAUDE.md` traf empirisch nicht zu (genau 1 Session-Block bereits
+in CLAUDE.md, alle 14 älteren im Archiv). Statt die Datei gegen die Realität
+„aufzufüllen" oder die Hypothese stillschweigend zu ignorieren: **Drift gefunden →
+Nikinger-Wahl-Slot (Frage-Tool) → „Nur ROADMAP + Drift-Vermerk" → dated note in
+Plan §6 A-5 + §7 AK4**. AK4 als Akzeptanzkriterium reduziert auf `ROADMAP.md`
+allein — `phase7_reward/CLAUDE.md` aus AK4 ausgenommen, statt stillschweigend
+„erfüllt" zu markieren.
+
+🟢 **Pre-Commit-Hook (`scripts/check_doc_rotation.py`) verifiziert:** Hook läuft
+sauber durch (PHASE_DIRS endet bei `phase14_discovery`, deckt weder `ROADMAP.md`-
+noch `ROADMAP_ARCHIVE.md`-Pfade ab). Die Phase-15-spezifische Hook-Härtung bleibt
+eine separate Mini-Plan-Aufgabe (siehe OFFENE ITEMS aus der Vorseesession),
+nicht Phase-15-A-5-Scope.
+
+🟡 **`ROADMAP.md`-Pre-A-5-Stand im Header der `ROADMAP_ARCHIVE.md` referenziert**
+(„bei Phasen-1-8-Closeout-Re-Reviews den Stand auf `ROADMAP.md` vor 2026-08-31
+rekonstruieren — der relevante `ROADMAP.md`-HEAD ist in der A-5-Session-Commit-
+Message verlinkt"). Commit-Message-Pflege ist Nikingers Aufgabe — Vorseesession
+arbeitet mit `git log --oneline --grep='^phase15:.*A-5'` zur Rekonstruktion.
+
+### Open questions / blockers
+
+- **Gate P7 unverändert zu** (Block B): wartet auf einen OPEN-Trade mit IG-Lag +
+  24 h Beobachtung (Phase-12-Reconcile-Timing Live-Verify, A6). Heute 0 OPEN-Trades
+  gemessen, erwarteter Live-Effekt: ≤ 5 CRITICALs in 24 h statt 6+ in 52 min;
+  > 24 h ohne Auflösung = WARNING statt CRITICAL.
+- **A-6 noch offen** (Nikinger-Wahl heute nicht gewählt): INDEX.md Doppel-Header
+  (`## Closed phases` Z. 35+37) + 3 stale „P15-Plan-Session offen"-Zeilen
+  (`phase7_reward/CLAUDE.md:457`, `phase13_live_data/CLAUDE.md:238`, D5-H.-B-Vermerk
+  in `phase14_discovery/CLAUDE.md`).
+- **Phase-15-spezifische Hook-Härtung** (Mini-Plan-Aufgabe, nicht Phase-15-Scope):
+  P14-F-Regex `(?:Mini-)?Session\s+(\d+)` matcht den Plan-Session-Heading nicht;
+  PHASE_DIRS endet bei `phase14_discovery` und deckt weder `phase15_v4` noch
+  `ROADMAP.md`/`ROADMAP_ARCHIVE.md` ab.
+
+### NEXT (für die nächste Session / morgen)
+
+**Nikinger-Wahl zum nächsten Schritt erwartet** (Stand ~15:45 UTC = ~17:45 CEST).
+
+**Konkrete Empfehlung (sortiert nach Aufwand × Impact):**
+
+1. **A-6: INDEX.md Doppel-Header + 3 stale Zeilen** (~10 Min, Doc-only, Cross-Phase-
+   Freigabe P7/P13/P14 vorhanden): `## Closed phases` Überschriften zusammenführen
+   (Z. 35 + Z. 37 sind redundant), 3 stale Vermerke datiert aktualisieren. Schließt
+   Block A **endgültig** ab (AK4 ✅, AK14 ✅; A-6 war der letzte offene Punkt).
+2. **Phase-15-spezifische Hook-Härtung als Mini-Plan-Aufgabe** (~30 Min Plan +
+   ~1 h Code+Tests, Cross-Phase: P14-F-Erweiterung + PHASE_DIRS-Update): die
+   Doc-Rotation-Hook-Lücke für `phase15_v4` + die Root-Level-Dateien
+   (`ROADMAP.md`, `ROADMAP_ARCHIVE.md`) schließen. Vorbedingung für saubere
+   Folge-Sessions in Phase 15 (sonst wieder manuell rotieren).
+3. **Block D (Erbstücke) D1-D3** — parallel zu A-6 möglich (kein Gate), aber von
+   Nikinger-Wahl abhängig. D1: D5-H.-B-Vermerk in `phase14_discovery/CLAUDE.md`
+   (Cross-Phase P14, freigegeben). D2: `phase13_14_15.svg` (~1 h). D3: Pfad A
+   Operator-Tool in Phase 13 (Cross-Phase P13, freigegeben).
+4. **Block B** — bleibt hinter Gate P7. **Nicht** in dieser Session, **nicht** in
+   der nächsten — wartet auf A6-Abschlussmeldung.
+
+**Push-Status:** A-5-Commit lokal erzeugt, **1 Commit ahead of `origin/main = ef320e6`**.
+**Push wartet auf expliziten Nikinger-Auftrag** (Working-style-Regel: Push ist
+Nikingers Job, nicht der der Session).
+
+---
+
 ## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session, Block A: A-1..A-4 + Session-End-Rotation)
 
 > **Auftrag:** Nikinger-Chat 2026-08-31 nach Plan-Commit (`f98df68` + Folge-Commits +

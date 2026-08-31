@@ -234,9 +234,7 @@ warte auf Nikinger-Wahl).
 
 **Konkrete Empfehlung (sortiert nach Aufwand × Impact):**
 
-1. **Phase-15-Plan-Session** (großer Block, ~2-3h): Material jetzt vollständig.
-   Vier P15-V4-Kandidaten dokumentiert: Pfad A, Pfad B (aufgehoben solange C),
-   Quellen-Vertrauens-Modell, Reward-Reform / Force-Trigger / Council.
+1. **Phase-15-Plan-Session** (V4) — ✅ **abgeschlossen 2026-08-31** (Plan-Commit `f98df68`, Nikinger-Freigabe `aad1d00`); Phase 15 in execution seit 2026-08-31, Block A in Ausführung, Blöcke B/C/D danach — siehe [`../phase15_v4/CLAUDE.md`](../phase15_v4/CLAUDE.md) + Plan [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md). *korrigiert 2026-08-31 (Phase-15 A-6):* Material ist nicht nur „vollständig", sondern **schon geplant + in execution**.
 2. **Phase-12-Reconciliation-Timing Live-Verify (A6)** (~24-h-Beobachtung am
    Live-Betrieb): nächster OPEN-Trade mit IG-Lag soll ≤ 5 CRITICALs in 24 h
    produzieren (vorher 6+ in 52 min). Pre-Test grün (4 von 4 Backoff-Tests A2–A5,
