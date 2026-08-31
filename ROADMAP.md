@@ -689,18 +689,16 @@ dann "Phase 13", dann "Phase 14", jetzt Phase 15 — umnummeriert 2026-08-11, 20
 - [ ] Trigger detection for ad-hoc strategy evaluation
 
 ### 15b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b / 11b / 12b / 13b / 14b)*
-- [ ] Context-window monitoring during debate (~60–70 %)
-- [ ] Compression of Bull/Bear/Judge state into summary
-- [ ] New session continuation
+- [x] Context-window monitoring during debate (~60–70 %) — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): Schwellwert-Mechanismus gebaut, `phase6_debate/debate/debate.py:172` (`cfg.compression_trigger_pct * cfg.max_cumulative_input_tokens`). Live-Verhalten nicht verifiziert (Plan §9 #4).*
+- [x] Compression of Bull/Bear/Judge state into summary — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): deterministischer Compression-Latch, `phase6_debate/debate/debate.py:187-195` (`if not compressed and budget.summary()["input_tokens"] > threshold`).*
+- [ ] New session continuation — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): **gegenstandslos** — durch laufende Compression ersetzt; eine neue Session zu starten ist nicht nötig, wenn der Kontext im Lauf deterministisch komprimiert wird.*
 
 ### 15c — Reward/Punishment Reform *(vormals 9d / 11c / 12c / 13c / 14c)*
-- [ ] `+ process_quality_score` (VETOs, confidence, debate quality, gate path)
-- [ ] Anti-emotionality: separate process score from outcome score
+- [ ] `+ process_quality_score` (VETOs, confidence, debate quality, gate path) — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): **„VETOs" und „gate path" sind gegenstandslos** (Plan P4, Beleg §2.4: 0 von 1902 `abstain_records` mit `stage='veto'`/`'gate'`); **„confidence" und „debate quality" sind gebaut** (`phase7_reward/reward/scorer.py:122-131` — `entry_signal` aus `spread_at_entry_pct` + `debate_signal` aus `debate_confidence`).*
+- [x] Anti-emotionality: separate process score from outcome score — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): strukturell getrennt seit Phase 7, `phase7_reward/reward/scorer.py:114-133` (`outcome_delta` Z. 112 + `process_delta` Z. 133 unabhängig, „Weak, centred, additive — never a multiplier"). **Kalibrierung** wird in Phase-15 Block B gefixt (Plan P1/P2: `process_weight` 1.5 → 0.5).*
 
 ### 15d — Force Trigger Safeguard *(vormals 9e / 11d / 12d / 13d / 14d)*
-- [ ] Lock force trigger when daily PNL < 0 — das P2-Schema-Feld `force_trigger_locked` existiert
-  bereits seit Phase 2, wird aber von keiner Funktion durchgesetzt (kein Force-Trigger existiert
-  bisher überhaupt)
+- [ ] Lock force trigger when daily PNL < 0 — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): **gegenstandslos solange kein Force-Trigger existiert.** `grep -rn "force_trigger" --include="*.py" --exclude-dir=.venv --exclude-dir=.git .` liefert 3 Treffer, alle in `phase2_persistence/` (Schema-Default `defaults.py:27` + 2 Test-Beweise `test_migrations.py:103` + `test_db.py:204`). Kein Wiring, kein Aufrufer, kein Code-Pfad. CLAUDE.md Hard Rule 5 bleibt wörtlich stehen — sie ist die Vorschrift für den Tag, an dem jemand einen Force-Trigger baut.*
 
 ### 15e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f / 11e / 12e / 13e / 14e, aus Phase 7 hierher verschoben)*
 - [ ] AI extrahiert strukturierte Instincts (`trigger` / `domain` / `confidence` / `evidence_trade_ids`) aus P7 `trade_lessons` + `reward_pts`
