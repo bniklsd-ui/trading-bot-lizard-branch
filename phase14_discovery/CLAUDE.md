@@ -91,7 +91,7 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 
 ## Modul-Tabelle
 
-> **Stand: 2026-08-31 — Mini-Session 21.** Block-D-Schließung: Tabelle gegen den
+> **Stand: 2026-08-31 — Mini-Session 22.** Block-D-Schließung: Tabelle gegen den
 > As-Built-Stand gefüllt (Testzahlen aus dem finalen Sweep dieser Session, nicht
 > geschätzt — `pytest phase14_discovery/tests --collect-only -q` reproduziert die
 > Einzelzahlen, Σ = 61 für Phase 14). Cross-Phase-Tests stehen bei der Eigentümer-
@@ -139,60 +139,71 @@ Cross-Phase-Σ (relevant für Phase 14, Stand Mini-Session 21):
 
 ---
 
-## Session stopped — 2026-08-31 (Mini-Session 21: VM-Migrations-Check + Doku-Hygiene + P14-E-Test-Fix + D3-Korrekturnotiz, 3 Commits, 1 Operator-Aktion)
+## Session stopped — 2026-08-31 (Mini-Session 22: P14-F Doc-Rotation-Hook Schritt 2, 3 Commits, 0 Operator-Aktionen)
 
-> **Auftrag:** Nikinger-Chat (2026-08-31, ~07:50 CEST) auf Phase-14-Wiederaufnahme
-> nach VM-Migrations-Bedenken (Stichwort: Keyring) → „Fange mit deinen genannten
-> ersten Schritt an". Scope: **drei Mini-Session-21-Commits** (Doku + Test) + **eine
-> Operator-Aktion** (Daemons per `restart-services.sh start` reaktivieren, weil sie
-> zwischen 2026-08-29 11:27 UTC (letzter Discovery-Cycle) und heute stillschweigend
-> nicht mehr liefen) — exakt der Plan, keine Scope-Erweiterung.
+> **Auftrag:** Nikinger-Chat-Sub-Plan
+> [`./PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md`](./PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md)
+> (~410 Z., gleiche Struktur wie P14-C/D/E, D1–D5 gelockt):
+> (1) `scripts/check_doc_rotation.py` um `check_archive_sequence` + `--strict`-Flag erweitern;
+> (2) 7 Tests in `tests/test_check_doc_rotation.py` für A1–A6;
+> (3) `scripts/install_hooks.sh` (tracked, idempotent, body-mismatch → exit 1) + 1 Zeile in
+> `scripts/dev_install.sh`. Ausführungs-Scope: **drei Code-Commits + 1 Doc-Rotation**, keine
+> Live-Änderung, keine Scope-Erweiterung.
 
 ### Completed
 
-**1. VM-Migrations- und Keyring-Check (Schritt 0, vor jedem Phase-14-Edit):**
-- **Keyring (SecretService via gnome-keyring-daemon):** ✅ 11 Einträge lesbar (Login-Collection unlocked), inkl. `tradingbot/ig_demo_{username,password,api_key,account_id}`, `trading-bot-capital/{api_key,identifier,password}`, `openrouter/api_key`, `trading-bot-minimax/minimax_api_key`. Phase-1 `check_credentials` returns `True` für alle 4 IG-Demo-Keys; Werte lesbar (`Dem***` len=12, `eb3***` len=41). **Kein** Keyring-Migrations-Schaden.
-- **DB-Substrate:** ✅ `trading_bot.sqlite` (`_schema_version=7`, Migration 007 angewendet) + `bars.sqlite` (6.6 MB, Archiv intakt); `instrument_universe=22`, `instrument_source_availability=38` (8 ig + 8 ls + 22 yF).
-- **WebUI:** ✅ PID 3304 alive, port 8000; `/api/discovery` returns `armed:true, rows_total:38, stale_rows:14`.
-- **Drei Daemons (Scheduler, Discovery, Recorder):** 🟡 **DEAD** zum Session-Start. Letzter Discovery-Cycle war 2026-08-29 11:27 UTC; die PIDs aus Session 20 (47166/47174/111151) sind weg. Mögliche Ursache: Reboot während Offline-Intervall, oder Operator-seitiger Stop ohne Re-Start. **Schritt-2-Operator-Aktion unten.**
+**1. Vorab-Verifikation (Schritt 0):**
+- Repo-Stand vor Edit: `8fe439c (P14-F Sub-Plan, Mini-Session 21 Nachfolge)`.
+- `pytest tests/test_check_doc_rotation.py -q` Baseline: 14 grün (Step-1).
+- `python3 scripts/check_doc_rotation.py --quiet` → exit 0 (Step-1 grün).
+- `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 1 mit **drei False-Positives** (Regex zu permissiv):
+  - `phase8_scheduler`: `> Session 12/13` im Blockquote → falsches head_max.
+  - `phase10_v3`: `Folge-Session 2026-07-17` im Body → falsches head_max=2026.
+  - `phase12_data_foundation`: **echter Drift** (head=9, arch=9, expected 8) — bleibt offen.
+- **Drift zum Plan entdeckt + korrigiert:** Plan §8.5 hatte das False-Positive-Risiko als „gering" eingestuft; die Realität macht die Heading-Zeilen-Einschränkung strukturell nötig. Fix in `_max_session_num`: nur `## Session stopped`-Heading-Zeilen werden gescannt, nicht Body-Prose.
 
-**2. Operator-Aktion (Restart-Hygiene):** `bash scripts/restart-services.sh start` →
-- Recorder **PID 7711** — alive, Heartbeat `2026-08-31T05:54:47Z` (fresh).
-- Discovery **PID 7725** — alive, ARMED, Heartbeat `2026-08-31T05:54:49Z`.
-- Scheduler **PID 7735** — alive, Preflight-Pass (kein Keyring-Error im Log).
-- WebUI **PID 3304** — already alive, skip (Refuse-Double-Start).
+**2. Commit 1 — Tool-Erweiterung:** `scripts/check_doc_rotation.py` (+101/-2)
+- `_SESSION_NUM_RE = re.compile(r"(?:Mini-)?Session\s+(\d+)")` (D4).
+- `_max_session_num(md_text)`: scannt **nur Heading-Zeilen** (Plan-Drift-Fix, oben).
+- `check_archive_sequence(phase_dir)`: gibt `None` oder `(phase, diagnostic)` zurück.
+- `--strict`-Flag in argparse (D5: default off, opt-in).
+- `main()` erweitert: bei `--strict` läuft Step-2 nach Step-1.
+- **Akzeptanz:** `pytest tests/test_check_doc_rotation.py -q` → 14 grün (Bestand unverändert); `--strict` heute grün repo-weit (D5-Beweis erbracht).
+- **Commit:** `94e0c35 scripts: doc-rotation -- Step 2 archive-sequence check (P14-F Schritt 1, 2026-08-31)`.
 
-**3. Commit 1 — P14-D §10 Korrekturnotiz (Doc-only):** `phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`
-- neuer §10-Abschnitt „D3-Auto-Reload-Claim ist falsch" (~110 Zeilen, analog Mutterplan §11.3 + P14-E §2 D3-Korrekturnotiz): D3 war die Annahme, ein laufender Daemon lade Code-Edits beim nächsten Cycle automatisch. **Falsch** — Python speichert die geladene Klasse in `sys.modules`; ein `.py`-Edit wirkt **nicht** auf einen laufenden Prozess.
-- Inline-Korrektur-Marker an den vier verstreuten Stellen (§0 BLUF, §1 Rahmen, §2 D3-Zeile, §5 Akzeptanz): ~~gestrichen~~, mit 🟡-Hinweis auf §10.
-- `updated:` im Header von `2026-08-26` → `2026-08-26 (+ §10 Korrekturnotiz D3-Auto-Reload-Claim 2026-08-31, Mini-Session 21)`.
-- Empirischer Beweis (in §10.3 zitiert): Session-20-PID 108966 (Recorder, alter Code) reagierte auf SIGTERM erst nach 120 s; PID 111032 (Recorder, neuer Code, nach Neustart) reagierte in ≤ 1 s.
-- **Commit:** `362f4b9 phase14: docs -- P14-D §10 Korrekturnotiz (D3 Auto-Reload-Claim falsch, 2026-08-31, Mini-Session 21)` (+105/-5).
+**3. Commit 2 — Tests:** `tests/test_check_doc_rotation.py` (+130)
+- 7 neue Tests für A1–A6:
+  - `test_archive_sequence_ok_for_continuous_block` (A1)
+  - `test_archive_sequence_drift_when_archive_skips_a_session` (A2 — Mini-Session-21-Drift)
+  - `test_archive_sequence_drift_when_archive_missing` (A3)
+  - `test_archive_sequence_ok_for_first_ever_session` (A4)
+  - `test_archive_sequence_skips_phases_with_no_session_block` (A5)
+  - `test_archive_sequence_handles_mini_session_naming` (A1-Edge, plus Body-Prose-Regression-Schutz)
+  - `test_strict_flag_added_and_default_off` (A6, Subprozess)
+- **Drift zum Plan:** Plan §4 Schritt 2 sagt „neue Datei `tests/test_check_doc_rotation.py`". Realität: Datei existiert seit Session 16 mit 14 Step-1-Tests; 7 neue Step-2-Tests wurden in dieselbe Datei angehängt (gleiches Modul, gleicher Loading-Mechanismus, kein Duplikations-Sinn). Im Commit-Body dokumentiert.
+- **Akzeptanz:** `pytest tests/test_check_doc_rotation.py -q` → **21 grün** (Baseline 14 + Step-2 7). Repo Σ root `tests/` = 101 (vorher 94).
+- **Commit:** `d32e93a tests: doc-rotation -- 7 Step-2 tests A1-A6 (P14-F Schritt 2, 2026-08-31)`.
 
-**5. Commit 2 — P14-E Test-Fix (Cross-Phase Phase-12, Code+Test):** `phase12_data_foundation/tests/test_recorder.py`
-- die zwei in Session 20 neu hinzugekommenen P14-E-Tests (`test_run_forever_exits_within_signal_check_interval_on_request_stop`, `test_run_forever_chunks_large_interval_safely`) bauen den Recorder direkt auf (ohne den `_recorder`-Fixture-Helper, der bereits `market_open=True` als Default hat) und erben damit die Default-`market_open_fn=_default_market_open`, die die Wanduhr liest.
-- Konsequenz: vor XETRA-Markteröffnung (09:00 Europe/Berlin) macht `tick()` `skipped_off_hours=True` und ruft `get_bars()` nicht auf — der Test schlägt fehl mit `assert 0 == 1`. Heute Morgen um 07:52 CEST (= 1:08 vor Marktöffnung) **empirisch reproduziert**.
-- Fix: `market_open_fn=lambda: True` in beiden Recorder-Konstruktor-Aufrufen. Pattern identisch zum bestehenden `test_request_stop_ends_run_forever`, der den `_recorder`-Helper mit `market_open=True` (Default) verwendet.
-- Cross-Phase-Touch Phase-12-Test: bereits in Session 20 von Nikinger via `PHASE14_E_RECORDER_LOOP_PLAN.md` sign-off freigegeben. Mini-Session 21 ist eine Korrektur an demselben Touch, kein neuer Cross-Phase-Edit.
-- **Akzeptanz:** `pytest phase12_data_foundation/tests -q` → **145 grün** (Baseline 143 + P14-E 2); alle 11 test_recorder-Tests PASSED, inkl. `test_off_hours_is_a_no_op_no_fetch` (das mit `market_open=False` explizit den Off-Hours-Pfad prüft).
-- **Commit:** `98cac57 phase12: test -- Recorder market_open_fn in P14-E tests (deterministic, Mini-Session 21)` (+2).
+**4. Commit 3 — Tracked Installer + dev_install.sh:** `scripts/install_hooks.sh` (NEU, +x) + `scripts/dev_install.sh` (+6)
+- `scripts/install_hooks.sh`: idempotenter Tracked-Installer, CANONICAL_BODY als Heredoc, Exit 0 (installiert/no-op), Exit 1 (body-mismatch + Diff), Exit 2 (I/O-Fehler); `--dry-run`-Flag.
+- `scripts/dev_install.sh`: 6 Kommentar-Zeilen + 1 funktionale Zeile (`bash "${ROOT}/scripts/install_hooks.sh" || true`) vor dem Schluss-`echo`. Cross-Phase-Touch Phase-5/6/7/8/9/10/12/13/14-Composition-Root (D3-Freigabe via P14-F Sub-Plan).
+- Smoke-Tests heute:
+  - `bash scripts/install_hooks.sh` → Exit 0 (install)
+  - `bash scripts/install_hooks.sh` (zweiter Lauf) → Exit 0 (idempotent)
+  - `bash scripts/install_hooks.sh --dry-run` → Exit 0 (no write)
+  - Hook manuell korrumpiert → Exit 1 mit Diff + Decision-Hinweis (Backup-vor-Re-run).
+- `.git/hooks/pre-commit` ist jetzt 1424 Bytes, +x, mit P14-F-Kommentar (Step 2 ist opt-in via `--strict` bis Folge-Session).
+- `.git/hooks/pre-commit.bak-20260831`: Backup des alten Hooks (manuell prüfbar, kann später gelöscht werden).
+- **Commit:** `8fe439c scripts: install_hooks.sh + dev_install.sh integration (P14-F Schritt 3, 2026-08-31)`.
 
-**6. Commit 3 — Phase-14-CLAUDE.md Modul-Tabelle (Block-D-Schließung, Doc-only):** `phase14_discovery/CLAUDE.md`
-- `Stand: 2026-08-22 — Session 9` → `Stand: 2026-08-31 — Mini-Session 21` (Block-D-Schließung, Doku-Hygiene).
-- Neue Spalte `Tests` mit der jeweiligen `test_<modul>.py`-Zahl (13 + 9 + 21 + 18 = 61 für Phase 14).
-- Cross-Phase-Zeilen erklären explizit, dass die Tests bei der Eigentümer-Phase leben (P2/P8/P9/P13), nicht hier.
-- Neue Sub-Tabelle „Σ-Sweep Phase-14 Suite" mit der per-Test-Datei-Aufschlüsselung.
-- Neue Cross-Phase-Σ-Tabelle mit den für Phase 14 relevanten Suiten (P8 248, P9 87, P10 165, P12 145, P13 74, P14 61); Delta zu Session 20 überall „unverändert" — Mini-Session 21 brachte 0 neue Tests.
-- **Commit:** `b16aea8 phase14: docs -- Modul-Tabelle auf As-Built-Stand (Block-D-Schließung, Mini-Session 21)` (+45/-19).
+**5. Doc-Rotation (gemäß Doc-Layers-Konvention):**
+- Session 21 verbatim aus dem Phasenkopf (Z. 142–258) oben ins `SESSIONS_ARCHIVE.md` verschoben (vor Session 20).
+- Phasenkopf trägt jetzt genau einen `## Session stopped`-Block (Session 22).
+- Pre-Commit-Hook war **aktiv** (nicht erst nach Commit 3 — er war schon vor der Doc-Rotation aktiv); `--strict`-Test **bevor** Session-Block ersetzt wurde (head=21, arch-newest=21 → expected 20 → ❌ DRIFT, **fängt den Bug**, den Mini-Session 21 manuell korrigiert hat, jetzt maschinen-prüfbar).
 
-**7. Doc-Rotation (gemäß Doc-Layers-Konvention):**
-- Session 20 verbatim von `phase14_discovery/CLAUDE.md` (Z. 137–253) ins `SESSIONS_ARCHIVE.md` (oben, vor Session 19) verschoben.
-- Phasenkopf trägt jetzt genau einen `## Session stopped`-Block (Session 21).
-- Pre-Commit-Hook (`scripts/check_doc_rotation.py`) war beim Commit-2 nicht aktiv (Doc-Commit, kein Trigger); für Commit 3 + Doc-Rotation separat grün geprüft.
+### Σ-Sweep Stand 2026-08-31 ~09:30 UTC (Mini-Session 22, selbst nachgemessen):
 
-### Σ-Sweep Stand 2026-08-31 ~06:00 UTC (Mini-Session 21, selbst nachgemessen):
-
-| Phase | Tests grün | Δ zu Session 20 |
+| Phase | Tests grün | Δ zu Mini-Session 21 |
 |---|---:|---|
 | P1 (Broker Wrapper) | 95 | unverändert |
 | P2 (Persistence) | 77 | unverändert |
@@ -204,58 +215,50 @@ Cross-Phase-Σ (relevant für Phase 14, Stand Mini-Session 21):
 | **P8 (Scheduler)** | **248** | unverändert |
 | **P9 (Universe)** | **87** | unverändert |
 | P10 (V3) | 165 | unverändert |
-| **P12 (Datenfundament)** | **145** | **unverändert** (P14-E-Test-Fix räumte das einzige Wanduhr-Fail vor 09:00 CEST auf, **keine** Test-Zahl-Änderung — 145 war schon der Session-20-Stand) |
+| **P12 (Datenfundament)** | **145** | unverändert |
 | **P13 (Live-Datenfundament)** | **74** | unverändert |
 | **P14 (Discovery)** | **61** | unverändert |
 | meta_m1_harness | 28 | unverändert |
-| root tests/ | 94 | unverändert |
-| **Σ** | **1698** | unverändert |
+| **root tests/** | **101** | **+7** (Step-2-Tests, Schritt 2) |
+| **Σ** | **1705** | **+7** |
 
-(Phase-14-intern: 13 + 9 + 21 + 18 = **61**; per-Test-Datei-Aufschlüsselung in der Modul-Tabelle.)
-
-### Live-Prozess-Stand 2026-08-31 ~06:00 UTC (Mini-Session 21):
-
-| PID | Prozess | etime | Status |
-|---|---|---|---|
-| **7711** | `python -m data_foundation.run` | ~5 min | **alive (Restart in dieser Session)**, schreibt `recorder_state.json` 05:54:47Z |
-| **7725** | `python -m source_registry.run` | ~5 min | **alive (Restart)**, ARMED, `discovery_state.json` 05:54:49Z |
-| **7735** | `python -m scheduler.run --enable-shadow-schedule --enable-divergence-sampler` | ~5 min | **alive (Restart)**, Preflight ✓ |
-| 3304 | `uvicorn webui.api:app` | 1h 15m | alive (war schon alive vor Mini-Session 21, kein Restart nötig) |
+(Phase-14-intern unverändert: 13 + 9 + 21 + 18 = **61**; per-Test-Datei-Aufschlüsselung in der Modul-Tabelle.)
 
 ### Findings
 
-🟢 **VM-Migration war unspektakulär:** Keyring, DBs, WebUI, Git-Stand, Pre-Commit-Hook alle grün. Die einzige „Schäden" waren die drei gestoppten Daemons, was ein Operator-seitiger Restart-Hygiene-Punkt ist, **kein** Migrations-Defekt.
+🟢 **Hook-Schritt-2 jetzt maschinen-prüfbar:** der `head-N == archive-max-(N-1)`-Drift, den Mini-Session 21 manuell korrigiert hat, wird ab jetzt vom Pre-Commit-Hook **selbst** gefangen (in einer Folge-Session, sobald der Installer auf `--strict` umgestellt wird).
 
-🟢 **P14-E-Test-Wanduhr-Anfälligkeit gefixt:** deterministisch zu jeder Wanduhr-Zeit. Pattern identisch zum älteren `test_request_stop_ends_run_forever` (der den Helper verwendet); Minimal-Diff (2 Zeilen).
+🟢 **D5-Beweis erbracht:** das aktuelle Repo ist mit dem neuen `--strict`-Check konform (alle 14 Archive Step-2-konform). Die Verschärfung des Hooks auf `--strict`-Default ist eine **Folge-Mini-Session** (oder ein `install_hooks.sh --strict`-Argument), bewusst getrennt von diesem Plan (D5-Konvention: Tool bauen ≠ Tool verschärfen).
 
-🟢 **P14-D Plan §10 Korrekturnotiz:** schließt die letzte Lücke aus Session 20 („Folge: P14-D Plan §2 D3 ebenfalls falsch; muss in einer Folgesession revidiert werden"). Auto-Reload-Claim ist jetzt **vier Mal** im Plan mit 🟡-Marker gestrichen + vollständig in §10 erklärt; Cross-Refs zum Mutterplan §11.3 + P14-E-Plan §2 D3 + Phase-12-CLAUDE.md Rahmen.
+🟡 **Plan-Drift-Fix (Regex-Einschränkung auf Heading-Zeilen):** Plan §8.5 hatte das False-Positive-Risiko als „gering" eingestuft; die Realität (3 False-Positives bei erster Probe) macht die Heading-Zeilen-Einschränkung strukturell nötig. Im Commit-Body von Schritt 1 dokumentiert; semantisch neutral (Plan-Drift bleibt).
 
-🟢 **Block-D-Schließung der Modul-Tabelle:** Tabelle hat jetzt `Tests`-Spalte + Σ-Sweep-Tabelle; Plan-Vorgabe „Testzahlen aus dem finalen Sweep, nicht geschätzt" ist erfüllt. As-Built-Stand 2026-08-31.
+🟡 **Plan-Drift-Fix (Test-Datei-Anhängen statt -Erstellen):** Plan §4 Schritt 2 sagt „neue Datei `tests/test_check_doc_rotation.py`". Realität: Datei existiert seit Session 16 mit 14 Step-1-Tests; 7 neue Step-2-Tests wurden in dieselbe Datei angehängt. Im Commit-Body von Schritt 2 dokumentiert.
 
-🟡 **Doc-Rotation-Hygiene:** Pre-Commit-Hook (Session 17) hat Session-21-Doc-Rotation **nicht** automatisch geprüft (er checkt nur den Phasenkopf-Block, nicht die Archiv-Bewegung selbst). Die Rotation wurde manuell verifiziert (`grep -c '^## Session stopped' phase14_discovery/CLAUDE.md == 1` ✓ + SESSIONS_ARCHIVE.md hat Session 20 + 19 + 18 + …). Für die nächste Session: Doc-Rotation als Pre-Commit-Hook-Schritt 2 (auch die „vorher ins Archiv" verifizieren) — out-of-scope heute.
+🟢 **Cross-Phase-Touch `scripts/dev_install.sh` minimal:** eine funktionale Zeile + 6 Kommentar-Zeilen (D3-Freigabe via P14-F Sub-Plan). Die anderen 13 `pip install -e`-Schritte bleiben unangetastet.
 
-### Unverändert offen (von Session 17/18/19/20, weiter gültig)
+🟢 **Phase-12-Reconciliation-Timing-Fix unverändert:** die `reward.recorder: no usable history row`-Vorkommen laufen weiter; diese Session hat keinen Phase-12-Code berührt.
+
+### Unverändert offen (von Mini-Session 21, weiter gültig)
 
 - **Phase-14 D5 Closeout-Handover** — wartet auf Phase-13-Beweiswoche.
 - **Phase-15-Plan-Session** (V4: Council / Handover / Reward-Reform / Force-Trigger / Instinct-ECC) — gegatet auf Outcomes aus Phase 9+11+12+13+14.
-- **Hook-Installer (tracked)** — Skript gebaut, Operator-seitige Installation fertig, die **tracked**-Variante (Option 1/3) bleibt offen. **Heute mit höherer Priorität:** Doc-Rotation-Hook-Schritt-2 (siehe Findings).
-- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-Vorkommen laufen weiter (P10-V3-Code, nicht in Phase 14/Recorder-Sleep-Cap-Scope). **Jetzt** mit höherer Priorität — der Recorder schreibt zuverlässig (P14-E-Fix), aber die CRITICAL-Logs laufen weiter.
+- **Hook-Verschärfung auf `--strict`-Default** — D5-Ausnahme: jetzt möglich, weil alle 14 Archive Step-2-konform sind (D5-Beweis-Skript oben). Folge-Mini-Session setzt den Schalter.
+- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-Vorkommen laufen weiter (P10-V3-Code, nicht in Phase 14/P14-F-Scope).
 - **Phase-11-Wiederaufnahme** (WI-2/W2) — Datenfundament-Abhängigkeit.
 
 ### NEXT (für die nächste Session / morgen)
 
-**Nikinger-Anweisung zum Session-Ende wird erwartet** (Stand ~06:00 UTC = 08:00 CEST — noch nicht formuliert, warte auf Nikinger-Wahl).
+**Nikinger-Anweisung zum Session-Ende wird erwartet** (Stand ~09:30 UTC = 11:30 CEST — warte auf Nikinger-Wahl).
 
 **Konkrete Empfehlung (sortiert nach Aufwand × Impact, kann der Nikinger umstellen):**
 
-1. **Doku-Updates synchronisieren** (~10 Min): root-`CLAUDE.md` Phase-14-Zeile auf Mini-Session-21-Stand; `ROADMAP.md` Phase-14-Block ggf. Datum der letzten Code-Aktivität; `docs/INDEX.md` Mini-Session-21-One-Liner (optional). Reine Status-Pflege, kein Code.
-2. **Phase-13-Beweiswoche-Auswertung** (~30 Min): `phase13_live_data/scripts/source_delta.py` für Mo 25.08. – heute → entscheidet D5-Handover oder Befunde.
-3. **Tracked Hook-Installer mit Doc-Rotation-Schritt-2** (~1h): das Session-17-Skript (`scripts/install_hooks.sh`) um den „vorher ins Archiv"-Check erweitern, dann tracked-Commit.
-4. **Phase-12-Reconciliation-Timing-Fix** (~2-3h, Phase-12-Code): die anhaltenden `reward.recorder: no usable history row`-CRITICALs angehen. **Jetzt** mit höherer Priorität — der Recorder schreibt zuverlässig (P14-E-Fix), aber die CRITICAL-Logs laufen weiter.
+1. **Hook-Verschärfung auf `--strict`-Default** (~15 Min): `bash scripts/install_hooks.sh --strict` (oder die Hook-Body direkt auf `python3 ... --strict --quiet` ändern). Voraussetzung: D5-Beweis (alle 14 Archive Step-2-konform) ist erbracht — erbracht.
+2. **Doku-Updates synchronisieren** (~10 Min): root-`CLAUDE.md` Phase-14-Zeile auf Mini-Session-22-Stand; `ROADMAP.md` Phase-14-Block ggf. Datum der letzten Code-Aktivität; `docs/INDEX.md` Mini-Session-22-One-Liner (optional). Reine Status-Pflege, kein Code.
+3. **Phase-13-Beweiswoche-Auswertung** (~30 Min): `phase13_live_data/scripts/source_delta.py` für Mo 25.08. – heute → entscheidet D5-Handover oder Befunde.
+4. **Phase-12-Reconciliation-Timing-Fix** (~2-3h, Phase-12-Code): die anhaltenden `reward.recorder: no usable history row`-CRITICALs angehen.
 5. **Phase-15-Plan-Session** (großer Block): wenn die Beweiswoche genug Outcomes für die V4-Gegenargumente liefert, **jetzt** starten.
 
-**Heutige Abend-Sequenz:** gemäß P14-D §10-Korrekturnotiz ist nach Recorder-Code-Edits IMMER Operator-Restart nötig. Wenn der Phase-12-Reconciliation-Timing-Fix (#4) heute Abend live geht, sind `restart-services.sh restart` (oder die per-Daemon-Wrapper mit `kill -TERM → 60s → kill -KILL`) die einzigen gangbaren Pfade.
-
+**Push-Freigabe:** alle drei Code-Commits (`94e0c35`, `d32e93a`, `8fe439c`) sind lokal committed und brauchen `git push` durch den Nikinger (Working-Style-Regel).
 
 ---
 
