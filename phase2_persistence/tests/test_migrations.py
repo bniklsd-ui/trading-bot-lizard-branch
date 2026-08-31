@@ -33,15 +33,16 @@ def test_get_version_zero_on_empty_db(tmp_path):
     assert migrations._get_schema_version(conn) == 0
 
 
-def test_fresh_db_reaches_version_7(tmp_path):
+def test_fresh_db_reaches_version_8(tmp_path):
     conn = sqlite3.connect(str(tmp_path / "x.sqlite"))
     conn.row_factory = sqlite3.Row
     version = migrations.run_migrations(conn, MIGRATIONS_DIR)
     # 001_initial + 002_phase7_reward + 003_phase8_trade_provenance +
     # 004_phase9_instrument_universe + 005_v3_learning + 006_phase12_data_foundation +
-    # 007_phase14_source_availability (Phase 14 D1)
-    assert version == 7
-    assert migrations._get_schema_version(conn) == 7
+    # 007_phase14_source_availability (Phase 14 D1) +
+    # 008_phase12_reconcile_backoff (Phase 7+8 Backoff, Mini-Session 26, 2026-08-31)
+    assert version == 8
+    assert migrations._get_schema_version(conn) == 8
 
 
 def test_all_tables_created(tmp_path):
@@ -76,22 +77,23 @@ def test_rerun_is_noop(tmp_path):
     migrations.run_migrations(conn, MIGRATIONS_DIR)
     # Second run must not raise and must not advance the version.
     version = migrations.run_migrations(conn, MIGRATIONS_DIR)
-    assert version == 7
-    # One version row per applied migration (001-007), and no more on rerun.
+    assert version == 8
+    # One version row per applied migration (001-008), and no more on rerun.
     count = conn.execute("SELECT COUNT(*) FROM _schema_version").fetchone()[0]
-    assert count == 7
+    assert count == 8
 
 
 def test_find_pending_respects_current(tmp_path):
     pending = migrations._find_pending(MIGRATIONS_DIR, current=0)
-    assert [v for v, _ in pending] == [1, 2, 3, 4, 5, 6, 7]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=1)] == [2, 3, 4, 5, 6, 7]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=2)] == [3, 4, 5, 6, 7]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=3)] == [4, 5, 6, 7]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=4)] == [5, 6, 7]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=5)] == [6, 7]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=6)] == [7]
-    assert migrations._find_pending(MIGRATIONS_DIR, current=7) == []
+    assert [v for v, _ in pending] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=1)] == [2, 3, 4, 5, 6, 7, 8]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=2)] == [3, 4, 5, 6, 7, 8]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=3)] == [4, 5, 6, 7, 8]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=4)] == [5, 6, 7, 8]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=5)] == [6, 7, 8]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=6)] == [7, 8]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=7)] == [8]
+    assert migrations._find_pending(MIGRATIONS_DIR, current=8) == []
 
 
 def test_database_run_migrations_seeds_defaults(db):
@@ -104,8 +106,8 @@ def test_database_run_migrations_seeds_defaults(db):
 def test_database_run_migrations_idempotent(tmp_path):
     path = str(tmp_path / "x.sqlite")
     d = Database(path)
-    assert d.run_migrations() == 7
-    assert d.run_migrations() == 7  # no error, no change
+    assert d.run_migrations() == 8
+    assert d.run_migrations() == 8  # no error, no change
     d.close()
 
 

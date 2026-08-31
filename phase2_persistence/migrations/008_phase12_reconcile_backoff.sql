@@ -1,0 +1,18 @@
+-- 008_phase12_reconcile_backoff.sql (Phase 7+8 backoff, 2026-08-31)
+--
+-- Erweitert trade_outcomes um last_resolve_attempt_utc (ISO-8601, tz-aware UTC)
+-- für die RewardSink-Backoff-Logik aus
+-- phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md §4 Schritt 1.
+--
+-- Wird vom Phase-7-RewardSink._on_trade_closed (Mini-Session 26) gelesen
+-- und via db.update_trade_resolve_attempt(deal_id, iso_utc) geschrieben
+-- (Pre-claim-Pattern, D5).
+--
+-- nullable + ohne Initial-Value: bestehende OPEN-Trades (heute 0) bleiben
+-- NULL; _next_retry_in_s() returnt für NULL sofort 0 (=sofort retry). Nach
+-- dem ersten Versuch wird die Spalte gesetzt.
+--
+-- Migration-Runner scannt phase2_persistence/migrations/ (nicht
+-- phase7_reward/migrations/) — siehe Phase-7-CLAUDE §1.7. Idempotent via
+-- _schema_version-Guard im Migration-Runner.
+ALTER TABLE trade_outcomes ADD COLUMN last_resolve_attempt_utc TEXT;
