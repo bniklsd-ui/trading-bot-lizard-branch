@@ -219,3 +219,133 @@ def test_repo_end_to_end_cli_invocation() -> None:
         f"check_doc_rotation.py --quiet exited {result.returncode}:\n"
         f"stdout={result.stdout!r}\nstderr={result.stderr!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# P14-F Step 2 — archive-sequence integrity (Mini-Session 22, 2026-08-31).
+#
+# The pre-existing tests above cover Step-1 (inline-duplicate count). The
+# tests below cover Step-2 (head-N == archive-max-(N-1)). Acceptance A1-A6
+# from PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md §5.
+# ---------------------------------------------------------------------------
+
+
+def test_archive_sequence_ok_for_continuous_block(tmp_path: Path) -> None:
+    """A1: head=Session N, archive-newest=Session (N-1) → OK.
+
+    Reproduziert den heutigen korrekten Zustand für Mini-Session 21.
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-08-31 (Mini-Session 21 ...)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "## Session stopped — 2026-08-28 (Session 20 ...)\n"
+        "## Session stopped — 2026-08-28 (Session 19 ...)\n",
+        encoding="utf-8",
+    )
+    assert check_doc_rotation_mod.check_archive_sequence(tmp_path) is None
+
+
+def test_archive_sequence_drift_when_archive_skips_a_session(tmp_path: Path) -> None:
+    """A2: head=Session 21, archive-newest=Session 19 → ❌ DRIFT.
+
+    Genau der Fall, den Mini-Session-21 manuell korrigiert hat: Session 20
+    wurde beim Hinzufügen von Session 21 nicht ins Archiv rotiert.
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-08-31 (Mini-Session 21 ...)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "## Session stopped — 2026-08-28 (Session 19 ...)\n",
+        encoding="utf-8",
+    )
+    result = check_doc_rotation_mod.check_archive_sequence(tmp_path)
+    assert result is not None
+    label, diagnostic = result
+    assert "Session 21" in diagnostic
+    assert "Session 19" in diagnostic
+    assert "expected 20" in diagnostic
+
+
+def test_archive_sequence_drift_when_archive_missing(tmp_path: Path) -> None:
+    """A3: head=Session 5, no archive → ❌ DRIFT (Sessions 1..4 verloren)."""
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-08-31 (Session 5 ...)\n",
+        encoding="utf-8",
+    )
+    result = check_doc_rotation_mod.check_archive_sequence(tmp_path)
+    assert result is not None
+    label, diagnostic = result
+    assert "Session 5" in diagnostic
+    assert "SESSIONS_ARCHIVE.md" in diagnostic
+
+
+def test_archive_sequence_ok_for_first_ever_session(tmp_path: Path) -> None:
+    """A4: head=Session 1, archive absent oder leer → OK.
+
+    Erste Session einer Phase, Archiv darf leer sein / fehlen.
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-08-31 (Mini-Session 1 ...)\n",
+        encoding="utf-8",
+    )
+    # Kein SESSIONS_ARCHIVE.md angelegt
+    assert check_doc_rotation_mod.check_archive_sequence(tmp_path) is None
+
+    # Auch mit leerem Archiv OK
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text("# noch leer\n", encoding="utf-8")
+    assert check_doc_rotation_mod.check_archive_sequence(tmp_path) is None
+
+
+def test_archive_sequence_skips_phases_with_no_session_block(tmp_path: Path) -> None:
+    """A5: Phasenkopf ohne Session-Block → OK (kein Check noetig)."""
+    (tmp_path / "CLAUDE.md").write_text(
+        "# Phase ohne Sessions\n\nKein Block, nichts zu pruefen.\n",
+        encoding="utf-8",
+    )
+    assert check_doc_rotation_mod.check_archive_sequence(tmp_path) is None
+
+
+def test_archive_sequence_handles_mini_session_naming(tmp_path: Path) -> None:
+    """A1/A4-Edge: 'Mini-Session 21' und 'Session 20' werden korrekt extrahiert.
+
+    Bonus: Body-Prose wie 'Folge-Session 2026-XX-XX' darf KEIN falsches Maximum
+    erzeugen (sonst würden alle Phasen mit Datums-Erwähnungen fälschlich als
+    Session 2026+ detected). Regex ist deshalb auf ``## Session stopped``-
+    Heading-Zeilen eingeschränkt (siehe Kommentar in ``_max_session_num``).
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-08-31 (Mini-Session 21 ...)\n",
+        encoding="utf-8",
+    )
+    # Body-Prose mit Datum darf das Maximum NICHT verändern.
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "Frühere Folge-Session 2026-07-17 war eröffnet; später dann:\n\n"
+        "## Session stopped — 2026-08-28 (Session 20 ...)\n",
+        encoding="utf-8",
+    )
+    assert check_doc_rotation_mod.check_archive_sequence(tmp_path) is None
+
+
+def test_strict_flag_added_and_default_off() -> None:
+    """A6: ``--strict``-Flag wird geparst; ohne Flag laeuft nur Step-1.
+
+    Subprozess-Aufruf (kein Mock) — verifiziert, dass das aktuelle Repo
+    bereits Step-2-konform ist (D5-Beweis-Skript).
+    """
+    # Ohne --strict: kein Step-2-Output fuer ein gut funktionierendes Repo
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPT_PATH), "--quiet"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT),
+    )
+    assert result.returncode == 0  # Step-1 gruen, Step-2 nicht aktiv
+
+    # Mit --strict: Step-2 laeuft zusaetzlich, gleicher Exit fuer aktuelles Repo
+    result_strict = subprocess.run(
+        [sys.executable, str(_SCRIPT_PATH), "--strict", "--quiet"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT),
+    )
+    assert result_strict.returncode == 0  # aktuelles Repo ist auch Step-2-konform
+    assert "sequence gap" not in result_strict.stdout.lower()  # kein FAIL
