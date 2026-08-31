@@ -16,7 +16,7 @@ down:
   - ./scripts/source_delta.py                  # das Diagnose-Tool (Block C3, 7 Tests grün)
   - ../../phase14_discovery/CLAUDE.md           # Phase-14-Phasenkopf (D5-Handover-Status)
   - ../../phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md # Phase-14-Schwester, die in dieser Diagnose-Woche auch lebte
-updated: 2026-08-31
+updated: 2026-08-31 (+ §8 Pfad-C-Nachtrag 2026-08-31, Mini-Session 24)
 ---
 # PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31 — Source-Delta-Diagnose
 
@@ -309,6 +309,85 @@ pushbar nach Nikinger-Sign-off.
 - **Mini-Session-21-Findings (Phase-14-CLAUDE.md Z. 235)** — "Hook-Installer (tracked) —
   Skript gebaut, Operator-seitige Installation fertig, die **tracked**-Variante (Option 1/3)
   bleibt offen" — **erledigt in Mini-Session 22** (Commit 8fe439c, `scripts/install_hooks.sh`).
+
+---
+
+## §8 Nachtrag 2026-08-31 (Mini-Session 24, Nikinger-Entscheidung Pfad C)
+
+> **Operator-Entscheidung:** Nikinger hat nach Vorlage der drei Pfade A/B/C in
+> Mini-Session 24 Pfad C gewählt. Pfad A/B bleiben offen — Pfad A als P15-V4-Kandidat
+> (siehe §8.2), Pfad B als Phase-14-Schema-Migration (aufgehoben solange C gilt).
+
+### §8.1 "by design"-Vermerk (Pfad C)
+
+Die in dieser Notiz dokumentierten Befunde B1/B2/B3 bleiben **empirisch korrekt**,
+bekommen aber eine **andere Lesart**:
+
+- **B1 (IG-Bars-Lücke 2/13 Tage)** ist **kein Defekt**, sondern **Architektur-konform**:
+  die Phase-13-Architektur sieht **strukturell keine kontinuierliche `source='ig'`-Beschaffung**
+  vor. IG ist als **S4-Rettungspfad** (GapRescue, `phase13_live_data/live_data/rescue.py`,
+  Default AUS per Phase-13-CLAUDE.md, Budget-bound 10 000 IG-Punkte/Woche) designed.
+  Die heutigen 2 IG-Tage (17.07. + 18.08.) stammen aus Operator-gefahrenen
+  GapRescue-Einmal-Runs (vermutlich B1a-Probe + Block-C-Live-Verify), nicht aus
+  einer Pipeline.
+- **B2 (53.6 % Divergenzrate am 2026-08-18)** ist weiter ein **echter Befund** — aber
+  eingeschränkt auf den einen Tag mit IG-Bars; ab 2026-08-19 systematisch nicht
+  messbar (keine IG-Bars, kein Vergleich). **Nicht** ein Beweis für eine
+  kontinuierliche Drift; **ein** Stichproben-Befund an einem Operator-Run-Tag.
+- **B3 (`last_verified_utc` reflektiert Discovery-Ableitung, nicht Substrat)** bleibt
+  ein **struktureller Drift in der Tabelle** — der Discovery-Process aktualisiert das
+  Feld aus `instrument_universe` (= trivial wahr), nicht aus `bars.sqlite` (= echte
+  Substrat-Validität). **Aber:** solange Pfad C gilt und IG als "GapRescue-Pfad"
+  verstanden wird, ist die Tabelle semantisch korrekt (sie zeigt
+  "Discovery hat diese Epic bestätigt", nicht "diese Quelle liefert heute Bars").
+
+**Konsequenz für Phase-14 D5-Handover (Mini-Session 23):** die Entscheidung "architektonisch
+freigegeben, operativ vorbehaltlich Phase-13-Recorder-Mapping-Initiative" wird
+**relativiert** — der "operativ vorbehaltlich"-Teil entfällt, weil die Initiative als
+"Architektur-konform" entlarvt ist. **Phase-14 D5-Handover ist jetzt komplett
+freigegeben** (kein Vorbehalt).
+
+### §8.2 P15-V4-Kandidatenliste (offen, nicht in Mini-Session-24-Scope)
+
+Drei Items wandern explizit in die **P15-V4-Plan-Session** (V4 = Council, Handover,
+Reward-Reform, Force-Trigger, Instinct-ECC):
+
+1. **Pfad A — Operator-S4-Aktivierung** (~2-3h Phase-13-Code):
+   - Wenn eine echte IG-Coverage für Divergenz-Vergleich gebraucht wird:
+     GapRescue-Skript als Operator-Tool mit Schedule (z. B. täglich 17:30 UTC).
+   - IG-Budget-Kontingent ist 10 000/Woche — `enable_divergence_sampler` verbraucht
+     ~120/Woche (~1.2 %); ein täglicher 1-Tages-Backfill der 8 IG-Epics verbraucht
+     weitere ~560/Woche (~5.6 %); beides zusammen **innerhalb der 10 000/Woche**.
+   - Frage: ist die zus-liche Coverage den Budget-Preis wert? **V4-Entscheidung.**
+
+2. **Pfad B — Schema-Reinterpretation** (~1-2h Phase-14-Code, **aufgehoben solange C gilt**):
+   - Neuer `status='gap_rescue_only'`-Wert in `instrument_source_availability`,
+     IG-Rows umklassifiziert. Semantisch sauberer, aber **Pfad C hat sich als
+     ausreichend erwiesen** — V4 kann entscheiden, ob das später nochmal relevant wird.
+
+3. **P15-Quellen-Vertrauens-Modell** (siehe Findings §5.3, jetzt mit Befund-Inversion
+   neu gerahmt):
+   - Die ursprüngliche V4-Forderung war "jede `status='ok'`-Zeile braucht eine
+     **tatsächliche** Substrat-Coverage-Messung, sonst automatische Degradation auf
+     `stale`/`empty`". Mit Pfad C wird das **weniger dringend**: `status='ok'` heißt
+     "GapRescue-Pfad verfügbar", was eine andere Kategorie ist als "Live-Coverage".
+     **V4 kann das** als "Quellen-Verfügbarkeits-Modell" (was die Tabelle heute ist)
+     **statt Quellen-Aktualitäts-Modell** (was der ursprüngliche Vorschlag war)
+     framen. Konkrete Frage: soll V4 die `last_verified_utc`-Semantik von
+     "Discovery-Ableitung" auf "Bars-Substrat-Validierung" umstellen? **V4-Entscheidung.**
+
+### §8.3 Update-Liste (für die nächste Session / P15-Plan)
+
+- **Pfad C ist umgesetzt** durch diesen Nachtrag — keine Code-Änderung, nur Doku.
+- **P15-Plan-Session-Material** ist um drei konkrete Items (§8.3) erweitert — die
+  V4-Plan-Session kann direkt mit der Quellen-Vertrauens-Diskussion starten.
+- **Phase-13 ist close-out-fähig** mit Pfad C + diesem Nachtrag — eine eigenständige
+  Closeout-Session ist jetzt **möglich** (siehe auch Phase-12-Closeout als Pattern).
+
+---
+
+**>Updated:** 2026-08-31 (Mini-Session 24, Pfad-C-Entscheidung, §8 Nachtrag angehängt;
+  Header `updated:` von `2026-08-31` auf `2026-08-31 (+ §8 Pfad-C-Nachtrag 2026-08-31, Mini-Session 24)`).
 
 ---
 

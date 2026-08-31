@@ -224,11 +224,13 @@ Operator-Runs, yF als täglicher Standard), Findings-Notiz um "by design" ergän
 **Pro:** kein Code-Touch, kein Schema-Touch. **Contra:** Divergenz-Vergleich zwischen
 IG und yF weiter eingeschränkt (nur an Tagen mit beiden Quellen).
 
-**Mein Vorschlag:** **Pfad C** (Architektur-Akzeptanz) + **eine Beobachtungs-Periode**
-(1-2 Wochen Beweiswoche ohne aktive IG-Beschaffung), um zu sehen, ob die fe
-hlenden IG-Bars operativ wirklich ein Problem sind. Falls ja → Pfad A. Die jetzige
-Findings-Notiz sollte mit einem "by design"-Vermerk ergänzt werden, damit die
-nächste Session nicht wieder denselben Drift entdeckt.
+**Nikinger-Entscheidung 2026-08-31: Pfad C** angenommen.
+**Findings-Notiz §8 Nachtrag angehängt** (Mini-Session 24): "by design"-Vermerk für B1 + B2
+eingeschränkt + B3 semantisch korrekt unter Pfad C; **Phase-14 D5-Handover komplett
+freigegeben** (kein operativer Vorbehalt mehr). **Pfad A + Pfad B wandern in die
+P15-V4-Plan-Session** (Kandidatenliste in Findings §8.2): Pfad A = Operator-S4-Aktivierung
+(~2-3h, IG-Budget 5.6 % + 1.2 % = innerhalb 10 000/Woche); Pfad B = Schema-Reinterpretation
+(neuer `status='gap_rescue_only'`, ~1-2h, aufgehoben solange C gilt). V4 entscheidet.
 
 ### Unverändert offen (von Mini-Session 23, weiter gültig)
 
