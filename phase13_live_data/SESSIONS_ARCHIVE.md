@@ -3,6 +3,178 @@
 Newest-first. Rotation rule (`CLAUDE.md` root, mandatory since 2026-07-06): the phase head
 carries exactly one `
 
+
+## Session stopped — 2026-08-31 (Session 16: P14-F D5 Hook-Verschärfung + Doku-Sync + IG-Architektur-Sondierung, 3 Commits, 0 Operator-Aktionen)
+
+> **Auftrag:** Nikinger-Chat 2026-08-31 nach Mini-Session 23 (~11:00 UTC): „Erst item #2
+> und #3, danach #0 evtl mit Plan nach deiner Einschätzung". Mini-Plan-Modus: drei
+> in-line Schritte + eine Sondierung, kein neuer Plan (D5-Ausnahme aus P14-F Plan §2).
+> Ausführungs-Scope: **1 Hook-Update + 1 Doku-Sync-Commit + 1 Findings-Update**, exakt
+> der Auftrag, keine Scope-Erweiterung.
+
+### Completed
+
+**1. P14-F D5-Ausnahme — Hook-Verschärfung auf `--strict`-Default (Item #2):**
+- **Begründung (P14-F Plan §2 D5-Ausnahme):** wenn die ausführende Session nachweisen
+  kann, dass alle 14 Phasenarchive die Sequenz-Invariante erfüllen, kann `--strict`
+  sofort default werden. **D5-Beweis erbracht in Mini-Sessions 22 (initial) + 23
+  (re-verifiziert nach Phase-13-Findings-Indizierung).**
+- `scripts/install_hooks.sh` CANONICAL_BODY: `python3 scripts/check_doc_rotation.py --quiet`
+  → `python3 scripts/check_doc_rotation.py --strict --quiet`. Kommentar-Block von
+  "Step 2 ist opt-in via --strict" auf "Step 2 became default after D5-Beweis
+  (Mini-Session 24)" umgestellt; Header von "Also (with --strict flag)" auf
+  "Two steps (P14-F, 2026-08-31)".
+- Operator-Aktion: `mv .git/hooks/pre-commit .git/hooks/pre-commit.bak-20260831-2`
+  (Backup), `bash scripts/install_hooks.sh` (install, 1438 bytes), `bash scripts/install_hooks.sh`
+  (idempotent), `bash .git/hooks/pre-commit` (exit 0).
+- **Akzeptanz:** repo-weit `--strict` grün; Doc-Rotation-Drift-Klasse aus Mini-Session 21
+  ist jetzt **maschinell** gefangen (nicht mehr manuell).
+- **Commit:** `c4f7d9c scripts: install_hooks.sh -- --strict jetzt default (P14-F D5, Mini-Session 24, 2026-08-31)`.
+
+**2. Doku-Sync (Item #3):**
+- root-`CLAUDE.md` Phase-13-Row: Status von "Beweiswoche ausstehend" auf "ausgewertet
+  2026-08-31 (Mini-Session 23)" + Verweis-Zeile zur Findings-Notiz + D5-Handover-Status.
+- root-`CLAUDE.md` Phase-14-Row: Block-D-Status auf Mini-Sessions 21+22+23+24 erweitert
+  + D5-Handover-Status + P14-F-Ergebnis-Vermerk.
+- `ROADMAP.md` Phase-13-Section: Status auf "Beweiswoche ausgewertet" + Findings-Verweis.
+- `ROADMAP.md` Phase-14-Section: Status auf "architektonisch freigegeben, operativ
+  vorbehaltlich" + P14-F Special-Plan-Verweis + D5-Handover-Status-Absatz.
+- `docs/INDEX.md`: 4 Einträge aktualisiert (P14-Phasenkopf, P14-Archive, P13-Phasenkopf,
+  P13-Archive).
+- **Akzeptanz:** `python3 scripts/check_doc_rotation.py --strict --quiet` exit 0.
+- **Commit:** `69b239e docs: sync -- root CLAUDE + ROADMAP + INDEX auf Mini-Session-23/24-Stand`.
+
+**3. IG-Architektur-Sondierung (Item #0):**
+- **Code-Sondierung** (`grep -rn "source='ig'"` + `grep -rn SOURCE_IG`): vier Stellen
+  identifiziert, die `source='ig'`-Bars schreiben könnten:
+  - `phase12_data_foundation/data_foundation/recorder.py:144` → schreibt NUR
+    `source=SOURCE_YF` (`'yf'`), keine IG-Output.
+  - `phase13_live_data/live_data/stream.py` (LSBarRecorder + TickAggregatorRecorder)
+    → schreibt `source='ls'` (CHART-Pfad) oder `source='ls_tick_agg'` (Tick-Agg-Fallback).
+  - `phase13_live_data/live_data/rescue.py` (GapRescue) → schreibt `source='ig'`,
+    **Default AUS** per Phase-13-CLAUDE.md.
+  - `phase13_live_data/live_data/backfill.py` (CapitalSource) → schreibt `source='capital'`.
+- **Heutige 2 IG-Tage (17.07. + 18.08.)** sind Operator-gefahrene GapRescue-Einmal-Runs
+  (vermutlich B1a-Probe + Block-C-Live-Verify), nicht Teil einer kontinuierlichen Pipeline.
+- **`fetched_at`-Analyse 2026-08-18:** IG-Bars geschrieben zwischen 11:10:09 und 13:41:48
+  UTC (1782 Bars in 2.5h = ~10/s = klassischer REST-Bulk-Backfill), yF-Bars gleicher Tag
+  geschrieben 07:18:22-15:25:20 UTC (103 distinct fetched_at = kontinuierlicher Recorder).
+- **TickAggregator läuft NICHT** (kein `stream.py`-Prozess in `ps aux`). Der Scheduler
+  hätte ihn via `--enable-bar-stream` aktivieren können (Phase-13 Block B3 wired), aber
+  das Flag ist `enable_bar_stream: bool = False` per Default in `config.py:215`.
+
+### **Befund-Inversion (wichtig):**
+
+Item #0 ist **kein Recorder-Mapping-Bug**, sondern eine **architektonische
+Design-Frage**. Die Phase-13-Architektur sieht **strukturell keine kontinuierliche
+`source='ig'`-Beschaffung** vor:
+
+  - IG ist als **S4-Rettungspfad** (GapRescue, Default AUS, Budget-bound) designed.
+  - Die "tägliche" Bar-Lieferung kommt von **yF** (Phase 12 Recorder, läuft) +
+    **Capital.com** (Phase 13 Block C, Operator-aktiviert).
+  - **`instrument_source_availability.status='ok'` für IG** heißt **"GapRescue-Pfad ist
+    prinzipiell verfügbar"**, **nicht** "wird kontinuierlich befüllt". Die Tabelle
+    lügt nicht — meine Interpretation in Mini-Session 23 war falsch.
+
+**Konsequenz:** es gibt nichts zu fixen, nur eine **Operator-Entscheidung** zu treffen
+(siehe §5 Empfehlungen).
+
+### Σ-Sweep Stand 2026-08-31 ~12:00 UTC (Mini-Session 24, selbst nachgemessen):
+
+| Phase | Tests grün | Δ zu Mini-Session 23 |
+|---|---:|---|
+| P1 (Broker Wrapper) | 95 | unverändert |
+| P2 (Persistence) | 77 | unverändert |
+| P3 (External Data) | 104 | unverändert |
+| P4 (Research) | 155 | unverändert |
+| P5 (Execution) | 173 | unverändert |
+| P6 (Debate) | 76 | unverändert |
+| P7 (Reward) | 138 | unverändert |
+| **P8 (Scheduler)** | **248** | unverändert |
+| **P9 (Universe)** | **87** | unverändert |
+| P10 (V3) | 165 | unverändert |
+| **P12 (Datenfundament)** | **145** | unverändert |
+| **P13 (Live-Datenfundament)** | **74** | unverändert |
+| **P14 (Discovery)** | **61** | unverändert |
+| meta_m1_harness | 28 | unverändert |
+| **root tests/** | **101** | unverändert |
+| **Σ** | **1705** | unverändert |
+
+### Findings
+
+🟢 **Item #2 abgeschlossen:** `--strict` ist jetzt Hook-Default, P14-F D5-Ausnahme umgesetzt.
+Repo-weit grün, Idempotenz bestätigt, Doc-Rotation-Drift-Klasse aus Mini-Session 21 jetzt
+maschinell gefangen.
+
+🟢 **Item #3 abgeschlossen:** root-CLAUDE.md Phase-13/14, ROADMAP, INDEX alle auf
+Mini-Session-23/24-Stand. Reine Status-Pflege, kein Code.
+
+🟡 **Item #0 invertiert:** kein "Recorder-Mapping-Bug", sondern architektonische
+Design-Frage. Drei mögliche Pfade (siehe §5 Empfehlungen). **Plan-Skizze nicht
+sinnvoll** — keine Code-Änderung nötig, nur Operator-Entscheidung.
+
+🟢 **Code-Sondierung erbracht:** 4 Pfade identifiziert, die `source='ig'` schreiben
+könnten, **keiner läuft kontinuierlich**. Das ist **by design** (Phase-13-S4-Pfad).
+
+### Empfehlungen an Nikinger (§5)
+
+**Pfad A — Operator-S4-Aktivierung:** regelmäßige GapRescue-Runs (z. B. 1× pro
+Tag nach Markt-Close) einplanen. **Pro:** echte IG-Coverage für Divergenz-Vergleich.
+**Contra:** IG-Budget-Kontingent (10 000/Woche), aktuell **nicht in Verwendung** (Recorder
+verwendet yF, das keinen IG-Budget verbraucht).
+
+**Pfad B — Status-Reinterpretation:** `instrument_source_availability.status` für IG
+auf `'on_demand'` (oder neu `'gap_rescue_only'`) setzen, statt `'ok'`. **Pro:**
+semantisch korrekt, keine Lüge. **Contra:** erfordert Schema-Migration oder
+neuen Status-Wert im Vokabular, Phase-14-Code-Touch.
+
+**Pfad C — Architektur-Akzeptanz:** den heutigen Stand akzeptieren (IG-Bars nur bei
+Operator-Runs, yF als täglicher Standard), Findings-Notiz um "by design" ergänzen.
+**Pro:** kein Code-Touch, kein Schema-Touch. **Contra:** Divergenz-Vergleich zwischen
+IG und yF weiter eingeschränkt (nur an Tagen mit beiden Quellen).
+
+**Nikinger-Entscheidung 2026-08-31: Pfad C** angenommen.
+**Findings-Notiz §8 Nachtrag angehängt** (Mini-Session 24): "by design"-Vermerk für B1 + B2
+eingeschränkt + B3 semantisch korrekt unter Pfad C; **Phase-14 D5-Handover komplett
+freigegeben** (kein operativer Vorbehalt mehr). **Pfad A + Pfad B wandern in die
+P15-V4-Plan-Session** (Kandidatenliste in Findings §8.2): Pfad A = Operator-S4-Aktivierung
+(~2-3h, IG-Budget 5.6 % + 1.2 % = innerhalb 10 000/Woche); Pfad B = Schema-Reinterpretation
+(neuer `status='gap_rescue_only'`, ~1-2h, aufgehoben solange C gilt). V4 entscheidet.
+
+### Unverändert offen (von Mini-Session 23, weiter gültig)
+
+- **Phase-14 D5-Handover (operativ)** — bleibt formal offen, ist aber mit dem heutigen
+  Befund-Inversion **weniger dringend** als angenommen: die Tabelle ist **nicht falsch**,
+  sie reflektiert eine **GapRescue-Verfügbarkeit**, keine kontinuierliche Befüllung.
+- **Phase-15-Plan-Session (V4)** — gegatet auf Outcomes aus Phase 9+11+12+13+14.
+  Mit "by design"-Vermerk wird die Phase-15-Quellen-Vertrauens-Frage neu gerahmt.
+- **Phase-12-Reconciliation-Timing-Fix** — `reward.recorder: no usable history row`-CRITICALs.
+- **Phase-11-Wiederaufnahme (WI-2/W2)** — Datenfundament-Abhängigkeit.
+
+### NEXT (für die nächste Session / morgen)
+
+**Nikinger-Entscheidung zum Pfad (A/B/C) erwartet** — siehe §5 Empfehlungen.
+
+**Konkrete Empfehlung (sortiert nach Aufwand × Impact):**
+
+1. **Pfad-C-Entscheidung + Findings-Update** (~10 Min): Architektur-Akzeptanz,
+   "by design"-Vermerk in der Findings-Notiz anhängen (keine Code-Änderung, nur
+   Doku-Korrektur). Schließt den vermeintlichen Drift strukturell.
+2. **Doku-Updates synchronisieren** (~10 Min): root-CLAUDE.md Phase-13/14 auf
+   Mini-Session-24-Stand (P14-F D5 + Befund-Inversion-Vermerk); ggf. Phase-13-Header
+   "Beweiswoche abgelöst durch Architektur-Akzeptanz".
+3. **Pfad-A (Operator-S4-Aktivierung)** (~2-3h, Phase-13-Code): GapRescue-Skript
+   als Operator-Tool, das regelmäßig (z. B. täglich 17:30 UTC) die letzten
+   gehandelten Tage mit IG-Bars befüllt. **Nur wenn Pfad C nicht akzeptabel.**
+4. **Pfad-B (Schema-Reinterpretation)** (~1-2h, Phase-14-Code): neuer
+   `status='gap_rescue_only'` Wert, IG-Rows umklassifiziert.
+6. **Phase-15-Plan-Session** (großer Block): wenn die Architektur-Frage gelöst ist.
+
+**Push-Freigabe:** Items #2 + #3 sind bereits gepusht (`c4f7d9c`, `69b239e`).
+Die Befund-Inversion + Pfad-Wahl wird in der nächsten Session entschieden —
+dieser Doc-Rotations-Commit folgt (1 Commit, Session-15 → Archiv + Session-16 → Kopf).
+
+
 ## Session stopped — 2026-08-31 (Session 15: Phase-13-Beweiswoche-Auswertung, 2 Commits, 0 Operator-Aktionen)
 
 > **Auftrag:** Nikinger-Chat 2026-08-31 nach P14-F-Push (~09:30 UTC): „Arbeite an item #5
