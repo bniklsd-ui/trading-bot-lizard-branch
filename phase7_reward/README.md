@@ -4,7 +4,7 @@ purpose: What phase7_reward built — components, limitations, integration point
 read-when: needing this phase's public surface without its full head
 detail: L2
 up: ./CLAUDE.md
-updated: 2026-07-06
+updated: 2026-08-31 (+ P12-Reconcile-Timing-Backoff, Mini-Session 26)
 ---
 # Phase 7 — Reward/Brain (`phase7_reward/`)
 
@@ -48,11 +48,36 @@ optional, duck-typed `reward_sink` injected into the Phase-5 `Executor` (default
 
 ## Package layout
 
-The importable package is **`reward`** (nested as `phase7_reward/reward/`), mirroring
+The importable package is **`reward`**` (nested as `phase7_reward/reward/`), mirroring
 the repo convention (`phase4_research/research/`, `phase5_execution/execution/`,
 `phase6_debate/debate/`). Cross-phase collaborators (broker, the Phase-4 LLM stack,
 the Phase-2 `Database`) are reached only through their contracts, wired in
 `scripts/wiring.py` (a later step).
+
+### P12-Reconcile-Timing (Mini-Session 26, 2026-08-31)
+
+`RewardSink.reconcile_open_trades` (delegated from the Phase-8 scheduler's
+`reconcile.tick`, every 5 min) now honours an **exponential backoff** when
+`pnl_resolver.resolve()` raises `PnLUnavailable` (= empty IG history match).
+Schema column: `trade_outcomes.last_resolve_attempt_utc` (Migration 008).
+
+| Step | Wait after last attempt |
+|---|---|
+| 1 | 15 min |
+| 2 | 30 min |
+| 3 | 1 h |
+| 4 | 4 h |
+| 5 | 24 h (cap; further retries allowed, but logged as `WARNING` not `CRITICAL`) |
+
+The pre-claim pattern (`db.update_trade_resolve_attempt` *after* a failed
+resolve, never on success) keeps two parallel reconcile calls idempotent.
+The historic 17 CRITICAL logs from 2026-08-25/26/27 (4 deal_ids, 2-7 retries
+each) would collapse to ≤5 with this backoff — replay-verified by
+`test_backoff_replay_reduces_critical_count`.
+
+Live-verify the next OPEN trade with IG-history lag: ≤ 1 CRITICAL per
+backoff step (max 5 in 24 h). Plan:
+[`./PHASE12_RECONCILIATION_TIMING_PLAN.md`](./PHASE12_RECONCILIATION_TIMING_PLAN.md).
 
 ## Setup (editable installs — the composition root)
 
