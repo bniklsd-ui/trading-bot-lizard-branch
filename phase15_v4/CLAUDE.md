@@ -93,20 +93,37 @@ Auto-Gap-Fill-Scheduler (D16) · Dukascopy echt (D15). Begründungen: Plan §10.
 | 6 | Score-Historie | **Score auf 50 zurücksetzen**, alte Deltas bleiben stehen |
 | 7 | Block C Akzeptanz | Extraktion + Validierung, Promotion hinter Flag, **Akzeptanz = „verweigert korrekt bei n=8"** |
 | 8 | Erbstücke | Quellen-Vertrauens-Lock + `phase13_14_15.svg` + **Pfad A** (nicht D15/D16) |
+| 9 | Startblock | **Block A** (nicht Block D zuerst) — Nikinger 2026-08-31, nach dem Plan-Commit |
+| 10 | Gate P7 | **A6 ist freigegeben** (Beobachtung autorisiert) — ⚠ freigegeben ≠ abgeschlossen, siehe unten |
 
 ### Next
 
-**Block A und Block D können sofort starten** — sie hängen nicht am Gate P7.
-Konkret der erste Schritt: Plan §6 Step **A-1** (Step-0-Ritual ausführen und protokollieren),
-dann **A-2** (Σ-Baseline, Erwartung 1703).
+**Startblock ist Block A** (Nikinger 2026-08-31). Erster Schritt: Plan §6 Step **A-1**
+(Step-0-Ritual ausführen und protokollieren), dann **A-2** (Σ-Baseline, Erwartung 1703),
+dann A-3 … A-6. Block D danach — er hängt auch nicht am Gate, ist aber nachgeordnet.
 
-**Block B startet nicht**, bevor das „Phase-12-Reconcile-Timing Live-Verify" (in
-`phase7_reward/CLAUDE.md` „A6" genannt) abgeschlossen gemeldet ist — 24-h-Beobachtung am
-laufenden Bot, wartet auf den nächsten OPEN-Trade.
+**Block B startet nicht.** Gate P7 ist **zu**.
+
+### Gate-P7-Stand (gemessen 2026-08-31, nach der Nikinger-Freigabe)
+
+Der Nikinger hat A6 **freigegeben** — das heißt: die Beobachtung ist autorisiert und der
+Bot läuft dafür (PIDs 21184 / 21197 / 21207). Es heißt **nicht**, dass A6 abgeschlossen ist:
+
+| geprüft | Ergebnis |
+|---|---|
+| OPEN-Trades in `trade_outcomes` | **0** — alle 8 Zeilen `status='CLOSED'` |
+| neuester Trade | `id=11`, `2026-08-27T08:15:08Z`, geschlossen |
+| `reward_pts` | 8 Zeilen, unverändert |
+
+A6 braucht einen **OPEN-Trade mit IG-Lag** und danach 24 h Beobachtung. Beides ist noch
+nicht passiert. **Gate P7 öffnet erst, wenn A6 als abgeschlossen gemeldet ist** — nicht
+mit der Freigabe. Wer Block B vorher anfängt, macht die Messung wertlos (P7-Begründung).
 
 ### Open questions / blockers
 
-- **Gate P7** ist der einzige harte Blocker: Operator-Aktion, wartet auf einen OPEN-Trade.
-- **Push steht aus** — `git push origin main` ist Nikinger-Sache (Working-Style-Regel).
-- Die vollständige Drift-Liste steht in **Plan §9** (7 Punkte). Was dort nicht steht,
+- **Gate P7 ist der einzige harte Blocker** und weiterhin zu: wartet auf einen OPEN-Trade
+  + 24 h. Erwarteter Live-Effekt: ≤ 5 CRITICALs in 24 h statt 6+ in 52 min;
+  > 24 h ohne Auflösung = WARNING statt CRITICAL.
+- **Push ist erledigt** — `origin/main` = `d1dd26b` (Nikinger, 2026-08-31), 0 ahead / 0 behind.
+- Die vollständige Drift-Liste steht in **Plan §9** (8 Punkte). Was dort nicht steht,
   ist in der Plan-Session gegen Code oder Live-DB geprüft.

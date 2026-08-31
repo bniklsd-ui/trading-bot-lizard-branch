@@ -773,10 +773,10 @@ oder Live-DB geprüft und darf als Fakt behandelt werden.**
 
 | # | Aktion | Wann | Kosten |
 |---|---|---|---|
-| 1 | **„Phase-12-Reconcile-Timing Live-Verify" abschließen** (in `phase7_reward/CLAUDE.md` „A6") — 24-h-Beobachtung, nächster OPEN-Trade mit IG-Lag soll ≤ 5 CRITICALs in 24 h liefern (statt 6+ in 52 min) | **vor Block B** (Gate P7) | keine |
+| 1 | **„Phase-12-Reconcile-Timing Live-Verify" abschließen** (in `phase7_reward/CLAUDE.md` „A6") — **freigegeben 2026-08-31**, aber noch **nicht abgeschlossen**: 0 OPEN-Trades gemessen, neuester Trade `id=11` vom 2026-08-27 ist geschlossen | **vor Block B** (Gate P7 bleibt zu, bis „abgeschlossen" gemeldet ist) | keine |
 | 2 | Bot stoppen vor Block B, danach `bash scripts/restart-services.sh restart scheduler` | Block B | keine |
 | 3 | `reset_score_baseline.py --apply` freigeben, nachdem die `--dry-run`-Ausgabe vorliegt | Step B6 | keine |
-| 4 | `git push origin main` | nach jedem Block | keine |
+| 4 | `git push origin main` | nach jedem Block | keine — Plan-Commits `f98df68`/`a2d4a15`/`d1dd26b` **erledigt 2026-08-31**, `origin/main` = `d1dd26b` |
 | 5 | `enable_gap_rescue` scharfschalten | **nicht in Phase 15** (P15) | ~560 IG-Punkte/Woche, unverifiziert (§9.2) |
 
 ---
@@ -791,5 +791,7 @@ Blockweise Commits, nicht schrittweise: A ist 3–4 Commits, B ist 2–3, C ist 
 ---
 
 > **Stand:** 2026-08-31, Plan-Session (Claude Code, Opus 5).
-> **Nächste Aktion:** Nikinger gibt Operator-Aktion 1 („Phase-12-Reconcile-Timing Live-Verify") frei; die Exec-Session (Sonnet 5)
-> kann **Block A und Block D sofort** starten — sie hängen nicht am Gate P7.
+> **Nächste Aktion (Stand 2026-08-31, nach Nikinger-Freigabe):** Operator-Aktion 1 ist
+> **freigegeben**, aber noch nicht abgeschlossen (0 OPEN-Trades) — **Gate P7 bleibt zu**.
+> Die Exec-Session (Sonnet 5) startet mit **Block A**, Step **A-1** (Nikinger-Wahl 2026-08-31);
+> Block D danach. Block B erst, wenn A6 als abgeschlossen gemeldet ist.
