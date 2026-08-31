@@ -86,25 +86,51 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 
 ## Modul-Tabelle
 
-> Stand: **2026-08-22 — Session 9.** Diese Tabelle wird in Block D gegen den
-> As-Built-Stand gefüllt (Testzahlen aus dem finalen Sweep, nicht geschätzt).
+> **Stand: 2026-08-31 — Mini-Session 21.** Block-D-Schließung: Tabelle gegen den
+> As-Built-Stand gefüllt (Testzahlen aus dem finalen Sweep dieser Session, nicht
+> geschätzt — `pytest phase14_discovery/tests --collect-only -q` reproduziert die
+> Einzelzahlen, Σ = 61 für Phase 14). Cross-Phase-Tests stehen bei der Eigentümer-
+> Phase (P2/P8/P9/P13), nicht hier — die Spalte zeigt den Beitrag, den Phase 14
+> an der jeweiligen Suite hat (Phase-13-Backfill z. B. wird in P13 getestet, nicht
+> hier).
 
-| Datei | Zweck | Status |
-|---|---|---|
-| `source_registry/models.py` | `SourceAvailability`, `SourceProfile`, `Source`-Protocol, `origin`-Vokabular | ✅ A2/A3 (gelockt in Phase-13-Session 4) |
-| `source_registry/store.py` | `SourceAvailabilityStore` — der einzige Zugriff auf Migration 007 | ✅ A2 |
-| `source_registry/sources.py` | `IGDerivedSource`, `LSStaticSource`, `RegistryYFSource` — alle drei ohne Netz | ✅ A3 |
-| `source_registry/arm.py` | Scharf-Flag `data/state/DISCOVERY_ARMED` (Muster `killswitch.py`, sichere Richtung umgedreht) | ✅ C1 (Session 9) |
-| `source_registry/run.py` | Der Daemon (Muster `data_foundation/run.py`: PID-File, graceful SIGTERM, `--once`) | ✅ C2 (Session 9) |
-| `scripts/run_discovery.sh` | Start-Wrapper (Muster `run_recorder.sh`) | ✅ C4 (Session 9) |
-| *(cross-phase)* `phase2_persistence/migrations/007_phase14_source_availability.sql` | die Kreuzungs-Tabelle **+ der einmalige yF-Backfill aus `instrument_universe`** (der Grundbestand kommt aus der Migration, nicht aus einem Resolver-Lauf — `resolve_epic` ruft `set_symbol` in sechs von acht Pfaden nicht) | ✅ A2 |
-| *(cross-phase)* `phase9_universe/universe/models.py` | `DS_STALE_SOURCE` ins Vokabular (Live-Blocker B1) | ✅ A1 |
-| *(cross-phase)* `phase9_universe/universe/store.py` | yF-Projektion in `set_symbol`, nicht-fatal | ✅ A4 (Session 7) |
-| *(cross-phase)* `phase13_live_data/live_data/backfill.py` | `CapitalSource.discover()` (B1b); `EPIC_MAP` raus + Symbol-Lookup rein (B2) | ✅ B1b + B2 (Session 8) |
-| *(cross-phase)* `phase13_live_data/scripts/probe_capital.py` | CFD-Filter-Bug Fix: `"CFD"`-Substring → exakt `"INDICES"`; neuer Helper `_pick_index_match` für Testbarkeit | ✅ Cross-Phase-Hygiene (Session 7) |
-| *(cross-phase)* `phase13_live_data/scripts/source_delta.py` | drei Fälle statt zwei (`not_available` / `available_but_empty` / `compared`) | ✅ B3 (Session 8) |
-| *(cross-phase)* `phase8_scheduler/webui/api.py` + `static/` | `GET /api/discovery`, ARM/DISARM, Warn-Banner | ✅ C3 (Session 9) |
-| *(cross-phase)* `phase8_scheduler/scripts/run_scheduler.sh` | Autostart-Hook für `run_discovery.sh` (analog Recorder) | ✅ C4b (Session 9) |
+| Datei | Zweck | Status | Tests |
+|---|---|---|---|
+| `source_registry/models.py` | `SourceAvailability`, `SourceProfile`, `Source`-Protocol, `origin`-Vokabular | ✅ A2/A3 (gelockt in Phase-13-Session 4) | *(in test_store, test_sources)* |
+| `source_registry/store.py` | `SourceAvailabilityStore` — der einzige Zugriff auf Migration 007 | ✅ A2 | 13 (test_store.py) |
+| `source_registry/sources.py` | `IGDerivedSource`, `LSStaticSource`, `RegistryYFSource` — alle drei ohne Netz | ✅ A3 | 9 (test_sources.py) |
+| `source_registry/arm.py` | Scharf-Flag `data/state/DISCOVERY_ARMED` (Muster `killswitch.py`, sichere Richtung umgedreht) | ✅ C1 (Session 9) | 21 (test_arm.py) |
+| `source_registry/run.py` | Der Daemon (Muster `data_foundation/run.py`: PID-File, graceful SIGTERM, `--once`) | ✅ C2 (Session 9) | 18 (test_run.py) |
+| `scripts/run_discovery.sh` | Start-Wrapper (Muster `run_recorder.sh`) | ✅ C4 (Session 9) | — (Bash-Wrapper, kein Python-Test) |
+| *(cross-phase)* `phase2_persistence/migrations/007_phase14_source_availability.sql` | die Kreuzungs-Tabelle **+ der einmalige yF-Backfill aus `instrument_universe`** (der Grundbestand kommt aus der Migration, nicht aus einem Resolver-Lauf — `resolve_epic` ruft `set_symbol` in sechs von acht Pfaden nicht) | ✅ A2 | Migration-007-Tests leben in `test_store.py` (2 Tests, Idempotenz + Backfill-Reproduktion des heutigen Substrats); Eigentümer-Suite P2 unverändert |
+| *(cross-phase)* `phase9_universe/universe/models.py` | `DS_STALE_SOURCE` ins Vokabular (Live-Blocker B1) | ✅ A1 | +1 Regressionstest in `phase9_universe/tests/test_store.py` (vom Plan A1 gefordert); Eigentümer-Suite P9 87 grün |
+| *(cross-phase)* `phase9_universe/universe/store.py` | yF-Projektion in `set_symbol`, nicht-fatal | ✅ A4 (Session 7) | +6 Tests in `phase9_universe/tests/test_store.py` (Bit-Identität mit `SourceAvailabilityStore.upsert`, messbarer_substrat-byte-gleich, …); Eigentümer-Suite P9 unverändert |
+| *(cross-phase)* `phase13_live_data/live_data/backfill.py` | `CapitalSource.discover()` (B1b); `EPIC_MAP` raus + Symbol-Lookup rein (B2) | ✅ B1b + B2 (Session 8) | +4 Tests in `phase13_live_data/tests/test_backfill.py` (gemockt, kein Netz); `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` ist **leer** (Akzeptanz A2) |
+| *(cross-phase)* `phase13_live_data/scripts/probe_capital.py` | CFD-Filter-Bug Fix: `"CFD"`-Substring → exakt `"INDICES"`; neuer Helper `_pick_index_match` für Testbarkeit | ✅ Cross-Phase-Hygiene (Session 7) | Tests in `phase13_live_data/tests/test_probe_capital.py` (Eigentümer-Suite P13 74 grün) |
+| *(cross-phase)* `phase13_live_data/scripts/source_delta.py` | drei Fälle statt zwei (`not_available` / `available_but_empty` / `compared`) | ✅ B3 (Session 8) | +4 Tests in `phase13_live_data/tests/test_source_delta.py`; Eigentümer-Suite P13 unverändert |
+| *(cross-phase)* `phase8_scheduler/webui/api.py` + `static/` | `GET /api/discovery`, ARM/DISARM, Warn-Banner | ✅ C3 (Session 9) | +4 Tests in `phase8_scheduler/tests/test_webui.py` (inkl. fail-soft ohne Tabelle 007); Eigentümer-Suite P8 248 grün |
+| *(cross-phase)* `phase8_scheduler/scripts/run_scheduler.sh` | Autostart-Hook für `run_discovery.sh` (analog Recorder) | ✅ C4b (Session 9) | — (Bash-Wrapper, kein Python-Test) |
+
+### Σ-Sweep Phase-14 Suite (Mini-Session 21, 2026-08-31, selbst nachgemessen)
+
+| Test-Datei | Tests | As-Built-Zweck |
+|---|---:|---|
+| `test_store.py` | **13** | A2-Akzeptanz (Migration 007 + Store-Kontrakte); inkl. Backfill-Reproduktion des heutigen Substrats + Idempotenz |
+| `test_sources.py` | **9** | A3-Akzeptanz (drei Quell-Profile strukturell ohne Netz); **Test 2 ist das A1-Akzeptanzkriterium (Broker-Fake, dessen jede Methode wirft)** |
+| `test_arm.py` | **21** | C1-Akzeptanz (Scharf-Flag fehlend/leer/kaputt/`false` ⇒ alle False; Round-Trip; atomare Schreibung) |
+| `test_run.py` | **18** | C2-Akzeptanz (Daemon unscharf/scharf/stale/werfend/probe_calls_used/ **+ 1 P14-D-Test** = CAP-on-Stop) |
+| **Σ Phase 14** | **61** | (= Σ-Sweep Stand Session 20 / 21 unverändert; Mini-Session 21 brachte **0** neue Tests) |
+
+Cross-Phase-Σ (relevant für Phase 14, Stand Mini-Session 21):
+
+| Phase | Tests grün | Δ zu Session 20 |
+|---|---:|---|
+| P8 (Scheduler) | 248 | unverändert |
+| P9 (Universe) | 87 | unverändert |
+| P10 (V3) | 165 | unverändert |
+| P12 (Datenfundament) | **145** | unverändert (P14-E-Test-Fix räumte das einzige Wanduhr-Fail vor 09:00 CEST auf, keine Test-Änderung an der Zahl) |
+| P13 (Live-Datenfundament) | 74 | unverändert |
+| **P14 (Discovery)** | **61** | **unverändert** |
 
 ---
 
