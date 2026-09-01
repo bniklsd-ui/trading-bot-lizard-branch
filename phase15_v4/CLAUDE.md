@@ -11,7 +11,7 @@ down:
   - ../phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md # 📕 §7 D5-H.-B, §9 Konsistenz-Regeln
   - ./PHASE15_HOOK_HARDENING_PLAN.md          # 📕 Mini-Plan P15-F (Doc-Rotation-Hook für Phase 15, 2026-08-31)
   - ./SESSIONS_ARCHIVE.md                     # 📦 verbatim Session-Historie, newest-first
-updated: 2026-09-01 (A-1..A-7 protokolliert + P15-F Doc-Rotation-Hook-Härtung + D1 D5-H.-B geschlossen, MiniMax-M3)
+updated: 2026-09-01 (A-1..A-7 protokolliert + P15-F Doc-Rotation-Hook-Härtung + D1 D5-H.-B geschlossen + D2 phase13_14_15.svg, MiniMax-M3)
 ---
 
 # Phase 15 — V4: Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock
@@ -537,6 +537,93 @@ Der Phase-14-Phasenkopf trägt weiterhin **genau einen** `## Session stopped`-Bl
 - **Step D2** (`docs/architecture/phase13_14_15.svg`) — kein Gate, jetzt möglich.
 - **Step D3** (`RescueConfig` + `gap_rescue_operator.py` in Phase 13) — kein Gate,
   Cross-Phase-Freigabe Phase 13 (Plan §4).
+
+---
+
+## Step D2 — `docs/architecture/phase13_14_15.svg` (2026-09-01, MiniMax-M3 Exec-Session, Block-D-2)
+
+> **Plan-Anker:** [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md) §6 D2 (S. 654-668).
+> **Scope:** Drei-Säulen-Bild `docs/architecture/phase13_14_15.svg` + `docs/INDEX.md`-Zeile im selben Commit. **Kein** Code, **kein** Cross-Phase-Code-Touch.
+> **Nikinger-Freigabe (2026-09-01, Block-D-Auftrag):** „Erst weiter mit dem nächsten D step" — Step D2 nach D1, atomarer Commit pro Step.
+
+### Was
+
+NEU: [`docs/architecture/phase13_14_15.svg`](../docs/architecture/phase13_14_15.svg)
+(329 Zeilen / 26.880 B / 1080×1080 / valid SVG per `xml.etree.ElementTree`).
+Stil-konsistent mit den Geschwister-SVGs (`phase13_live_data.svg`, `phase12_closeout.svg`,
+`phase12_5_failure.svg`, `phase10_v3.svg`, `data_foundation.svg`) — gleiche
+`viewBox`, gleiches Farb-Set (`#f7f8fa` Hintergrund, `#1b1f24` Text, `#5b6470`
+Sekundärtext, `#1e7a4d` grün OK, `#c0392b` rot STOP/AUS/zu, `#c98a1a` amber aktiv),
+gleiche Marker (`a`/`ag`/`ar`/`ay`).
+
+**Drei Spalten:**
+
+1. **① Phase 13 — Beschaffung** (Spalte 1)
+   - Vier Stufen S1 LS-Kerzen / S2 yF-Recorder / S3 Capital.com / S4 GapRescue (gestrichelt, „Default AUS · nie gelaufen (§3 B4)")
+   - → `BarArchive` (data/bars.sqlite, quellenagnostisch)
+   - → 4 Konsumenten (Paper-Tracker, Research P4, DivergenceSampler, measurement_heartbeat)
+   - **Linker Callout:** „L1 (gelockt) — kein Pfeil Konsument → Quelle" mit `test_get_window_never_fetches`-Beleg (L12)
+
+2. **② Phase 14 — Vermittlung** (Spalte 2)
+   - 4 Quellen oben (IGDerivedSource / LSStaticSource / RegistryYFSource / CapitalSource — alle netzfrei im Discovery-Pfad)
+   - → `instrument_source_availability` (Migration 007, 38 Zeilen, „einzige Kreuzungs-Wahrheit")
+   - → DISCOVERY_ARMED-Flag
+   - → EPIC_MAP als durchgestrichener Kasten mit Strike-through-Linie + „grep ist leer (Akzeptanz A2)"
+   - → 4 Konsumenten rechts (phase13_backfill.py B2, phase9_universe.set_symbol, phase13_source_delta.py, webui/api.py)
+   - **Rechter Callout:** „D5-H.-B geschlossen (2026-09-01) — Verfügbarkeits-Modell" mit `last_verified_utc`-Semantik + B3-Beleg aus Phase-13-Beweiswoche
+
+3. **③ Phase 15 — Verwertung** (Spalte 3)
+   - `reward_pts.score_after (78,72)` (rot — Block B in execution, process_weight 1.5 → 0.5)
+   - → `Database.get_current_score()` → `get_risk_level(): AGGRESSIV (>50)` → `select_risk_pct → risk_pct (3.0/2.0)` → `compute_size → Positionsgröße` (Plan §2.5 Kette, jede Zeile mit Datei:Zeile)
+   - `trade_lessons` + `reward_pts` → Instinct-Extraktion (LLM, amber) → deterministische Validierung (Code, kein LLM, AK8) → VETO 5 (bit-identisch zu heute, AK9)
+   - **Promotion-Gatter ZU** (roter Rahmen + 2 rote Diagonal-Kreuzbalken, „heute n=8 < n_min=10: bleibt ZU", AK7)
+   - Unterer Block-D-Callout: „D1 ✅ · D2 ✅ · D3 ⏳"
+
+**Was-das-Bild-trägt-Callout** (gelber Balken unten, das ist der zweite Wert des Bildes):
+
+> „Was das Bild trägt — die zwei Elemente, die man sehen können muss, ohne den Text zu lesen:
+> ① **Fehlender Pfeil Konsument → Quelle** (Phase 13): die Pfeile führen immer von Quelle zum Archiv und vom Archiv zum Konsumenten — nie zurück. L1+L12 sind die strukturelle Garantie.
+> ② **Geschlossenes Promotion-Gatter** (Phase 15): Instinct-Extraktion ist gebaut, Validierung ist gebaut, VETO 5 ist verkabelt — aber die Promotion auf VETO-5-Beteiligung wartet auf n ≥ n_min. Heute n=8, n_min=10: Gatter bleibt ZU."
+
+**Status-Panel** (3 Spalten: Phase 13 ✅ / Phase 14 ✅ / Phase 15 🔄).
+
+### INDEX-Zeile (im selben Commit)
+
+[`docs/INDEX.md`](../docs/INDEX.md) nach der Phase-15-Plan-Zeile (Z. 60) eingefügt:
+
+```
+- [docs/architecture/phase13_14_15.svg](./architecture/phase13_14_15.svg) — 📕 1080×1080:
+  Drei-Säulen-Bild für Phase 13 + 14 + 15 (das Bild, das beide Closeouts empfehlen, **kein**
+  Solo-SVG). Drei Spalten: ① Phase 13 — Beschaffung (...) · ② Phase 14 — Vermittlung (...)
+  · ③ Phase 15 — Verwertung (...) + Callout + Status-Panel. Stil konsistent mit
+  `phase13_live_data.svg` / `phase12_closeout.svg`.
+```
+
+### Verdienst + Akzeptanz
+
+| Akzeptanzkriterium (Plan §7) | Status |
+|---|---|
+| **AK11** | ✅ `phase13_14_15.svg` existiert (1080×1080, valid SVG); zeigt den **fehlenden Konsument→Quelle-Pfeil** (Phase 13 L1+L12-Callout + nie gezeichneter Pfeil) und das **geschlossene Promotion-Gatter** (rote Diagonal-Kreuzbalken + „n=8 < n_min=10: bleibt ZU") + INDEX-Zeile im selben Commit |
+| **AK14** | ✅ Neue `.svg` hat ihre `docs/INDEX.md`-Zeile im selben Commit |
+
+### Σ-Sweep
+
+Doc-only, **kein** Code-Touch, **kein** Test-Touch. Σ-Baseline **1707 grün** unverändert
+(Phase-15-A-7-Stand 2026-08-31, MiniMax-M3-Exec-Session #4, unverändert seit D1).
+
+### Doc-Rotation-Hook-Verify
+
+```
+$ python3 scripts/check_doc_rotation.py --strict --quiet
+exit=0
+```
+
+Keine neuen `.md`-Dateien — keine Doc-Rotation-Auswirkung.
+
+### NEXT (für die Folge-Session)
+
+- **Step D3** (`RescueConfig` + `gap_rescue_operator.py` in Phase 13) — kein Gate,
+  Cross-Phase-Freigabe Phase 13 (Plan §4). **Einziges** offenes D-Item.
 
 ---
 
