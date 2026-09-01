@@ -8,6 +8,7 @@ is a real ``BarArchive`` (D4) on tmp_path.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -19,7 +20,7 @@ from data_foundation.archive import BarArchive
 from data_foundation.budget import IG_QUOTA_V1, SourceBudget
 from data_foundation.models import Bar
 
-from live_data.rescue import GapRescue, RescueReport, _age_minutes, _to_minute_iso
+from live_data.rescue import GapRescue, RescueConfig, RescueReport, _age_minutes, _to_minute_iso
 
 
 # ---------- fakes ----------------------------------------------------------
@@ -308,3 +309,206 @@ def test_to_minute_iso_truncates_to_minute():
     # the garbage itself. The helper never crashes the caller.
     out = _to_minute_iso("garbage")
     assert out.endswith(".000Z") and "T" in out
+
+
+# ---------- Phase 15 §6 D3 — RescueConfig + Doppel-Sperre --------------------
+#
+# Plan §6 D3 (S. 670-698) + Plan §7 AK12 (S. 727):
+# - `enable_gap_rescue` lives ONLY in RescueConfig (Phase 13),
+#   NOT in SchedulerConfig, NOT in phase8_scheduler/.
+# - Operator-Script `gap_rescue_operator.py` requires BOTH
+#   `enable_gap_rescue=True` AND `--apply` to write (Doppel-Sperre).
+# - Default of `enable_gap_rescue` is `False` (Plan §6 D3 + AK12).
+# These tests pin all four invariants.
+
+
+def test_rescue_config_default_is_aus():
+    """AK12: ``RescueConfig()`` defaults to ``enable_gap_rescue=False``.
+
+    The Operator-Tool's Doppel-Sperre means the Schreib-Pfad requires
+    ``enable_gap_rescue=True`` AND ``--apply``; a default of ``False``
+    keeps the second condition from ever accidentally landing on True.
+    """
+    cfg = RescueConfig()
+    assert cfg.enable_gap_rescue is False
+    assert cfg.epics == ()
+    # Plan §6 D3 + §9.2: 560/Woche, nicht nachgerechnet.
+    assert cfg.max_points_per_run == 560
+
+
+def test_rescue_config_is_frozen_and_hashable():
+    """``RescueConfig`` is ``frozen=True``: mutation raises, hash works.
+
+    Phase-15 follows the Phase-10 frozen-dataclass discipline
+    (``enable_*`` flags in ``SchedulerConfig`` are all frozen).
+    """
+    cfg = RescueConfig(enable_gap_rescue=True, epics=("IX.D.DAX.IFMM.IP",))
+    with pytest.raises((AttributeError, Exception)) as ei:
+        cfg.enable_gap_rescue = False  # type: ignore[misc]
+    # frozen dataclass ⇒ FrozenInstanceError; the exact name varies by
+    # Python version, so just check it is not a plain AssertionError.
+    assert "Frozen" in type(ei.value).__name__ or "frozen" in str(ei.value).lower()
+    # hashable (frozen + no list fields; tuple default for epics).
+    assert hash(cfg) is not None
+    # two configs with the same values hash equal.
+    cfg2 = RescueConfig(enable_gap_rescue=True, epics=("IX.D.DAX.IFMM.IP",))
+    assert hash(cfg) == hash(cfg2)
+
+
+def test_rescue_config_epics_default_is_empty_tuple_not_list():
+    """Mutable-default trap guard: ``epics`` is a **tuple** (immutable),
+    not a list that a caller could mutate across instances. Python
+    interns empty tuples (so ``cfg_a.epics is cfg_b.epics`` is
+    ``True``), but the structural safety is the tuple-immutability,
+    not the identity — a list would have failed this test by being
+    mutable. Verify by type-check + mutation attempt."""
+    cfg_a = RescueConfig()
+    cfg_b = RescueConfig()
+    assert isinstance(cfg_a.epics, tuple), "epics must be tuple, not list"
+    assert isinstance(cfg_b.epics, tuple), "epics must be tuple, not list"
+    assert cfg_a.epics == cfg_b.epics == ()
+    # A tuple cannot be mutated — this is the real safety property.
+    with pytest.raises((AttributeError, TypeError)):
+        cfg_a.epics.append("IX.D.DAX.IFMM.IP")  # type: ignore[attr-defined]
+    # operator may extend via explicit tuple (the dataclass stays frozen).
+    cfg_c = RescueConfig(epics=("IX.D.DAX.IFMM.IP", "IX.D.CAC.IFE.IP"))
+    assert cfg_c.epics == ("IX.D.DAX.IFMM.IP", "IX.D.CAC.IFE.IP")
+    assert isinstance(cfg_c.epics, tuple)
+
+
+def test_enable_gap_rescue_is_NOT_in_scheduler_config():
+    """AK12 (Plan §7): ``enable_gap_rescue`` lives ONLY in
+    ``RescueConfig``, NOT in ``SchedulerConfig``. Plan §6 D3 warnt
+    explizit: „Kein Feld in SchedulerConfig, kein Wiring in
+    phase8_scheduler/." Diese Regression pinns den Schnitt — falls
+    jemand das Feld doch ins SchedulerConfig schmuggelt, geht der
+    Test rot.
+    """
+    import subprocess
+
+    # Field declaration must exist (Phase 13 only).
+    r1 = subprocess.run(
+        ["grep", "-rn", "enable_gap_rescue: bool",
+         "--include=*.py", "."],
+        cwd="/home/trading-bot/trading-bot",
+        capture_output=True, text=True,
+    )
+    assert r1.returncode == 0, "no enable_gap_rescue field declaration found at all"
+    decls = [l for l in r1.stdout.splitlines() if l]
+    assert any("/phase13_live_data/" in l for l in decls), \
+        f"enable_gap_rescue field not in phase13_live_data: {decls}"
+    assert not any("/phase8_scheduler/" in l for l in decls), \
+        f"AK12 violated: enable_gap_rescue field leaked into phase8_scheduler: {decls}"
+
+    # Nothing in phase8_scheduler/ at all.
+    r2 = subprocess.run(
+        ["grep", "-rn", "enable_gap_rescue",
+         "--include=*.py", "phase8_scheduler/"],
+        cwd="/home/trading-bot/trading-bot",
+        capture_output=True, text=True,
+    )
+    assert r2.stdout.strip() == "", \
+        f"AK12 violated: enable_gap_rescue in phase8_scheduler/: {r2.stdout!r}"
+
+
+def test_gap_rescue_operator_doppel_sperre_default_dry_run():
+    """AK12 + Plan §6 D3: der Operator-Script schreibt NUR, wenn
+    ``enable_gap_rescue=True`` UND ``--apply`` beide gesetzt sind.
+    Default-Verhalten (``enable_gap_rescue=False``, kein ``--apply``):
+    ``dry_run: True`` im JSON-Output, kein Archive-Write, kein
+    Keyring-Read, kein Broker-Connect.
+
+    Der Test ruft ``main([...])`` direkt mit gemockten Subprozessen
+    (``subprocess.run`` für Grep nicht nötig — der Test arbeitet
+    auf der reinen ``main``-Funktion) und fängt den JSON-Output ab.
+    """
+    # --dry-run, --enable-gap-rescue=False (default), kein --apply
+    import sys as _sys
+    _sys.path.insert(0, "/home/trading-bot/trading-bot")
+    from phase13_live_data.scripts import gap_rescue_operator as op
+
+    # Capture stdout.
+    import io
+    buf = io.StringIO()
+    old_stdout, _sys.stdout = _sys.stdout, buf
+
+    # No archive write: just a plan with no actual rescue.
+    # Use a clearly fake path; --dry-run means we never touch the DB.
+    rc = op.main([
+        "--start", "2026-09-01T08:00:00Z",
+        "--end",   "2026-09-01T16:00:00Z",
+        "--epics", "IX.D.DAX.IFMM.IP",
+        "--db",    "/tmp/this_path_does_not_matter_in_dry_run.sqlite",
+        "--universe-db", "/tmp/this_path_does_not_matter_in_dry_run.sqlite",
+    ])
+    _sys.stdout = old_stdout
+    payload = buf.getvalue()
+
+    assert rc == 0, f"dry-run should exit 0, got {rc}"
+    parsed = json.loads(payload)
+    assert parsed["dry_run"] is True
+    assert parsed["ok"] is True
+    assert parsed["config"]["enable_gap_rescue"] is False
+    assert parsed["doppel_sperre"]["write_path_active"] is False
+    # The Doppel-Sperre lists both missing conditions.
+    assert "enable_gap_rescue=True" in parsed["doppel_sperre"]["missing"]
+    assert "--apply" in parsed["doppel_sperre"]["missing"]
+
+
+def test_gap_rescue_operator_enable_only_no_apply_still_dry_run():
+    """Doppel-Sperre, Hälfte 1: ``--enable-gap-rescue`` ohne ``--apply``
+    aktiviert den Schreib-Pfad NICHT (Plan §6 D3)."""
+    import sys as _sys
+    _sys.path.insert(0, "/home/trading-bot/trading-bot")
+    from phase13_live_data.scripts import gap_rescue_operator as op
+
+    import io
+    buf = io.StringIO()
+    old_stdout, _sys.stdout = _sys.stdout, buf
+
+    rc = op.main([
+        "--start", "2026-09-01T08:00:00Z",
+        "--end",   "2026-09-01T16:00:00Z",
+        "--epics", "IX.D.DAX.IFMM.IP",
+        "--enable-gap-rescue",
+    ])
+    _sys.stdout = old_stdout
+    parsed = json.loads(buf.getvalue())
+
+    assert rc == 0
+    assert parsed["dry_run"] is True
+    assert parsed["config"]["enable_gap_rescue"] is True
+    assert parsed["doppel_sperre"]["write_path_active"] is False
+    # First condition met, second missing.
+    assert "enable_gap_rescue=True" not in parsed["doppel_sperre"]["missing"]
+    assert "--apply" in parsed["doppel_sperre"]["missing"]
+
+
+def test_gap_rescue_operator_apply_only_no_enable_still_dry_run():
+    """Doppel-Sperre, Hälfte 2: ``--apply`` ohne ``--enable-gap-rescue``
+    aktiviert den Schreib-Pfad NICHT (Plan §6 D3). Symmetrisch zum
+    vorigen Test."""
+    import sys as _sys
+    _sys.path.insert(0, "/home/trading-bot/trading-bot")
+    from phase13_live_data.scripts import gap_rescue_operator as op
+
+    import io
+    buf = io.StringIO()
+    old_stdout, _sys.stdout = _sys.stdout, buf
+
+    rc = op.main([
+        "--start", "2026-09-01T08:00:00Z",
+        "--end",   "2026-09-01T16:00:00Z",
+        "--epics", "IX.D.DAX.IFMM.IP",
+        "--apply",
+    ])
+    _sys.stdout = old_stdout
+    parsed = json.loads(buf.getvalue())
+
+    assert rc == 0
+    assert parsed["dry_run"] is True
+    assert parsed["config"]["enable_gap_rescue"] is False
+    assert parsed["doppel_sperre"]["write_path_active"] is False
+    # Second condition met, first missing.
+    assert "enable_gap_rescue=True" in parsed["doppel_sperre"]["missing"]
+    assert "--apply" not in parsed["doppel_sperre"]["missing"]

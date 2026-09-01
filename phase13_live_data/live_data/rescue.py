@@ -33,13 +33,51 @@ der Aufrufer erst entpacken müsste.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 logger = logging.getLogger("live_data.rescue")
 
 NowFn = Callable[[], datetime]
+
+
+@dataclass(frozen=True)
+class RescueConfig:
+    """Phase 15 §6 D3 — Operator-facing config for Pfad A (S4 GapRescue).
+
+    ``enable_gap_rescue`` is the **master switch** for the S4 operator
+    tool (`phase13_live_data/scripts/gap_rescue_operator.py`). Default
+    **AUS** (Plan §6 D3, analog ``enable_shadow_schedule`` /
+    ``enable_divergence_sampler`` / ``enable_paper_debate``).
+
+    The Operator-Tool requires **both** ``enable_gap_rescue=True``
+    **and** ``--apply`` to actually write to the archive — die
+    Doppel-Sperre aus dem Plan (S. 689) verhindert, dass eine einzige
+    Bedingung versehentlich scharf schaltet.
+
+    **Kein** Feld in ``SchedulerConfig`` (Plan §4: Phase 8 ist NICHT
+    cross-phase-freigegeben für Phase 15), **kein** Wiring im Daemon
+    — Pfad A ist bewusst ein **Operator-Tool**, kein Scheduler-Feature
+    (Plan §6 D3: „Pfad A ist ein Operator-Tool, kein Daemon-Feature.
+    P13-Findings §8.2 sagt wörtlich ‚GapRescue-Skript als Operator-Tool
+    mit Schedule'.").
+
+    Attributes:
+        enable_gap_rescue: master switch (default ``False``).
+        epics: explicit epic list. Empty tuple means: Operator-Tool
+            resolves via ``UniverseStore.measurable_universe()``
+            (analog ``scripts/capital_backfill.py --auto``). Frozen
+            tuple to keep the dataclass truly hashable.
+        max_points_per_run: Punkte-Deckel pro Lauf (Plan §6 D3
+            + §9.2: 560 stammt aus P13-Findings §8.2, **nicht
+            nachgerechnet** — vor dem Scharfschalten gegen
+            ``source_spend`` verifizieren, Plan §9.2).
+    """
+
+    enable_gap_rescue: bool = False
+    epics: tuple[str, ...] = field(default_factory=tuple)
+    max_points_per_run: int = 560
 
 
 @dataclass

@@ -11,7 +11,7 @@ down:
   - ../phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md # 📕 §7 D5-H.-B, §9 Konsistenz-Regeln
   - ./PHASE15_HOOK_HARDENING_PLAN.md          # 📕 Mini-Plan P15-F (Doc-Rotation-Hook für Phase 15, 2026-08-31)
   - ./SESSIONS_ARCHIVE.md                     # 📦 verbatim Session-Historie, newest-first
-updated: 2026-09-01 (A-1..A-7 protokolliert + P15-F Doc-Rotation-Hook-Härtung + D1 D5-H.-B geschlossen + D2 phase13_14_15.svg, MiniMax-M3)
+updated: 2026-09-01 (A-1..A-7 protokolliert + P15-F Doc-Rotation-Hook-Härtung + D1 D5-H.-B geschlossen + D2 phase13_14_15.svg + D3 Pfad A Operator-Tool, MiniMax-M3)
 ---
 
 # Phase 15 — V4: Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock
@@ -624,6 +624,126 @@ Keine neuen `.md`-Dateien — keine Doc-Rotation-Auswirkung.
 
 - **Step D3** (`RescueConfig` + `gap_rescue_operator.py` in Phase 13) — kein Gate,
   Cross-Phase-Freigabe Phase 13 (Plan §4). **Einziges** offenes D-Item.
+
+---
+
+## Step D3 — Pfad A Operator-Tool, gebaut aber AUS (2026-09-01, MiniMax-M3 Exec-Session, Block-D-3)
+
+> **Plan-Anker:** [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md) §6 D3 (S. 670-698).
+> **Scope:** `RescueConfig` in `phase13_live_data/live_data/rescue.py` + `phase13_live_data/scripts/gap_rescue_operator.py` (NEU) + 7 Tests in `phase13_live_data/tests/test_rescue.py`. Cross-Phase-Freigabe Phase 13 (Plan §4, Nikinger 2026-08-31).
+> **Nikinger-Freigabe (2026-09-01, Block-D-Auftrag):** „D3, danach commiten und Session beenden" — Step D3 nach D2, atomarer Commit, Session-Rotation am Ende.
+
+### Was
+
+**1. `RescueConfig` (NEU in `phase13_live_data/live_data/rescue.py:46-86`)**
+
+Frozen dataclass, drei Felder:
+```python
+@dataclass(frozen=True)
+class RescueConfig:
+    enable_gap_rescue: bool = False      # Master-Schalter (Default AUS, Plan §6 D3)
+    epics: tuple[str, ...] = field(default_factory=tuple)  # leer = Universe-Resolver
+    max_points_per_run: int = 560         # §6 D3 + §9.2: 560/Woche, nicht nachgerechnet
+```
+
+`enable_gap_rescue` ist **nur** hier — kein SchedulerConfig-Feld, kein Phase-8-Wiring
+(Plan §6 D3 explizit: „Kein Feld in `SchedulerConfig`, kein Wiring in
+`phase8_scheduler/`"). D19/L18 (IG Default AUS, Mini-Session 24) bleibt gelockt;
+Pfad A macht das Aufheben **erst möglich**, hebt es **nicht** auf.
+
+**2. `phase13_live_data/scripts/gap_rescue_operator.py` (NEU, 299 Zeilen)**
+
+Operator-Tool nach dem Muster von `scripts/capital_backfill.py`. CLI:
+- `--start`, `--end` (UTC ISO 8601, beide required)
+- `--epics` (comma-separated) oder `--auto` (Universe-Resolver, analog Capital-Backfill)
+- `--max-points-per-run` (Default 560)
+- `--enable-gap-rescue` (Bedingung 1 der Doppel-Sperre)
+- `--apply` (Bedingung 2 der Doppel-Sperre)
+- `--broker` (Default `ig_demo`)
+
+**Doppel-Sperre (Plan §6 D3):** Schreib-Pfad aktiviert sich **nur**, wenn
+`enable_gap_rescue=True` UND `--apply` beide gesetzt sind. Sonst `--dry-run`-Default
+mit JSON-Plan-Output, der die fehlenden Bedingungen explizit auflistet. Analog
+`promote_eligible` (P10), `enable_shadow_schedule`, `enable_divergence_sampler`,
+`enable_paper_debate` (P10/Phase-15-Disziplin).
+
+Im `--dry-run`-Pfad: **kein** Keyring-Read, **kein** Broker-Connect, **kein**
+Archive-Write — Operator kann den Plan sicher inspizieren, bevor er scharf
+schaltet. Die Punkteschätzung ist konservativ (`epic_count * 60`, gecappt auf
+`max_points_per_run`); Plan §9.2 weist explizit darauf hin, dass die 560/Woche
+aus P13-Findings §8.2 stammen und **nicht** nachgerechnet sind.
+
+Im Schreib-Pfad: baut `SourceBudget` + `BarArchive` + `GapRescue` + Broker über
+`broker_wrapper.factory.get_broker(args.broker)`, ruft `rescue_epic(epic, start,
+end)` pro Epic, aggregiert `RescueReport` ins JSON-Envelope. Top-level Safety
+Net fängt Setup-Fehler (Keyring leer, Broker nicht erreichbar, etc.) und gibt
+einen `{"ok": false, "error": ...}`-Envelope zurück.
+
+**3. 7 neue Tests in `phase13_live_data/tests/test_rescue.py`**
+
+| Test | Pinnt |
+|---|---|
+| `test_rescue_config_default_is_aus` | AK12: `RescueConfig()` default `enable_gap_rescue=False`, `epics=()`, `max_points_per_run=560` |
+| `test_rescue_config_is_frozen_and_hashable` | frozen-dataclass-Disziplin (Phase-10-Vorbild) |
+| `test_rescue_config_epics_default_is_empty_tuple_not_list` | mutable-default-trap-Schutz: `tuple`, kein `list` |
+| `test_enable_gap_rescue_is_NOT_in_scheduler_config` | AK12 strukturell: kein `phase8_scheduler/`-Match, nur `phase13_live_data/`-Deklaration |
+| `test_gap_rescue_operator_doppel_sperre_default_dry_run` | Default (kein `--enable-gap-rescue`, kein `--apply`) ⇒ `dry_run: True`, beide Bedingungen in `missing` |
+| `test_gap_rescue_operator_enable_only_no_apply_still_dry_run` | Bedingung 1 allein reicht nicht |
+| `test_gap_rescue_operator_apply_only_no_enable_still_dry_run` | Bedingung 2 allein reicht nicht |
+
+### Verdienst + Akzeptanz
+
+| Akzeptanzkriterium (Plan §7) | Status |
+|---|---|
+| **AK12** | ✅ `enable_gap_rescue` existiert als Feld einer `RescueConfig` in Phase 13 (`rescue.py:78`) mit Default `False`; Operator-Script mit `--dry-run`-Default (`gap_rescue_operator.py:194`); **kein** `SchedulerConfig`-Feld (`test_enable_gap_rescue_is_NOT_in_scheduler_config` pınnt das strukturell), **kein** `phase8_scheduler/`-Diff |
+| **AK13** | ✅ Σ-Sweep am Ende ≥ 1703 — exakt **1714 grün** repo-weit (1707 + 7 neue P15-D3-Tests) |
+
+### Σ-Sweep Stand 2026-09-01 ~08:00 UTC (selbst nachgemessen, diese Session)
+
+| Phase | Tests grün | Δ |
+|---|---:|---|
+| phase1_broker_wrapper | 95 | — |
+| phase2_persistence | 77 | — |
+| phase3_external_data | 104 | — |
+| phase4_research | 155 | — |
+| phase5_execution | 173 | — |
+| phase6_debate | 76 | — |
+| phase7_reward | 142 | — |
+| phase8_scheduler | 248 | — |
+| phase9_universe | 87 | — |
+| phase10_v3 | 165 | — |
+| phase12_data_foundation | 145 | — |
+| **phase13_live_data** | **81** | **+7** (P15-D3: 4 RescueConfig + 3 Operator-Script) |
+| phase14_discovery | 61 | — |
+| root `tests/` | 105 | — |
+| **Σ total** | **1714** | **+7** vs. P15-D2-Stand 1707 ✅ |
+
+### Doc-Rotation-Hook-Verify
+
+```
+$ python3 scripts/check_doc_rotation.py --strict --quiet
+exit=0
+$ python3 scripts/check_doc_rotation.py --strict --phase phase15_v4
+[OK]   phase15_v4: 1 session block
+```
+
+Keine neuen `.md`-Dateien — keine Doc-Rotation-Auswirkung.
+
+### Cross-Phase-Touch
+
+Nur Phase-13-eigener Code (`live_data/rescue.py`, `scripts/gap_rescue_operator.py`,
+`tests/test_rescue.py`); **kein** Touch in `phase8_scheduler/` (AK12 explizit),
+**kein** Touch in `phase2_persistence/` oder anderen Phasen.
+
+### NEXT (für die Folge-Session)
+
+- **Block A** endgültig ✅ (A-1..A-7)
+- **Block D** endgültig ✅ (D-1..D-3) — diese Session
+- **Block B** bleibt hinter Gate P7 (Phase-12-Reconcile-Timing Live-Verify,
+  wartet auf nächsten OPEN-Trade + 24-h-Beobachtung)
+- **Block C** (Instinct-ECC) erst nach Block B
+- **Push-Status:** 3 Commits lokal (D1, D2, D3), 3 ahead of `origin/main`,
+  Working-Tree clean nach Commit — Push-Freigabe für die nächste Session
 
 ---
 
