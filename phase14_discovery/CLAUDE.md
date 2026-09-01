@@ -307,4 +307,62 @@ enthält **kein** Cross-Phase-Produktionscode-Edit. Sweep Σ 1703 grün, kein Bo
 
 ---
 
+## Phase 15 — Block D Step D1 — D5-H.-B geschlossen (2026-09-01, MiniMax-M3-Exec-Session #5)
+
+> **Plan-Anker:** [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md) §6 D1 (S. 641-652).
+> **Scope:** Datierter Absatz in dieser Datei (Phase-14-Phasenkopf). **Kein** Code, **keine** Migration, **kein** Phase-14-Code-Touch. Cross-Phase-Freigabe Phase 14 (Plan §4, Nikinger 2026-08-31).
+> **📕-Konvention:** [`./PHASE14_CLOSEOUT_HANDOVER.md`](./PHASE14_CLOSEOUT_HANDOVER.md) ist L3-Snapshot (status: snapshot, 2026-08-31) — **nicht** editierbar. Der D5-H.-B-Eintrag dort (§7, L18-Gruppe, Z. 272) behält verbatim den Wortlaut *„offen für P15-V4-Plan-Session (V4 entscheidet `last_verified_utc`-Semantik)"*; das ist historisch korrekt (die Plan-Session war zu jenem Zeitpunkt offen). Die formale Schließung der offenen Frage wird **hier** im Phasenkopf dokumentiert, der Plan-Anker §6 D1 zeigt die formale Schließung.
+
+### Was — D5-H.-B geschlossen
+
+**D5-H.-B geschlossen 2026-09-01 durch Phase-15: Verfügbarkeits-Modell,
+`last_verified_utc` behält die Semantik ‚Discovery-Ableitung'.**
+
+`instrument_source_availability` (Migration 007) bleibt ein **Verfügbarkeits-Modell**, kein
+Aktualitäts-Modell. Die Spalte `last_verified_utc` markiert, wann die letzte
+**Discovery-Ableitung** für das Tripel (Epic, Quelle, Auflösung) stattfand — sie sagt
+**nicht** „die Quelle hat in dieser Sekunde geliefert". Unter Pfad C (Default AUS seit
+Phase-13-L18 / Phase-14-D19, Mini-Session 24) heißt `status='ok'` deshalb „GapRescue-Pfad
+(S4) verfügbar", nicht „Live-Coverage in den letzten N Minuten" — das ist eine andere
+Kategorie und war nie eine Lüge. Belegt durch B3 der Phase-13-Beweiswoche
+([`../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md)),
+unverändert seit 2026-08-31.
+
+Diese Entscheidung schließt **D5-H.-B** (Phase-14-Closeout-Handover §7, Z. 272,
+„Quellen-Vertrauens-Modell-Framing", Wahl (b) Verfügbarkeits-Modell) strukturell. **Keine**
+Code-Änderung in Phase 14 nötig: die Phase-13-L18- und Phase-14-D19-Locks sind die
+strukturelle Antwort, dieser Phasenkopf-Eintrag ist die formale Schließung der offenen
+Frage aus der Plan-Session.
+
+**Nicht angefasst (per 📕-Konvention):**
+- `PHASE14_CLOSEOUT_HANDOVER.md` §7 Z. 272 — verbatim wie am 2026-08-31, Z. 272 trägt
+  weiterhin *„offen für P15-V4-Plan-Session"*; das ist die korrekte historische Aussage
+  (die Plan-Session war offen). D5-H.-B-Schließung wird **hier** dokumentiert.
+- `PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md` — L3-Findings-Snapshot, nicht updateable;
+  der Verweis auf §8.1 + B3 geht in den Phasenkopf (siehe oben).
+- Phase-14-Code (`source_registry/`, `data_foundation/`, `live_data/`,
+  `phase9_universe/universe/{models,store}.py`, `phase8_scheduler/webui/`) — unverändert,
+  kein Step braucht einen Code-Touch.
+
+### Verdienst + Akzeptanz
+
+| Akzeptanzkriterium (Plan §7) | Status |
+|---|---|
+| **AK10** | ✅ Datierter Absatz in dieser Datei vorhanden; Plan §6 D1 formalisiert; 📕-Konvention eingehalten |
+
+### Σ-Sweep
+
+Doc-only, **kein** Code-Touch, **kein** Test-Touch. Σ-Baseline 1707 grün (Phase-15-A-7-Stand
+2026-08-31, MiniMax-M3-Exec-Session #4) bleibt erhalten.
+
+### NEXT (für die Folge-Session)
+
+- **Step D2** (`docs/architecture/phase13_14_15.svg`) — kein Gate, jetzt möglich.
+- **Step D3** (`RescueConfig` + `gap_rescue_operator.py` in Phase 13) — kein Gate,
+  Cross-Phase-Freigabe Phase 13 (Plan §4).
+- **Phase-14-Code-Touch in dieser Session:** **null** — diese Session schließt nur D5-H.-B
+  per Doku, nichts strukturell an Phase 14.
+
+---
+
 > **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first): [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)).
