@@ -747,80 +747,62 @@ Nur Phase-13-eigener Code (`live_data/rescue.py`, `scripts/gap_rescue_operator.p
 
 ---
 
-## Session stopped — 2026-09-01 (MiniMax-M3-Exec-Session #5, Block D Step D1+D2+D3 — kompletter Block D abgeschlossen)
+## Session stopped — 2026-09-02 (MiniMax-M3-Exec-Session #6, Gate-P7-Status-Notiz — Block-B-Code-Vorbereitung freigegeben)
 
-> **Auftrag:** Nikinger-Chat 2026-09-01 nach VM-Comeback (Dienste-Status-Check war die erste
-> Aktion dieser Session): „Ich schlage vor, mit Block D weiter zu machen. Laut Plan hat dieser
-> keine Blocker. Bitte arbeite atomar." — Reihenfolge: D1 → D2 → D3, jeder Step ein eigener
-> atomarer Commit. Nach D3: „D3, danach commiten und Session beenden" — diese Session.
+> **Auftrag:** Nikinger-Chat 2026-09-02 morgens: „wenn das Phase-15-B-Doku-Doc
+> noch geht, dann mach das jetzt." Vorbereitung: Draft der P7-Status-Notiz in
+> `/tmp/opencode/p15-b-p7-status-note-draft.md`. Plan-Anker:
+> [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md)
+> §0 + §6 Block B (GATE P7) + §11 #1. Cross-Phase-Freigabe: Phase 7 ist
+> freigegeben (§4).
 >
-> Antwort: „Ja, alles klar, Nikinger." — Reihenfolge: (1) Dienste-Lage-Check (Recorder ALIVE
-> PID 42947, Discovery ALIVE PID 42958, Scheduler ALIVE PID 42968, WebUI ALIVE PID 43008,
-> DISCOVERY_ARMED present; Markt öffnet 09:00 CEST = ~72 Min nach Check, Scheduler wird
-> selbstständig PRE_OPEN ab 08:50 nehmen); (2) Block D D1 atomar (D5-H.-B-Doku-Close);
-> (3) Block D D2 atomar (Drei-Säulen-Bild); (4) Block D D3 atomar (Pfad A Operator-Tool);
-> (5) Session-Rotation-Commit (alter #4-Block → Archiv, neuer #5-Block hier).
+> Antwort: „Ja, alles klar, Nikinger." — Reihenfolge: (1) Dienste-Lage-Check
+> (4/4 ALIVE, Recorder 42947, Discovery 42958, Scheduler 42968, WebUI 43008,
+> DISCOVERY_ARMED present); (2) SQL-Verify `data/trading_bot.sqlite`
+> (`SELECT COUNT(*) FROM trade_outcomes WHERE status='OPEN'` → 0); (3) Doku-Notiz
+> aus Draft in `phase15_v4/CLAUDE.md` zwischen Session-#5 und Doku-Notiz
+> einfügen (Commit `b173efe`); (4) Session-Rotation (Commit #6-Block) folgt.
 >
-> Ausführungs-Scope: **3 atomare Commits (D1/D2/D3) + 1 Session-Rotation-Commit** — exakt
-> Block D + Session-Stop. **Kein** Push in dieser Session (Nikinger hat keinen Push erteilt;
-> 3 Commits ahead of `origin/main`, Working-Tree clean nach Session-Rotation).
+> Ausführungs-Scope: **2 atomare Commits (Doku-Notiz + Session-Rotation)** —
+> exakt die freigegebene Aufgabe. **Kein** Code-Touch, **kein** Block-B-Code,
+> **kein** Bot-Stop. Push-Freigabe: Nikinger entscheidet am Session-Ende.
 
 ### Completed
 
-**0. Cross-Session-Drift-Vorab-Check (Session-Start):**
-- `bash scripts/restart-services.sh status` → 4/4 Dienste ALIVE (Recorder, Discovery,
-  Scheduler, WebUI); `DISCOVERY_ARMED` present. VM-Wartung hat den Prozess-State
-  offenbar zurückgesetzt — die Dienste laufen seit Aug 31 20:52 sauber.
-- `python3 scripts/check_doc_rotation.py --strict --quiet` → 15 Phasen OK
-  (P15-F-Härtung aus Session #4 greift).
-- HEAD = `d1bca9c` (= Session-#4-Ende), working tree clean, **1 Commit ahead**
-  of `origin/main` (= Session-Rotation-Commit `d1bca9c` für #3→#4, lokal
-  nicht gepusht — wird mit dem nächsten Push-Bundle mitgenommen).
+**0. Cross-Session-Drift-Vorab-Check (Session-Start, 2026-09-02 ~19:20 UTC = ~21:20 CEST):**
+- `git status` → `main`, working tree clean (nur `data/` untracked).
+- `git log --oneline -3` → `1fef7cf docs: README -- Status auf 2026-09-01 aktualisiert`
+  (HEAD), `c045435 phase15: Session-Rotation #4->#5`, `97f599f phase15: Block D Step D3`.
+- `git rev-list --left-right --count origin/main...HEAD` → `0 0` — main == origin/main
+  (P14-F-Push + README-Update sind in `origin/main`).
+- Σ 1714 grün (95+77+104+155+173+76+142+248+87+165+145+81+61+105 = 1714, exakt
+  Phase-15-A-7/D3-Stand).
+- `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 (15 Phasen OK,
+  P15-F-Härtung greift).
+- `bash scripts/restart-services.sh status` → 4/4 Dienste ALIVE seit Aug 31 20:52.
+- **SQL-Verify:** `SELECT COUNT(*) FROM trade_outcomes WHERE status='OPEN'` → **0**.
+  Letzter Trade `id=11` vom 2026-08-27 (Deal `DIAAAAYCT67N8AU`, IX.D.DAX.IGN.IP,
+  BUY 25140.06, CLOSED_BY_BROKER). 5 geschlossene Tage dazwischen, 0 OPEN.
 
-**1. Step D1 (Commit `b253f5c`):**
-- `phase14_discovery/CLAUDE.md` (+58): neuer Abschnitt „Phase 15 — Block D Step D1 —
-  D5-H.-B geschlossen (2026-09-01, MiniMax-M3-Exec-Session #5)" zwischen
-  Session-23-Block und Footer. Inhalt: Verfügbarkeits-Modell-Framing
-  (`last_verified_utc` = „Discovery-Ableitung"), B3-Beleg aus Phase-13-Beweiswoche,
-  📕-Konvention (PHASE14_CLOSEOUT_HANDOVER.md + PHASE13_BEWEISWOCHE_FINDINGS
-  unverändert).
-- `phase15_v4/CLAUDE.md` (+65 / −1): Step-D1-Sektion vor Session-#4-Block;
-  Header-Card `updated:` aktualisiert.
-- 📕-Konvention eingehalten, kein Phase-14-Code-Touch, **AK10 ✅**.
+**1. Block-B-Gate-P7-Status-Notiz (Commit `b173efe`):**
+- `phase15_v4/CLAUDE.md` (+82 / −1): neue Sektion **„Phase 15 — Block B /
+  Gate-P7-Status-Notiz (2026-09-02, MiniMax-M3 Exec-Session #6)"** zwischen
+  Session-#5-Block und Footer. Header-Card `updated:` aktualisiert auf
+  `2026-09-02 (+ Gate-P7-Status-Notiz für Block B / Phase-15 — 0 OPEN-Trades am
+  Tag nach Marktschluss, Block-B-Code-Vorbereitung freigegeben, MiniMax-M3)`.
+- Inhalt: SQL-verifizierter Befund (0 OPEN, Trade `id=11`, 6 Tage her), Markt-
+  Verlauf 2026-09-02 (09:00–17:30 CEST ohne neuen Trade, 5-Gate-Pipeline filtert
+  offenbar alle Kandidaten — separater Befund), Backoff-Logik replay-verifiziert
+  (Mini-Session 26), Nikinger-Entscheidung zitiert, Auditability-Vermerk
+  (A6 bleibt „ausstehend bis nächster OPEN-Trade + 24 h", Block B startet unter
+  der Lesart „P7-A6 ist Beobachtungs-Akzeptanz, nicht Code-Akzeptanz"),
+  📕-Konvention (PHASE12_RECONCILIATION_TIMING_PLAN + PHASE13_BEWEISWOCHE_FINDINGS
+  unverändert), Doc-Rotation-Hinweis („diese Sektion ist **kein** Session-Block,
+  triggert **keine** Rotation").
+- Doc-only, **kein** Code-Touch, **kein** Test-Touch. Σ-Baseline **1714 grün**
+  bleibt erhalten.
 
-**2. Step D2 (Commit `94018b2`):**
-- `docs/architecture/phase13_14_15.svg` (NEU, 329 Z., 26.880 B, valid SVG per
-  `xml.etree.ElementTree`): Drei-Säulen-Bild 1080×1080. Spalte 1 (Phase 13
-  Beschaffung mit L1+L12-Callout „kein Pfeil Konsument → Quelle"), Spalte 2
-  (Phase 14 Vermittlung mit EPIC_MAP durchgestrichen + D5-H.-B-geschlossen-Callout),
-  Spalte 3 (Phase 15 Verwertung mit reward_pts → score → risk_pct → Positionsgröße +
-  Promotion-Gatter ZU mit roten Diagonal-Kreuzbalken) + „Was-das-Bild-trägt"-Callout
-  + Status-Panel. Stil konsistent mit `phase13_live_data.svg` / `phase12_closeout.svg`.
-- `docs/INDEX.md` (+1): INDEX-Zeile nach Phase-15-Plan (Z. 60).
-- `phase15_v4/CLAUDE.md` (+89 / −1): Step-D2-Sektion.
-- **AK11 ✅ + AK14 ✅**.
-
-**3. Step D3 (Commit `97f599f`):**
-- `phase13_live_data/live_data/rescue.py` (+40): `RescueConfig` (frozen dataclass,
-  drei Felder: `enable_gap_rescue: bool = False`, `epics: tuple = ()`,
-  `max_points_per_run: int = 560`). **Kein** SchedulerConfig-Feld, **kein**
-  Phase-8-Wiring (Plan §6 D3 explizit).
-- `phase13_live_data/scripts/gap_rescue_operator.py` (NEU, 299 Z.): Operator-Tool
-  nach `scripts/capital_backfill.py`-Muster. **Doppel-Sperre:** Schreib-Pfad nur
-  bei `enable_gap_rescue=True` UND `--apply`. Default `--dry-run` mit JSON-Plan +
-  Auflistung der fehlenden Bedingungen. Im Dry-Run: kein Keyring-Read, kein
-  Broker-Connect, kein Archive-Write.
-- `phase13_live_data/tests/test_rescue.py` (+206): 7 neue Tests (4 für
-  RescueConfig, 3 für Operator-Doppel-Sperre, inkl. strukturelle Regression
-  `test_enable_gap_rescue_is_NOT_in_scheduler_config` die `phase8_scheduler/`-
-  Leak pinnt).
-- `phase15_v4/CLAUDE.md` (+122 / −1): Step-D3-Sektion.
-- **AK12 ✅** (strukturell: Feld in Phase-13-RescueConfig, kein SchedulerConfig,
-  kein Phase-8-Diff).
-
-### Σ-Sweep Stand 2026-09-01 ~08:00 UTC (selbst nachgemessen, diese Session)
-
-Block D = Code + Doc + Test-Touch. Σ-Baseline 1707 → **1714 grün** (+7 P15-D3-Tests):
+**2. Σ-Sweep Stand 2026-09-02 19:23 UTC (selbst nachgemessen, diese Session):**
 
 | Phase | Tests grün | Δ |
 |---|---:|---|
@@ -835,107 +817,94 @@ Block D = Code + Doc + Test-Touch. Σ-Baseline 1707 → **1714 grün** (+7 P15-D
 | phase9_universe | 87 | — |
 | phase10_v3 | 165 | — |
 | phase12_data_foundation | 145 | — |
-| **phase13_live_data** | **81** | **+7** (P15-D3) |
+| phase13_live_data | 81 | — |
 | phase14_discovery | 61 | — |
 | root `tests/` | 105 | — |
-| **Σ total** | **1714** | +7 vs. P15-D2-Stand 1707 ✅ |
+| **Σ total** | **1714** | unverändert ✅ |
 
-### Commits (lokal, in dieser Session erzeugt; **4 Commits, 0 gepusht**)
-
-| Commit | Scope | Diff |
-|---|---|---|
-| `b253f5c` | `phase15: docs -- Block D Step D1 D5-H.-B geschlossen (P15-D1, Verfuegbarkeits-Modell)` | 2 files, +122 −1 |
-| `94018b2` | `phase15: docs -- Block D Step D2 phase13_14_15.svg + INDEX-Zeile (P15-D2, Drei-Saeulen-Bild)` | 3 files, +418 −1 |
-| `97f599f` | `phase15: code -- Block D Step D3 Pfad A Operator-Tool + RescueConfig (P15-D3, gebaut aber AUS)` | 4 files, +664 −3 |
-| (dieser) | Session-Rotation-Commit: alter #4-Block verbatim nach SESSIONS_ARCHIVE.md + neuer #5-Block hier + Header-Card `updated:` | `phase15_v4/CLAUDE.md` +X, `phase15_v4/SESSIONS_ARCHIVE.md` +211 |
-
-**Push-Status:** HEAD = dieser Session-Rotation-Commit, **3 Commits ahead**
-of `origin/main` (D1/D2/D3 + die-Session-Rotation), **0 gepusht**. Nikinger hat
-explizit **keinen** Push erteilt — Push-Bundle geht raus, sobald die Folge-Session
-die Freigabe einholt.
+**3. Session-Rotation (dieser Commit):**
+- Alter Session-#5-Block (189 Zeilen) **verbatim** von `phase15_v4/CLAUDE.md` nach
+  `phase15_v4/SESSIONS_ARCHIVE.md` rotiert (neue Position: oben, nach Header,
+  vor #4-Block). SESSIONS_ARCHIVE.md: 798 → 988 Zeilen.
+- Neuer Session-#6-Block in `phase15_v4/CLAUDE.md` zwischen Steps und Doku-Notiz
+  eingefügt.
+- Footer „Ältere Session-Blöcke" + „Hinweis (History)" in `phase15_v4/CLAUDE.md`
+  aktualisiert: Verweis auf rotierten Block (#5 → Archiv), History-Count 5 → 6,
+  Datum-Liste um 2026-09-02 erweitert, „Phasenkopf trägt exakt einen Block
+  (dieser #6-Block)".
 
 ### Findings
 
-🟢 **Block D endgültig abgeschlossen** (D-1 + D-2 + D-3 alle ✅):
-- **AK10** ✅ D5-H.-B geschlossen (Doku) — `phase14_discovery/CLAUDE.md` Z. 310
-- **AK11** ✅ `phase13_14_15.svg` zeigt den fehlenden Konsument→Quelle-Pfeil und
-  das geschlossene Promotion-Gatter
-- **AK12** ✅ `enable_gap_rescue` als Feld einer `RescueConfig` in Phase 13
-  (`rescue.py:78`), Default `False`, kein SchedulerConfig-Leak
-- **AK13** ✅ Σ-Sweep ≥ 1703 — exakt 1714 grün repo-weit
-- **AK14** ✅ INDEX-Zeile für die neue SVG im selben Commit
+🟢 **Block-B-Code-Vorbereitung freigegeben** durch Nikinger-Entscheidung 2026-09-02:
+P7s A6 ist eine **Beobachtungs-Akzeptanz**, nicht eine **Code-Akzeptanz**. Der
+beobachtete Effekt (≤ 5 CRITICALs / 24 h) hängt vom Eintreten eines OPEN-Trades
+ab, das im aktuellen Markt-Regime nicht eingetreten ist (6 Tage, 0 OPEN).
 
-🟢 **Cross-Phase-Touches minimal:**
-- **D1**: nur `phase14_discovery/CLAUDE.md` (Doku, Cross-Phase P14 freigegeben §4)
-- **D2**: nur `docs/architecture/phase13_14_15.svg` (NEU) + `docs/INDEX.md` (1 Zeile)
-  + `phase15_v4/CLAUDE.md` (Phase-15-intern)
-- **D3**: nur `phase13_live_data/{live_data,scripts,tests}/` (Cross-Phase P13 freigegeben §4)
-- **Phase 8 Scheduler nicht angefasst** (AK12-Bedingung erfüllt, kein `SchedulerConfig`-Feld,
-  kein Wiring)
+🟢 **Auditability gesichert:** A6 bleibt formell „ausstehend", die Doku-Notiz
+hält fest, warum Block B unter dieser Lesart starten kann. Eine zukünftige
+Audit-Session kann diese Entscheidung nachvollziehen, ohne raten zu müssen.
 
-🟡 **Dienste-Lage-Check vor Session-Start:** alle 4 ALIVE seit VM-Wartung (PIDs 42947/42958/
-42968/43008, gestartet Aug 31 20:52). DISCOVERY_ARMED present. **Kein** Handlungsbedarf —
-Markt öffnet in ~72 Min, Scheduler schaltet selbstständig PRE_OPEN ab 08:50 CEST.
+🟡 **Markt-Verlauf 2026-09-02 ist separater Befund:** 09:00–17:30 CEST ohne
+neuen Trade ist ungewöhnlich — P4-Research liefert weiter Kandidaten, P5-Gates/
+VETOs filtern sie offenbar weg. Nicht Teil dieser Notiz; Block-B-Vorbereitung
+ist unabhängig.
 
-🟡 **Push-Freigabe ausstehend:** 3 Commits (D1/D2/D3) lokal ahead of `origin/main` +
-diese Session-Rotation. Folge-Session muss `git push origin main` einholen, dann ist der
-Push-Bundle komplett.
+🟡 **Bot-Stop-Pflicht für B2 (Plan §6 Block B):** vor jedem Edit in `models.py`
+/`scorer.py` muss der Scheduler gestoppt werden (`bash scripts/restart-services.sh
+stop scheduler` + `ps aux | grep scheduler.run` Gegenprobe). Python-Import-Caching
+macht Edits für den laufenden Scheduler praktisch inert, aber die Plan-Disziplin
+ist hart. **B1 (Test RED) ist read-only und braucht keinen Stop.**
 
-🟡 **Plan §9.2 unverifiziert:** die 560 IG-Punkte/Woche für Pfad A stammen aus
-P13-Findings §8.2 und sind **nicht nachgerechnet**. Vor dem Scharfschalten muss
-gegen `source_spend` verifiziert werden — im Operator-Tool als `--max-points-per-run`
-(Default 560) konfigurierbar. **Keine** Aktion in dieser Session nötig — das
-Scharfschalten ist ohnehin eine separate Nikinger-Aktion nach Gate-Abschluss.
+🟡 **Block B apply bleibt Operator-Aktion** (Plan §11 #3 — Nikinger): der
+`reset_score_baseline.py --apply`-Aufruf wird **separat** von der Code-Vorbereitung
+ausgeführt. Bis dahin ist Block B Code-bereit, nicht Code-live.
 
-🟡 **Phase-15-Push-Drift:** Nikinger hat in dieser Session keinen Push erteilt
-(`Erst weiter mit dem nächsten D step` → „D3, danach commiten und Session beenden"
-— beides impliziert Commit, kein expliziter Push). HEAD = dieser Commit, 3 ahead
-of `origin/main`. Folge-Session: `git push origin main` (3 Commits + ggf. diese
-Session-Rotation).
+🟡 **Push-Freigabe:** 2 Commits (Doku-Notiz + Session-Rotation) lokal ahead of
+`origin/main`. Nikinger entscheidet am Session-Ende.
 
 ### Open questions / blockers
 
-- **Gate P7 unverändert zu** (Block B): wartet auf einen OPEN-Trade mit IG-Lag +
-  24 h Beobachtung (Phase-12-Reconcile-Timing Live-Verify). Heute 0 OPEN-Trades
-  gemessen.
-- **Block A endgültig abgeschlossen** (A-1..A-7 + P15-F).
-- **Block D endgültig abgeschlossen** (D-1 + D-2 + D-3) — diese Session.
-- **Block B** bleibt hinter Gate P7.
+- **Gate P7 de facto tot** (diese Session dokumentiert): 6 Tage ohne OPEN-Trade,
+  Backoff replay-verifiziert, Block-B-Lesart etabliert. A6 bleibt „ausstehend
+  bis nächster OPEN-Trade + 24 h".
+- **Block B Code-Vorbereitung** kann jetzt starten (Reihenfolge B1 → B2 → B3 →
+  B4 → B5 → B6, B2-B5 mit Bot-Stop, B6 mit --dry-run für Nikinger-Audit).
+- **Block B apply** (`--apply` für Reset) bleibt hinter Nikinger-Freigabe.
 - **Block C** (Instinct-ECC) erst nach Block B.
-- **Pfad A Scharfschalten:** ist eine **separate** Nikinger-Aktion (Plan §6 D3 +
-  §9.2 — 560/Woche sind nicht nachgerechnet, vor Scharfschalten verifizieren).
-- **Push-Freigabe für D1/D2/D3 + diese Session-Rotation** ausstehend.
+- **Pfad A Scharfschalten** ist separate Nikinger-Aktion (Plan §6 D3 + §9.2).
+- **Push-Freigabe für Doku-Notiz + Session-Rotation** ausstehend.
 
 ### NEXT (für die nächste Session)
 
-**Nikinger-Wahl-bedingt.** Stand ~08:00 UTC = ~10:00 CEST, 2026-09-01.
+**Nikinger-Wahl-bedingt.** Stand 2026-09-02 19:23 UTC = 21:23 CEST.
 
 **Sofort-Aktion (Nikinger-Wahl):**
-1. **`git push origin main`** — 3 Commits (D1/D2/D3) + diese Session-Rotation
-   gehen auf `origin/main`. HEAD nach Push = letzter Commit, working tree clean.
+1. **`git push origin main`** — 2 Commits (Doku-Notiz `b173efe` + diese Session-
+   Rotation) gehen auf `origin/main`. HEAD nach Push = dieser Commit, working
+   tree clean.
 2. **Optional:** `bash scripts/restart-services.sh status` — alle 4 Dienste
-   sollten weiter ALIVE sein (Scheduler ist seit ~08:50 in PRE_OPEN, jetzt in
-   WINDOW wenn Markt offen).
+   sollten weiter ALIVE sein (Markt seit 17:30 CEST geschlossen, POST_WINDOW-
+   Phase, Scheduler schläft bis morgen 08:50 PRE_OPEN).
 
 **Konkrete Empfehlung für die Folge-Session (sortiert nach Aufwand × Impact):**
 
-1. **Block B (Reward-Kalibrierung) Vorbereitung:** rein Code-Vorbereitung
-   (`process_weight` 1.5 → 0.5 + Score-Reset auf 50, Datenbank-Migration +
-   Scorer-Config), **applied** erst nach P7-Abschluss (Operator-Aktion).
-   Block B bleibt hinter Gate P7.
-2. **Block C (Instinct-ECC) Vorbereitung:** Extraktion + Validierung kann
-   geplant + implementiert werden, **Promotion hinter Flag** (default
-   `False`), `n=8` verweigert korrekt (AK7). Block C erst nach Block B.
-3. **`phase13_14_15.svg` Polish** (optional, ~10 Min): falls die Spalten-
-   Abstände / Callout-Positionen nicht 100 % sitzen — der SVG ist neu
-   (Stand 2026-09-01), keine Geschwister-SVG hat denselben 3-Spalten-Layout,
-   kleine Korrekturen sind im Folge-Session-Sweep unproblematisch.
-4. **Status-Pflege-Hygiene** (optional, ~5 Min): root-CLAUDE.md
-   `## Current state`-Header könnte Block-A-abschluss + Block-D-abschluss
-   ergänzen; nicht dringend (Plan §7 hat dafür keine AK).
+1. **Block B Code-Vorbereitung (B1, RED-Test):** `test_a_full_stop_loss_never_
+   raises_the_score` in `phase7_reward/tests/test_scorer.py` anlegen, parametrisiert
+   über `status × spread_at_entry_pct × debate_confidence`. Read-only gegen
+   `scorer.py` — **kein** Bot-Stop nötig. Erwartung: ROT (current `process_weight=1.5`
+   verletzt Invariante). AK5-Vorbereitung. ~15 Min.
+2. **Block B Code-Vorbereitung (B2-B5, nach Bot-Stop):** `process_weight` 1.5 → 0.5
+   + Docstring-Nachtrag + `tight_spread_pct`-ponytail + `veto_trigger_count`-
+   Vermerk. Bot-Stop + `ps aux`-Gegenprobe + Scheduler-Start. B1 wird GRÜN.
+   ~30 Min inkl. Sweep.
+3. **Block B Code-Vorbereitung (B6, reset-Script):** `phase7_reward/scripts/
+   reset_score_baseline.py` + Test in `phase15_v4/tests/`. `--dry-run` mit
+   Audit-Block für Nikinger. **Kein** `--apply`. ~20 Min.
+4. **Status-Pflege-Hygiene** (optional, ~5 Min): root-CLAUDE.md `## Current state`-
+   Header könnte Block-A+D-Abschluss präzisieren; nicht dringend.
 
 **Push-Status dieser Session:** **0 Commits gepusht** (Nikinger hat keinen Push
-erteilt); **3+1 Commits pending** (D1/D2/D3 + Session-Rotation-Commit).
+erteilt); **2 Commits pending** (Doku-Notiz `b173efe` + diese Session-Rotation).
 
 ---
 
@@ -1014,18 +983,21 @@ oder anderen L3-Snapshots.
 
 > **Hinweis:** diese Sektion ist **kein** `## Session stopped`-Block und triggert
 > damit **keine** Doc-Rotation (`scripts/check_doc_rotation.py` zählt nur
-> `Session stopped`-Header). Sie ist ein Phase-15-interner Doku-Absatz zwischen
-> Session-#5-Block und Footer; der Footer („Ältere Session-Blöcke" +
-> „Hinweis (History)") bleibt bis zur Session-#6-Rotation unverändert.
+> `Session stopped`-Header). Sie ist ein Phase-15-interner Doku-Absatz; der
+> aktuelle Footer wurde mit dem Session-#6-Rotation-Commit aktualisiert (siehe
+> `## Session stopped — 2026-09-02` weiter oben).
+
+
+---
 
 > **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first):
 > [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention
 > ([docs/DOC_LAYERS_CONVENTION.md](../docs/DOC_LAYERS_CONVENTION.md)). Der vorherige
-> MiniMax-M3-Exec-Session #4-Block (P15-F + Dienste-Pause, 211 Z.) wurde in dieser
-> Session **nach** SESSIONS_ARCHIVE.md rotiert.
+> MiniMax-M3-Exec-Session #5-Block (Block D, 189 Z.) wurde in dieser Session
+> **nach** SESSIONS_ARCHIVE.md rotiert.
 
-> **Hinweis (History):** SESSIONS_ARCHIVE.md trägt jetzt **5** Session-Blöcke,
-> alle 2026-08-31 / 2026-09-01, newest-first: #5 (dieser, Block D) → #4 (P15-F,
-> gleich dazurotiert) → #3 (A-6) → #2 (A-5) → #1 (A-1..A-4) → Plan-Session
-> (Opus 5). Phasenkopf trägt exakt einen Block (dieser #5-Block),
-> Rotation-Konvention gewahrt.
+> **Hinweis (History):** SESSIONS_ARCHIVE.md trägt jetzt **6** Session-Blöcke,
+> alle 2026-08-31 / 2026-09-01 / 2026-09-02, newest-first: #6 (dieser, P7-Status-Notiz
+> + Session-Rotation) → #5 (Block D, gleich dazurotiert) → #4 (P15-F) → #3 (A-6)
+> → #2 (A-5) → #1 (A-1..A-4) → Plan-Session (Opus 5). Phasenkopf trägt exakt einen
+> Block (dieser #6-Block), Rotation-Konvention gewahrt.
