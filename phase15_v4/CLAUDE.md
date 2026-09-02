@@ -11,7 +11,7 @@ down:
   - ../phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md # 📕 §7 D5-H.-B, §9 Konsistenz-Regeln
   - ./PHASE15_HOOK_HARDENING_PLAN.md          # 📕 Mini-Plan P15-F (Doc-Rotation-Hook für Phase 15, 2026-08-31)
   - ./SESSIONS_ARCHIVE.md                     # 📦 verbatim Session-Historie, newest-first
-updated: 2026-09-01 (A-1..A-7 protokolliert + P15-F Doc-Rotation-Hook-Härtung + D1 D5-H.-B geschlossen + D2 phase13_14_15.svg + D3 Pfad A Operator-Tool + Session-#5-Block abgeschlossen, MiniMax-M3)
+updated: 2026-09-02 (+ Gate-P7-Status-Notiz für Block B / Phase-15 — 0 OPEN-Trades am Tag nach Marktschluss, Block-B-Code-Vorbereitung freigegeben, MiniMax-M3)
 ---
 
 # Phase 15 — V4: Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock
@@ -936,6 +936,87 @@ Session-Rotation).
 
 **Push-Status dieser Session:** **0 Commits gepusht** (Nikinger hat keinen Push
 erteilt); **3+1 Commits pending** (D1/D2/D3 + Session-Rotation-Commit).
+
+---
+
+## Phase 15 — Block B / Gate-P7-Status-Notiz (2026-09-02, MiniMax-M3 Exec-Session #6)
+
+> **Plan-Anker:** [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md)
+> §0 + §6 Block B (GATE P7) + §11 #1.
+> **Cross-Phase-Freigabe:** Phase 7 ist freigegeben (§4).
+
+### Was gemessen wurde (Stand 2026-09-02 ~21:20 CEST)
+
+- **„Phase-12-Reconcile-Timing Live-Verify" (P7-A6):** in
+  [`../phase7_reward/CLAUDE.md`](../phase7_reward/CLAUDE.md) als „A6" geführt;
+  Akzeptanz = ≤ 5 CRITICALs in 24 h nach dem nächsten OPEN-Trade (vorher 6+ in 52 min).
+- **Stand 2026-09-02 19:23 UTC = 21:23 CEST = 6 Tage seit letztem OPEN-Trade.**
+  Letzter geschlossener Trade ist `trade_outcomes.id = 11` vom **2026-08-27**
+  (5 geschlossene Tage dazwischen, 0 OPEN, SQL-verifiziert).
+- **24-h-Beobachtungsfenster im strengen Sinne** (= 24 h ununterbrochener
+  Live-Betrieb mit **mindestens einem OPEN-Trade**, an dem die Reconcile-Timing
+  gemessen werden kann): **de facto nicht möglich** seit dem letzten OPEN. Der
+  Scheduler läuft ununterbrochen, das Reconcile-Verhalten selbst ist in
+  Mini-Session 26 (Backoff 15 min → 30 min → 1 h → 4 h → 24 h) bereits
+  replay-verifiziert (17 → 4 CRITICALs) — aber das ist ein **Unit-Test-Replay**,
+  keine Live-Beobachtung.
+- **Backoff-Logik ist live** (Mini-Session 26½, Operator-Restart 2026-08-31
+  ~08:30 CEST, alle 4 Dienste ALIVE seit Aug 31 20:52 — Stand 2026-09-02 19:23
+  UTC: Recorder 42947, Discovery 42958, Scheduler 42968, WebUI 43008).
+- **Markt-Verlauf 2026-09-02:** 09:00–17:30 CEST ohne neuen Trade. Scheduler
+  hat den Tag über PRE_OPEN/OPEN/WINDOW/POST_WINDOW-Zyklen normal durchlaufen,
+  ohne dass die 5-Gate-Pipeline einen Kandidaten bis zum OPEN gebracht hat
+  (P4-Research liefert weiter Kandidaten, P5-Gates/VETOs filtern sie offenbar
+  weg — separater Befund, nicht Teil dieser Notiz).
+
+### Befund
+
+**Gate P7 ist im strengen Sinne nicht abschließbar, im praktischen Sinne tot:**
+
+- 24 h+ sind vergangen (Anker für A6-Beobachtungsfenster wäre „nächster OPEN-Trade").
+- 0 OPEN-Trades seit `id=11` (2026-08-27, also 6 Tage).
+- Ohne OPEN-Trade keine IG-Lag-Beobachtung am echten Live-Betrieb möglich.
+- Der Backoff-Mechanismus selbst ist replay-verifiziert (Mini-Session 26).
+
+**Nikinger-Entscheidung 2026-09-02 (MiniMax-M3-Exec-Session #6):**
+„Ich schlage vor, den heutigen Tag bis Marktschluss noch auf einen open trade
+zu warten. Kommt dieser nicht, fängst du mit der Doku Notiz an." — am Abend
+kein Trade; Notiz wird hiermit eingefügt.
+
+### Konsequenz für Block B
+
+**Code-Vorbereitung startet jetzt** (Phase 15 Block B §6 B1–B6, alle atomaren
+Edits), **Score-Reset-`--apply` bleibt Operator-Aktion** (Plan §11 #3 — Nikinger).
+
+Reihenfolge: B1 (Test, RED) → B2 (`process_weight` 1.5 → 0.5) → B3 (⚠-Docstring-Nachtrag)
+→ B4 (`tight_spread_pct` ponytail) → B5 (`veto_trigger_count` Vermerk) →
+B6 (`reset_score_baseline.py` + Test + `--dry-run` mit Audit-Block für Nikinger).
+
+**Bot-Stop-Disziplin (§6 Warnung Block B):** wird im Session-#6-Block vor B2
+eingehalten (`bash scripts/restart-services.sh stop scheduler`, `ps aux |
+grep scheduler.run` Gegenprobe, danach `start scheduler`). B1 ist read-only
+gegen `scorer.py` und benötigt **keinen** Bot-Stop.
+
+### Auditability
+
+Diese Notiz ersetzt **nicht** die A6-Akzeptanz aus
+[`../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md`](../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md) §6.
+A6 bleibt formell „ausstehend bis nächster OPEN-Trade + 24 h". Diese Notiz hält
+fest, **warum** Block B unter Nikinger-Freigabe 2026-09-02 trotzdem starten kann:
+P7s A6 ist eine **Beobachtungs-Akzeptanz**, keine **Code-Akzeptanz**, und der zu
+beobachtende Effekt (≤ 5 CRITICALs / 24 h) hängt vom Eintreten eines OPEN-Trades
+ab, das im aktuellen Markt-Regime nicht eingetreten ist.
+
+📕-Konvention eingehalten: keine Edits in
+[`PHASE12_RECONCILIATION_TIMING_PLAN.md`](../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md),
+[`PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md)
+oder anderen L3-Snapshots.
+
+> **Hinweis:** diese Sektion ist **kein** `## Session stopped`-Block und triggert
+> damit **keine** Doc-Rotation (`scripts/check_doc_rotation.py` zählt nur
+> `Session stopped`-Header). Sie ist ein Phase-15-interner Doku-Absatz zwischen
+> Session-#5-Block und Footer; der Footer („Ältere Session-Blöcke" +
+> „Hinweis (History)") bleibt bis zur Session-#6-Rotation unverändert.
 
 > **Ältere Session-Blöcke** (verbatim ausgelagert, newest-first):
 > [SESSIONS_ARCHIVE.md](./SESSIONS_ARCHIVE.md) — Rotation per Doc-Layers-Konvention
