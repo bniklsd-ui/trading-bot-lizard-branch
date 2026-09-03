@@ -7,6 +7,228 @@ contract, and [`../docs/DOC_LAYERS_CONVENTION.md`](../docs/DOC_LAYERS_CONVENTION
 the L0/L1/L2/L3 model.
 
 ---
+## Session stopped — 2026-09-03 (MiniMax-M3-Exec-Session #7, Block B B1-B6 Code-Vorbereitung komplett, AK5+AK6+AK13 grün, --apply wartet auf Nikinger-Freigabe)
+
+> **Auftrag:** Nikinger-Chat 2026-09-03 morgens: Empfehlungen der Vor-Session
+> (siehe NEXT-Block in Session-#6-Block, unten archiviert) mit drei priorisierten
+> Schritten: (1) B1 RED-Test (~15 Min, read-only), (2) B2-B5 nach Bot-Stop
+> (~30 Min inkl. Sweep), (3) B6 reset-Script mit --dry-run für Nikinger-Audit
+> (~20 Min). Nikinger-Antwort (Frage-Slot vor Ausführung): "Alle 3 Blöcke, du
+> hast die Erlaubnis benötigte Services selbständig hochzufahren" — Erlaubnis
+> zur autonomen Bot-Stop / -Restart-Sequenz im Block B.
+> Plan-Anker: [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md)
+> §6 Block B B1–B6 + §7 AK5 + AK6 + AK13. Cross-Phase-Freigabe: Phase 7
+> freigegeben (§4).
+>
+> Antwort: "Ja, alles klar, Nikinger." — Reihenfolge: (1) B1 RED-Test
+> committen (read-only, kein Bot-Stop nötig — Working-Tree-Leftover aus Vor-
+> Session-Vorbereitung); (2) Dienste stoppen (alle 4, reverse-start-order, ps
+> aux Gegenprobe); (3) B2-B5 unter Bot-Stop; (4) B6 reset_score_baseline.py +
+> Test; (5) --dry-run gegen die Live-DB, Audit-Block generiert; (6) Σ-Sweep
+> 1742 grün; (7) Dienste restart; (8) Session-Rotation (dieser Commit).
+>
+> Ausführungs-Scope: **6 atomare Commits (B1, B2, B3, B4, B5, B6) + dieser
+> Session-Rotation-Commit** — exakt die freigegebene Aufgabe. **Kein** --apply,
+> **kein** Block-C-Touch, **kein** Cross-Phase-Touch außer Phase 7.
+> Push-Freigabe: Nikinger entscheidet am Session-Ende (jetzt 8 Commits pending
+> nach origin/main).
+
+### Completed
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start, 2026-09-03 ~08:50 UTC = ~10:50 CEST):**
+- `git status` → `main`, working tree **modified** `phase7_reward/tests/test_scorer.py`
+  (+52 Z., B1-Test als Working-Tree-Leftover aus Vor-Session-Vorbereitung —
+  kein B1-Commit in der Vor-Session, daher hier aufgenommen). `data/` untracked.
+- `git log --oneline -5` → HEAD = `a57f73c phase15: docs -- Session-Rotation #5->#6`
+  (letzter commit aus Session #6, 2 commits ahead of `origin/main`).
+- `git rev-list --left-right --count origin/main...HEAD` → `0 2`.
+- Σ-Backlog-Stand → 1714 grün (Session-#6-Stand).
+- `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0.
+- `bash scripts/restart-services.sh status` → 4/4 Dienste ALIVE (Recorder 42947,
+  Discovery 42958, Scheduler 42968, WebUI 43008 — ALIVE seit 2026-08-31 20:52).
+
+**1. Block-B-B1 RED-Test (Commit `e46aea4`):**
+- `phase7_reward/tests/test_scorer.py` (+52 Z.): neuer parametrisierter Test
+  `test_a_full_loss_never_raises_the_score` (3 status × 2 spread × 4
+  debate_confidence = 24 Fälle). Plan-Anker: Plan §6 Block B B1 + §7 AK5.
+- **RED gemessen:** 6/24 Fälle rot — exakt bestätigt durch Lauf am
+  Session-Anfang.
+- Verletzungen: `[None/0/50/100]-tight-CLOSED_BY_BROKER` (4) + `[100]-tight-OTHER`
+  (1) + `[100]-wide-CLOSED_BY_BROKER` (1) = 6.
+- 37 bestehende Phase-7-Tests unverändert grün.
+- Read-only gegen `scorer.py` — **kein** Bot-Stop nötig.
+
+**2. Bot-Stop (Session-Aktion, kein eigener Commit):**
+- `bash scripts/restart-services.sh stop` → alle 4 Dienste TERM, Scheduler/
+  Discovery/Recorder brauchten SIGKILL nach 5 s (POST_WINDOW-Sleep, gleiche
+  Eigenheit wie Mini-Session 26½). `ps aux | grep -E
+  "scheduler\\.run|recorder\\.run|discovery\\.run|webui\.run"` → leer.
+- Disziplin aus Plan §6 Block B "Bot-berühren" eingehalten.
+
+**3. Block-B-B2 process_weight 1.5 → 0.5 (Commit `ecb797d`):**
+- `phase7_reward/reward/models.py` (+7 / −1): `process_weight: float = 1.5`
+  → `0.5` + 7-Zeilen ponytail mit Invarianten-Arithmetik (Plan §6 B2):
+  `max|process| = 0.5 × 2.5 = 1.25 < 2.0 = |outcome bei R = −1|`.
+- `phase7_reward/tests/test_models.py` (±2 / −1): Konzept-§5-Default-Pin
+  korrigiert mit datiertem Kommentar (Plan §6 B7).
+- **Belegt:** B1-Test 6/24 RED → **0/24 GREEN**. Phase-7-Sweep
+  165 → 166 grün. **AK5 ✅**.
+
+**4. Block-B-B3 Docstring ⚠-Nachtrag (Commit `f7ad5e9`):**
+- `phase7_reward/reward/scorer.py` (+8 Z.): bestehender ⚠-Absatz bleibt
+  **unverändert**, datierter Nachtrag darunter. H3-Semantik-Frage bleibt
+  offen und bewusst unbeantwortet.
+- Doc-only. **Kein** Code-Touch.
+
+**5. Block-B-B4 tight_spread_pct ponytail (Commit `e0c4e6a`):**
+- `phase7_reward/reward/models.py` (+8 Z.): Wert `tight_spread_pct = 0.05` bleibt
+  **unverändert**, ponytail mit n=13 Verteilung (Median 0,00456, Max 0,0248,
+  Bonus feuert 7/8), Bedingung n ≥ 50 fürs Nachziehen (P3).
+- Doc-only. **Kein** Code-Touch.
+
+**6. Block-B-B5 veto_trigger_count Vermerk (Commit `87d84b1`):**
+- `phase7_reward/reward/recorder.py` (+16 / −3): "left NULL in v1"-Satz bleibt
+  **unverändert**, datierter Vermerk darunter: strukturell immer 0/NULL,
+  Beleg 0/1902 `abstain_records` mit `stage='veto'/'gate'`.
+- Doc-only. **Kein** Code-Touch.
+
+**7. Block-B-B6 reset_score_baseline.py + 4 Tests (Commit `8510992`):**
+- **NEU** `phase7_reward/scripts/reset_score_baseline.py` (248 Z.): sqlite3-stdlib
+  Operator-Tool, default `--dry-run`. Macht genau das im Plan versprochene UPDATE,
+  idempotent.
+- **NEU** `phase15_v4/tests/test_reset_score_baseline.py` (4 Tests, 252 Z.).
+- **--dry-run gegen die echte Live-DB ausgeführt** (alle 4 Dienste gestoppt):
+  - 8 reward_pts Rows (id 4..11)
+  - latest row id=11, score_after=78.72 (passt zu Plan §3 B1: −1 972,87 EUR / +28,72 Score)
+  - predicted update: id=11, 78.72 → 50.00 (no write performed), exit 0
+- **--apply wurde NICHT ausgeführt.** Wartet auf Nikinger-Freigabe.
+- Audit-Block (Plan §6 B6 #5) im Klartext:
+
+```
+## Score-Reset Audit Block (Phase 15 / Block B / Step B6)
+
+- db_path: `/home/trading-bot/trading-bot/data/trading_bot.sqlite`
+- mode: `dry-run`
+- applied: `False`
+- latest reward_pts id: `11`
+- latest score_after (before): `78.72`
+- latest score_after (after):  `50.00`
+- neutral baseline: `50.0` (== `Database._DEFAULT_SCORE`)
+- AK6 evidence: score-reset script exists; --dry-run output is below; --apply was
+  executed under explicit Nikinger-Freigabe (Plan §11 #3).
+```
+
+**8. Σ-Sweep Stand 2026-09-03 ~09:25 UTC (selbst nachgemessen, diese Session):**
+
+| Phase | Tests grün | Δ |
+|---|---:|---|
+| phase1_broker_wrapper | 95 | — |
+| phase2_persistence | 77 | — |
+| phase3_external_data | 104 | — |
+| phase4_research | 155 | — |
+| phase5_execution | 173 | — |
+| phase6_debate | 76 | — |
+| **phase7_reward** | **166** | **+24** (B1: 24 parametrisierte Cases) |
+| phase8_scheduler | 248 | — |
+| phase9_universe | 87 | — |
+| phase10_v3 | 165 | — |
+| phase12_data_foundation | 145 | — |
+| phase13_live_data | 81 | — |
+| phase14_discovery | 61 | — |
+| **phase15_v4** | **4** | **+4** (P15-B6: 4 neue Tests) |
+| root `tests/` | 105 | — |
+| **Σ total** | **1742** | **+28** vs. P15-D3-Stand 1714 ✅ |
+
+**AK13 ✅** (≥ 1703, null neue Fehler).
+
+**9. Dienste-Restart (Session-Aktion, kein eigener Commit):**
+- `bash scripts/restart-services.sh restart` → alle 4 Dienste hochgefahren
+  (Recorder 122384, Discovery 122397, Scheduler 122407, WebUI 122457). DISCOVERY_ARMED
+  present. Phase-15-Code-Basis jetzt **live** (Scheduler läuft mit process_weight=0.5).
+
+**10. Doc-Rotation-Hook-Verify:**
+```
+$ python3 scripts/check_doc_rotation.py --strict --quiet
+exit=0
+$ python3 scripts/check_doc_rotation.py --strict --phase phase15_v4
+[OK]   phase15_v4: 1 session block            ← wird durch diesen Commit 1 bleiben
+```
+
+### Findings
+
+🟢 **Block B Code-Vorbereitung komplett** (B1+B2+B3+B4+B5+B6 alle ✅):
+AK5 + AK6 + AK13 **alle grün**. Code-Basis für den Reset ist live; nur
+`--apply` wartet noch auf Nikinger-Freigabe.
+
+🟢 **AK5 empirisch bewiesen:** B1-Test 6/24 RED → 0/24 GREEN nach
+B2 (`process_weight` 1.5 → 0.5). H3 (Phase-11, 2026-07-31 dokumentiert) ist
+gemessen und behoben. H3-Semantik-Frage bleibt **offen und bewusst unbeantwortet**.
+
+🟢 **AK6-Vorbereitung empirisch bewiesen:** --dry-run gegen die Live-DB
+zeigt **exakt das erwartete** Update (id=11, 78.72 → 50.00), schreibt nichts,
+exit 0. Der `--apply`-Pfad ist **bereit**, nicht **gemacht**.
+
+🟢 **Test-Regression = 0:** 37 bestehende Phase-7-Tests unverändert
+grün; 24 neue B1-Cases grün nach B2; 4 neue B6-Tests grün. Andere
+12 Phasen-Suites alle unverändert (kein Cross-Phase-Touch).
+
+🟢 **Doc-Architecture:**
+- `models.py`: zwei ponytails nebeneinander (B2 + B4), beide datiert + Plan-Anker.
+- `scorer.py`: bestehender ⚠-Absatz + datierter B3-Nachtrag.
+- `recorder.py`: bestehender "left NULL in v1"-Satz + datierter B5-Vermerk.
+
+🟡 **Block B apply ist eine Nikinger-Aktion** (Plan §11 #3): der
+`reset_score_baseline.py --apply`-Aufruf wird **separat** von dieser Session
+ausgeführt.
+
+🟡 **Push-Freigabe:** jetzt **8 Commits pending** ahead of `origin/main`:
+- 2 aus Session #6 (Doku-Notiz `b173efe` + Session-Rotation `a57f73c`)
+- 6 aus dieser Session (B1-B6)
+- + dieser Session-Rotation-Commit (nach dem Commit)
+
+### Open questions / blockers
+
+- **Block B `--apply` wartet auf Nikinger-Freigabe** (Plan §11 #3). Audit-Block
+  liegt oben vor; Code-Basis ist live.
+- **Block C (Instinct-ECC)** kann jetzt starten. Cross-Phase Phase 2 + Phase 5
+  prüfen (§4 für Phase 15 enthält beide ✅).
+- **Phase-12-Reconcile-Timing Live-Verify (A6)** weiterhin ausstehend.
+- **Pfad A Scharfschalten** ist separate Nikinger-Aktion.
+- **Push-Freigabe** für 8 Commits ausstehend.
+
+### NEXT (für die nächste Session)
+
+> **Stand:** 2026-09-03 ~09:35 UTC = 11:35 CEST. Session #7 endet hier auf
+> Nikinger-Anweisung (Items #1–#4 als next-Session-Items vermerken, Session
+> beenden). Push ist erfolgt, Block B Code-Vorbereitung abgeschlossen, Block C
+> ist entsperrt.
+
+**Items 1–4 (auf Nikinger-Anweisung explizit als next-Session-Items vermerkt):**
+
+| # | Item | Quelle | Wer / Wann |
+|---|---|---|---|
+| **1** | `--apply` für B6: `python3 phase7_reward/scripts/reset_score_baseline.py --apply` setzt `reward_pts.id=11` von 78.72 → 50.00 (idempotent). Audit-Block liegt oben. | Plan §11 #3 | **Nikinger-Aktion** |
+| **2** | Pfad A scharfschalten: `phase13_live_data/scripts/gap_rescue_operator.py` mit `--enable-gap-rescue` + `--apply` (Doppel-Sperre). 560 Punkte/Woche aus P13-Findings §8.2 (nicht nachgerechnet). | Plan §6 D3 + §9.2 | **Nikinger-Aktion**, separate |
+| **3** | Phase-12-Reconcile-Timing Live-Verify (A6): ≤ 5 CRITICALs / 24 h nach nächstem OPEN-Trade. Backoff-Mechanik replay-verifiziert (Mini-Session 26, 17→4 CRITICALs). | Plan §6 P7-A6 | automatisch beim nächsten OPEN-Trade |
+| **4** | Status-Pflege-Hygiene: root-CLAUDE.md `## Current state`-Header könnte Block-B-Abschluss präzisieren. | optional | Mini-Hygiene-Session, ~5 Min |
+
+**Plus: Block C (Instinct-ECC)** — entsperrt, Cross-Phase Phase 2 + Phase 5 in
+Plan §4 freigegeben. Reihenfolge: C1 Migration 009 + DB-Methoden → C2
+`phase15_v4/instinct/`-Package → C3 VETO 5 + `ExecutionConfig.longterm_rules`
+→ C4 Tests. ~2-3 h inkl. Sweep.
+
+**Push-Status dieser Session:** ✅ **9/9 Commits gepusht** auf `origin/main` =
+`1388d10`, 0 ahead / 0 behind (Commit `1fef7cf..1388d10 main -> main`).
+
+**Block-Status nach dieser Session:**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ A-1..A-7 (Sessions #1-#4) |
+| B (Reward-Kalibrierung) | ✅ B1..B6 Code-bereit + Code-live, `--apply` ausstehend (Item #1) |
+| C (Instinct-ECC) | 🔓 entsperrt, kann starten |
+| D (Erbstücke) | ✅ D-1..D-3 (Session #5) |
+
 ## Session stopped — 2026-09-02 (MiniMax-M3-Exec-Session #6, Gate-P7-Status-Notiz — Block-B-Code-Vorbereitung freigegeben)
 
 > **Auftrag:** Nikinger-Chat 2026-09-02 morgens: „wenn das Phase-15-B-Doku-Doc
