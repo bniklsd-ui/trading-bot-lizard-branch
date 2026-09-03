@@ -301,3 +301,55 @@ def test_score_before_passthrough_and_exact_after() -> None:
     assert r.outcome_delta == pytest.approx(expected_outcome)
     assert r.process_delta == pytest.approx(expected_process)
     assert r.score_after == pytest.approx(40.0 + expected_total)
+
+
+# --------------------------------------------------------------------------- #
+# 8. Phase-15 Block B — Invariante P1: ein Verlust darf den Score niemals heben
+# --------------------------------------------------------------------------- #
+# Phase 15 / Block B / Step B1 — die Invariante als Test VOR dem Fix (Plan §6
+# Block B B1; AK5). Belegt den Plan-Befund §3 B1 (Reward-Loop belohnt Verluste):
+# bei ``r_multiple = -1.0`` muss ``score_after < score_before`` gelten für JEDE
+# Kombination der drei Prozess-Signale. Vor B2 (``process_weight: 1.5 → 0.5``)
+# ist dieser Test **ROT** (6/24 Fälle verletzen die Invariante — gemessen
+# 2026-09-02, MiniMax-M3-Exec-Session #7); nach B2 GRÜN (0/24).
+#
+# ``score_before = 50.0`` ist absichtlich **nicht** am Floor (Plan §8: ein
+# tiefer ``score_before`` würde den Floor-Clamp auf 0.0 triggern und das
+# Vorzeichen der Verletzung verschleiern — der Test wäre dann fälschlich
+# grün). 50.0 liegt mitten im [0, 100]-Clamp-Bereich und lässt die Verletzung
+# ungefiltert durchschlagen.
+#
+# Parametrisierung folgt Plan §6 Block B B1 verbatim: 3 × 2 × 4 = 24 Fälle.
+@pytest.mark.parametrize(
+    "status",
+    ["CLOSED_BY_BROKER", "TIME_STOP", "OTHER"],
+)
+@pytest.mark.parametrize(
+    "spread_label,spread_at_entry_pct",
+    [("tight", 0.02), ("wide", 0.20)],
+)
+@pytest.mark.parametrize(
+    "debate_confidence",
+    [None, 0, 50, 100],
+)
+def test_a_full_stop_loss_never_raises_the_score(
+    status: str,
+    spread_label: str,
+    spread_at_entry_pct: float,
+    debate_confidence: int | None,
+) -> None:
+    s = _scorer()
+    r = s.score(
+        r_multiple=-1.0,
+        status=status,
+        spread_at_entry_pct=spread_at_entry_pct,
+        debate_confidence=debate_confidence,
+        score_before=50.0,
+    )
+    assert r.score_after < r.score_before, (
+        f"Invariante P1 verletzt: r_multiple=-1.0 hebt den Score "
+        f"({r.score_before} → {r.score_after}). "
+        f"status={status}, spread={spread_label} ({spread_at_entry_pct}), "
+        f"debate_confidence={debate_confidence}. "
+        f"outcome_delta={r.outcome_delta:+.3f}, process_delta={r.process_delta:+.3f}."
+    )
