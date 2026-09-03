@@ -354,7 +354,14 @@ class RewardConfig:
     max_delta_per_trade: float = 5.0
     outcome_weight: float = 2.0
     r_clip: float = 3.0
-    process_weight: float = 1.5
+    process_weight: float = 0.5
+    # ponytail (Phase 15 Block B Step B2, 2026-09-03, MiniMax-M3-Exec-Session #7):
+    # gesenkt von 1.5 → 0.5. Arithmetik der Invariante P1/P2:
+    #   max|process| = process_weight × (1 + 1 + 0.5) = 0.5 × 2.5 = 1.25
+    #   |outcome bei R = −1| = outcome_weight × 1.0 × loss_asymmetry = 2.0
+    # 1.25 < 2.0 ⇒ ein voller Stop-Out kann den Score nicht mehr netto heben.
+    # Belegt durch den RED→GREEN-Test `test_a_full_stop_loss_never_raises_the_score`
+    # (Phase-15-B-B1 / AK5): vor B2 6/24 Fälle rot, nach B2 0/24.
     loss_asymmetry: float = 1.0
     tight_spread_pct: float = 0.05
     clean_exit_bonus: float = 1.0

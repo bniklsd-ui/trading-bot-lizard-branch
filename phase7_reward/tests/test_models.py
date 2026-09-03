@@ -77,7 +77,7 @@ def test_reward_config_defaults_match_concept_section_5() -> None:
     assert cfg.max_delta_per_trade == 5.0
     assert cfg.outcome_weight == 2.0
     assert cfg.r_clip == 3.0
-    assert cfg.process_weight == 1.5
+    assert cfg.process_weight == 0.5  # korrigiert 2026-09-03 (Phase-15-B-B2): war 1.5, gesenkt für Invariante P1/P2 (Plan §6 Block B)
     assert cfg.loss_asymmetry == 1.0
     assert cfg.tight_spread_pct == 0.05
     assert cfg.clean_exit_bonus == 1.0
