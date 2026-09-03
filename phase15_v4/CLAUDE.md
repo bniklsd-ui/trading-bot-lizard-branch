@@ -938,23 +938,36 @@ ausgeführt.
 
 ### NEXT (für die nächste Session)
 
-**Nikinger-Wahl-bedingt.** Stand 2026-09-03 ~09:30 UTC = 11:30 CEST.
+> **Stand:** 2026-09-03 ~09:35 UTC = 11:35 CEST. Session #7 endet hier auf
+> Nikinger-Anweisung (Items #1–#4 als next-Session-Items vermerken, Session
+> beenden). Push ist erfolgt, Block B Code-Vorbereitung abgeschlossen, Block C
+> ist entsperrt.
 
-**Sofort-Aktion (Nikinger-Wahl):**
-1. **Push-Freigabe:** `git push origin main` — 8 Commits gehen auf `origin/main`.
-2. **`reset_score_baseline.py --apply`** (Nikinger-Aktion, Plan §11 #3):
-   ```bash
-   python3 phase7_reward/scripts/reset_score_baseline.py --apply
-   ```
-3. **Optional:** `bash scripts/restart-services.sh status`.
+**Items 1–4 (auf Nikinger-Anweisung explizit als next-Session-Items vermerkt):**
 
-**Konkrete Empfehlung für die Folge-Session (sortiert nach Aufwand × Impact):**
-1. **Block C (Instinct-ECC):** C1 = Migration 009 + DB-Methoden; C2 = `phase15_v4/instinct/`-
-   Package; C3 = VETO 5; C4 = Tests. ~2-3 h inkl. Sweep.
-2. **Status-Pflege-Hygiene** (optional, ~5 Min).
-3. **Phase-12-Reconcile-Timing Live-Verify (A6)** automatisch beim nächsten OPEN-Trade.
+| # | Item | Quelle | Wer / Wann |
+|---|---|---|---|
+| **1** | `--apply` für B6: `python3 phase7_reward/scripts/reset_score_baseline.py --apply` setzt `reward_pts.id=11` von 78.72 → 50.00 (idempotent). Audit-Block liegt oben. | Plan §11 #3 | **Nikinger-Aktion** |
+| **2** | Pfad A scharfschalten: `phase13_live_data/scripts/gap_rescue_operator.py` mit `--enable-gap-rescue` + `--apply` (Doppel-Sperre). 560 Punkte/Woche aus P13-Findings §8.2 (nicht nachgerechnet). | Plan §6 D3 + §9.2 | **Nikinger-Aktion**, separate |
+| **3** | Phase-12-Reconcile-Timing Live-Verify (A6): ≤ 5 CRITICALs / 24 h nach nächstem OPEN-Trade. Backoff-Mechanik replay-verifiziert (Mini-Session 26, 17→4 CRITICALs). | Plan §6 P7-A6 | automatisch beim nächsten OPEN-Trade |
+| **4** | Status-Pflege-Hygiene: root-CLAUDE.md `## Current state`-Header könnte Block-B-Abschluss präzisieren. | optional | Mini-Hygiene-Session, ~5 Min |
 
-**Push-Status dieser Session:** **0 Commits gepusht**; **8 Commits pending**.
+**Plus: Block C (Instinct-ECC)** — entsperrt, Cross-Phase Phase 2 + Phase 5 in
+Plan §4 freigegeben. Reihenfolge: C1 Migration 009 + DB-Methoden → C2
+`phase15_v4/instinct/`-Package → C3 VETO 5 + `ExecutionConfig.longterm_rules`
+→ C4 Tests. ~2-3 h inkl. Sweep.
+
+**Push-Status dieser Session:** ✅ **9/9 Commits gepusht** auf `origin/main` =
+`1388d10`, 0 ahead / 0 behind (Commit `1fef7cf..1388d10 main -> main`).
+
+**Block-Status nach dieser Session:**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ A-1..A-7 (Sessions #1-#4) |
+| B (Reward-Kalibrierung) | ✅ B1..B6 Code-bereit + Code-live, `--apply` ausstehend (Item #1) |
+| C (Instinct-ECC) | 🔓 entsperrt, kann starten |
+| D (Erbstücke) | ✅ D-1..D-3 (Session #5) |
 
 ## Phase 15 — Block B / Gate-P7-Status-Notiz (2026-09-02, MiniMax-M3 Exec-Session #6)
 
