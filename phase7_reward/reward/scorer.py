@@ -47,6 +47,14 @@ dedicated knob for, documented here as deliberate:
   ``clean_exit_bonus`` (it hit the planned SL), so the score still drifts upward
   (~+1.2 per consecutive loss) after this fix — whether a stop-out should count as a
   "clean exit" is an open design question, not addressed here (Phase-11 H3).
+  -- Nachtrag 2026-09-03 (Phase 15 Block B Step B3, MiniMax-M3-Exec-Session #7):
+  Phase 15 hat die B2-fix-beschriebene Lücke **arithmetisch** geschlossen
+  (``RewardConfig.process_weight`` 1.5 → 0.5; P15-B2, Plan §6 Block B): die
+  Invariante P1/P2 ist hergestellt, ``test_a_full_stop_loss_never_raises_the_score``
+  geht von 6/24 RED auf 0/24 GREEN (Plan §7 AK5). Die H3-Semantik-Frage
+  („zählt ein Stop-Out als clean exit?") bleibt **offen und bewusst unbeantwortet**
+  — sie ist ein Design-Thema, kein Rechen-Thema. Die Live-Messung dazu steht in
+  Plan §3 B1.
 
 Conventions mirror :mod:`reward.confidence`: stdlib only, reads every tunable from
 the passed :class:`~reward.models.RewardConfig`.
