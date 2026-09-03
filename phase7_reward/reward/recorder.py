@@ -42,9 +42,22 @@ Reconciliations vs concept §8 (code = source of truth): ``confidence_provider``
 **optional, keyword-only** forward-compat hook (it is observe-only — there is no
 confidence DB column, so it is invoked + logged, never written, never gates); and
 ``cfg`` precedes it in the signature. ``veto_trigger_count`` / ``gate_fail_count`` are
-left NULL in v1 (not load-bearing for the score). ``initial_risk`` / ``account`` /
-``r_multiple`` are written but only persist once migration 002 (Step 12) adds the
-columns — the P2 ``_insert`` whitelist silently drops them until then.
+left NULL in v1 (not load-bearing for the score).
+-- Vermerk 2026-09-03 (Phase 15 Block B Step B5, MiniMax-M3-Exec-Session #7):
+Strukturell immer 0 / NULL, weil ein ``reward_pts``-Row per Definition nur
+geschrieben wird, NACHDEM ein Trade alle Gates und VETOs passiert hat
+(sonst waere er nie geoeffnet worden, siehe Phase-5 ``executor.py`` +
+``vetos.py``). Empirischer Beleg (Plan §3 / Phase-15-B-B5, Stand 2026-08-31):
+0 von 1902 ``abstain_records`` mit ``stage='veto'`` oder ``stage='gate'`` —
+die VETO-/Gate-Information fuer abgelehnte Zyklen lebt in
+``decision_context`` (``005_v3_learning.sql:78-92``), nicht in ``reward_pts``.
+Die zwei Spalten bleiben im Schema (Migration 002) und koennen befuellt
+werden, sobald jemand einen Reward-Score auf eine abgelehnte Candidate-
+Zeile zurueckschreiben will — bis dahin ist NULL die korrekte Aussage. No
+code change.
+``initial_risk`` / ``account`` / ``r_multiple`` are written but only persist once
+migration 002 (Step 12) adds the columns — the P2 ``_insert`` whitelist silently
+drops them until then.
 """
 
 from __future__ import annotations
