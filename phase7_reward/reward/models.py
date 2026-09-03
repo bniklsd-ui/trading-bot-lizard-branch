@@ -363,6 +363,14 @@ class RewardConfig:
     # Belegt durch den RED→GREEN-Test `test_a_full_stop_loss_never_raises_the_score`
     # (Phase-15-B-B1 / AK5): vor B2 6/24 Fälle rot, nach B2 0/24.
     loss_asymmetry: float = 1.0
+    # ponytail (Phase 15 Block B Step B4, 2026-09-03, MiniMax-M3-Exec-Session #7):
+    # sichtbarer Knopf — Wert bewusst unverändert (Plan §6 B4: P3).
+    # Gemessene Verteilung (Plan §3 B2, Stand 2026-08-31): n=13 Trades+S Snapshots,
+    # Median spread_at_entry_pct = 0.00456, Max = 0.0248. Der Schwellwert 0.05
+    # liegt ~11× über dem Median ⇒ der Clean-Entry-Bonus feuert in 7/8 Trades
+    # (fast immer) und ist damit faktisch eine Konstante, kein Signal.
+    # Bedingung fürs Nachziehen: n ≥ 50 Spread-Beobachtungen (sonst overfitten
+    # auf n=13). Bis dahin: Bonus bleibt als „Planmäßigkeit dokumentiert" stehen.
     tight_spread_pct: float = 0.05
     clean_exit_bonus: float = 1.0
 
