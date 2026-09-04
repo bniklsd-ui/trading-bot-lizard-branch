@@ -936,33 +936,39 @@ Version anfassen — Test-Anpassung dort mitnehmen.
 | # | Item | Status nach Session #8 |
 |---|---|---|
 | **1** | `--apply` für B6 | ✅ **erledigt** (diese Session, mit expliziter Reihenfolge stop→backup→apply→restart) |
-| **2** | Pfad A scharfschalten | offen — separate Nikinger-Aktion |
+| **2** | Pfad A scharfschalten | ✅ **Operator-Versuch erfolgt, mit Befund** (diese Session, Rescue-Bug entdeckt — siehe Audit-Trail-Block unten) |
 | **3** | Phase-12-Reconcile-Timing Live-Verify (A6) | offen — automatisch beim nächsten OPEN-Trade |
-| **4** | Status-Pflege-Hygiene root-CLAUDE.md | 🔄 in Bearbeitung (siehe Commit-Plan unten) |
+| **4** | Status-Pflege-Hygiene root-CLAUDE.md | ✅ **erledigt** (diese Session, Phase-15-Row + Status-Block aktualisiert) |
 
-**Konkrete Empfehlung für die Folge-Session:**
+### Neue Items für die Folge-Session (aus Session #8½, Pfad-A-Scharfschaltung)
 
-1. **Block C (Instinct-ECC)** starten (~2-3 h inkl. Sweep, ~6-8 Commits):
-   - C1: Migration 009 (`phase2_persistence/migrations/009_phase15_instincts.sql`) +
-     `_INSTINCT_COLUMNS` + 3 DB-Methoden in `phase2_persistence/persistence/db.py`
-     + Test-Migrations-Anpassungen.
-   - C2: `phase15_v4/instinct/`-Package (`models.py` + `extractor.py` +
-     `validator.py` + `promotion.py`), spiegelt `Brain.reflect`/`promote_eligible`
-     (Plan §6 C2 + P9).
-   - C3: VETO 5 + `ExecutionConfig.longterm_rules` in Phase 5
-     (`phase5_execution/execution/vetos.py` + `config.py`); Cross-Phase P5
-     freigegeben.
-   - C4: Tests (`phase15_v4/tests/test_instinct.py` +
-     `test_promotion.py` + Phase-5-Sweep-Verify).
-2. **`phase13_14_15.svg` Polish** (optional, ~10 Min): Spalten-Abstände /
+**Diagnose vollständig im Audit-Trail-Block oben dokumentiert** (Sektion „Phase 15 —
+Block D Folgefix — Rescue.py Bug-Diagnose + Audit-Trail", ~200 Zeilen mit allen
+Verträgen, Aufrufer, Mock-Status, Test-Surface-Audit, Fix-Plan, Ledger-Recovery).
+
+| # | Item | Quelle | Priorität | Wer / Wann |
+|---|---|---|---|---|
+| **5** | **Phase-15-Block-D-Folgefix** — `phase13_live_data/live_data/rescue.py:264` Signatur korrigieren (`get_historical_ohlcv(epic, from_dt, to_dt, resolution)`) + `_call_history` von 4 auf 3 Args reduzieren (count ist ungenutzt). Audit-Trail oben gibt den genauen Plan. Variante A (minimal) → B (vollständig) → C (komplett + Mock-Fix). | Audit-Trail-Block oben | hoch (Block D Bug, Cross-Phase P13 freigegeben §4) | **Folge-Session** |
+| **6** | **Ledger-Restore** — 250 gebuchte Punkte aus dem Fehl-Lauf in `data/bars.sqlite.source_spend WHERE kind='rescue'` löschen (additiv, kein FK, kein Code-Touch). Nikinger-Aktion (manuell), kein Commit. | Audit-Trail-Block oben, §Ledger-Recovery | hoch | **Nikinger-Aktion** (separat) |
+| **7** | **Plan-§6-C2-Korrekturhinweis** (optional, ~5 Min) — `docs/concepts/phase13_live_data_plan.md` Z. 1112-1113 dokumentiert „Spend wird gebucht vor Call" als **geplant**; der heutige Bug-Fix macht daraus „Spend wird gebucht nur bei erfolgreichem Call". Datierter Korrekturhinweis. | Plan-Doc-Konsistenz | niedrig | **Folge-Session** |
+
+**Konkrete Empfehlung für die Folge-Session (sortiert nach Aufwand × Impact):**
+
+1. **Phase-15-Block-D-Folgefix** (Item #5, Audit-Trail oben lesen, Variante A/B/C nach
+   Nikinger-Wahl): ~10-20 Min, Cross-Phase P13 freigegeben §4, Σ-Sweep-Erwartung
+   1742 → 1743 (A) oder 1743 (B) oder 1744 (C). Phase 1 nicht angefasst.
+2. **Block C (Instinct-ECC)** starten (~2-3 h inkl. Sweep, ~6-8 Commits):
+   - C1: Migration 009 + `_INSTINCT_COLUMNS` + 3 DB-Methoden in
+     `phase2_persistence/persistence/db.py` + Test-Migrations-Anpassungen.
+   - C2: `phase15_v4/instinct/`-Package (Models + Extractor + Validator + Promotion).
+   - C3: VETO 5 + `ExecutionConfig.longterm_rules` in Phase 5.
+   - C4: Tests + Phase-5-Sweep-Verify.
+3. **`phase13_14_15.svg` Polish** (optional, ~10 Min): Spalten-Abstände /
    Callout-Positionen falls nicht 100 % sitzend.
-3. **Status-Pflege-Hygiene Item #4** (im selben Commit dieser Session, optional):
-   root-CLAUDE.md Phase-15-Row aktualisieren auf
-   „Block A + D ✅ · Block B ✅ (--apply live) · Block C 🔓".
+4. **Plan-§6-C2-Korrekturhinweis** (Item #7, optional, ~5 Min, Doc-only).
 
-**Push-Status dieser Session:** **0 Commits gepusht** (Session #7 ist auf
-`origin/main` = `40b3ae0`); **2-3 Commits pending** (Audit-Block + Item #4
-optional + Session-Rotation-Commit, je nach Reihenfolge).
+**Push-Status dieser Session:** **0 Commits gepusht**; **2 Commits pending**
+(Audit-Trail-Block-Doc-only + Session-Rotation-Commit, je nach Nikinger-Wahl).
 
 **Block-Status nach dieser Session:**
 
@@ -971,7 +977,363 @@ optional + Session-Rotation-Commit, je nach Reihenfolge).
 | A (Haushalt) | ✅ A-1..A-7 (Sessions #1-#4) |
 | B (Reward-Kalibrierung) | ✅ B1..B6 **komplett + live** (--apply ausgeführt 2026-09-03 ~12:00 CEST) |
 | C (Instinct-ECC) | 🔓 entsperrt, kann starten |
-| D (Erbstücke) | ✅ D-1..D-3 (Session #5) |
+| D (Erbstücke) | ✅ D-1..D-3 (Session #5) — **Folgefix** (Rescue.py Signatur-Bug) ausstehend, siehe Audit-Trail |
+
+## Phase 15 — Block D Folgefix — Rescue.py Bug-Diagnose + Audit-Trail (2026-09-03, MiniMax-M3-Exec-Session #8½, vor Fix)
+
+> **Auftrag:** Nikinger-Chat 2026-09-03 (direkt nach Pfad-A-Scharfschaltung): "Für Cross-Phase Edits
+> bitte besonders detailliert und nachvollziehbar dokumentieren. Außerdem: starte eine tiefe
+> Recherche, wie und welche Calls überhaupt valide sind, um nicht weiter zu raten."
+> Plan-Anker: [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md) §6 D3
+> (Pfad A Operator-Tool, gebaut-aber-AUS, Cross-Phase P13 freigegeben §4).
+> Diese Sektion ist **kein** `## Session stopped`-Block (kein Header-Treffer für die Doc-Rotation)
+> und **kein** Cross-Phase-Code-Edit. Sie ist ein Phase-15-interner Doku-Absatz vor dem Fix;
+> Auditability = ein Cold-Reader kann die Diagnose + Recherche + den Fix-Plan nachvollziehen,
+> ohne raten zu müssen.
+
+### Befund: Was passiert ist (vom Nikinger-Lauf geliefert)
+
+```
+$ python3 phase13_live_data/scripts/gap_rescue_operator.py \
+    --start 2026-09-01T08:00:00Z --end 2026-09-01T16:00:00Z \
+    --auto --enable-gap-rescue --apply
+
+get_historical_ohlcv raised for IX.D.DAX.IFMM.IP
+  TypeError: IGAdapter.get_historical_ohlcv() got multiple values for argument 'from_dt'
+[same for IX.D.DAX.IGN.IP, IX.D.CAC.IFE.IP, IX.D.IBEX.IFM.IP, IX.D.IBEX.FWM2.IP]
+
+JSON: "epics_total": 5, "bars_written_total": 0, "points_spent_total": 250
+       skipped_reason: "not_ok" für alle 5
+```
+
+| Größe | Wert |
+|---|---|
+| Epics angefragt | 5 |
+| Bars geschrieben | **0** |
+| Punkte gebucht | **250** (5 × 50) |
+| Ledger-Einträge neu | 5 × `kind='rescue'` in `data/bars.sqlite.source_spend` |
+| Restlauf-Budget | 9 750 (10 000 − 250) |
+| Reward-Loop / `trading_bot.sqlite` | nicht betroffen (nur `bars.sqlite`) |
+
+### Tiefe Recherche: alle relevanten Verträge + Aufrufer (Nikinger-Anforderung: "nicht raten")
+
+**1. Vertrag: `IGAdapter.get_historical_ohlcv` Signatur**
+
+`phase1_broker_wrapper/broker_wrapper/adapters/base.py:49-52` (ABC):
+```python
+@abstractmethod
+def get_historical_ohlcv(
+    self, epic: str, from_dt: str, to_dt: str, resolution: str
+) -> Envelope:
+    """OHLCV bars between two ISO 8601 timestamps."""
+```
+
+`phase1_broker_wrapper/broker_wrapper/adapters/ig_adapter.py:449-451` (Implementation):
+```python
+def get_historical_ohlcv(
+    self, epic: str, from_dt: str, to_dt: str, resolution: str,
+) -> Envelope:
+```
+
+→ **Vertrag gelockt: `(epic, from_dt, to_dt, resolution)` — 4 positionelle Args, kein `count`.**
+`docs/concepts/phase13_live_data_plan.md:1108` zitiert denselben Vertrag.
+
+**2. Kontrast: `IGAdapter.get_ohlcv` (singular, count-basiert)**
+
+`phase1_broker_wrapper/broker_wrapper/adapters/base.py:43-46`:
+```python
+@abstractmethod
+def get_ohlcv(self, epic: str, resolution: str, count: int) -> Envelope:
+    """Most recent ``count`` OHLCV bars at ``resolution``."""
+```
+
+→ `get_ohlcv` hat **count** als 3. Argument. `get_historical_ohlcv` hat **from_dt** an dieser
+Stelle. Die zwei Methoden haben **bewusst unterschiedliche** Signaturen.
+
+**3. Vertrag: `get_historical_ohlcv`-Aufrufer im Repo (3 Treffer — alle außer rescue.py sind korrekt)**
+
+| Datei | Zeile | Aufruf |
+|---|---|---|
+| `phase1_broker_wrapper/broker_wrapper/cli.py` | 157-159 | `broker.get_historical_ohlcv(args.epic, args.from_dt, args.to_dt, args.resolution)` — **korrekt** |
+| `phase1_broker_wrapper/tests/test_ig_adapter.py` | 527-529 | `a.get_historical_ohlcv("IX.D.DAX.IFMM.IP", "2026-07-01T00:00:00", "2026-07-02T00:00:00", "DAY")` — **korrekt** (Happy-Path-Test) |
+| `phase1_broker_wrapper/tests/test_ig_adapter.py` | 539 | `a.get_historical_ohlcv("X", "2026-01-01", "2026-01-02", "BOGUS")` — **korrekt** (invalid-resolution-Test) |
+| `phase13_live_data/live_data/rescue.py` | 264 | `method(epic, "MINUTE", count, from_dt=start_utc, to_dt=end_utc)` — **FALSCH** (passt `count` positionell in `from_dt`-Slot + doppeltes `from_dt` als Keyword) |
+| `phase13_live_data/tests/test_rescue.py` | 36 (Mock) | `def get_historical_ohlcv(self, epic, resolution, count, **kwargs):` — **falsch**, aber mock-spezifisch (`**kwargs` schluckt `from_dt`/`to_dt`) |
+
+**4. Vertrag: Module-Docstring `rescue.py:9-11`**
+
+```python
+"""Phase 13 §6 C2 — S4 GapRescue (Default AUS).
+...
+: meth:`BrokerAdapter.get_historical_ohlcv` (Bereichs-API mit ``from``/``to``,
+nicht das count-basierte ``get_ohlcv``) ...
+"""
+```
+
+→ **Design-Intent explizit dokumentiert: range-basiert, nicht count-basiert.** Der Code
+verletzt das eigene Doc-Kontrakt.
+
+**5. Vertrag: Plan §6 C2 — `phase13_live_data_plan.md:1107-1113`**
+
+```
+2. **Lückengroße Anfrage** statt Vollfenster — und zwar über
+   `broker.get_historical_ohlcv(epic, from_dt, to_dt, resolution)`
+   (`ig_adapter.py:449-451`, **Bereichs-API mit `from`/`to`**). Damit ist der Einwand des
+   Failure-Handovers §5.2 („Chain-Provider ist count-basiert") gegenstandslos ...
+   ⚠ `get_historical_ohlcv` bucht **keinen** Spend — `GapRescue` muss ihn selbst gegen
+   `SourceBudget` buchen und vorher `can_spend` fragen.
+```
+
+→ **Plan-Anker gelockt: range-basiert, kein count-Parameter.** `GapRescue` bucht selbst.
+Der Code widerspricht dem Plan.
+
+**6. Test-Suite-Defekt: `test_rescue.py:36` Mock hat die Bug-Signatur**
+
+```python
+def get_historical_ohlcv(self, epic, resolution, count, **kwargs):
+    if self.raise_exc:
+        raise RuntimeError("boom")
+    if not self.ok:
+        return SimpleNamespace(ok=False, error="not_ok")
+    return SimpleNamespace(ok=True, data={"bars": list(self.bars or [])})
+```
+
+→ Der Mock matcht die **Bug-Signatur** von `rescue.py:264`, NICHT die echte
+`IGAdapter`-Signatur. `**kwargs` schluckt die `from_dt`/`to_dt`-Argumente und wirft
+keinen TypeError. **Die Test-Suite hat den Integrationsfehler nicht gefangen** — getestet
+wurde der eigene Bug, nicht der Broker-Adapter-Vertrag.
+
+**7. Spend-Booking-Logik (zweites Problem im Bug-Cluster)**
+
+`rescue.py:217-225` (verbatim):
+```python
+env = self._call_history(epic, gap_start, gap_end, points)
+# Plan §6 C2: Spend is booked **before** the bars are written.
+# Even a stale response is a spent call. This is the same
+# trap-of-omission L8 warns about, repeated here for emphasis.
+self._budget.record_spend(points, "rescue")
+self._last_rescue_date[epic] = today
+if not getattr(env, "ok", False):
+    return RescueReport(epic=epic, gaps_found=1, bars_written=0,
+                       points_spent=points, skipped_reason="not_ok")
+```
+
+→ **Spend wird VOR dem Erfolg der IG-Antwort gebucht.** Begründung laut Code-Kommentar:
+"Even a stale response is a spent call" — IG hat den Call gesehen und abgerechnet, auch
+wenn die Daten stale/empty sind. **Das ist für erfolgreiche IG-Antworten korrekt**, aber
+**falsch für Exception-Fälle** (Call hat IG nie erreicht, wir buchen trotzdem). Genau
+das ist beim heutigen Lauf passiert: 250 Punkte für 5 Calls, die IG nie gesehen hat.
+
+**8. Plan §9.2 — 560 Punkte/Woche nicht nachgerechnet**
+
+```
+2. **Die 560 IG-Punkte/Woche für Pfad A** (§6 D3). Stammt aus P13-Findings §8.2,
+   **nicht nachgerechnet**. Vor dem Scharfschalten gegen `source_spend` verifizieren.
+```
+
+→ **Die Budget-Schätzung war von Anfang an ungeprüft.** Heute wurden 250 Punkte in einem
+einzigen Lauf verbrannt — ohne dass die Schätzung vorher gegen das tatsächliche
+Verhalten validiert wurde. Der jetzige Lauf **ist** die Validierung (mit Schaden).
+Künftige Läufe dürfen das nicht wiederholen.
+
+### Diagnose (zwei Bugs, einer mit Folgefehler)
+
+**Bug 1 (Hauptfehler) — falsche Signatur in `rescue.py:264`:**
+- Aufruf: `method(epic, "MINUTE", count, from_dt=start_utc, to_dt=end_utc)`
+- Mapping: `from_dt="MINUTE"` (positionell), `to_dt=count` (positionell),
+  `resolution="MINUTE"` (was IG nicht nutzt), plus keyword `from_dt=start_utc`
+  → **`got multiple values for argument 'from_dt'`** (TypeError).
+- Korrekt: `method(epic, start_utc, end_utc, "MINUTE")` — 4 positionelle Args in der
+  vom ABC und der Implementation festgelegten Reihenfolge.
+- Folge: 5 × TypeError → 5 × `_Env(False, "exception")` → 5 × `skipped_reason="not_ok"`.
+
+**Bug 2 (Test-Defekt) — Mock-Signatur in `test_rescue.py:36`:**
+- Mock: `def get_historical_ohlcv(self, epic, resolution, count, **kwargs):`
+- Folgt der Bug-Signatur statt der echten Vertrag-Signatur.
+- `**kwargs` schluckt `from_dt`/`to_dt`, also wirft der Mock keinen TypeError.
+- **Folge:** 11 Tests in `test_rescue.py` (Plan-Stand: 11 Tests) sind gegen die Bug-
+  Signatur gepinnt, NICHT gegen den ABC-Vertrag. Der Integrationsfehler wurde nie entdeckt.
+
+**Bug 3 (Konzept-Folgefehler) — Spend-Booking-Logik:**
+- `record_spend(points, "rescue")` läuft **bevor** `env.ok` geprüft wird.
+- **Korrekt für:** IG-Antwort egal welchen Inhalts (leer, stale, partial) → Call hat
+  stattgefunden, IG hat abgerechnet.
+- **Falsch für:** Exception im Call (z.B. TypeError durch Bug 1) → Call hat **nicht**
+  stattgefunden, IG hat **nicht** abgerechnet, wir buchen trotzdem.
+- Bug 1 hat **diesen Fehler versteckt**, weil jeder Lauf in den Exception-Pfad lief
+  und 100 % des gebuchten Spends "umsonst" war.
+
+### Test-Surface-Audit (welche Tests müssen angepasst werden)
+
+`phase13_live_data/tests/test_rescue.py` — 13 Treffer `_FakeBroker`/`get_historical_ohlcv`:
+
+| Zeile | Test | Mock-Signatur heute | Anpassung nötig |
+|---|---|---|---|
+| 30-41 | `_FakeBroker` Klasse | `def get_historical_ohlcv(self, epic, resolution, count, **kwargs)` | **JA** — auf ABC-Vertrag anpassen |
+| 82 | `rec = GapRescue(_FakeBroker(), budget, archive)` | keine direkte Signatur | nein (Konstruktor) |
+| 105, 148, 170, 194, 221 | `_FakeBroker(bars=[...])` für rescue_epic-Pfade | nutzen `_FakeBroker` | **JA** (über _FakeBroker-Signatur) |
+| 234-252 | `test_broker_not_ok_returns_not_ok_report` | pin: `out.points_spent == 5` | ggf. Anpassung (Spend-Logik ändert sich) |
+| 247 | `_FakeBroker(ok=False)` | nutzt `_FakeBroker` | **JA** (über _FakeBroker-Signatur) |
+| 255-267 | `test_broker_exception_is_caught` | pin: `out.points_spent == 0` | bleibt (Exception = kein Spend, korrekt nach Bug-3-Fix) |
+| 263 | `_FakeBroker()` (für scan_error-Pfad) | nutzt `_FakeBroker` | **JA** (über _FakeBroker-Signatur) |
+
+→ **2 Tests direkt + 8 Konstruktor-Aufrufe indirekt betroffen** (alle über
+`_FakeBroker`-Mock). Plus 2 neue Regression-Tests.
+
+### Plan für Fix (4 atomare Schritte, alle in Phase 13 = Cross-Phase-Freigabe §4 vorhanden)
+
+**Schritt 1 — `rescue.py:264` Signatur korrigieren + `_call_history`-Signatur entrümpeln:**
+
+```python
+# Vorher (Z. 255-267):
+def _call_history(self, epic: str, start_utc: str, end_utc: str, count: int) -> Any:
+    ...
+    return method(epic, "MINUTE", count, from_dt=start_utc, to_dt=end_utc)
+
+# Nachher:
+def _call_history(self, epic: str, start_utc: str, end_utc: str) -> Any:
+    """
+    The actual broker call. Range-basiert: ``get_historical_ohlcv`` ist die
+    Bereichs-API mit ``from``/``to`` (nicht count-basiert wie ``get_ohlcv``),
+    siehe Plan §6 C2 + rescue.py Module-Docstring Z. 9-11 + ig_adapter.py:449.
+    """
+    method = getattr(self._broker, "get_historical_ohlcv", None)
+    if method is None:
+        return _Env(False, "broker has no get_historical_ohlcv")
+    try:
+        return method(epic, start_utc, end_utc, "MINUTE")
+    except Exception:  # noqa: BLE001
+        logger.exception("get_historical_ohlcv raised for %s", epic)
+        return _Env(False, "exception")
+```
+
+Plus Aufrufer in `rescue_epic` Z. 217:
+```python
+# Vorher:
+env = self._call_history(epic, gap_start, gap_end, points)
+# Nachher:
+env = self._call_history(epic, gap_start, gap_end)
+```
+
+**Schritt 2 — Spend-Booking-Logik korrigieren (Bug 3):**
+
+```python
+# Vorher (Z. 217-225):
+env = self._call_history(epic, gap_start, gap_end, points)
+self._budget.record_spend(points, "rescue")
+self._last_rescue_date[epic] = today
+if not getattr(env, "ok", False):
+    return RescueReport(epic=epic, gaps_found=1, bars_written=0,
+                       points_spent=points, skipped_reason="not_ok")
+
+# Nachher:
+self._last_rescue_date[epic] = today
+env = self._call_history(epic, gap_start, gap_end)
+if not getattr(env, "ok", False):
+    # Call hat IG nie erreicht (Exception) oder hat nicht_ok geantwortet
+    # → KEIN Spend. (Bei erfolgreicher IG-Antwort mit stale/empty Daten
+    # wird der Spend weiterhin gebucht, siehe Z. nach _write_bars — die
+    # ursprüngliche L8-Logik bleibt für gültige Antworten erhalten.)
+    return RescueReport(epic=epic, gaps_found=1, bars_written=0,
+                       points_spent=0, skipped_reason="not_ok")
+self._budget.record_spend(points, "rescue")
+```
+
+**Konsequenz:** `_last_rescue_date[epic] = today` muss **vor** dem Call passieren,
+sonst blockiert eine Exception die Throttle. (Throttle ist heute *nach* dem Call —
+Bug 1 hat das maskiert; jetzt korrekt.)
+
+**Schritt 3 — `test_rescue.py:36` Mock an ABC-Vertrag anpassen + Tests fixen:**
+
+```python
+# Vorher (Z. 36):
+def get_historical_ohlcv(self, epic, resolution, count, **kwargs):
+
+# Nachher:
+def get_historical_ohlcv(self, epic, from_dt, to_dt, resolution):
+    if self.raise_exc:
+        raise RuntimeError("boom")
+    if not self.ok:
+        return SimpleNamespace(ok=False, error="not_ok")
+    return SimpleNamespace(ok=True, data={"bars": list(self.bars or [])})
+```
+
+Tests anpassen:
+- `test_broker_not_ok_returns_not_ok_report`: `out.points_spent == 0` (statt 5) —
+  Bug-3-Fix: `not_ok` bucht jetzt keinen Spend mehr. Doc-String anpassen.
+- `test_broker_exception_is_caught`: bleibt korrekt (Exception → 0 Spend schon heute),
+  aber Mock-Update nötig.
+- Optional: `test_stale_response_is_rejected_and_spend_still_booked` (Z. 204-230):
+  bleibt korrekt (stale = ok=True, also wird gebucht), aber Mock-Update nötig.
+
+**Schritt 4 — Neuer Regressionstest, der den Integrationsfehler gefangen hätte:**
+
+```python
+def test_call_history_uses_correct_signature(archive, budget):
+    """Regressions-Pin (Nikinger 2026-09-03, Pfad-A-Scharfschaltung):
+    ``rescue.py:_call_history`` muss ``get_historical_ohlcv`` mit der
+    ABC-Vertrag-Signatur ``(epic, from_dt, to_dt, resolution)`` aufrufen,
+    NICHT mit der count-basierten ``get_ohlcv``-Signatur. Heute (vor
+    Fix) hat ein Bug den Call mit ``(epic, "MINUTE", count, ...)``
+    aufgerufen → ``TypeError: got multiple values for argument 'from_dt'``.
+    """
+    seen: dict = {}
+
+    class _SpyBroker:
+        def get_historical_ohlcv(self, epic, from_dt, to_dt, resolution):
+            seen["call"] = (epic, from_dt, to_dt, resolution)
+            return SimpleNamespace(ok=False, error="not_ok")
+
+    rec = GapRescue(_SpyBroker(), budget, archive)
+    rec.rescue_epic("IX.D.DAX.IFMM.IP",
+                    "2026-08-19T09:00:00.000Z",
+                    "2026-08-19T09:06:00.000Z")
+    assert seen["call"] is not None
+    epic, from_dt, to_dt, resolution = seen["call"]
+    assert epic == "IX.D.DAX.IFMM.IP"
+    assert from_dt == "2026-08-19T09:00:00.000Z"
+    assert to_dt == "2026-08-19T09:06:00.000Z"
+    assert resolution == "MINUTE"
+```
+
+### Ledger-Recovery (Nikinger-Aktion, kein Code-Touch)
+
+Die 5 × 50 = 250 gebuchten Punkte aus dem heutigen Fehl-Lauf stehen noch im
+`data/bars.sqlite.source_spend`-Ledger mit `kind='rescue'`:
+
+```sql
+-- VORHER (Verifikation der 5 Einträge):
+SELECT COUNT(*), SUM(points) FROM source_spend WHERE kind='rescue';
+
+-- RESTORE (manuell, Nikinger-Aktion):
+DELETE FROM source_spend WHERE kind='rescue';
+```
+
+→ Restore ist **additiv** (kein FK, keine Auswirkung auf `bars`-Tabelle),
+kann gefahrlos laufen. **Kein** Commit nötig (`data/` ist `.gitignore`-d).
+
+### Σ-Sweep-Erwartung nach Fix
+
+| Phase | Tests grün | Δ |
+|---|---:|---|
+| phase13_live_data | 81 | +2 (neuer Regressionstest + Mock-Anpassung-Test) |
+| Σ total | **1744** | +2 vs. 1742 |
+
+`git diff --stat` Cross-Phase: 2 Files in Phase 13 (`rescue.py` + `test_rescue.py`),
+**kein** Touch in Phase 1 (Vertrag bleibt unverändert).
+
+### Open questions / blockers (vor Fix-Ausführung)
+
+- **Ledger-Restore** (250 Punkte): Nikinger-Aktion, manuell, kein Code-Touch.
+- **Cross-Phase-Freigabe** Phase 13 für Phase 15 ist bereits in Plan §4 dokumentiert
+  (Block D Step D3 hat Phase 13 explicit freigegeben). Der hier beschriebene
+  Folgefix liegt im selben Scope (gleiche Datei `rescue.py`, gleiches Modul
+  `live_data.rescue`). **Keine neue Freigabe nötig**, aber Nikinger-Entscheidung
+  über den **Umfang** des Fixes:
+  - **Variante A:** nur Schritt 1 (Signatur-Fix) — minimal-invasiv
+  - **Variante B:** Schritte 1+2 (Signatur + Spend-Logik) — vollständige Korrektur
+  - **Variante C:** Schritte 1+2+3+4 (alle) — inkl. Regressionstest
+- **Push-Freigabe** für den/die Commits: Nikinger entscheidet am Session-Ende.
 
 ## Phase 15 — Block B / Gate-P7-Status-Notiz (2026-09-02, MiniMax-M3 Exec-Session #6)
 
