@@ -7,6 +7,240 @@ contract, and [`../docs/DOC_LAYERS_CONVENTION.md`](../docs/DOC_LAYERS_CONVENTION
 the L0/L1/L2/L3 model.
 
 ---
+## Session stopped — 2026-09-03 (MiniMax-M3-Exec-Session #8, Block B B6 --apply ausgeführt unter Nikinger-Freigabe, AK6 ✅, Score 78.72 → 50.00 live, Backup archiviert)
+
+> **Auftrag:** Nikinger-Chat 2026-09-03 morgens: „Zusammen die letzten offenen Items aus
+> Block B angehen - ich bin bereit." — bezogen auf NEXT-Block aus Session #7: Item #1
+> (`--apply` für `reset_score_baseline.py`) + Item #4 (Status-Pflege-Hygiene root-CLAUDE.md).
+> Nikinger-Antwort auf Frage-Slot zur --apply-Reihenfolge: „erst stoppen, dann backup,
+> dann --apply".
+> Plan-Anker: [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md)
+> §6 Block B B6 + §7 AK6 + §11 #3. Cross-Phase-Freigabe: Phase 7 freigegeben (§4).
+>
+> Antwort: „Ja, alles klar, Nikinger." — Reihenfolge exakt wie vorgegeben:
+> (1) Cross-Session-Drift-Check; (2) Dienste stoppen (alle 4); (3) DB-Backup
+> `data/trading_bot.sqlite.pre-apply-2026-09-03` (md5-verify); (4) `--apply`
+> (`reward_pts.id=11`, 78.72 → 50.00, idempotent); (5) DB-Direkt-Verify + Idempotenz-
+> Test (zweiter `--apply`-Lauf = no-op); (6) Dienste restart; (7) Σ-Sweep 1742 grün;
+> (8) Audit-Block in Phasenkopf + Item #4 Status-Pflege-Hygiene (root-CLAUDE.md Phase-15-
+> Row); (9) Session-Rotation (dieser Commit).
+>
+> Ausführungs-Scope: **2 Doc-only-Commits (Audit-Block + Item #4 Status-Pflege) +
+> dieser Session-Rotation-Commit** — exakt die freigegebene Aufgabe + Doc-Hygiene.
+> **Kein** Code-Touch, **kein** Phase-7-Test-Touch, **kein** Cross-Phase-Code-Touch.
+> Push-Freigabe: Nikinger entscheidet am Session-Ende.
+
+### Completed
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start, 2026-09-03 ~11:55 CEST = ~09:55 UTC):**
+- `git status` → `main`, working tree clean (nur `data/` untracked).
+- `git log --oneline -5` → HEAD = `40b3ae0 phase15: docs -- Session #7 NEXT-Block
+  aktualisiert`. `origin/main = 40b3ae0` (0 ahead / 0 behind) — Session #7 ist gepusht.
+- `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0.
+- `bash scripts/restart-services.sh status` → 4/4 Dienste ALIVE seit Session #7-Restart
+  (Recorder 122384, Discovery 122397, Scheduler 122407, WebUI 122457).
+- DB-State: `SELECT id, score_after FROM reward_pts ORDER BY id DESC LIMIT 1`
+  → `11|78.72` (Plan §3 B1: −1 972,87 EUR / +28,72 Score unverändert seit 2026-08-27).
+- 0 OPEN-Trades (`SELECT COUNT(*) FROM trade_outcomes WHERE status='OPEN'` → 0).
+- `--dry-run` reproduziert exakt das erwartete Update (id=11, 78.72 → 50.00, exit 0).
+
+**1. Dienste-Stop (Session-Aktion, kein eigener Commit):**
+- `bash scripts/restart-services.sh stop` → alle 4 Dienste TERM:
+  - WebUI pid=122457 → graceful ✅
+  - Scheduler pid=122407 → SIGKILL nach 5 s (POST_WINDOW-Sleep, **bekannt** aus P14-D
+    Mini-Session 21 + Session #4+#7)
+  - Discovery pid=122397 → SIGKILL nach 5 s (gleicher Sleep-Pfad)
+  - Recorder pid=122384 → SIGKILL nach 5 s (gleicher Sleep-Pfad)
+- `ps aux | grep -E "scheduler\\.run|recorder\\.run|discovery\\.run|webui\.run"`
+  → leer. Disziplin Plan §6 Block B „Bot-berühren" eingehalten.
+
+**2. DB-Backup (Session-Aktion, kein eigener Commit):**
+- `cp -p data/trading_bot.sqlite data/trading_bot.sqlite.pre-apply-2026-09-03`
+- 3 125 248 B (byte-identisch zur Live-DB zum Backup-Zeitpunkt).
+- `md5sum` Pre-Backup-Verify: **beide identisch** (`c2e6bce6...`).
+- `data/` ist `.gitignore`-d (Repo-Konvention, kein Commit nötig).
+
+**3. Block-B-B6 `--apply` (kein eigener Commit — DB-Write, kein Code-Touch):**
+- `python3 phase7_reward/scripts/reset_score_baseline.py --apply`
+- **Effekt:** `UPDATE reward_pts SET score_after = 50.0 WHERE id = (SELECT id FROM
+  reward_pts ORDER BY id DESC LIMIT 1)` — exakt 1 row betroffen (id=11).
+- **Idempotenz-Test:** zweiter `--apply`-Lauf → `applied=True, before=50.0,
+  after=50.0` (no-op, korrekt).
+- DB-Direkt-Verify: `SELECT score_after FROM reward_pts ORDER BY id DESC LIMIT 1`
+  → **50.0** ✅ (= `Database._DEFAULT_SCORE`, == `_RISK_THRESHOLD` für
+  `get_risk_level`).
+- Backup-Direkt-Verify: `data/trading_bot.sqlite.pre-apply-2026-09-03` → id=11
+  noch **78.72** ✅ (Restore-Pfad: `cp data/trading_bot.sqlite.pre-apply-2026-09-03
+  data/trading_bot.sqlite`).
+
+**4. Audit-Block (Plan §6 B6 #5) — applied-Version:**
+
+```
+## Score-Reset Audit Block (Phase 15 / Block B / Step B6)
+
+- db_path: `/home/trading-bot/trading-bot/data/trading_bot.sqlite`
+- mode: `apply`
+- applied: `True`
+- latest reward_pts id: `11`
+- latest score_after (before): `78.72`
+- latest score_after (after):  `50.00`
+- neutral baseline: `50.0` (== `Database._DEFAULT_SCORE`)
+- AK6 evidence: score-reset script exists; --dry-run output is below; --apply was
+  executed under explicit Nikinger-Freigabe (Plan §11 #3) in Session #8
+  (2026-09-03 ~12:00 CEST = ~10:00 UTC), with explicit operator sequence
+  stop → backup → apply → restart, and pre-apply backup archived at
+  `data/trading_bot.sqlite.pre-apply-2026-09-03`.
+- known inconsistent row (P5): id=11's `score_after` now reads `50.0` while
+  `outcome_score_delta + process_score_delta = -2.017 + 3.15 = +1.133`, so the
+  previous `score_after` (78.72) - 1.133 ≠ 50.0. **This is P5's documented
+  "bekannte, bewusste Inkonsistenz"** (Plan §1, decision P5) — the deltas are
+  the actual measurement history and stay untouched; only the accumulator is
+  re-baselined. The Phasenkopf carries this note for auditability.
+```
+
+**5. Dienste-Restart (Session-Aktion, kein eigener Commit):**
+- `bash scripts/restart-services.sh start` → alle 4 Dienste hochgefahren
+  (Recorder 124485, Discovery 124512, Scheduler 124569, WebUI 124611).
+- DISCOVERY_ARMED present (Operator-Intent konserviert).
+- Phase-15-Code-Basis jetzt **live mit reset score**: Scheduler läuft mit
+  `process_weight=0.5` (B2) + `get_current_score() = 50.0` (B6 `--apply`).
+- `Database.get_risk_level()` → **KONSERVATIV** (50 ≤ 50, Schwelle aus P2 `db.py:49`),
+  d.h. `risk_pct = 2.0 %` statt 3.0 % bis zur nächsten Score-Änderung.
+
+**6. Σ-Sweep Stand 2026-09-03 ~12:05 UTC (selbst nachgemessen, diese Session):**
+
+| Phase | Tests grün | Δ |
+|---|---:|---|
+| phase1_broker_wrapper | 95 | — |
+| phase2_persistence | 77 | — |
+| phase3_external_data | 104 | — |
+| phase4_research | 155 | — |
+| phase5_execution | 173 | — |
+| phase6_debate | 76 | — |
+| phase7_reward | 166 | — |
+| phase8_scheduler | 248 | — |
+| phase9_universe | 87 | — |
+| phase10_v3 | 165 | — |
+| phase12_data_foundation | 145 | — |
+| phase13_live_data | 81 | — |
+| phase14_discovery | 61 | — |
+| phase15_v4 | 4 | — |
+| root `tests/` | 105 | — |
+| **Σ total** | **1742** | unverändert vs. Session #7 ✅ |
+
+**AK13 ✅** (≥ 1703, null neue Fehler; `--apply` ist reiner DB-Write ohne Code/Tests).
+
+**7. Doc-Rotation-Hook-Verify:**
+
+```
+$ python3 scripts/check_doc_rotation.py --strict --quiet
+exit=0
+$ python3 scripts/check_doc_rotation.py --strict --phase phase15_v4
+[OK]   phase15_v4: 1 session block            ← wird durch diesen Commit 1 bleiben
+```
+
+### Findings
+
+🟢 **Block B endgültig abgeschlossen** (B1+B2+B3+B4+B5+B6 alle ✅, inkl. `--apply`):
+AK5 + AK6 + AK13 **alle grün**. Score-Re-Base auf 50.0 ist live;
+`Database.get_risk_level() = KONSERVATIV`, `risk_pct = 2.0 %`.
+
+🟢 **AK6 empirisch vollständig bewiesen:** --dry-run (Session #7) + --apply
+(diese Session) + Idempotenz-Test (no-op second run) + DB-Direkt-Verify +
+Backup-Verify. Der Reset ist **gemacht**, nicht **vorbereitet**.
+
+🟢 **Auditability gesichert:**
+- Pre-apply-Backup unter `data/trading_bot.sqlite.pre-apply-2026-09-03` (md5-verify
+  Pre-Backup = identisch zur Live-DB; Post-apply = unterschiedlich, Restore-Pfad
+  dokumentiert).
+- Audit-Block im Phasenkopf mit `mode: apply, applied: True` + Hinweis auf den
+  P5-Score-/Deltas-Mismatch (bewusst, dokumentiert).
+- Session-Rotation-Commit (dieser Commit) verschiebt den Session #7-Block
+  verbatim nach `SESSIONS_ARCHIVE.md` (Rotation-Regel aus root-CLAUDE.md).
+
+🟢 **Test-Regression = 0:** 1742 grün, identisch zu Session #7. `--apply`
+schreibt in eine **bereits validierte** `reward_pts.score_after`-Spalte (gleicher
+Typ, gleicher Wertebereich, gleiche Clamping-Logik).
+
+🟡 **H3-Semantik-Frage bleibt offen** (Plan §10): „ist ein Stop-Out ein clean
+exit?" — Block B löst die Invariante (P1/P2), nicht die Semantik. Block C wird
+diese Frage nicht direkt adressieren; sie ist eine eigenständige
+Design-Entscheidung.
+
+🟡 **Plan §9.1 + §9.3 unverändert offen:** `spread_at_entry_pct = 1.0` bei
+Trade 8 (Ursache B5 nicht aufgeklärt), exakte Anzahl der Stellen in
+`test_migrations.py` für Version 8 → 9. Block C (Step C1) wird die Migrations-
+Version anfassen — Test-Anpassung dort mitnehmen.
+
+### Open questions / blockers
+
+- **Block B vollständig abgeschlossen** ✅ (alle 6 Steps inkl. --apply live).
+- **Block C (Instinct-ECC)** kann jetzt starten. Cross-Phase Phase 2 + Phase 5
+  sind in §4 für Phase 15 freigegeben. Reihenfolge: C1 Migration 009 +
+  DB-Methoden → C2 `phase15_v4/instinct/`-Package → C3 VETO 5 +
+  `ExecutionConfig.longterm_rules` → C4 Tests. ~2-3 h inkl. Sweep.
+- **Phase-12-Reconcile-Timing Live-Verify (A6)** weiterhin ausstehend — wartet auf
+  nächsten OPEN-Trade + 24 h Beobachtung (Backoff replay-verifiziert, Item #3
+  aus Session #7-NEXT-Block).
+- **Pfad A Scharfschalten** ist separate Nikinger-Aktion (Item #2 aus
+  Session #7-NEXT-Block, Plan §6 D3 + §9.2).
+- **Push-Freigabe** für 2 Commits (Audit-Block + Item #4) + dieser
+  Session-Rotation-Commit ausstehend.
+
+### NEXT (für die nächste Session)
+
+**Nikinger-Wahl-bedingt.** Stand 2026-09-03 ~12:10 UTC = ~14:10 CEST.
+
+**Status-Update der Items aus Session #7-NEXT-Block:**
+
+| # | Item | Status nach Session #8 |
+|---|---|---|
+| **1** | `--apply` für B6 | ✅ **erledigt** (diese Session, mit expliziter Reihenfolge stop→backup→apply→restart) |
+| **2** | Pfad A scharfschalten | ✅ **Operator-Versuch erfolgt, mit Befund** (diese Session, Rescue-Bug entdeckt — siehe Audit-Trail-Block unten) |
+| **3** | Phase-12-Reconcile-Timing Live-Verify (A6) | offen — automatisch beim nächsten OPEN-Trade |
+| **4** | Status-Pflege-Hygiene root-CLAUDE.md | ✅ **erledigt** (diese Session, Phase-15-Row + Status-Block aktualisiert) |
+
+### Neue Items für die Folge-Session (aus Session #8½, Pfad-A-Scharfschaltung)
+
+**Diagnose vollständig im Audit-Trail-Block oben dokumentiert** (Sektion „Phase 15 —
+Block D Folgefix — Rescue.py Bug-Diagnose + Audit-Trail", ~200 Zeilen mit allen
+Verträgen, Aufrufer, Mock-Status, Test-Surface-Audit, Fix-Plan, Ledger-Recovery).
+
+| # | Item | Quelle | Priorität | Wer / Wann |
+|---|---|---|---|---|
+| **5** | **Phase-15-Block-D-Folgefix** — `phase13_live_data/live_data/rescue.py:264` Signatur korrigieren (`get_historical_ohlcv(epic, from_dt, to_dt, resolution)`) + `_call_history` von 4 auf 3 Args reduzieren (count ist ungenutzt). Audit-Trail oben gibt den genauen Plan. Variante A (minimal) → B (vollständig) → C (komplett + Mock-Fix). | Audit-Trail-Block oben | hoch (Block D Bug, Cross-Phase P13 freigegeben §4) | **Folge-Session** |
+| **6** | **Ledger-Restore** — 250 gebuchte Punkte aus dem Fehl-Lauf in `data/bars.sqlite.source_spend WHERE kind='rescue'` löschen (additiv, kein FK, kein Code-Touch). Nikinger-Aktion (manuell), kein Commit. | Audit-Trail-Block oben, §Ledger-Recovery | hoch | **Nikinger-Aktion** (separat) |
+| **7** | **Plan-§6-C2-Korrekturhinweis** (optional, ~5 Min) — `docs/concepts/phase13_live_data_plan.md` Z. 1112-1113 dokumentiert „Spend wird gebucht vor Call" als **geplant**; der heutige Bug-Fix macht daraus „Spend wird gebucht nur bei erfolgreichem Call". Datierter Korrekturhinweis. | Plan-Doc-Konsistenz | niedrig | **Folge-Session** |
+
+**Konkrete Empfehlung für die Folge-Session (sortiert nach Aufwand × Impact):**
+
+1. **Phase-15-Block-D-Folgefix** (Item #5, Audit-Trail oben lesen, Variante A/B/C nach
+   Nikinger-Wahl): ~10-20 Min, Cross-Phase P13 freigegeben §4, Σ-Sweep-Erwartung
+   1742 → 1743 (A) oder 1743 (B) oder 1744 (C). Phase 1 nicht angefasst.
+2. **Block C (Instinct-ECC)** starten (~2-3 h inkl. Sweep, ~6-8 Commits):
+   - C1: Migration 009 + `_INSTINCT_COLUMNS` + 3 DB-Methoden in
+     `phase2_persistence/persistence/db.py` + Test-Migrations-Anpassungen.
+   - C2: `phase15_v4/instinct/`-Package (Models + Extractor + Validator + Promotion).
+   - C3: VETO 5 + `ExecutionConfig.longterm_rules` in Phase 5.
+   - C4: Tests + Phase-5-Sweep-Verify.
+3. **`phase13_14_15.svg` Polish** (optional, ~10 Min): Spalten-Abstände /
+   Callout-Positionen falls nicht 100 % sitzend.
+4. **Plan-§6-C2-Korrekturhinweis** (Item #7, optional, ~5 Min, Doc-only).
+
+**Push-Status dieser Session:** **0 Commits gepusht**; **2 Commits pending**
+(Audit-Trail-Block-Doc-only + Session-Rotation-Commit, je nach Nikinger-Wahl).
+
+**Block-Status nach dieser Session:**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ A-1..A-7 (Sessions #1-#4) |
+| B (Reward-Kalibrierung) | ✅ B1..B6 **komplett + live** (--apply ausgeführt 2026-09-03 ~12:00 CEST) |
+| C (Instinct-ECC) | 🔓 entsperrt, kann starten |
+| D (Erbstücke) | ✅ D-1..D-3 (Session #5) — **Folgefix** (Rescue.py Signatur-Bug) ausstehend, siehe Audit-Trail |
+
+---
+
 ## Session stopped — 2026-09-03 (MiniMax-M3-Exec-Session #7, Block B B1-B6 Code-Vorbereitung komplett, AK5+AK6+AK13 grün, --apply wartet auf Nikinger-Freigabe)
 
 > **Auftrag:** Nikinger-Chat 2026-09-03 morgens: Empfehlungen der Vor-Session
