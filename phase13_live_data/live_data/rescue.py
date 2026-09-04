@@ -214,7 +214,7 @@ class GapRescue:
         if not self._budget.can_spend(points):
             return RescueReport(epic=epic, gaps_found=1, bars_written=0,
                                points_spent=0, skipped_reason="budget")
-        env = self._call_history(epic, gap_start, gap_end, points)
+        env = self._call_history(epic, gap_start, gap_end)
         # Plan §6 C2: Spend is booked **before** the bars are written.
         # Even a stale response is a spent call. This is the same
         # trap-of-omission L8 warns about, repeated here for emphasis.
@@ -252,16 +252,23 @@ class GapRescue:
 
     # -- internals ---------------------------------------------------------
 
-    def _call_history(self, epic: str, start_utc: str, end_utc: str, count: int) -> Any:
-        """The actual broker call. ``get_historical_ohlcv`` is the
-        Bereichs-API per Plan §6 C2. Adapter method is duck-typed
-        (same shape as the existing ``get_ohlcv`` envelope).
+    def _call_history(self, epic: str, start_utc: str, end_utc: str) -> Any:
+        """
+        The actual broker call. Range-basiert: ``get_historical_ohlcv`` ist die
+        Bereichs-API mit ``from``/``to`` (nicht count-basiert wie ``get_ohlcv``),
+        siehe Plan §6 C2 + rescue.py Module-Docstring Z. 9-11 + ig_adapter.py:449.
+
+        Phase 15 Block-D-Folgefix (2026-09-03, Audit-Trail): der frühere Aufruf
+        ``method(epic, "MINUTE", count, from_dt=start_utc, to_dt=end_utc)``
+        verletzt den ABC-Vertrag (``(epic, from_dt, to_dt, resolution)``) — IG
+        antwortete mit ``TypeError: got multiple values for argument 'from_dt'``.
+        Fix: 4 positionelle Args in der Vertrag-Reihenfolge, kein ``count``.
         """
         method = getattr(self._broker, "get_historical_ohlcv", None)
         if method is None:
             return _Env(False, "broker has no get_historical_ohlcv")
         try:
-            return method(epic, "MINUTE", count, from_dt=start_utc, to_dt=end_utc)
+            return method(epic, start_utc, end_utc, "MINUTE")
         except Exception:  # noqa: BLE001
             logger.exception("get_historical_ohlcv raised for %s", epic)
             return _Env(False, "exception")
