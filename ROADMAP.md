@@ -482,7 +482,7 @@ Abstain) — Ursache Infrastruktur, nicht Strategie.
 - [ ] **B Substrat** — Schema-Floor (Live-DB v7, Migrations 008/009 nie angewendet) + Operator-
   Apply + Ledger-Restore; Wochenend-Epics raus
 - [ ] **C Research-Loop** — 14-Tage-Fenster für die Trade-Historie + ein Prompt-Satz; Token-Budget
-  300 k; Breaker-Semantik (P3-Freigabe offen)
+  300 k; Breaker-Semantik (P3 freigegeben)
 - [ ] **D Freischaltung** — vier Arme **Default ON** (`--no-*`), Bar-Stream-Token-Wrapper,
   Promotion-Bridge + Compiler (Gatter n ≥ 50 bleibt), Margin-Headroom (B3)
 - [ ] **E 2-Wochen-Autonomie-Test** — Vorregistrierung, `autonomy_report.py`, Runbook, Closeout

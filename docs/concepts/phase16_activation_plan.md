@@ -15,7 +15,7 @@ updated: 2026-09-05
 
 # Phase 16 — Freischaltung: Execution-ready Plan (2026-09-05)
 
-> **Adressat:** die ausführende Session (Sonnet 5 / `claude-minimax`). Nichts hier muss neu
+> **Adressat:** die ausführende Session (**OpenCode / MiniMax M3**, Nikinger Runde 2 2026-09-05 — vorher Sonnet 5 angenommen; der Plan ist modellneutral, Einstieg über `AGENTS.md`). Nichts hier muss neu
 > hergeleitet werden. Jede Zahl in §2/§3 ist in der Plan-Session selbst gegen Code oder
 > Live-DB (mode=ro) gemessen, mit Datum und Zeilennummer. Was **nicht** geprüft werden konnte,
 > steht vollständig in **§9** — was dort nicht steht, gilt als geprüft. Zeilennummern sind
@@ -41,7 +41,7 @@ im selben Zug alle vier bewusst-AUS-gebauten Arme scharf (Nikinger-Philosophiewe
 |---|---|---|
 | **A** | Haushalt: Step-0-Ritual, Σ-Baseline **1843**, Code↔.md-Sweep (4 falsche Behauptungen), WebUI-Log, Push + Ledger-Restore (Operator) | keins |
 | **B** | Substrat: Schema-Floor im Preflight (L3) + Operator-Apply mit Backup; Wochenend-Filter (L5) | nach A |
-| **C** | Research-Loop: Historien-Fenster (L1), Budget 300 k (L2), Breaker-Semantik (L9, braucht P3-Freigabe) | nach B |
+| **C** | Research-Loop: Historien-Fenster (L1), Budget 300 k (L2), Breaker-Semantik (L9, P3 freigegeben Runde 2) | nach B |
 | **D** | Freischaltung: Defaults flippen (L4), Promotion-Bridge + Prädikat-Compiler (L6), Margin-Headroom (L7) | nach C |
 | **E** | 2-Wochen-Autonomie-Test: Vorregistrierung, `autonomy_report.py`, Runbook, Closeout | nach D, Bot-Restart |
 
@@ -66,11 +66,12 @@ Watch-Item, kein Fix-Target). Profit ist **kein** PASS-Kriterium des Tests.
 | **P10** | L7 = B3 rein, als **letzter** Code-Block D3, mit Operator-Live-Probe **vor** dem Code; fehlt der IG-Margin-Faktor → Rückfall auf den heutigen Leverage-Cap (nicht fail-closed) | B3 rejects (22,1 vs 22,0) sind ein reales Loch; Rückfall statt fail-closed, weil ein fehlender Faktor sonst den ganzen Test still auf 0 Trades stellt |
 | **P11** | PASS-Kriterien des 2-Wochen-Tests werden **vor** dem Start committet (Block E1) und danach nicht geändert; Profit ist kein Kriterium. Jedes Kriterium hat eine **append-only** Messquelle (§6 E2) | M1-Vorregistrierungs-Disziplin; ein nach dem Lauf geschriebenes Kriterium beweist nichts. `scheduler_state.json` / `recorder_state.json` / `discovery_state.json` werden in-place überschrieben und taugen nicht als Beleg (Opus-Review §13) |
 | **P17** | **Erlaubte Operator-Ereignisse im Test** (vorregistriert, gezählt, nie still): (a) Backoff-KILL (`runner.py:355-361`, 3 Zyklus-Exceptions in Folge → `data/state/KILL`) darf **einmal** mit geloggtem Grund gelöscht + neu gestartet werden, der Root-Cause wird als Befund geführt; ein zweites Mal = FAIL Kriterium 1. (b) Reboot/Keyring-Relogin = Restart-Ritual, zählt als Intervention (FAIL Kriterium 1), Lauf geht weiter. `max_consecutive_failures` bleibt **3** | Der einzige automatische KILL-Schreiber ist der Backoff; `restart-services.sh` fasst KILL nie an (Z. 22). Kein systemd-Unit, kein Cron, kein Auto-Reboot (`Automatic-Reboot` auskommentiert = false; letzte Reboots 08-25/08-30 waren manuelle VM-Wartung). Der Keyring braucht einen Desktop-Login → ein Reboot ist ohne Hand nicht überlebbar; das wird ehrlich als Grenze vorregistriert, nicht wegautomatisiert (Supervision ist Phase-17-Material) |
-| **P12** | Cross-Phase-Freigabe (Nikinger #9, „mit Hinweis zur wirklich ausgiebigen Situation"): **P1, P2, P4, P5, P7, P8, P9, P15** — jeder Touch nur, wo ein Step ihn braucht; **P3 (fetcher.py, L9) ist NICHT enthalten** → Step C5 wartet auf eigene Freigabe | Phase 8 war in P15 gesperrt, Phase 16 braucht sie zwingend (Defaults, Wiring, Migrations-Aufruf) |
+| **P12** | Cross-Phase-Freigabe (Nikinger #9, „mit Hinweis zur wirklich ausgiebigen Situation"): **P1, P2, P4, P5, P7, P8, P9, P15** — jeder Touch nur, wo ein Step ihn braucht; **P3 (fetcher.py, L9) seit Runde 2 ebenfalls frei (P18)** | Phase 8 war in P15 gesperrt, Phase 16 braucht sie zwingend (Defaults, Wiring, Migrations-Aufruf) |
 | **P13** | Operator-Aktionen sind freigegeben (Nikinger #10): Push, Ledger-Restore, Migrations-Apply, Demotion-Verify, Live-Probe — die Exec-Session bereitet Befehl + Kosten vor, führt **nicht** selbst aus | Live-/Netz-/kostenpflichtige Läufe bleiben Nikinger-Job (CLAUDE.md Working style) |
 | **P14** | Bot-berührende Edits: erst `bash scripts/restart-services.sh stop`, `ps aux \| grep scheduler.run` als Gegenprobe; Neustart erst nach dem letzten Code-Commit eines Blocks | Parallel-Login-Falle; Python cached Module (`sys.modules`) — Code-Edits wirken erst nach Restart (P14-D §10) |
 | **P15** | Neue `.md`/`.svg` ⇒ `docs/INDEX.md`-Zeile im selben Commit; Phasenkopf trägt genau einen `## Session stopped`-Block | Doc-Layers-Konvention + Hook `check_doc_rotation.py --strict` |
 | **P16** | Advisor-Ersatz: Opus-Plan-Agent-Review vor dem Festlegen (gelaufen, §13), Sonnet-Cold-Read vor „fertig" | `/advisor` ist in Claude Code nicht verfügbar; Agent-Freigabe Nikinger 2026-09-05 |
+| **P18** *(Runde 2, 2026-09-05)* | **P3 ist freigegeben** → Step C5 ist regulär; **Exec-Modell = OpenCode / MiniMax M3** für alle Blöcke A–E (nicht Sonnet 5 / `claude-minimax`); Push freigegeben; Allein-Entscheidungen P3 (kein Caching) + P5 (Promotion-Default True) bestätigt | Nikinger-Antwort Runde 2: „1. ja 2. ja 3. ja, das passt — allerdings soll die weitere execution über die initial Blöcke hinweg von openCode / minimax m3 erledigt werden." Plan bleibt modellneutral lesbar (AGENTS.md-Konvention aus M1) |
 
 ---
 
@@ -259,7 +260,7 @@ schreibt für dieselben Ticker 500+ 1m-Bars/Tag — der Ticker ist nicht tot, er
 | P8 | `scheduler/config.py:134,178,189,207,215`, `scheduler/run.py:57,97-135,165-168`, `scripts/wiring.py:302-325,790-803,1066-1077,1091-1134`, `webui/api.py:75`, `scripts/run_webui.sh`, `tests/test_run.py`, `tests/test_config.py`, `tests/test_webui.py:338-348` | A-4, B1, C3, D1, D2 | Defaults + Wiring + Preflight-Floor + Bar-Stream-Wrapper |
 | P9 | `universe/discovery.py:131`, `universe/promotion.py:251-262`, `universe/models.py` (Prädikat), `tests/test_discovery.py`, `tests/test_promotion.py` | B3 | additiv |
 | P15 | `instinct/models.py:171`, `instinct/extractor.py` (Trigger-Grammatik im Prompt), `instinct/bridge.py` (NEU), `instinct/compile.py` (NEU), `tests/` | D1, D2 | eigene Phase |
-| **P3** | `external_data/fetcher.py:407-411` | **C5 — NUR mit eigener Nikinger-Freigabe** | Semantik-Änderung |
+| **P3** | `external_data/fetcher.py:407-411`, `tests/` | C5 — **freigegeben Runde 2 (2026-09-05, P18)** | Semantik-Änderung |
 | **P13 / P1** | `live_data/stream.py`, `streaming/ig_lightstreamer.py` | **nicht angefasst** — der Token-Fix D1.2 lebt als Wrapper in P8 `wiring.py` | — |
 | root + Doku anderer Phasen | `scripts/check_doc_rotation.py:66`, `.gitignore` (+`data/reports/`), `CLAUDE.md`, `ROADMAP.md`, `README.md`, `docs/INDEX.md`; **A-3 zusätzlich** `phase9_universe/CLAUDE.md:133` (Vermerk) + `phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md` (🟡-Anhang, 📕) | A-0, A-3, E | Doku/Hygiene — Doku-Vermerke in fremden Phasenköpfen sind kein Code-Touch (P15-Konvention) |
 
@@ -526,7 +527,7 @@ Mit 300 k reicht der Tag (102 Zyklen × 2,6 k = 265 k). Ein Dedupe („Prompt un
 Call") ist **nicht** möglich, weil Live-Quotes im User-Prompt jede Runde variieren — bewusst
 nicht gebaut, im Phasenkopf so notieren (YAGNI mit Begründung).
 
-#### C5 — Breaker-Semantik (L9) — **wartet auf P3-Freigabe**
+#### C5 — Breaker-Semantik (L9, P3) — *freigegeben Runde 2 (P18)*
 
 `fetcher.py:407-411` Anker:
 
@@ -551,10 +552,9 @@ Frame ist ein **Daten**-Urteil, kein Ausfall:
 Kosten: an einem wirklich toten Ticker 3 Retries × Backoff pro Zyklus (~7 s) statt 15 min
 Sperre — akzeptabel, weil `no_intraday_source`-Epics die Registry ohnehin überspringt.
 Tests (`phase3_external_data/tests/`): bestehende Circuit-Tests anpassen (welche: §9 #8) +
-`test_empty_frame_does_not_open_circuit`. **Ohne Freigabe: Step übersprungen, im Phasenkopf
-als „offen, P3 nicht freigegeben" geführt — kein stilles Weglassen.**
+`test_empty_frame_does_not_open_circuit`.
 
-**Block-C-Commits:** 2–3 (C1 · C2+C3 · C5 nur falls freigegeben).
+**Block-C-Commits:** 3 (C1 · C2+C3 · C5).
 
 ### Block D — Freischaltung
 
@@ -838,7 +838,7 @@ Status-Pflege root-CLAUDE/ROADMAP/README/INDEX, Session-Rotation.
 | **AK13** | Vorregistrierung committet **vor** dem E3-Restart (Commit-Zeit < Start-Zeile im Log) | `git log` vs. `run_scheduler.log` |
 | **AK14** | `autonomy_report.py --day` läuft offline gegen Fixture; `--summary` bewertet 7 Kriterien | P16-Tests |
 | **AK15** | **2-Wochen-Test PASS** = alle sieben (Messquellen §6 E2): (1) genau eine Start-Zeile je Dienst im Fenster (≥ 10 Handelstage ohne Operator-Restart; P17-Ausnahme einmal Backoff-KILL) · (2) Scheduler/Recorder/Discovery an jedem Handelstag mit append-only Beleg aktiv + WebUI operator-gesichtet · (3) ≥ 5 autonome open→close-Trades · (4) Heartbeat `ok` an ≥ 8/10 Tagen · (5) ≤ 5 CRITICALs in den 24 h nach jedem OPEN (A6) · (6) Token-Budget an 0 Tagen vor 17:30 erschöpft · (7) Daily-Loss-Cap/`max_trades`/Demo unverändert | `--summary` |
-| **AK17** *(nur mit P3-Freigabe)* | leerer yF-Frame öffnet den Circuit **nicht**; `RateLimitError` weiterhin; live: 0 `circuit open`-Zeilen um 09:05–09:20 an Tag 1 | P3-Tests C5 + Log-Grep |
+| **AK17** | leerer yF-Frame öffnet den Circuit **nicht**; `RateLimitError` weiterhin; live: 0 `circuit open`-Zeilen um 09:05–09:20 an Tag 1 | P3-Tests C5 + Log-Grep |
 | **AK16** | Closeout-Handover + SVG + INDEX + Status-Pflege in einem Commit; Phasenkopf trägt genau einen Session-Block; `check_doc_rotation.py --strict` exit 0 | E4 |
 
 ---
@@ -958,9 +958,12 @@ Plan-Session-Einfügungen verschoben), `InstinctValidation.decision` verifiziert
 auf `wiring.py:832` festgelegt, D3.2-Aufrufkette (`executor.py:321-324`, kein Caller-Touch)
 ergänzt, §4 um die Fremd-Phasen-Doku-Vermerke aus A-3, §7 um AK17 (C5) und §9 um #20 erweitert.
 
+**Nikinger Runde 2 (2026-09-05):** P18 — P3 freigegeben, Exec-Modell OpenCode / MiniMax M3, Push
+freigegeben, P3/P5-Allein-Entscheidungen bestätigt. Keine weiteren Fragen offen.
+
 
 ---
 
-> **Stand:** 2026-09-05, Plan-Session (Claude Code, Fable 5.1). Σ-Baseline 1843, HEAD `2f9eb82`
-> + 7 ahead. **Nächste Aktion:** Exec-Session (Sonnet 5) startet mit **Block A, Step A-0**;
-> Operator-Aktionen 1–2 sind freigegeben und können sofort laufen.
+> **Stand:** 2026-09-05, Plan-Session (Claude Code, Fable 5.1). Σ-Baseline 1843. **Nächste Aktion:**
+> Exec-Session (**OpenCode / MiniMax M3**) startet mit **Block A, Step A-0**; Push ist erledigt,
+> Operator-Aktion B2 folgt nach Block B.

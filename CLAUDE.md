@@ -99,7 +99,7 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 > „automatisch beim Restart"-Aussage im Absatz darunter ist **falsch**, Korrektur folgt in Plan
 > Step A-3). Blöcke A Haushalt · B Substrat · C Research-Loop · D Freischaltung (alle vier Arme
 > Default ON, Bridge, B3) · E vorregistrierter 2-Wochen-Autonomie-Test. Cross-Phase frei:
-> P1/2/4/5/7/8/9/15 — P3 nicht.
+> P1/2/3/4/5/7/8/9/15 (P3 seit Runde 2). Exec-Modell: OpenCode / MiniMax M3.
 
 > **✅ 2026-09-05 — Phase 15 (V4) ABGESCHLOSSEN (Session #13, MiniMax-M3-Exec).** Phase 15 (V4) ist
 > seit Session #13 mit Closeout-Handover abgeschlossen ([`phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md`](./phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md),
