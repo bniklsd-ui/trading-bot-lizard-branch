@@ -634,6 +634,47 @@ Mindestens diese Assertions:
 
 Danach die volle Sweep-Wiederholung (§2.1). Erwartung: **1703 + neue**, alle grün.
 
+> 🟡 **Korrekturhinweis (2026-09-05, MiniMax-M3-Exec-Session #11+#12, Block C Steps C2+C3+C4):**
+> Zwei As-Built-Drifts gegen den Plan-Snapshot — Plan bleibt **unverändert** (📕-Snapshot),
+> der Korrekturhinweis macht den Drift sichtbar.
+>
+> 1. **`phase15_v4/tests/test_instinct.py` ist im As-Built in 4 Files aufgeteilt** (analog zu
+>    den 4 Modulen des Packages):
+>    - `phase15_v4/tests/test_instinct_models.py` — 35 Tests (Dataclass-Invariants + Config-Defaults)
+>    - `phase15_v4/tests/test_instinct_extractor.py` — 22 Tests (Prompt-Builder pure + happy-path
+>      + 8 Failure-Paths, best-effort-Kontrakt)
+>    - `phase15_v4/tests/test_instinct_validator.py` — 16 Tests (AK8: `test_validator_has_no_llm_import`
+>      dreifach gepinnt auf Modul-Namespace + Source-Text + AST-Import-Survey)
+>    - `phase15_v4/tests/test_promotion.py` — 14 Tests (AK7 = P13 + boundary + status-filter)
+>    - **Σ Phase-15-C2-Tests: 87** (= 35 + 22 + 16 + 14, alle grün, Commit `c00ab73`)
+>    - `test_extractor_never_raises` ist As-Built `test_extractor_never_raises_on_llm_runtime_error`
+>      + 7 weitere Failure-Path-Tests (alle rufen `result.ok is False` ab, kein `pytest.raises`
+>      — best-effort-Kontrakt).
+>
+> 2. **`test_veto5_with_empty_rules_is_identity` ist nicht in `phase15_v4/tests/` gebaut,
+>    sondern in `phase5_execution/tests/test_vetos.py`** (Cross-Phase-Touch Phase 5, Plan §4
+>    freigegeben). Begründung: VETO 5 lebt in `phase5_execution/execution/vetos.py` — der
+>    Test gehört semantisch zu Phase 5 (VETO-Layer), nicht zu Phase 15 (Instinct-Package).
+>    Plus 11 weitere VETO-5-Tests in derselben Datei:
+>    `test_longterm_pre_trade_check_empty_rules_passes`,
+>    `test_longterm_pre_trade_check_all_rules_pass`,
+>    `test_longterm_pre_trade_check_first_false_vetoes`,
+>    `test_longterm_pre_trade_check_raising_rule_vetoes`,
+>    `test_longterm_pre_trade_check_does_not_mutate_candidate`,
+>    `test_pre_trade_check_veto5_empty_rules_is_identity` (AK9, Pin-Identität zu pre-C3),
+>    `test_pre_trade_check_veto5_short_circuits_after_veto4`,
+>    `test_pre_trade_check_veto5_vetoes_when_rule_returns_false`,
+>    `test_pre_trade_check_veto5_passes_when_all_rules_pass`,
+>    `test_longterm_rules_default_is_empty_tuple_not_list`,
+>    `test_longterm_rules_is_frozen_via_config`,
+>    `test_longterm_rules_supports_arbitrary_callables`.
+>    **Σ Phase-5-C3-Tests: +12** (173 → 185 grün, Commit `6065e6c`).
+>
+> Konsequenz für die Σ-Erwartung: Plan sagt **1703 + neue**, real **1703 + 87 (Phase 15) +
+> 12 (Phase 5) = 1802 + root 105 → Σ 1843 grün** (statt „nur Phase 15" hatte die Cross-Phase-
+> Implementation auch 12 Phase-5-Tests — die Promotion-Bridge macht den Effekt erst zukünftig
+> sichtbar, aber die Test-Schicht selbst muss Phase-5-seitig stehen).
+
 ---
 
 ### Block D — Erbstücke
