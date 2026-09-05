@@ -71,8 +71,12 @@ def default_config() -> SchedulerConfig:
     Used for the module-level ``app`` so ``uvicorn webui.api:app`` reads the same files the daemon
     writes, regardless of the process's working directory.
     """
+    # Phase 16 A-4 (2026-09-05, L8 — irreführende WebUI-Warnung): die WebUI baut die Config
+    # nur für Budget-Anzeige, sie gatet nichts. Anzeige-Default = CLI-Default `run.py
+    # --daily-loss-cap` (1800.0), damit `__post_init__`s Loss-Cap-WARNING beim WebUI-Start
+    # nicht mehr feuert. Verhalten bit-identisch; nur die irreführende WARNING ist weg.
     return dataclasses.replace(
-        SchedulerConfig(),
+        SchedulerConfig(daily_loss_cap=1800.0),
         live_db_path=str(_DATA_DIR / "trading_bot.sqlite"),
         state_path=str(_DATA_DIR / "state" / "scheduler_state.json"),
         kill_path=str(_DATA_DIR / "state" / "KILL"),

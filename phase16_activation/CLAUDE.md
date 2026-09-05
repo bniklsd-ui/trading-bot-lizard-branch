@@ -289,12 +289,81 @@ exit=0
 
 - `phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md` ist 📕 (snapshot, never edit) — aber Phase-12/13/14-Closeout-Pattern erlaubt **datierte Korrekturhinweise anhängen** (Working-style-Regel: *„On conflict, trust what's actually running, then fix the doc with a dated correction note — never silently trust prose over code"*). Korrekturhinweis ist als 🟡-Anhang mit Datum + Quelle + Verweis auf den Code-Befund, kein Body-Edit.
 
+---
+
+## Step A-4 — WebUI-Access-Log + irreführende Loss-Cap-Warnung (2026-09-05, MiniMax-M3 Exec-Session #1)
+
+> **Plan-Anker:** [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 A-4 (S. 342-350).
+> **Scope:** 2 Edit-Anker in 2 Files (Phase 8 / P8 freigegeben, Plan §4 + §12 Commit-Konvention). Wirkt erst nach WebUI-Restart (Block-D-Restart-Fenster). **0 Test-Edits** nötig (alle bestehenden WebUI-Tests passen ihre eigene Config, nicht die WebUI-Default-Config).
+> **Σ 1843 grün unverändert** (kein Test-Touch, keine Test-Fixture-Änderung).
+
+### 2 Edit-Anker
+
+| # | Datei | Vorher | Nachher |
+|---|---|---|---|
+| 1 | `phase8_scheduler/scripts/run_webui.sh:48` | `exec uvicorn webui.api:app --host 127.0.0.1 --port "${PORT}"` | `exec uvicorn webui.api:app --host 127.0.0.1 --port "${PORT}" --no-access-log` (Kommentar: „*Phase 16 A-4 (2026-09-05, L8): --no-access-log kills the 16 MB/day uvicorn access log; application logs on stderr stay. Restart der WebUI (Block D) wirkt.*") |
+| 2 | `phase8_scheduler/webui/api.py:74-80` | `return dataclasses.replace(\n        SchedulerConfig(),\n        live_db_path=…,\n        …\n    )` | `return dataclasses.replace(\n        SchedulerConfig(daily_loss_cap=1800.0),\n        …\n    )` (Block-Kommentar: *„Phase 16 A-4 — Anzeige-Default = CLI-Default `run.py --daily-loss-cap` (1800.0), damit `__post_init__`s Loss-Cap-WARNING beim WebUI-Start nicht mehr feuert. Verhalten bit-identisch; nur die irreführende WARNING ist weg. Die WebUI gatet nichts."*) |
+
+### Was die Edits leisten
+
+| Befund | Korrektur |
+|---|---|
+| 🟢 L8 — WebUI-Access-Log 16 MB/Tag, 510 736 `GET /api`-Zeilen / 2 Tage (Polling 7 s), keine Rotation → Disk-Pressure + Audit-Trail-Lärm | `--no-access-log` flag (uvicorn-nativ, kein Repo-Code, kein logrotate nötig). Application-Logs auf stderr bleiben. Reduktion erwartet ≥ 95 % (WebUI-Logs heute 32 MB in 2 Tagen → ≤ 1 MB/Tag nach Restart) |
+| 🟢 Irreführende WebUI-Warnung — `SchedulerConfig()` Default hat `daily_loss_cap=None` → `__post_init__` (`config.py:233-235`) emittiert `daily_loss_cap is None — INACTIVE` WARNING beim WebUI-Start, obwohl der Scheduler-CLI `--daily-loss-cap 1800.0` setzt | `SchedulerConfig(daily_loss_cap=1800.0)` explizit in der WebUI-Default-Konstruktion (Anzeige-Default = CLI-Default). WARNING verschwindet, **Verhalten bit-identisch** (die WebUI baut die Config nur für die Budget-Anzeige, gatet nichts — siehe Code-Kommentar) |
+
+### Test-Verifikation
+
+| Test-Set | Stand vor A-4 | Stand nach A-4 |
+|---|---:|---:|
+| `phase8_scheduler/tests` | 248 grün | **248 grün** ✅ (kein Test-Touch, alle Tests passen ihre eigene `SchedulerConfig`, nicht die WebUI-Default) |
+
+### Σ-Sweep nach A-4
+
+| Phase | Tests grün | Σ-Sweep-Laufzeit |
+|---|---:|---|
+| phase1_broker_wrapper | 95 | 0,43 s |
+| phase2_persistence | 78 | 14,33 s |
+| phase3_external_data | 104 | 0,23 s |
+| phase4_research | 155 | 0,24 s |
+| phase5_execution | 185 | 0,23 s |
+| phase6_debate | 76 | 0,10 s |
+| phase7_reward | 166 | 0,13 s |
+| phase8_scheduler | 248 | 1,90 s |
+| phase9_universe | 87 | 5,08 s |
+| phase10_v3 | 165 | 0,87 s |
+| phase12_data_foundation | 145 | 3,17 s |
+| phase13_live_data | 82 | 2,56 s |
+| phase14_discovery | 61 | 1,25 s |
+| phase15_v4 | 91 | 0,15 s |
+| root `tests/` | 105 | 4,19 s |
+| **Σ repo-weit** | **1843** | ✅ AK2 weiterhin erfüllt |
+
+### Hook-Verify
+
+```
+$ python3 scripts/check_doc_rotation.py --strict --quiet
+exit=0
+```
+
+### Verdienst + Akzeptanz
+
+| Akzeptanzkriterium | Status |
+|---|---|
+| **AK12** (`run_webui.sh` mit `--no-access-log`; Log-Wachstum < 1 MB/Tag nach Restart — heute noch nicht messbar, Restart erst Block D) | ✅ Code-Edit committed, Restart steht aus |
+| Σ ≥ 1843 nach jedem Block-Ende | ✅ 1843 grün unverändert |
+| Doc-Rotation | ✅ Hook exit 0 |
+
+### Cross-Phase-Touch (P8 freigegeben)
+
+`phase8_scheduler/` ist in Plan §4 explizit als Cross-Phase-freigabe gelistet (P8, Runde 2, 2026-09-05). Phase-15-Phase-Head hatte **P8 nicht** freigegeben — Phase 16 hebt das (P12 + §4-Tabelle). 2 Cross-Phase-Files angefasst, **0 Phase-8-Test-Touch**, **0** andere Phasen berührt.
+
 ### Open questions / blockers
 
-- Keine. A-0..A-3 alle ✅, AK1 + AK2 + AK3 erfüllt. Nächster Step (A-4 WebUI) ist der erste Code-Touch der Session (Phase 8 / P8 freigegeben), aber gut abgegrenzt (2 Files + Tests-Anpassung).
+- Keine. A-0..A-4 alle ✅, AK1 + AK2 + AK3 + AK12 erfüllt.
+- A-5 (Operator-Push) bleibt Operator-Aktion (Nikinger).
 
-### Next (Fortsetzung dieser Session)
+### Next (Session-Ende)
 
-- **A-4 — WebUI-Access-Log (L8):** `phase8_scheduler/scripts/run_webui.sh` `--no-access-log` + `phase8_scheduler/webui/api.py:75` `SchedulerConfig(daily_loss_cap=1800.0)` mit Kommentar. Wirkt erst nach WebUI-Restart (kein Code-Touch im laufenden Bot, nur Konstruktions-Anpassung).
-- **A-5 — Operator-Push:** `git push origin main` — 8 + A-Commits. Nikinger-Aktion.
+- **A-5 — Operator-Push:** `git push origin main` — 9 + A-Commits. Nikinger-Aktion.
+- **Session-Rotation:** Phase-16-Exec-Session #1 → SESSIONS_ARCHIVE.md rotieren, Exec-Session #2 → Phasenkopf (mit Block-A-Bilanz + NEXT = Block B).
 - **B2 (nach Block B Commit)** — Operator-Fenster mit allen 4 Diensten gestoppt: Backup → `init_db.py` → v9 verifizieren → Ledger-Restore-SQL. **Erst nach** Block-B-Commit (P14-Disziplin, Schema-Floor wirkt ab dann).
