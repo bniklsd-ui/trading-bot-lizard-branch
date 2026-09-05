@@ -479,8 +479,8 @@ dann "Phase 13", dann "Phase 14", jetzt Phase 15 — umnummeriert 2026-08-11, 20
 (Demo) beweist Autonomie ohne Hand. Der Bot ist seit 2026-08-31 faktisch tot (100 % Research-
 Abstain) — Ursache Infrastruktur, nicht Strategie.
 
-- [x] **A Haushalt** — Ritual, Σ-Baseline 1843, Code↔.md-Sweep, WebUI-Log, Push *(A-0..A-2 ✅
-  Stand 2026-09-05; A-3..A-4 in Ausführung)*
+- [x] **A Haushalt** — Ritual, Σ-Baseline 1843, Code↔.md-Sweep, WebUI-Log, Push *(A-0..A-4
+  ✅ Stand 2026-09-05, MiniMax-M3-Exec-Session #1; A-5 = Operator-Push, ausstehend)*
 - [ ] **B Substrat** — Schema-Floor (Live-DB v7, Migrations 008/009 nie angewendet) + Operator-
   Apply + Ledger-Restore; Wochenend-Epics raus
 - [ ] **C Research-Loop** — 14-Tage-Fenster für die Trade-Historie + ein Prompt-Satz; Token-Budget
