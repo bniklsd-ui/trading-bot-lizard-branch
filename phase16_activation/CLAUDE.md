@@ -220,13 +220,81 @@ exit=0
 
 ---
 
+## Step A-3 — Code↔.md-Sweep (2026-09-05, MiniMax-M3 Exec-Session #1)
+
+> **Plan-Anker:** [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 A-3 (S. 329-340).
+> **Scope:** 8 Edit-Anker in 5 Dateien + Phase-16-Block-Häkchen-Pflege. **0 Code-Edits**, **0 Test-Edits**, **0 Cross-Phase-Code-Touches** (Doku-Vermerke in fremden Phasenköpfen sind nach P15-Konvention kein Code-Touch).
+
+### 8 Edit-Anker (alle verbatim aus Plan §6 A-3)
+
+| # | Datei | Vorher | Nachher |
+|---|---|---|---|
+| 1 | `CLAUDE.md:118-120` | `> (4) **Live-DB Migration 009** — additive Schema-Migration, `db.py:run_migrations()` wendet sie` / `> beim nächsten Service-Restart automatisch an (Schema heute v7).` | ersetzt durch `> (4) **Live-DB Migration 008+009** — **nicht automatisch**: kein Produktions-Caller von `run_migrations()` (korrigiert 2026-09-05, Phase-16-Plan §3 L3); Phase 16 B1 verdrahtet den Aufruf **nicht** im Daemon, sondern als **Schema-Floor** im Preflight (B1) + einmaligen Operator-Apply mit Backup (B2). Schema heute v7.` |
+| 2 | `CLAUDE.md:167` (Phase-15-Row in Status-Tabelle) | Teilstring `Live-DB Migration 009 (additiv, beim nächsten Service-Restart)` | `Live-DB Migration 008+009 (nicht automatisch — Phase 16 B1/B2)` |
+| 3 | `README.md:39` | `\| 15 \| V4: … \| 🔄 **in execution seit 2026-09-01** — Block A endgültig ✅ … \|` | `\| 15 \| … \| ✅ **abgeschlossen (Closeout 2026-09-05, Session #13)** — 4 Blöcke A/B/C/D alle ✅; Σ 1843 grün; Live-Apply Score 78,72 → 50,00 ¹¹ \|` + neue Zeile 16: `\| 16 \| Freischaltung … \| 🔄 **in execution seit 2026-09-05** — Plan execution-ready; Block A läuft (A-0..A-2 ✅) \|` |
+| 4 | `ROADMAP.md:95-97` | `- [ ] \`LiveQuoteCache\` in den P4-Research-Kontext verdrahtet — **weiterhin offen**, hing an einem 7b-Fix, der mangels Bug nie kam; …` | `- [ ] ~~\`LiveQuoteCache\` in den P4-Research-Kontext verdrahtet~~ — *gegenstandslos (korrigiert 2026-09-05, Phase 16 A-3): \`LiveQuoteCache\` existiert nicht im Repo (0 Treffer); der Bedarf ist durch Phase-12-\`BarService.get_window\` + Phase-13 LS-Tick-Aggregation strukturell abgelöst.*` |
+| 5 | `ROADMAP.md:437` (Phase-15-Status-Absatz) | Teilstring `Live-DB Migration 009 (additiv, beim nächsten Service-Restart)` | `Live-DB Migration 008+009 (nicht automatisch — Phase 16 B1/B2, korrigiert 2026-09-05 → Phase-16-Plan §3 L3)` |
+| 6 | `ROADMAP.md:481` (Phase-16-Block-Häkchen) | `- [ ] **A Haushalt** — Ritual, Σ-Baseline 1843, Code↔.md-Sweep, WebUI-Log, Push` | `- [x] **A Haushalt** — Ritual, Σ-Baseline 1843, Code↔.md-Sweep, WebUI-Log, Push *(A-0..A-2 ✅ Stand 2026-09-05; A-3..A-4 in Ausführung)*` |
+| 7 | `phase9_universe/CLAUDE.md:133` (Step 7b Status-Cell) | `⏸ Kein Fix-Target — 7a fand keinen Bug. Unblocked-aber-leer; …` | `⛔ *gegenstandslos (korrigiert 2026-09-05, Phase 16 A-3): \`LiveQuoteCache\` existiert nicht im Repo (0 Treffer) — Bedarf durch Phase 12 \`BarService.get_window\` + Phase 13 LS-Tick-Aggregation abgelöst.*` |
+| 8 | `phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md` (📕, Dateiende) | (kein Anhang) | 🟡 **Korrekturhinweis 2026-09-05 (Phase 16 A-3)** angehängt: §7 E1 + §9.13 + §10 #4 behaupten automatischen Migrations-Apply beim Restart — falsch (Phase-16-Plan §3 L3, §13 Opus-Befund #1); §4 „Live-Substrate"-Rescue-Zeilen ts 2026-09-04T07:12Z (nicht 09-03) — Datumsdrift korrigiert |
+
+### Was die Edits leisten
+
+| Befund | Korrektur |
+|---|---|
+| 🔴 L3 — „`db.py:run_migrations()` wendet beim nächsten Service-Restart automatisch an" in 4 Stellen (root-CLAUDE.md, ROADMAP.md, P15-Handover) — **falsch**, kein Produktions-Caller | 3 Edit-Anker korrigiert (root-CLAUDE.md Status-Tabelle + Status-Absatz, ROADMAP.md Phase-15-Status, P15-Handover Korrekturhinweis). Die Code-Wahrheit (`wiring.py:803` `db = Database(str(_DB_PATH))` ohne `run_migrations()`) wird jetzt von der Doku nicht mehr widersprochen |
+| 🟢 `LiveQuoteCache` als offenes Item in ROADMAP.md:95-97 + phase9-Head Step 7b — **gegenstandslos**, 0 Treffer im Repo | 2 Edit-Anker (ROADMAP.md gestrichen + Phase-9-Head Status-Cell) — Bedarf durch Phase 12 `BarService.get_window` + Phase 13 LS-Tick-Aggregation abgelöst |
+| 🟢 `README.md` Status-Tabelle Phase 15 in-execution + Σ-Stand 1714 veraltet | Status-Zelle auf ✅ geflippt + neue Phase-16-Zeile + Σ auf 1843 |
+| 🟢 `ROADMAP.md` Phase-16-Absatz mit `[ ]`-Häkchen trotz A-0..A-2 ✅ | Block A auf `[x]` gepflegt mit A-Stand-Vermerk |
+
+### Σ-Sweep nach A-3 (read-only-Verifikation, AK2)
+
+| Phase | Tests grün | Σ-Sweep-Laufzeit |
+|---|---:|---|
+| phase1_broker_wrapper | 95 | 0,42 s |
+| phase2_persistence | 78 | 14,92 s |
+| phase3_external_data | 104 | 0,23 s |
+| phase4_research | 155 | 0,22 s |
+| phase5_execution | 185 | 0,23 s |
+| phase6_debate | 76 | 0,09 s |
+| phase7_reward | 166 | 0,13 s |
+| phase8_scheduler | 248 | 1,78 s |
+| phase9_universe | 87 | 5,58 s |
+| phase10_v3 | 165 | 0,80 s |
+| phase12_data_foundation | 145 | 3,57 s |
+| phase13_live_data | 82 | 2,67 s |
+| phase14_discovery | 61 | 1,32 s |
+| phase15_v4 | 91 | 0,13 s |
+| root `tests/` | 105 | 6,19 s |
+| **Σ repo-weit** | **1843** | ✅ AK2 erfüllt |
+
+### Hook-Verify
+
+```
+$ python3 scripts/check_doc_rotation.py --strict --quiet
+exit=0
+```
+
+15 Phasen OK (PHASE_DIRS endet jetzt mit `phase16_activation`). Phasenkopf trägt genau 1 `## Session stopped`-Block (Exec-Session #1, A-0..A-3 enthalten).
+
+### Verdienst + Akzeptanz
+
+| Akzeptanzkriterium | Status |
+|---|---|
+| **AK3** (4 falsche Doku-Behauptungen + `LiveQuoteCache`-Items geschlossen) | ✅ alle 8 Edit-Anker committed |
+| **AK2** (Σ ≥ 1843) | ✅ 1843 grün unverändert |
+| Doc-Rotation | ✅ Hook exit 0 |
+
+### 📕-Konvention eingehalten
+
+- `phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md` ist 📕 (snapshot, never edit) — aber Phase-12/13/14-Closeout-Pattern erlaubt **datierte Korrekturhinweise anhängen** (Working-style-Regel: *„On conflict, trust what's actually running, then fix the doc with a dated correction note — never silently trust prose over code"*). Korrekturhinweis ist als 🟡-Anhang mit Datum + Quelle + Verweis auf den Code-Befund, kein Body-Edit.
+
 ### Open questions / blockers
 
-- Keine. A-0..A-2 alle ✅, AK1 + AK2 erfüllt. Nächster Step (A-3 Doku-Sweep) ist unabhängig und docs-only.
+- Keine. A-0..A-3 alle ✅, AK1 + AK2 + AK3 erfüllt. Nächster Step (A-4 WebUI) ist der erste Code-Touch der Session (Phase 8 / P8 freigegeben), aber gut abgegrenzt (2 Files + Tests-Anpassung).
 
 ### Next (Fortsetzung dieser Session)
 
-- **A-3 — Code↔.md-Sweep (4 falsche Behauptungen + Leichen):** root-CLAUDE.md:119-120, root-CLAUDE.md Status-Tabelle Z. 167, README.md:39, ROADMAP.md:99, ROADMAP.md:441, phase9_universe/CLAUDE.md:133, phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md (📕, 🟡-Anhang), ROADMAP.md Phase-16-Häkchen-Pflege. Erste Code-Touches im Plan-Scope: 0 (alles Doku).
-- **A-4 — WebUI-Access-Log (L8):** `run_webui.sh` `--no-access-log` + `webui/api.py:75` `SchedulerConfig(daily_loss_cap=1800.0)` mit Kommentar. Wirkt erst nach WebUI-Restart.
-- **A-5 — Operator-Push:** `git push origin main` — 8 + A-Commits (nach A-0..A-4 = +4). Stand vor A-5: 8 lokal ahead; nach A-5 dann 8 + 4 = 12 lokal ahead. Nikinger-Aktion.
+- **A-4 — WebUI-Access-Log (L8):** `phase8_scheduler/scripts/run_webui.sh` `--no-access-log` + `phase8_scheduler/webui/api.py:75` `SchedulerConfig(daily_loss_cap=1800.0)` mit Kommentar. Wirkt erst nach WebUI-Restart (kein Code-Touch im laufenden Bot, nur Konstruktions-Anpassung).
+- **A-5 — Operator-Push:** `git push origin main` — 8 + A-Commits. Nikinger-Aktion.
 - **B2 (nach Block B Commit)** — Operator-Fenster mit allen 4 Diensten gestoppt: Backup → `init_db.py` → v9 verifizieren → Ledger-Restore-SQL. **Erst nach** Block-B-Commit (P14-Disziplin, Schema-Floor wirkt ab dann).

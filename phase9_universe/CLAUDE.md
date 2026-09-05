@@ -130,7 +130,7 @@ Konzept C3, gleiche Disziplin wie P3s Brain-Context-Degradierung).
 | BarProvider-Kette (Step 6) gebaut | `external_data/providers.py` + Circuit + Divergenz | ✅ (Step 6) |
 | BarProvider-Kette **verdrahtet** (P4+P8 wiring) | `_build_market_data` hinter `enable_ig_bars`-Flag (Default **aus**) | ✅ (Wiring 2026-07-04) |
 | Step 7a — LS-Multi-Epic-Diagnose (Live-Lauf) | `scripts/diag_lightstreamer_multi.py` gegen die kuratierten 4 Epics | ✅ Live gelaufen 2026-07-06 → **NEGATIVE result**: kein Multi-Epic-Bug (alle 4 subscriben in M1+M2, H1–H4 alle False). Details: `phase1_broker_wrapper/lightstreamer_integration_notes.md` |
-| Step 7b — LS-Fix + `LiveQuoteCache` | Fix folgt aus 7a | ⏸ Kein Fix-Target — 7a fand keinen Bug. Unblocked-aber-leer; nur re-run bei ~10+ aktiven Epics (H2-Limit ungeprüft bei 4) |
+| Step 7b — LS-Fix + `LiveQuoteCache` | Fix folgt aus 7a | ⛔ *gegenstandslos (korrigiert 2026-09-05, Phase 16 A-3): `LiveQuoteCache` existiert nicht im Repo (0 Treffer) — Bedarf durch Phase 12 `BarService.get_window` + Phase 13 LS-Tick-Aggregation abgelöst.* |
 | `scripts/dev_install.sh` | `phase9_universe` in die editable-install-Kette aufgenommen | ✅ |
 
 ## Step 1 — Ergebnisse (2026-07-04)

@@ -36,9 +36,10 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 12    | Datenfundament (Registry + BarService + Bar-Archiv + Recorder) | ✅ **abgeschlossen (Closeout 2026-08-25)** — Steps 0–8.5 auf `main`; P12.5 formal CLOSED + GESCHEITERT 2026-08-18, die fünf Code-Fixes bleiben korrekt; strukturelle Antwort in Phase 13+14 ⁸ |
 | 13    | Live-Datenfundament (4-stufige Beschaffung, Lightstreamer live, Konsumenten fetchen nie) | ✅ **abgeschlossen (Closeout 2026-08-31, Session 18)** — Code-complete + Beweiswoche ausgewertet + Pfad-C-Entscheidung + Befund-Inversion ⁹ |
 | 14    | Discovery-Then-Deterministic (Quellen-Registry + Discovery-Daemon) | ✅ **abgeschlossen (Closeout 2026-08-31, Session 23)** — Akzeptanz A1–A8 grün; D5-Handover komplett freigegeben ¹⁰ |
-| 15    | V4: Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock | 🔄 **in execution seit 2026-09-01** — Block A endgültig ✅ (A-1..A-7 + P15-F), Block D endgültig ✅ (D-1..D-3); Block B hinter Gate P7, Block C nach B ¹¹ |
+| 15    | V4: Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock | ✅ **abgeschlossen (Closeout 2026-09-05, Session #13)** — 4 Blöcke A/B/C/D alle ✅; Σ 1843 grün; Live-Apply Score 78,72 → 50,00 ¹¹ |
+| 16    | Freischaltung (alle Löcher zu, alle Arme scharf, 2-Wochen-Autonomie-Test) | 🔄 **in execution seit 2026-09-05** — Plan execution-ready; Block A läuft (A-0..A-2 ✅) |
 
-> **Repo-weit Σ:** **1714 grün** (Stand 2026-09-01, Phase-15-D3-Verifikation).
+> **Repo-weit Σ:** **1843 grün** (Stand 2026-09-05, Phase-16-A-2-Verifikation).
 > **Detaillierter Plan:** [`ROADMAP.md`](./ROADMAP.md) (Phasen 9–15 + Cross-Cutting)
 > **Architektur-Diagramme:** [`docs/architecture/`](./docs/architecture/) (Phase-12/13/14-Closeout-SVGs + das neue `phase13_14_15.svg` von Phase 15 Block D)
 > **Komponenten-Übersicht:** [`ARCHITECTURE.md`](./ARCHITECTURE.md)

@@ -396,3 +396,26 @@ zur sofortigen Klärung.
 > eine Phase-15.5-Promotion-Bridge plant, einen anderen Track aufmacht, oder den
 > Doc-Polish (Plan-§6-C2-Korrekturhinweis, SVG-Polish) als Mini-Sessions abarbeitet.
 > **Keine** der offenen Arbeiten hat eine **harte Deadline** im Phase-15-Sinn.
+---
+
+> 🟡 **Korrekturhinweis 2026-09-05 (Phase 16 A-3, MiniMax-M3 Exec-Session #1):**
+> §7 E1, §9.13 und §10 Punkt 4 behaupten einen automatischen Migrations-Apply beim
+> Restart — **falsch**, kein Produktions-Caller von `db.py:run_migrations()`
+> (verifiziert durch `grep -rn "run_migrations()" phase8_scheduler/ --include=*.py`
+> 2026-09-05 → 0 Treffer außerhalb `phase2_persistence/`; Phase-16-Plan §3 L3 +
+> §13 Opus-Review Befund #1). Phase 16 B1 baut den Aufruf **nicht** im Daemon
+> (gelockte Preflight-Entscheidung `wiring.py:1070-1071` *„safety-critical daemon
+> does not mutate schema"* + Lock-Risiko gegen laufenden Discovery-Daemon bei
+> `journal_mode=delete` ohne `busy_timeout`), sondern einen **Schema-Floor** im
+> Preflight + einmaligen Operator-Apply mit Backup (Phase-16-Plan §6 B1/B2).
+>
+> §4 „Live-Substrate": die 5 Rescue-Zeilen tragen `ts 2026-09-04T07:12Z`, nicht
+> 09-03 — Datumsdrift in der ursprünglichen Erhebung, hiermit korrigiert
+> (Quelle: `sqlite3 "file:data/bars.sqlite?mode=ro" "SELECT created_utc, points
+> FROM source_spend WHERE kind='rescue'"`, Phase-16-Plan §2.5).
+>
+> Beide Korrekturen ändern die Phase-15-Bilanz nicht (Phase 15 bleibt ✅), sie
+> aktualisieren nur die zwei Stellen, an denen die Doku der Code-Wahrheit
+> widersprochen hat (Working-style-Regel: *„Tested code > concept doc >
+> README/status prose"*). Datierter Vermerk im Sinne der
+> Phase-12/13/14-Closeout-Konvention.

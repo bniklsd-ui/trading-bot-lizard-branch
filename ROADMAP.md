@@ -92,9 +92,10 @@ auf einem unzuverlässigen Datenfundament aufbaut.
 - [x] Deterministischer Divergenz-Check (IG-Bar-Close vs. yFinance-Last), gated nichts
 - [x] Lightstreamer-Multi-Epic-Diagnose (7a, live 2026-07-06) — **NEGATIV-Befund**, kein Bug,
   kein Fix-Target (7b unblocked-aber-leer)
-- [ ] `LiveQuoteCache` in den P4-Research-Kontext verdrahtet — **weiterhin offen**, hing an
-  einem 7b-Fix, der mangels Bug nie kam; kein Blocker, re-run erst bei ~10+ aktiven Epics
-  (H2-Grenze bei 4 ungeprüft)
+- [ ] ~~`LiveQuoteCache` in den P4-Research-Kontext verdrahtet~~ — *gegenstandslos (korrigiert
+  2026-09-05, Phase 16 A-3): `LiveQuoteCache` existiert nicht im Repo (0 Treffer);
+  der Bedarf ist durch Phase-12-`BarService.get_window` + Phase-13 LS-Tick-Aggregation
+  strukturell abgelöst*
 
 **Leitplanke:** kein neues AI im Daten-/Universum-Layer (Discovery-/Promotion-Kriterien sind
 100 % code-evaluiert); VETOs/Gates unangetastet; demo-only fail-closed.
@@ -434,7 +435,7 @@ angefasst wird. `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` ist leer
 ## Phase 15 — V4: Sophisticated / Optional *(die alte Phase 9, deferred; vormals "Phase 12",
 dann "Phase 13", dann "Phase 14", jetzt Phase 15 — umnummeriert 2026-08-11, 2026-08-18 und 2026-08-22)*
 
-> **Status: ✅ ABGESCHLOSSEN am 2026-09-05 (Session #13, MiniMax-M3-Exec)** — Closeout-Handover [`phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md`](../phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md), Bild [`docs/architecture/phase15_closeout.svg`](../docs/architecture/phase15_closeout.svg). Pattern-Vergleich zu Phase-12/13/14. **4 Blöcke alle ✅**: A (Haushalt) endgültig · B (Reward-Kalibrierung) live-validiert (Score 78,72 → 50,00) · C (Instinct-ECC) code-complete, heute bit-identical via VETO-5-leere-Regelliste (AK9) · D (Erbstücke + Folgefix Variante C) endgültig. **Σ 1843 grün repo-weit**. 18 Commits gepusht, 6 Commits lokal ahead (Push-Freigabe ausstehend). **Offen (alle nicht-Phase-15-Blocker):** Promotion-Bridge (Plan §10), Ledger-Restore (250 Punkte, Nikinger-Aktion), Live-DB Migration 009 (additiv, beim nächsten Service-Restart), Gate P7/A6 (wartet auf nächsten OPEN-Trade).
+> **Status: ✅ ABGESCHLOSSEN am 2026-09-05 (Session #13, MiniMax-M3-Exec)** — Closeout-Handover [`phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md`](../phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md), Bild [`docs/architecture/phase15_closeout.svg`](../docs/architecture/phase15_closeout.svg). Pattern-Vergleich zu Phase-12/13/14. **4 Blöcke alle ✅**: A (Haushalt) endgültig · B (Reward-Kalibrierung) live-validiert (Score 78,72 → 50,00) · C (Instinct-ECC) code-complete, heute bit-identical via VETO-5-leere-Regelliste (AK9) · D (Erbstücke + Folgefix Variante C) endgültig. **Σ 1843 grün repo-weit**. 18 Commits gepusht, 6 Commits lokal ahead (Push-Freigabe ausstehend). **Offen (alle nicht-Phase-15-Blocker):** Promotion-Bridge (Plan §10), Ledger-Restore (250 Punkte, Nikinger-Aktion), Live-DB Migration 008+009 (nicht automatisch — Phase 16 B1/B2, korrigiert 2026-09-05 → Phase-16-Plan §3 L3), Gate P7/A6 (wartet auf nächsten OPEN-Trade).
 >
 > Phasenkopf: [`phase15_v4/CLAUDE.md`](../phase15_v4/CLAUDE.md). Plan: [`docs/concepts/phase15_v4_plan.md`](./docs/concepts/phase15_v4_plan.md) (P1–P16, AK1–AK14, 📕).
 
@@ -478,7 +479,8 @@ dann "Phase 13", dann "Phase 14", jetzt Phase 15 — umnummeriert 2026-08-11, 20
 (Demo) beweist Autonomie ohne Hand. Der Bot ist seit 2026-08-31 faktisch tot (100 % Research-
 Abstain) — Ursache Infrastruktur, nicht Strategie.
 
-- [ ] **A Haushalt** — Ritual, Σ-Baseline 1843, Code↔.md-Sweep, WebUI-Log, Push
+- [x] **A Haushalt** — Ritual, Σ-Baseline 1843, Code↔.md-Sweep, WebUI-Log, Push *(A-0..A-2 ✅
+  Stand 2026-09-05; A-3..A-4 in Ausführung)*
 - [ ] **B Substrat** — Schema-Floor (Live-DB v7, Migrations 008/009 nie angewendet) + Operator-
   Apply + Ledger-Restore; Wochenend-Epics raus
 - [ ] **C Research-Loop** — 14-Tage-Fenster für die Trade-Historie + ein Prompt-Satz; Token-Budget
