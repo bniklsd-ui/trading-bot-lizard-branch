@@ -135,15 +135,98 @@ exit=0
 
 🟡 **Plan-Session-Block-Heading-Format-Variante** (Phase-15-Vorbild-„Plan-Session, Opus 5" hat die gleiche Eigenschaft — bewusste Konvention, in `SESSIONS_ARCHIVE.md`-Header-Absatz dokumentiert).
 
+---
+
+## Step A-1 — Step-0-Ritual (2026-09-05, MiniMax-M3 Exec-Session #1)
+
+> **Plan-Anker:** [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 A-1 (S. 315-323).
+> **Konvention:** Ritual wird **auch als No-Op** protokolliert (Plan §2.6, Phase-15-Vorbild).
+
+### Turbo-Grep — `grep -rni "turbo" --include="*.py" --include="*.sql" --include="*.sh" . --exclude-dir=.venv`
+
+**20 Repo-Treffer** (Plan-Erwartung §2.7 = 14; **+6 Drift seit Phase-15-Messung 2026-08-31**, ehrlich gemessen 2026-09-05). Aufschlüsselung:
+
+| Datei | Zeilen | Inhalt |
+|---|---|---|
+| `phase2_persistence/persistence/state.py` | 8, 27, 30, 114 | Konstante `CANDIDATES_FILE = "turbo_candidates.json"` + Doc-Hinweis „Legacy name; Do NOT rename" |
+| `phase2_persistence/tests/test_state.py` | 77 | Test-Beschreibung der Legacy-Datei |
+| `phase4_research/research/models.py` | 6 | Persistenz-Hinweis |
+| `phase4_research/scripts/live_test.py` | 7, 12 | Live-Test-Beschreibung |
+| `phase4_research/scripts/smoke_test.py` | 8 | Smoke-Test-Beschreibung |
+| `phase5_execution/execution/config.py` | 138 | Vertrag-Hinweis im Doc-Kommentar |
+| `phase5_execution/scripts/wiring.py` | 18 | Wiring-Doku |
+| `phase5_execution/scripts/seed_candidate.py` | 7, 101 | Seed-Script-Doku + Echo |
+| `phase6_debate/scripts/smoke_test.py` | 68 | Smoke-Test-Fehlermeldung |
+| `phase8_scheduler/webui/api.py` | 311, 319 | WebUI-Read des Legacy-Files |
+| `phase8_scheduler/scheduler/research_tick.py` | 6, 234 | Research-Tick-Doku |
+| `phase8_scheduler/tests/test_webui.py` | 370 | Test-Fixture |
+
+**VENV-Treffer:** wie immer ignoriert (Site-Packages, NICHT Repo-Code).
+
+**+6 Drift seit Phase-15-Messung 2026-08-31 (Plan-Session-Vermutung 14):**
+- `phase8_scheduler/webui/api.py:319` — `_load_json_array(str(state_dir / "turbo_candidates.json"))` (war in Phase-15-Stand evtl. in einer anderen Zeile, jetzt referenziert)
+- `phase8_scheduler/tests/test_webui.py:370` — Test-Fixture (neuere Test-Erweiterung)
+- `phase5_execution/execution/config.py:138` — Doc-Kommentar (war ggf. in Phase-15-Stand nicht referenziert, jetzt zusätzlich)
+- `phase4_research/research/models.py:6` — Persistenz-Hinweis
+- `phase4_research/scripts/live_test.py:7` — Live-Test-Beschreibung
+- `phase4_research/scripts/live_test.py:12` — Live-Test-Beschreibung
+
+→ **Alle 6 zusätzlichen Treffer sind ebenfalls Verweise auf den Legacy-Filenamen `turbo_candidates.json`** (Doku-Kommentare + Test-Fixtures), keine neue technische `turbo`-Referenz. **Verdienst: No-Op, Phase-16-Erstmal-Bestätigung.** Phase 16 führt keine neue Turbo-Referenz ein — Plan-Garantie eingehalten.
+
+### EPIC_MAP-Grep — `grep -rn "EPIC_MAP" --include="*.py" . --exclude-dir=.venv`
+
+**3 Treffer, alle in `phase14_discovery/`** (Plan-Erwartung §2.7 = 3, **exakt**):
+
+| Datei | Zeile | Inhalt |
+|---|---|---|
+| `phase14_discovery/source_registry/models.py` | 121 | Doku: *„the column whose absence in the Concept schema made `EPIC_MAP` structurally…"* |
+| `phase14_discovery/source_registry/store.py` | 194 | Doku: *„Replaces `EPIC_MAP.get(epic)` in `live_data/backfill.py:180` (Phase-14…"* |
+| `phase14_discovery/tests/test_store.py` | 239 | Test-Doku: *„value that replaces `EPIC_MAP.get(epic)` in `live_data/backfill.py:180`"* |
+
+→ aktiver `EPIC_MAP`-Code existiert **nicht** mehr im Repo (Phase-14 A2-Akzeptanz seit Session 9 grün). Die 3 Treffer dokumentieren die Ablösung. **Verdienst: bestätigt** — `EPIC_MAP` ist Geschichte, Doku in Phase-14-Tests bleibt stehen.
+
+---
+
+## Step A-2 — Σ-Baseline (2026-09-05, MiniMax-M3 Exec-Session #1)
+
+> **Plan-Anker:** [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 A-2 (S. 325-327) + §2.1 Σ-Baseline-Tabelle.
+> **Erwartung:** Σ = **1843 grün** (Plan §2.1).
+> **Kommandoform (verifiziert):** `cd <phaseN> && ../phase1_broker_wrapper/.venv/bin/python -m pytest tests/ -q -p no:cacheprovider`
+
+### Sweep-Ergebnis — Σ = 1843 grün, exakt Erwartung
+
+| Phase | Tests grün | Σ-Sweep-Laufzeit | Anmerkung |
+|---|---:|---|---|
+| phase1_broker_wrapper | **95** | 0,48 s | — |
+| phase2_persistence | **78** | 14,16 s | langsamster (DB-Fixture-Setup) |
+| phase3_external_data | **104** | 0,24 s | — |
+| phase4_research | **155** | 0,24 s | — |
+| phase5_execution | **185** | 0,24 s | — |
+| phase6_debate | **76** | 0,09 s | — |
+| phase7_reward | **166** | 0,14 s | — |
+| phase8_scheduler | **248** | 1,81 s | 1 Warning (pre-existing) |
+| phase9_universe | **87** | 5,25 s | — |
+| phase10_v3 | **165** | 0,82 s | — |
+| phase12_data_foundation | **145** | 3,07 s | — |
+| phase13_live_data | **82** | 2,94 s | — |
+| phase14_discovery | **61** | 1,34 s | — |
+| phase15_v4 | **91** | 0,13 s | — |
+| root `tests/` | **105** | 4,15 s | — |
+| **Σ repo-weit** | **1843** | ~35 s | = Plan-Erwartung exakt ✅ |
+
+**Phase 11 hat kein eigenes `tests/`-Verzeichnis** (lebt in `phase10_v3/`) — fehlt deshalb in der Σ-Tabelle, konsistent mit Plan §2.1 + Phase-15-Vorbild.
+
+**Phase-16-Bereitschaft:** Σ-Baseline steht **vor** dem ersten Phase-16-Code-Fix. AK2 erfüllt. Jede Abweichung vom Σ ≥ 1843 nach einem Phase-16-Schritt ist ein **Befund von Phase 16**, nicht von vorher.
+
+---
+
 ### Open questions / blockers
 
-- Keine. A-0 ist die saubere Brücke zwischen Plan-Session und Exec-Session; nächster Step (A-1 Ritual) ist unabhängig und read-only.
+- Keine. A-0..A-2 alle ✅, AK1 + AK2 erfüllt. Nächster Step (A-3 Doku-Sweep) ist unabhängig und docs-only.
 
-### Next (für die nächste Session oder Pause-Fortsetzung)
+### Next (Fortsetzung dieser Session)
 
-- **A-1 — Step-0-Ritual:** `grep -rni "turbo" --include="*.py" --include="*.sql" --include="*.sh" . --exclude-dir=.venv` + `grep -rn "EPIC_MAP" --include="*.py" . --exclude-dir=.venv` — Erwartung 14 + 3 wie Plan §2.7 (5. Mal No-Op-Bestätigung). Ergebnis in diesen Phasenkopf-Block.
-- **A-2 — Σ-Baseline:** Sweep nach Plan §2.1, Erwartung Σ = **1843** grün. Abweichung = Befund von *vor* Phase 16, dokumentieren.
 - **A-3 — Code↔.md-Sweep (4 falsche Behauptungen + Leichen):** root-CLAUDE.md:119-120, root-CLAUDE.md Status-Tabelle Z. 167, README.md:39, ROADMAP.md:99, ROADMAP.md:441, phase9_universe/CLAUDE.md:133, phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md (📕, 🟡-Anhang), ROADMAP.md Phase-16-Häkchen-Pflege. Erste Code-Touches im Plan-Scope: 0 (alles Doku).
 - **A-4 — WebUI-Access-Log (L8):** `run_webui.sh` `--no-access-log` + `webui/api.py:75` `SchedulerConfig(daily_loss_cap=1800.0)` mit Kommentar. Wirkt erst nach WebUI-Restart.
-- **A-5 — Operator-Push:** `git push origin main` — 7 + A-Commits. Stand vor A-5: 7 lokal ahead; nach A-5 dann 7 + Anzahl-A-Commits ahead. Nikinger-Aktion.
+- **A-5 — Operator-Push:** `git push origin main` — 8 + A-Commits (nach A-0..A-4 = +4). Stand vor A-5: 8 lokal ahead; nach A-5 dann 8 + 4 = 12 lokal ahead. Nikinger-Aktion.
 - **B2 (nach Block B Commit)** — Operator-Fenster mit allen 4 Diensten gestoppt: Backup → `init_db.py` → v9 verifizieren → Ledger-Restore-SQL. **Erst nach** Block-B-Commit (P14-Disziplin, Schema-Floor wirkt ab dann).
