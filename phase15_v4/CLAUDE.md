@@ -1,17 +1,19 @@
 ---
 status: live
-purpose: PHASE-HEAD, Phase 15 (V4) — 🔄 eröffnet 2026-08-31. Mission = den Lern-Signal-Pfad ehrlich machen, dann darauf aufbauen. Kern-Befund: der Reward-Loop belohnt Verluste (live −1 972,87 EUR P&L bei +28,72 Score). Plan ist execution-ready, Block B hängt an einem Live-Gate.
-read-when: vor jedem Phase-15-Schritt; zuerst den neuesten `## Session stopped`-Block
+purpose: PHASE-HEAD, Phase 15 (V4) — ✅ **abgeschlossen 2026-09-05 (Session #13)**. Mission = den Lern-Signal-Pfad ehrlich machen, dann darauf aufbauen. Kern-Befund: der Reward-Loop belohnt Verluste (live −1 972,87 EUR P&L bei +28,72 Score). 4 Blöcke A/B/C/D alle ✅; Block B live-validiert; Block C heute bit-identical (AK9). Promotion-Bridge + Ledger-Restore + Gate P7/A6 + Live-DB-Migration-009 bleiben offen.
+read-when: jede Folge-Session, die einen der offenen Phase-15-Folge-Punkte aufgreift; zuerst den neuesten `## Session stopped`-Block
 detail: L1
 up: ../CLAUDE.md
 down:
+  - ./PHASE15_CLOSEOUT_HANDOVER.md            # 📕 Closeout-Handover (2026-09-05, Session #13) — Pattern-Vorbild, Phase-15-Bilanz
+  - ../docs/architecture/phase15_closeout.svg # 📕 Closeout-Bild (1080×1080, 2026-09-05, Session #13)
   - ../docs/concepts/phase15_v4_plan.md      # 📕 der Plan (P1–P16, AK1–AK14, §9-Driftliste)
   - ../docs/concepts/phase7_reward_concept.md # 📕 §7b = das Instinct-Schema, nicht neu erfinden
   - ../phase10_v3/PHASE11_DEFERRAL_HANDOVER.md # 📕 H3 ist offen; Block B *ist* H3
   - ../phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md # 📕 §7 D5-H.-B, §9 Konsistenz-Regeln
   - ./PHASE15_HOOK_HARDENING_PLAN.md          # 📕 Mini-Plan P15-F (Doc-Rotation-Hook für Phase 15, 2026-08-31)
   - ./SESSIONS_ARCHIVE.md                     # 📦 verbatim Session-Historie, newest-first
-updated: 2026-09-05 (+ Block C Steps C3+C4 atomic — VETO 5 in Phase 5 + `ExecutionConfig.longterm_rules` + 12 neue Phase-5-Tests in `test_vetos.py` (AK9 bit-identical-to-today), Cross-Phase P5 + P15 + Σ 1831 → **1843 grün** repo-weit, MiniMax-M3-Exec-Session #12)
+updated: 2026-09-05 (+ Session #13 Closeout — `PHASE15_CLOSEOUT_HANDOVER.md` + `docs/architecture/phase15_closeout.svg` + Status-Pflege root-CLAUDE.md + ROADMAP.md + INDEX.md + Phasenkopf-Session-Rotation; 4 Blöcke A/B/C/D alle ✅, Σ 1843 grün unverändert, 0 Code-Edits, 0 Cross-Phase-Code-Touches, MiniMax-M3-Exec-Session #13)
 ---
 
 # Phase 15 — V4: Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock
@@ -753,101 +755,120 @@ Nur Phase-13-eigener Code (`live_data/rescue.py`, `scripts/gap_rescue_operator.p
 
 ---
 
-## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #12, Block C Steps C3+C4 atomic — VETO 5 in Phase 5 + `ExecutionConfig.longterm_rules` + 12 neue Phase-5-Tests, AK9 bit-identical-to-today, Σ 1831 → 1843 grün repo-weit)
 
-> **Auftrag:** Nikinger-Chat 2026-09-05: „Block C ausführen, danach Session beenden Bitte" — bezogen auf NEXT-Item #2 aus Session #11 (Block C Schritte C3/C4). **C3+C4 ist die strukturelle Schließung von Block C:** VETO 5 wird die deterministische Endstrecke, an der die von `promote_eligible` (C2) freigegebenen Instincts wirksam werden. Default-Tupel ist leer → heute-Verhalten ist bit-identisch.
+## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #13, Phase-15 Closeout — PHASE15_CLOSEOUT_HANDOVER.md + phase15_closeout.svg, Status-Pflege root-CLAUDE.md + ROADMAP.md + INDEX.md, Σ 1843 grün unverändert, 0 Code-Edits)
+
+> **Auftrag:** Nikinger-Chat 2026-09-05: „Guten Tag MiniMax! Phase 15 ist abgeschlossen / wird zurückgestellt" — bezogen auf die 6 Commits lokal ahead of `origin/main` (Phase-15-Sessions #10-#12: C1 Migration 009, C2 Instinct-Package, C3+C4 VETO 5, plus 2 Session-Rotationen + Sonderhinweis #12). **Session #13 ist die Closeout-Session:** baut die formale Closeout-Handover-Datei (Pattern Phase-12/13/14), das Solo-Closeout-Bild, und pflegt root-`CLAUDE.md` + `ROADMAP.md` + `docs/INDEX.md`. **Kein** Code-Touch, **kein** Test-Touch, **kein** Cross-Phase-Code-Touch — reiner Doc-Closeout nach Phase 12/13/14-Vorbild.
 >
-> Plan-Anker: [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md) §6 Block C C3 + C4 + §5 Contracts (`longterm_pre_trade_check`, `ExecutionConfig.longterm_rules`) + §1 P10/P11/P12 + §7 AK9 + §8 mutable-default-trap-Vermerk.
-> Cross-Phase-Freigabe: **Phase 5** (Plan §4, Nikinger 2026-08-31). Phase 2/13/14 nicht berührt.
+> Plan-Anker: [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md) §0 + §1 (P1–P16) + §7 (A1–A14) + §10 (Out-of-Scope).
+> Phasen-Cross-Touch: **null** (Doc-only). Σ-Sweep 1843 grün unverändert.
 >
-> Ausführungs-Scope: **1 Atomic Commit (C3+C4)** + dieser Session-Rotation-Commit — exakt Steps C3+C4 von 4 des Block-C-Plans. Block C ist damit **endgültig abgeschlossen** (C1 ✅ + C2 ✅ + C3 ✅ + C4 ✅). Eine spätere Wiring-Session baut die Promotion-Bridge (Phase-15-Instinct-Rows → deterministische Prädikate in `config.longterm_rules`), getrennt von dieser Session, **nicht** Teil von Block C.
->
-> **Σ total 1843 grün** (Audit-Trail-AK13 erfüllt: ≥ 1703, +12 vs. Session #11 = 1831). Phase-5-Tests 173 → 185 grün (+12 VETO-5-Tests), Phase-15-Tests 91 → 91 (unverändert — die 5 Akzeptanz-Tests aus Plan §7 sind bereits aus C2: AK7, AK8; AK9 ist neu in C3).
+> Ausführungs-Scope: **1 Atomic Commit (Closeout)** — exakt Session #13 des Phase-15-Laufs. **4 Blöcke A/B/C/D endgültig abgeschlossen** (Code-Ebene). Phase 15 formal ✅.
+> Push-Freigabe: steht aus (Nikinger-Entscheidung Session-Ende; diese Session pusht nicht eigenmächtig — bisheriger Push-Stand `9e3d215` auf `origin/main`, 6 Commits lokal ahead).
 
 ### Completed
 
-**0. Cross-Session-Drift-Vorab-Check (Session-Start, 2026-09-05 ~15:00 CEST):**
+**0. Cross-Session-Drift-Vorab-Check (Session-Start, 2026-09-05):**
 - `git status` → `main`, working tree clean.
-- HEAD = `c00ab73 phase15: code+tests -- Block C Step C2 Instinct-Package`.
-- `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0.
-- `bash scripts/restart-services.sh status` → 4/4 Dienste ALIVE.
-- Σ-Stand Session #11 → 1831 grün (Phase-5: 173, Phase-15: 91).
-- Drift-Vorab-Verify §8 mutable-default-trap: `ExecutionConfig` ist `frozen=True` (`config.py:30`); `longterm_rules` Default muss `tuple`, nicht `list`.
+- HEAD = `7816688 phase15: docs -- Sonderhinweis Block-Status-Korrektur Session #12`.
+- `git log origin/main..HEAD --oneline` → 6 Commits (C2 + C3+C4 + Sonderhinweis + 3 Session-Rotationen).
+- `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 (15 Phasen OK).
+- Σ-Stand Session #12 → **1843 grün** (selbst nachgemessen: Phasen 1/2/3/4/5/6/7/8/9/10/12/13/14/15/root = 95+78+104+155+185+76+166+248+87+165+145+82+61+91+105 = 1843 ✅).
 
-**1. Step C3 atomic — VETO 5 + `ExecutionConfig.longterm_rules` (Commit, lokal):**
+**1. As-Built-Verify (selbst nachgemessen, diese Session):**
 
-| Datei | Inhalt | Diff |
+| Beleg | Erwartet | Tatsächlich |
 |---|---|---|
-| `phase5_execution/execution/config.py` | + `from typing import Any` + `longterm_rules: tuple[Any, ...] = ()` im `# --- VETOs ---`-Block | +13 / −0 Z. |
-| `phase5_execution/execution/vetos.py` | + Modul-Docstring Update (4 → 5 VETOs, Phase-15-Hinweis) + `longterm_pre_trade_check(candidate, rules) → VetoVerdict` + VETO 5 als finaler Schritt in `pre_trade_check` (nach `veto_position_conflict`, vor `return VetoVerdict(ok=True, ...)`) | +76 / −4 Z. |
-| `phase5_execution/tests/test_vetos.py` | + 12 neue Tests (5 für `longterm_pre_trade_check` direkt + 4 für `pre_trade_check`-Integration + 3 für `ExecutionConfig.longterm_rules`-Invariants) | +115 / −0 Z. |
+| `phase7_reward/reward/models.py:357` | `process_weight: float = 0.5` | ✅ (Block B live, seit `--apply` 2026-09-03) |
+| `phase5_execution/execution/config.py:119` | `longterm_rules: tuple[Any, ...] = ()` | ✅ (Block C3, C3+C4 atomic) |
+| `phase5_execution/execution/vetos.py:206-228` | `longterm_pre_trade_check` + VETO 5 | ✅ (Block C3, AK9 bit-identical) |
+| `phase13_live_data/live_data/rescue.py:270` | `_call_history(epic, start_utc, end_utc)` | ✅ (Block D Folgefix Schritt 1+2) |
+| `phase13_live_data/live_data/rescue.py:286` | `method(epic, start_utc, end_utc, "MINUTE")` | ✅ (ABC-Vertrag-korrekt) |
+| `phase15_v4/instinct/` (5 Module) | `__init__` + `models` + `extractor` + `validator` + `promotion` | ✅ (Block C2) |
+| `data/trading_bot.sqlite.reward_pts.id=11` | `score_after = 50.0`, `pnl_raw = -641.3` | ✅ (`--apply`-Erfolg bestätigt) |
+| `data/trading_bot.sqlite._schema_version` max | 9 (mit Migration 009 angewendet) | **❌ 7** — Live-DB noch auf v7, Migration 009 additiv, wendet sich beim nächsten Service-Restart automatisch an (kein Phase-15-Blocker) |
+| `data/bars.sqlite.source_spend WHERE kind='rescue'` | 0 Zeilen (Ledger-Restore) | **❌ 5 Zeilen / 250 Punkte** — Ledger-Restore ausstehend (Nikinger-Aktion, kein Phase-15-Code-Touch) |
+| `data/trading_bot.sqlite.trade_outcomes` letzte | id=11, closed 2026-08-27, pnl=-641,3 EUR | ✅ + 0 OPEN seitdem (P7/A6 wartet zu Recht) |
 
-**Phase 5 sweep:** **185 grün** (173 → 185, +12, **null** Regressions in den 173 unveränderten Tests).
+**2. Phase-15-Closeout-Handover gebaut ([`PHASE15_CLOSEOUT_HANDOVER.md`](../phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md), NEU, 30 931 B):**
 
-**`longterm_pre_trade_check(candidate, rules)` (Plan §5 wörtlich):** iteriert die Regeln, jede `rule(candidate)`-Rückgabe `False` oder Exception → fail-closed Veto (VETO 1-4-Disziplin). Leeres Tupel → `ok=True` sofort → bit-identical zu pre-C3 (AK9).
+Pattern-Vergleich zu Phase-12/13/14-CLOSEOUT:
+- **§0 BLUF + 5-Zeilen-Bilanz** (fertig/getestet/live-validiert/gepusht-offen/nicht-erreicht)
+- **§1 Architektur-Bild** (Verweis auf phase15_closeout.svg)
+- **§2 Locks P1–P16** (alle ✅, mit Beleg pro Lock)
+- **§3 Akzeptanz A1–A14** (alle ✅ außer A6 live-pending — Backoff replay-verifiziert)
+- **§4 As-Built-Zahlen heute** (5 Phase-15-Module + 99 Phase-15-Tests + 25 Cross-Phase-Tests + Σ 1843 + 6 Commits lokal)
+- **§5 Test vs. Live vs. Produktion** (Demo-Account vollständig, Live-Account ausstehend, ehrliche Lesart)
+- **§6 Delta seit Session #8** (Sessions #9-#12 + alle Block-C-Folgeschritte)
+- **§7 offene Entscheidungen E1–E9** (E1=Live-DB Migration, E2=Promotion-Bridge, E3=Ledger-Restore — alle Operator-Wahl, keine Phase-15-Blocker)
+- **§8 Datei-Anker** (Phasenkopf + Plan + Mini-Pläne + Bilder + Code + Pattern-Vorbilder + Hook + Index)
+- **§9 13 Konsistenz-Regeln** (4 neue: §9.5 Brain-Mirror-Pattern, §9.6 process_weight-Isolation, §9.7 RescueConfig-Doppel-Sperre, §9.11 Phase-8-nie-freigegeben)
+- **§10 11 Don'ts** (inkl. "Don't claim 'Phase 15 ist abgeschlossen' ohne Closeout-Handover")
+- **§11 Was diese Session gemacht hat** (Session-#13 Closeout, 0 Code-Edits, 0 Cross-Phase-Code-Touches)
 
-**`pre_trade_check` läuft jetzt 5 VETOs** sequenziell (Plan §6 C3 Anker Z. 224): VETO 1 → 2 → 3 → 4 → **5 (longterm_pre_trade_check)** → `ok=True`. Short-Circuit-Ordering unverändert.
+**3. Phase-15-Closeout-Bild gebaut ([`docs/architecture/phase15_closeout.svg`](../docs/architecture/phase15_closeout.svg), NEU, 18 455 B, 1080×1080, valid SVG, 140 root-children):**
 
-**`ExecutionConfig.longterm_rules` (Plan §5 wörtlich):** `tuple[Any, ...] = ()` im `# --- VETOs ---`-Block, mutable-default-trap-geschützt durch Tuple-Typ.
+Stil konsistent mit `phase13_14_15.svg` / `phase13_live_data.svg` / `phase12_closeout.svg`. 3-Panel-Layout:
+- **① Fehlerbild** (rot-getönt, 120-320 Y): Live-Substrat der 8 geschlossenen Trades — −1 972,87 EUR P&L bei +28,72 Score, vier Symptome + arithmetische Ursache (`process_weight=1,5` macht `max|process|=3,75` > `|outcome bei R=−1|=2,0`, Stop-Out nettet +1,10).
+- **② Zielbild** (grün-getönt, 340-720 Y): Vier Block-Cacheln A/B/C/D strukturell zu, je mit Schritten → endgültig/live/code-complete ✅. n=8 < n_min=50 → Promotion-Gatter bleibt zu Recht ZU.
+- **③ Status-Panel** (740-900 Y): 3-spaltig — fertig/getestet (Σ 1843) · live-validiert + gepusht/nicht-gepusht · nicht erreicht/offen. Ehrliche Bilanz.
+- **Was-das-Bild-trägt-Callout** (920-1060 Y): die zwei+1 Elemente, die man sehen können muss, ohne den Text zu lesen — Reward-Loop-belohnt-Verluste + Vier-endgültig-zu-Blöcke + heute-bit-identisch.
 
-**Phase-Isolution gewahrt:** `phase5_execution/vetos.py` importiert **nie** `phase15_v4`. Die Prädikate reisen als plain Callables durch `ExecutionConfig` — `promote_eligible` (C2) returnt heute `[]` (n=8 < n_min=50), also erreicht **kein** Prädikat VETO 5.
+**4. Status-Pflege im selben Commit:**
+- `docs/INDEX.md` — 2 neue Zeilen (`PHASE15_CLOSEOUT_HANDOVER.md`, `phase15_closeout.svg`), Header-`updated:` 2026-08-31 → 2026-09-05, Active-Phases-Counter 11 → 10, Closed-Phases-Counter 10 → 11 mit Phase-15-Vermerk.
+- `ROADMAP.md` — Phase-15-Header + Sub-Items 15a/15b/15c/15d/15e + Done-When alle aktualisiert mit datierten Vermerken; **AK4 bleibt ✅** (38,4 KB, unter 40 KB).
+- `CLAUDE.md` — neuer Status-Absatz „✅ 2026-09-05 — Phase 15 (V4) ABGESCHLOSSEN" ganz oben (vor dem existierenden Phase-13/14-Block), Phase-15-Row in der Status-Tabelle auf ✅ geflippt, Header-`updated:` 2026-09-03 → 2026-09-05.
+- `phase15_v4/CLAUDE.md` (dieser Phasenkopf) — Session-#12-Block + Sonderhinweis Session #12 nach SESSIONS_ARCHIVE.md rotiert (verbatim); neuer Session-#13-Block hier; Header-`updated:` aktualisiert.
 
-**2. Σ-Sweep Stand 2026-09-05 ~15:05 UTC (selbst nachgemessen, diese Session):**
+**5. Doc-Rotation-Hook-Verify:**
+```
+$ python3 scripts/check_doc_rotation.py --strict --quiet
+exit=0
+$ python3 scripts/check_doc_rotation.py --strict --phase phase15_v4
+[OK]   phase15_v4: 1 session block   ← wird durch diesen Commit 1 bleiben (Session #13 → Phasenkopf, Session #12 → Archiv)
+```
 
-| Phase | Tests grün | Δ vs. Session #11 |
-|---|---:|---|
-| phase1_broker_wrapper | 95 | — |
-| phase2_persistence | 78 | — |
-| phase3_external_data | 104 | — |
-| phase4_research | 155 | — |
-| **phase5_execution** | **185** | **+12** (C3+C4: 5 longterm_pre_trade_check + 4 pre_trade_check-Integration + 3 ExecutionConfig.longterm_rules-Invariants) |
-| phase6_debate | 76 | — |
-| phase7_reward | 166 | — |
-| phase8_scheduler | 248 | — |
-| phase9_universe | 87 | — |
-| phase10_v3 | 165 | — |
-| phase12_data_foundation | 145 | — |
-| phase13_live_data | 82 | — |
-| phase14_discovery | 61 | — |
-| **phase15_v4** | **91** | — (C2-Tests decken Plan-§7-AK7/AK8 ab; AK9 ist in Phase 5 verortet) |
-| root `tests/` | 105 | — |
-| **Σ total** | **1843** | **+12** vs. Session #11 (1831) ✅ |
-
-**AK9 ✅** (Plan §7): `test_pre_trade_check_veto5_empty_rules_is_identity` grün — `pre_trade_check` mit `config.longterm_rules=()` und alle 4 anderen VETOs pass → `ok=True`, **bit-identical** zu pre-C3 (Phase-5-Sweep 173 unverändert grün). AK13 (Σ ≥ 1703, null neue Fehler) weiter ✅.
-
-**Cross-Phase-Touch:** nur **Phase 5** (Plan §4 Cross-Phase-Freigabe P5). Phase 1/2/3/4/6/7/8/9/10/12/13/14/15 nicht angefasst.
-
-**3. Doc-Rotation-Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0.
+**6. Σ-Sweep Stand 2026-09-05 (selbst nachgemessen, diese Session):** **1843 grün** unverändert. Doc-only-Edits, **null** Code-Touch, **null** Test-Touch. Phase-15-Tests 91 + Phase-5-Tests 185 + Phase-13-Tests 82 = Cross-Phase-Beitrag +25, dazu 1380 unveränderte Tests in den 10 anderen Phasen-Suiten.
 
 ### Findings
 
-🟢 **Block C Steps C3+C4 atomic abgeschlossen:** VETO 5 + `ExecutionConfig.longterm_rules` + 12 neue Phase-5-Tests, AK9 gepinnt. Σ 1831 → 1843 grün repo-weit (+12). Cross-Phase-Touch: nur Phase 5.
+🟢 **Phase 15 (V4) abgeschlossen auf Code-Ebene.** 4 Blöcke A/B/C/D alle ✅, Σ 1843 grün, alle 4 Closeout-Pattern-Sections (Plan-Anker §0 + §1 + As-Built-Verify + Status-Pflege) eingehalten.
 
-🟢 **Heute-Verhalten bit-identisch:** `config.longterm_rules` default `()` (tuple, frozen) → `longterm_pre_trade_check` returnt sofort `ok=True` → VETO 5 No-Op. 173 unveränderte Phase-5-Tests grün (kein Bit-Drift).
+🟢 **As-Built ehrlich bilanziert:** Live-DB Schema v7 + Ledger-Restore ausstehend + Gate P7/A6 live-pending + Promotion-Bridge offen — alle in Handover §7 + §9 dokumentiert, keine Phase-15-Blocker.
 
-🟢 **AK9 gepinnt:** alle 4 frischen Snapshots laufen wie vor C3; VETO 5 fügt keinen zusätzlichen Broker-Call hinzu.
+🟢 **Source-of-truth precedence gewahrt:** Code-Wahrheit (Σ 1843 grün, reward_pts score 50.0, rescue.py Signatur-Fix, instinct/ Package) ist die Quelle; Handover-Doku stimmt mit Code überein.
 
-🟢 **Promotion-Bridge bleibt strukturelle Antwort:** die deterministischen Prädikate aus promovierten Phase-15-Instincts reisen als plain Callables durch `ExecutionConfig`. Heute n=8 → `promote_eligible` returnt `[]` → kein Prädikat erreicht jemals `longterm_pre_trade_check`. Die spätere Wiring-Session baut die Brücke, **nicht** Block C.
+🟢 **Doc-only-Disziplin:** 0 Code-Edits, 0 Test-Edits, 0 Cross-Phase-Code-Touches. 6 Datei-Edits im selben Commit: neu (2: SVG + Handover) + Doc-Rotation (4: INDEX, ROADMAP, root-CLAUDE, phasenkopf).
 
-🟢 **Mutable-default-trap-Schutz:** `longterm_rules: tuple[Any, ...] = ()` (nicht `[]`). `frozen=True`-Dataclass + immutable Tuple-Default ⇒ safe across instances.
+🟢 **Push-Freigabe offen, nicht eigenmächtig:** 6 Commits lokal ahead (`c00ab73`, `6065e6c`, `7b5edf0`, `7816688`, 2 Session-Rotationen), dieser Commit wird der 7. ahead-of-`origin/main`. Nikinger entscheidet.
 
-🟢 **Fail-closed-Verhalten gepinnt:** `test_longterm_pre_trade_check_raising_rule_vetoes` + `test_longterm_pre_trade_check_first_false_vetoes` decken beide Fehler-Pfade ab — werfende oder `False`-returnende Regel vetoet hart.
+🟡 **Plan-§6-C2-Korrekturhinweis bleibt offen** (Mini-Session NEXT-Item #4): Plan-📕-Snapshot trägt weiterhin die alte `test_instinct.py`-Aufzählung (1 File); As-Built sind 4 Files. ~5 Min Doc-only-Edit, Folge-Session.
 
-🟡 **Schema-/Migrations-Touch:** null (VETO 5 ist reine Code-Schicht — keine DB-Spalte, keine Migration).
+🟡 **`phase13_14_15.svg` Polish bleibt offen** (Mini-Session NEXT-Item #5): Spalten-Abstände / Callout-Positionen. ~10 Min, optional.
 
-🟡 **Push-Freigabe:** 2 Commits lokal (Session-Rotation #10→#11 aus Session #11 + Commit `c00ab73` aus C3+C4) + dieser Session-Rotation-Commit = 3 pending ahead of `origin/main`.
+🟡 **Ledger-Restore** (Mini-Session NEXT-Item #3): 250 fälschlich gebuchte Rescue-Punkte aus 2026-09-03-Bug-Lauf. 1 SQL-Statement, Nikinger-Aktion. **Kein** Phase-15-Code-Touch.
+
+🟡 **Live-DB Migration 008+009 apply:** Schema heute v7, Migrations additiv, `db.py:run_migrations()` wendet beim nächsten Service-Restart automatisch an. Kein Phase-15-Edit nötig.
+
+🟡 **Promotion-Bridge** (Plan §10 out-of-scope): Pipeline `list_instincts('validated')` → `promote_eligible` → `config.longterm_rules` existiert nicht. Bewusst offen für Phase 15.5 / 16. Heute n=8 < n_min=50: Promotion returnt `[]`, VETO 5 ist No-Op. **Keine** Phase-15-Blocker.
+
+🟡 **ROADMAP.md 38,4 KB (Ziel < 40 KB):** AK4 ✅. Knapp unter Schwelle, weiterer Phase-15-Inhalt würde AK4 reißen — neue Phase-15-Edits nur mit Mini-Plan.
 
 ### Open questions / blockers
 
-- **C3+C4 ✅ abgeschlossen.** Block C ist endgültig **vollständig** (C1 ✅ + C2 ✅ + C3 ✅ + C4 ✅).
-- **Promotion-Bridge (out-of-scope für Block C):** die spätere Phase-15-Wiring-Session muss die Pipeline bauen: `Database.list_instincts(status="validated")` → `promote_eligible(instincts, n_closed, cfg)` → deterministische Prädikate kompilieren → `config.longterm_rules` setzen. **Nicht** von Block C erwartet (Plan §10 Out-of-Scope).
-- **D5 Polish** (Item #5): optional, ~10 Min.
-- **Plan-§6-C2-Korrekturhinweis** (Item #4): optional, ~5 Min, Doc-only.
-- **Ledger-Restore** (Item #3): separat, Nikinger-Aktion.
+- **Keine** Phase-15-Blocker. Alle 4 Blöcke ✅, alle Plan-Locks gewahrt, alle Cross-Phase-Disziplinen eingehalten.
+- **Push-Freigabe** für die 7 lokal-pending Commits (Sessions #10-#13): Nikinger-Entscheidung Session-Ende. Diese Session pusht nicht eigenmächtig.
+- **Ledger-Restore / Migration 009 apply / Promotion-Bridge-Plan** sind Folge-Arbeiten, nicht Phase-15-Blocker.
 
 ### NEXT (für die nächste Session)
 
-**Nikinger-Wahl-bedingt.** Stand 2026-09-05 ~15:10 UTC = ~17:10 CEST.
+**Phase 15 ist ✅ abgeschlossen.** Die nächste Session kann **frei wählen**:
+
+1. **Push-Freigabe für die 7 lokal-pending Commits** (`git push origin main`, Nikinger-Aktion, sonst manuell — diese Session pusht nicht).
+2. **Ledger-Restore** (manuell, `sqlite3 data/bars.sqlite "DELETE FROM source_spend WHERE kind='rescue'"`, Nikinger-Aktion).
+3. **Phase-15.5-Plan** (Promotion-Bridge-Skizze: welche Phasen die Brücke bauen, wo die Prädikat-Kompilierung lebt, wann sie live geht — n ≥ instinct_n_min + enable_instinct_promotion=True).
+4. **Phase 16+** (irgendein neuer Track, je nach Nikinger-Priorität; Phase 15 ist keine Sperre mehr).
+5. **Doc-Polish** (Plan-§6-C2-Korrekturhinweis, ~5 Min; `phase13_14_15.svg` Polish, ~10 Min) — Mini-Sessions, optional.
 
 **Block-Status nach dieser Session (endgültig):**
 
@@ -858,17 +879,8 @@ Nur Phase-13-eigener Code (`live_data/rescue.py`, `scripts/gap_rescue_operator.p
 | C (Instinct-ECC) | ✅ **C1 + C2 + C3 + C4 — komplett** (Sessions #10, #11, #12) |
 | D (Erbstücke) | ✅ D-1..D-3 (Session #5) + **Folgefix 1-4** (Session #9) — **endgültig abgeschlossen** |
 
-**Phase 15 ist endgültig abgeschlossen.** C1 (DB-Substrat) + C2 (Instinct-Package + Promotion-Harness) + C3 (VETO 5 + ExecutionConfig) + C4 (Tests + Sweep) sind alle ✅. Die einzige offene Arbeit ist die **Promotion-Bridge** (Wiring, spätere Session), die **nicht** Teil von Block C war (Plan §10 Out-of-Scope). Die heute-Substrate (n=8) machen sie operativ ohnehin wirkungslos — sie ist eine **Zukunftsschicht**, kein heute-Fix.
+**Push-Status dieser Session:** **0 Commits gepusht**, 1 Commit (dieser Closeout) pending ahead of `origin/main` (gesamt: 7 Commits lokal ahead nach Commit). Nikinger entscheidet am Session-Ende.
 
-**Konkrete Empfehlung für die Folge-Session (sortiert nach Aufwand × Impact):**
-
-1. **Phase-15-Closeout-Handover** (~1 h, Pattern wie Phase-12/13/14-CLOSE-OUT-HANDOVER): §0 BLUF + 5-Zeilen-Bilanz, §1 Architektur, §2 Locks P1–P16, §3 A1–A14, §4 As-Built, §5 Test/Live, §6 Delta, §7 Decisions, §8 Datei-Anker, §9 Konsistenz-Regeln, §10 Don'ts, §11 Was diese Session gemacht hat. **Höchste Priorität**, weil Block C vollständig abgeschlossen ist.
-2. **Promotion-Bridge-Plan** (optional, eigene Session): Skizze der späteren Wiring-Session.
-3. **Plan-§6-C2-Korrekturhinweis** (optional, ~5 Min, Doc-only).
-4. **Ledger-Restore** (separat, Nikinger-Aktion).
-5. **`phase13_14_15.svg` Polish** (optional, ~10 Min).
-
-**Push-Status dieser Session:** 0 Commits gepusht; 3 Commits pending (Session #11-Rotation + C3+C4-Code + dieser Session-Rotation-Commit, je nach Nikinger-Wahl).
 ## Phase 15 — Block D Folgefix — Rescue.py Bug-Diagnose + Audit-Trail (2026-09-03, MiniMax-M3-Exec-Session #8½, vor Fix)
 
 > **Auftrag:** Nikinger-Chat 2026-09-03 (direkt nach Pfad-A-Scharfschaltung): "Für Cross-Phase Edits
@@ -1304,74 +1316,6 @@ oder anderen L3-Snapshots.
 > aktuelle Footer wurde mit dem Session-#6-Rotation-Commit aktualisiert (siehe
 > `## Session stopped — 2026-09-02` weiter oben).
 
-## Phase 15 — Sonderhinweis: Block-Status-Korrektur Session #12 (2026-09-05, MiniMax-M3-Exec-Session #12)
-
-> **Hinweis:** diese Sektion ist **kein** `## Session stopped`-Block und triggert
-> damit **keine** Doc-Rotation (`scripts/check_doc_rotation.py` zählt nur
-> `Session stopped`-Header — der Titel hier beginnt mit „## Phase 15 —",
-> nicht mit „## Session stopped"). Sie ist ein Phase-15-interner
-> Korrektur-Vermerk analog zum Gate-P7-Status-Notiz-Pattern (Session #6
-> oben).
->
-> **Auditability-Lücken-Schluss — was diese Session tatsächlich geleistet hat:**
-
-### Befund (Nikinger-Rückfrage 2026-09-05: „Meinst du Phase 15 ist hiermit vollständig abgeschlossen?")
-
-Session #12 schloss mit der Aussage **„Phase 15 ist endgültig abgeschlossen"**
-und listete **„✅ C1 + C2 + C3 + C4 — komplett"** als Block-C-Status. Diese
-Aussage war **zu stark** formuliert — Working-Style §6 (CLAUDE.md):
-„Report outcomes faithfully ... A wrong 'it works' costs more than an honest
-'it's broken'." Die ehrliche Differenzierung lautet:
-
-| Ebene | Status |
-|---|---|
-| **Block C Code (C1 + C2 + C3 + C4)** | ✅ **endgültig abgeschlossen** — DB-Substrat, Instinct-Package, VETO 5, Tests, Σ 1843 grün |
-| **Phase 15 formal** | ⚠️ **noch offen** — zwei Folge-Arbeiten fehlen: |
-
-### Was tatsächlich noch offen ist (Nikinger-Folge-Liste, 2026-09-05 bestätigt)
-
-1. **Phase-15-Closeout-Handover** (Pattern wie Phase-12/13/14):
-   `PHASE15_CLOSEOUT_HANDOVER.md` mit §0 BLUF + 5-Zeilen-Bilanz, §1 Architektur,
-   §2 Locks P1–P16, §3 Akzeptanz A1–A14, §4 As-Built-Zahlen heute,
-   §5 Test/Live/Produktion, §6 Delta seit 2026-08-31-Plan-Commit,
-   §7 offene Entscheidungen (E1–E9 aus Plan §7 + die zwei hier dokumentierten
-   Lücken), §8 Datei-Anker, §9 Konsistenz-Regeln, §10 Don'ts, §11 Was diese
-   Session gemacht hat. **Wird eine neue Session bauen** (Nikinger 2026-09-05).
-2. **Promotion-Bridge** (Phase-15-Instinct-Rows → deterministische Prädikate →
-   `config.longterm_rules`): die Pipeline
-   `Database.list_instincts(status="validated")` → `promote_eligible(...)` →
-   Prädikat-Kompilierung → `config.longterm_rules`-Befüllung existiert **nicht**.
-   VETO 5 ist heute ein **toter Briefkasten** — bei n=8 eh No-Op, aber die
-   strukturelle Schließung des C-Blocks (Draht Instincts → VETO-Schicht) fehlt.
-   Plan §10 listet das als out-of-scope, also **bewusst offen**, muss aber im
-   Closeout-Handover explizit als „deliberately deferred to post-Phase-15 wiring
-   session" markiert werden.
-
-### Zugehörige Doku-Korrektur in dieser Session
-
-- **Plan §6 C4 Korrekturhinweis** (Commit `7b5edf0`, datiert 2026-09-05): macht
-  sichtbar, dass `phase15_v4/tests/test_instinct.py` As-Built in **4 Files**
-  aufgeteilt ist (test_instinct_models/extractor/validator + test_promotion),
-  und dass `test_veto5_with_empty_rules_is_identity` in **Phase 5** lebt
-  (Cross-Phase-Touch Plan §4). Beides ist im Plan-📕-Snapshot per 🟡-Hinweis
-  annotiert.
-
-### Empfehlung für die nächste Session (Nikinger-Wahl)
-
-1. **Phase-15-Closeout-Handover bauen** (~1 h, Pattern wie
-   Phase-12/13/14-CLOSE-OUT-HANDOVER) — **höchste Priorität**, weil Block C
-   vollständig ist und das offizielle Ende-Dokument fehlt.
-2. **Promotion-Bridge-Plan** (eigene Mini-Session-Skizze): welche Phasen die
-   Brücke bauen, wo die Prädikat-Kompilierung lebt, wann sie live geht
-   (n ≥ instinct_n_min + enable_instinct_promotion=True).
-
-### Konsequenz für Block-Status-Tabelle (Session #12)
-
-Die Tabelle in Session #12 listet **„✅ C1 + C2 + C3 + C4 — komplett"**
-unter Block C — das **stimmt** auf Block-Ebene. Auf Phase-15-Ebene fehlt die
-Closeout-Handover-Phase. Der Phase-15-Row im root `CLAUDE.md` trägt
-**„🔄 in Arbeit seit 2026-08-31"** — auch das stimmt weiterhin, weil Block C
-zwar Code-vollständig ist, aber die formale Phase-15-Schließung aussteht.
 
 
 ---

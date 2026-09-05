@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" font-family="Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6470"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1e7a4d"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+    <marker id="ay" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c98a1a"/>
+    </marker>
+  </defs>
+
+  <rect width="1080" height="1080" fill="#f7f8fa"/>
+
+  <!-- ============== HEADER ============== -->
+  <text x="40" y="46" font-size="25" font-weight="bold" fill="#1b1f24">Phase 15 — V4 Closeout: Lern-Signal ehrlich gemacht, Block C strukturell zu</text>
+  <text x="40" y="70" font-size="13.5" fill="#5b6470">Stand 2026-09-05 · Σ 1843 grün repo-weit · 4 Blöcke code-complete (A endgültig · B live-validiert · C strukturell zu · D endgültig) · 6 Commits lokal ahead of origin/main</text>
+  <text x="40" y="88" font-size="12" fill="#5b6470">Der Wert des Bildes: der Reward-Loop, der <tspan font-weight="bold" fill="#c0392b">Verluste belohnt</tspan> hat (−1 972,87 EUR P&amp;L bei +28,72 Score), ist <tspan font-weight="bold" fill="#1e7a4d">arithmetisch gestoppt</tspan>. Promotion wartet zu Recht auf n ≥ n_min.</text>
+  <line x1="40" y1="104" x2="1040" y2="104" stroke="#d5d9de" stroke-width="1"/>
+
+  <!-- ============== FEHLERBILD (oben, rot-getönt) ============== -->
+  <rect x="40" y="120" width="1000" height="200" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="120" width="1000" height="30" rx="6" fill="#fdecea"/>
+  <rect x="40" y="140" width="1000" height="10" fill="#fdecea"/>
+  <text x="56" y="140" font-size="14" font-weight="bold" fill="#c0392b">① Fehlerbild — der Reward-Loop belohnt Verluste (Block B Auslöser)</text>
+
+  <!-- P&amp;L vs Score Diagramm -->
+  <text x="56" y="170" font-size="11" font-weight="bold" fill="#1b1f24">Live-Substrat: 8 geschlossene Trades, −1 972,87 EUR P&amp;L, +28,72 Score</text>
+
+  <rect x="56" y="184" width="200" height="120" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="156" y="208" font-size="22" font-weight="bold" fill="#c0392b" text-anchor="middle">−1 972,87 EUR</text>
+  <text x="156" y="232" font-size="11" fill="#5b6470" text-anchor="middle">Σ P&amp;L (8 Trades)</text>
+  <text x="156" y="252" font-size="10" fill="#5b6470" text-anchor="middle">5 LOSS · 3 WIN · n=8</text>
+  <text x="156" y="282" font-size="10" font-weight="bold" fill="#c0392b" text-anchor="middle">pro Verlust: Score ↑</text>
+
+  <rect x="280" y="184" width="200" height="120" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="380" y="208" font-size="22" font-weight="bold" fill="#c0392b" text-anchor="middle">+28,72</text>
+  <text x="380" y="232" font-size="11" fill="#5b6470" text-anchor="middle">Σ Score-Drift (50 → 78,72)</text>
+  <text x="380" y="252" font-size="10" fill="#5b6470" text-anchor="middle">RISK → AGGRESSIV (&gt;50)</text>
+  <text x="380" y="282" font-size="10" font-weight="bold" fill="#c0392b" text-anchor="middle">Positionsgröße ↑</text>
+
+  <rect x="504" y="184" width="200" height="120" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="604" y="200" font-size="11" font-weight="bold" fill="#c0392b" text-anchor="middle">Ursache (arithmetisch):</text>
+  <text x="604" y="218" font-size="10" fill="#1b1f24" text-anchor="middle">process_weight = 1,5</text>
+  <text x="604" y="232" font-size="10" fill="#5b6470" text-anchor="middle">max |process| = 3,75</text>
+  <text x="604" y="248" font-size="10" fill="#1b1f24" text-anchor="middle">|outcome bei R=−1| = 2,0</text>
+  <text x="604" y="268" font-size="10" font-weight="bold" fill="#c0392b" text-anchor="middle">Stop-Out nettet +1,10</text>
+  <text x="604" y="284" font-size="9" fill="#5b6470" text-anchor="middle" font-style="italic">scorer.py:45-49 (Phase-11 H3)</text>
+
+  <rect x="728" y="184" width="296" height="120" rx="5" fill="#fdecea" stroke="#c0392b"/>
+  <text x="876" y="200" font-size="11" font-weight="bold" fill="#c0392b" text-anchor="middle">Vier Symptome am Live-Substrat:</text>
+  <text x="876" y="218" font-size="9.5" fill="#1b1f24" text-anchor="middle">Score steigt mit Verlusten,</text>
+  <text x="876" y="230" font-size="9.5" fill="#1b1f24" text-anchor="middle">Risk-Level kippt auf AGGRESSIV,</text>
+  <text x="876" y="242" font-size="9.5" fill="#1b1f24" text-anchor="middle">risk_pct 2,0 → 3,0 %,</text>
+  <text x="876" y="254" font-size="9.5" fill="#1b1f24" text-anchor="middle">Positionsgröße skaliert mit.</text>
+  <text x="876" y="276" font-size="10" fill="#c0392b" text-anchor="middle" font-weight="bold">Lern-Signal ist invertiert.</text>
+  <text x="876" y="294" font-size="9" fill="#5b6470" text-anchor="middle" font-style="italic">Hard Rule: Code macht VETO, nicht AI.</text>
+
+  <!-- ============== ZIELBILD (mitte, grün-getönt, 3 Spalten A/B/C/D) ============== -->
+  <rect x="40" y="340" width="1000" height="380" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="340" width="1000" height="30" rx="6" fill="#e8f5ee"/>
+  <rect x="40" y="360" width="1000" height="10" fill="#e8f5ee"/>
+  <text x="56" y="360" font-size="14" font-weight="bold" fill="#1e7a4d">② Zielbild — vier Blöcke strukturell zu (A · B · C · D)</text>
+
+  <!-- Block A -->
+  <rect x="56" y="384" width="220" height="320" rx="5" fill="#fdecea" stroke="#1e7a4d" stroke-width="1.5"/>
+  <text x="166" y="406" font-size="13" font-weight="bold" fill="#1e7a4d" text-anchor="middle">A — Haushalt</text>
+  <text x="166" y="422" font-size="9.5" fill="#5b6470" text-anchor="middle">Plan steht · Wahrheit im Repo</text>
+  <line x1="166" y1="430" x2="166" y2="442" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <text x="166" y="458" font-size="10" fill="#5b6470" text-anchor="middle">A-1..A-6 ✅</text>
+  <text x="166" y="474" font-size="10" fill="#5b6470" text-anchor="middle">A-7 (P15-F) ✅</text>
+  <text x="166" y="490" font-size="10" fill="#5b6470" text-anchor="middle">ROADMAP &lt; 40 KB</text>
+  <text x="166" y="506" font-size="10" fill="#5b6470" text-anchor="middle">ROADMAP_ARCHIVE.md neu</text>
+  <text x="166" y="522" font-size="10" fill="#5b6470" text-anchor="middle">5 stale P15-Vermerke geräumt</text>
+  <line x1="166" y1="534" x2="166" y2="546" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="76" y="554" width="180" height="138" rx="4" fill="#1e7a4d"/>
+  <text x="166" y="580" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">endgültig ✅</text>
+  <text x="166" y="608" font-size="10" fill="#e8f5ee" text-anchor="middle">AK1, AK3, AK14 grün</text>
+  <text x="166" y="624" font-size="10" fill="#e8f5ee" text-anchor="middle">ROADMAP 15b/15c/15d stimmen</text>
+  <text x="166" y="640" font-size="10" fill="#e8f5ee" text-anchor="middle">EPIC_MAP &amp; Turbo = No-Op</text>
+  <text x="166" y="656" font-size="10" fill="#e8f5ee" text-anchor="middle">Doc-Rotation-Hook erweitert</text>
+  <text x="166" y="678" font-size="9" fill="#e8f5ee" text-anchor="middle" font-style="italic">Sessions #1-#4</text>
+
+  <!-- Block B -->
+  <rect x="296" y="384" width="220" height="320" rx="5" fill="#fdecea" stroke="#1e7a4d" stroke-width="1.5"/>
+  <text x="406" y="406" font-size="13" font-weight="bold" fill="#1e7a4d" text-anchor="middle">B — Reward-Kalibrierung</text>
+  <text x="406" y="422" font-size="9.5" fill="#5b6470" text-anchor="middle">Block B = Phase-11 H3</text>
+  <line x1="406" y1="430" x2="406" y2="442" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <text x="406" y="458" font-size="10" fill="#5b6470" text-anchor="middle">process_weight 1,5 → 0,5</text>
+  <text x="406" y="474" font-size="10" fill="#5b6470" text-anchor="middle">Score-Reset 78,72 → 50,00</text>
+  <text x="406" y="490" font-size="10" fill="#5b6470" text-anchor="middle">Doku-Vermerke (B3/B4/B5)</text>
+  <text x="406" y="506" font-size="10" fill="#5b6470" text-anchor="middle">reset_score_baseline.py</text>
+  <text x="406" y="522" font-size="10" fill="#5b6470" text-anchor="middle">--apply 2026-09-03 ~12:00</text>
+  <line x1="406" y1="534" x2="406" y2="546" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="316" y="554" width="180" height="138" rx="4" fill="#1e7a4d"/>
+  <text x="406" y="580" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">live ✅</text>
+  <text x="406" y="608" font-size="10" fill="#e8f5ee" text-anchor="middle">AK5 + AK6 + AK13 grün</text>
+  <text x="406" y="624" font-size="10" fill="#e8f5ee" text-anchor="middle">pre-apply-Backup archiviert</text>
+  <text x="406" y="640" font-size="10" fill="#e8f5ee" text-anchor="middle">4 Dienste ALIVE seitdem</text>
+  <text x="406" y="656" font-size="10" fill="#e8f5ee" text-anchor="middle">A6 wartet auf 1. OPEN-Trade</text>
+  <text x="406" y="678" font-size="9" fill="#e8f5ee" text-anchor="middle" font-style="italic">Sessions #6-#8</text>
+
+  <!-- Block C -->
+  <rect x="536" y="384" width="220" height="320" rx="5" fill="#fdecea" stroke="#1e7a4d" stroke-width="1.5"/>
+  <text x="646" y="406" font-size="13" font-weight="bold" fill="#1e7a4d" text-anchor="middle">C — Instinct-ECC</text>
+  <text x="646" y="422" font-size="9.5" fill="#5b6470" text-anchor="middle">Promotion-Gatter wartet</text>
+  <line x1="646" y1="430" x2="646" y2="442" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <text x="646" y="458" font-size="10" fill="#5b6470" text-anchor="middle">C1 Migration 009</text>
+  <text x="646" y="474" font-size="10" fill="#5b6470" text-anchor="middle">C2 Instinct-Package</text>
+  <text x="646" y="490" font-size="10" fill="#5b6470" text-anchor="middle">C3 VETO 5 + Config</text>
+  <text x="646" y="506" font-size="10" fill="#5b6470" text-anchor="middle">C4 Tests + Sweep</text>
+  <text x="646" y="522" font-size="10" fill="#5b6470" text-anchor="middle">n=8 &lt; n_min=50 → bleibt ZU</text>
+  <line x1="646" y1="534" x2="646" y2="546" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="556" y="554" width="180" height="138" rx="4" fill="#1e7a4d"/>
+  <text x="646" y="580" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">code-complete ✅</text>
+  <text x="646" y="608" font-size="10" fill="#e8f5ee" text-anchor="middle">AK7 + AK8 + AK9 grün</text>
+  <text x="646" y="624" font-size="10" fill="#e8f5ee" text-anchor="middle">5 Module · 87 + 12 Tests</text>
+  <text x="646" y="640" font-size="10" fill="#e8f5ee" text-anchor="middle">Cross-Phase P2 + P5</text>
+  <text x="646" y="656" font-size="10" fill="#e8f5ee" text-anchor="middle">Promotion-Bridge offen</text>
+  <text x="646" y="678" font-size="9" fill="#e8f5ee" text-anchor="middle" font-style="italic">Sessions #10-#12</text>
+
+  <!-- Block D -->
+  <rect x="776" y="384" width="248" height="320" rx="5" fill="#fdecea" stroke="#1e7a4d" stroke-width="1.5"/>
+  <text x="900" y="406" font-size="13" font-weight="bold" fill="#1e7a4d" text-anchor="middle">D — Erbstücke</text>
+  <text x="900" y="422" font-size="9.5" fill="#5b6470" text-anchor="middle">Quellen-Vertrauen + Pfad A</text>
+  <line x1="900" y1="430" x2="900" y2="442" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <text x="900" y="458" font-size="10" fill="#5b6470" text-anchor="middle">D1 D5-H.-B geschlossen</text>
+  <text x="900" y="474" font-size="10" fill="#5b6470" text-anchor="middle">D2 phase13_14_15.svg</text>
+  <text x="900" y="490" font-size="10" fill="#5b6470" text-anchor="middle">D3 Pfad A Operator-Tool</text>
+  <text x="900" y="506" font-size="10" fill="#5b6470" text-anchor="middle">Folgefix 1-4 (rescue.py</text>
+  <text x="900" y="520" font-size="10" fill="#5b6470" text-anchor="middle">Bug-Cluster + Mock + Test)</text>
+  <line x1="900" y1="532" x2="900" y2="544" stroke="#1e7a4d" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="796" y="554" width="208" height="138" rx="4" fill="#1e7a4d"/>
+  <text x="900" y="580" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">endgültig ✅</text>
+  <text x="900" y="608" font-size="10" fill="#e8f5ee" text-anchor="middle">AK10 + AK11 + AK12 grün</text>
+  <text x="900" y="624" font-size="10" fill="#e8f5ee" text-anchor="middle">82 Phase-13-Tests grün</text>
+  <text x="900" y="640" font-size="10" fill="#e8f5ee" text-anchor="middle">3 source-spend-Ledgen</text>
+  <text x="900" y="656" font-size="10" fill="#e8f5ee" text-anchor="middle">Restore ausstehend</text>
+  <text x="900" y="678" font-size="9" fill="#e8f5ee" text-anchor="middle" font-style="italic">Sessions #5 + #9</text>
+
+  <!-- ============== WAS BLEIBT (3-spaltiges Status-Panel) ============== -->
+  <rect x="40" y="740" width="1000" height="160" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="740" width="1000" height="28" rx="6" fill="#eef1f4"/>
+  <rect x="40" y="758" width="1000" height="10" fill="#eef1f4"/>
+  <text x="56" y="759" font-size="14" font-weight="bold" fill="#1b1f24">③ Status heute (2026-09-05) — Σ 1843 grün repo-weit · 6 Commits lokal ahead of origin/main · Push-Freigabe ausstehend</text>
+
+  <!-- left: fertig/getestet -->
+  <text x="56" y="790" font-size="11.5" font-weight="bold" fill="#1e7a4d">fertig gestellt + getestet</text>
+  <text x="56" y="806" font-size="10" fill="#5b6470">Block A (A-1..A-7) · Block B (B1..B6) · Block C (C1..C4) · Block D (D1..D-3 + Folgefix 1-4)</text>
+  <text x="56" y="820" font-size="10" fill="#5b6470">5 Phase-15-Module · 99 Phase-15-Tests · 12 Phase-5-Tests · 7 Phase-13-Tests · 4 Hook-Tests</text>
+  <text x="56" y="836" font-size="10" fill="#5b6470">Σ 1843 grün (Session #12-Sweep, selbst nachgemessen 2026-09-05)</text>
+  <text x="56" y="852" font-size="10" fill="#5b6470">Phase-2-Sweep: 78 (+1) · Phase-5: 185 (+12) · Phase-13: 82 (+8) · Phase-15: 91 (+87+4+5+1-1)</text>
+  <text x="56" y="868" font-size="10" fill="#5b6470">Phase 1/3/4/6/7/8/9/10/12/14 unverändert grün</text>
+  <text x="56" y="884" font-size="10" fill="#5b6470" fill-opacity="0">spacer</text>
+
+  <!-- middle: live-validiert + gepusht -->
+  <text x="496" y="790" font-size="11.5" font-weight="bold" fill="#c98a1a">live-validiert (im Rahmen der Möglichkeiten)</text>
+  <text x="496" y="806" font-size="10" fill="#5b6470">Block B: --apply live (reward_pts.id=11, 78,72 → 50,00, Backup archiviert)</text>
+  <text x="496" y="820" font-size="10" fill="#5b6470">Block D: Rescue-Operator-Skript gebaut, bleibt AUS (--dry-run-Default, kein Live-Run)</text>
+  <text x="496" y="836" font-size="10" fill="#5b6470">Block A6 wartet auf 1. OPEN-Trade (Backoff replay-verifiziert, Mini-Session 26)</text>
+  <text x="496" y="852" font-size="10" fill="#5b6470">Block C: live-DB noch auf Schema v7 (Migrations 008/009 additiv, apply bei nächstem Restart)</text>
+  <text x="496" y="868" font-size="10" fill="#5b6470">gepusht: 18 Commits (Sessions #5 + #9 mit D-Folgefix-Variante-C vollständig auf origin/main)</text>
+  <text x="496" y="884" font-size="10" fill="#c0392b" font-weight="bold">NICHT gepusht: 6 Commits lokal (C2 + C3+C4 + Sonderhinweis #12 + 2 Session-Rotationen)</text>
+
+  <!-- right: nicht erreicht / offen -->
+  <text x="816" y="790" font-size="11.5" font-weight="bold" fill="#c0392b">nicht erreicht / offen</text>
+  <text x="816" y="806" font-size="10" fill="#5b6470">Promotion-Bridge: Instincts → Prädikate</text>
+  <text x="816" y="820" font-size="10" fill="#5b6470">→ config.longterm_rules (Plan §10 OoS)</text>
+  <text x="816" y="836" font-size="10" fill="#5b6470">Ledger-Restore: 250 gebuchte rescue-</text>
+  <text x="816" y="852" font-size="10" fill="#5b6470">Punkte löschen (Nikinger-Aktion, manuell)</text>
+  <text x="816" y="868" font-size="10" fill="#5b6470">Live-DB Migration 009 (additiv, beim nächsten Service-Restart)</text>
+  <text x="816" y="884" font-size="10" fill="#5b6470">A6: ≤5 CRITICALs/24h (Phase-12-Reconcile-Timing)</text>
+
+  <!-- ============== CALLOUT — WAS DAS BILD TRÄGT ============== -->
+  <rect x="40" y="920" width="1000" height="140" rx="6" fill="#fdf6ec" stroke="#c98a1a" stroke-width="1.5"/>
+  <text x="56" y="944" font-size="14" font-weight="bold" fill="#8a5d0d">Was das Bild trägt — die zwei Elemente, die man sehen können muss, ohne den Text zu lesen:</text>
+  <text x="56" y="966" font-size="11.5" fill="#5b6470"><tspan font-weight="bold" fill="#c0392b">①</tspan> <tspan font-weight="bold">Der Reward-Loop, der Verluste belohnt</tspan> (Block B Auslöser): −1 972,87 EUR P&amp;L bei +28,72 Score. <tspan font-weight="bold">process_weight=1,5</tspan> machte <tspan font-weight="bold">|process|=3,75</tspan> größer als <tspan font-weight="bold">|outcome bei R=−1|=2,0</tspan> — ein Stop-Out nettete <tspan font-weight="bold" fill="#c0392b">+1,10</tspan>.</text>
+  <text x="56" y="986" font-size="11.5" fill="#5b6470"><tspan font-weight="bold" fill="#1e7a4d">②</tspan> <tspan font-weight="bold">Vier endgültig-zu Blöcke</tspan>: A (Haushalt) · B (Reward-Kalibrierung, live-validiert) · C (Instinct-ECC, Code komplett, Promotion wartet) · D (Erbstücke). Das Promotion-Gatter wartet <tspan font-weight="bold">zu Recht</tspan> auf n ≥ n_min=50.</text>
+  <text x="56" y="1006" font-size="11" fill="#5b6470"><tspan font-weight="bold" fill="#c98a1a">③</tspan> <tspan font-weight="bold">Heute-Verhalten bit-identisch</tspan> (AK9): VETO 5 mit leerem `longterm_rules=()` ist ein No-Op — der Bot entscheidet exakt wie vor Block C. Die strukturelle Verbesserung wartet auf die Promotion-Bridge, nicht auf den Code.</text>
+  <text x="56" y="1026" font-size="11" fill="#5b6470" font-style="italic">Diese drei Sichtbarkeiten sind die nicht-erfundenen Antworten auf die zentrale Phase-Frage: „Was lernt der Bot?". Wer alle drei sieht, hat den Stand verstanden.</text>
+  <text x="56" y="1052" font-size="10" fill="#5b6470" font-style="italic">Stil konsistent mit `phase13_live_data.svg`, `phase12_closeout.svg`, `phase12_5_failure.svg`, `phase10_v3.svg`, `data_foundation.svg`, `phase13_14_15.svg`. 1080×1080, valid SVG.</text>
+
+</svg>

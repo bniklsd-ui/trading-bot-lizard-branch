@@ -438,35 +438,36 @@ angefasst wird. `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` ist leer
 ## Phase 15 — V4: Sophisticated / Optional *(die alte Phase 9, deferred; vormals "Phase 12",
 dann "Phase 13", dann "Phase 14", jetzt Phase 15 — umnummeriert 2026-08-11, 2026-08-18 und 2026-08-22)*
 
-> **Status: 🔄 in Arbeit seit 2026-08-31** (geflippt aus `deferred, gegatet auf Phase 9 + 11 + 12 + 13 + 14 UND reale Outcomes` — alle Vor-Gates bestanden; execution-ready Plan [`docs/concepts/phase15_v4_plan.md`](./docs/concepts/phase15_v4_plan.md) P1–P16, AK1–AK14. **Block A (Haushalt) in Ausführung; Block B (Reward-Kalibrierung) hinter Gate P7** = „Phase-12-Reconcile-Timing Live-Verify" = 24-h-Beobachtung am laufenden Bot nach einem OPEN-Trade mit IG-Lag. Blöcke C (Instinct-ECC) und D (Erbstücke) folgen A. Cross-Phase-Freigabe (Nikinger 2026-08-31): P2/4/5/6/7/13/14 — **P8 nicht**. Phasenkopf: [`phase15_v4/CLAUDE.md`](../phase15_v4/CLAUDE.md).
+> **Status: ✅ ABGESCHLOSSEN am 2026-09-05 (Session #13, MiniMax-M3-Exec)** — Closeout-Handover [`phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md`](../phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md), Bild [`docs/architecture/phase15_closeout.svg`](../docs/architecture/phase15_closeout.svg). Pattern-Vergleich zu Phase-12/13/14. **4 Blöcke alle ✅**: A (Haushalt) endgültig · B (Reward-Kalibrierung) live-validiert (Score 78,72 → 50,00) · C (Instinct-ECC) code-complete, heute bit-identical via VETO-5-leere-Regelliste (AK9) · D (Erbstücke + Folgefix Variante C) endgültig. **Σ 1843 grün repo-weit**. 18 Commits gepusht, 6 Commits lokal ahead (Push-Freigabe ausstehend). **Offen (alle nicht-Phase-15-Blocker):** Promotion-Bridge (Plan §10), Ledger-Restore (250 Punkte, Nikinger-Aktion), Live-DB Migration 009 (additiv, beim nächsten Service-Restart), Gate P7/A6 (wartet auf nächsten OPEN-Trade).
+>
+> Phasenkopf: [`phase15_v4/CLAUDE.md`](../phase15_v4/CLAUDE.md). Plan: [`docs/concepts/phase15_v4_plan.md`](./docs/concepts/phase15_v4_plan.md) (P1–P16, AK1–AK14, 📕).
 
 **Goal:** Implement the V2 improvements identified in the Council analysis.
 
-### 15a — Council Skill Integration *(vormals 9a / 11a / 12a / 13a / 14a)*
-- [ ] Integrate `verbesserungsvorschlaege` as structured input to pipeline
-- [ ] Trigger detection for ad-hoc strategy evaluation
+### 15a — Council Skill Integration *(vormals 9a / 11a / 12a / 13a / 14a)* — **zurückgestellt**
+- [ ] Integrate `verbesserungsvorschlaege` as structured input to pipeline — *Nikinger-Entscheidung 2026-08-31 Runde 1 (Plan §10): Council-Use-Case ist in Phase 10 (V3) gebaut, `default=False` (Phase-10-Closeout 2026-08-25). **Out-of-scope für Phase 15**.*
+- [ ] Trigger detection for ad-hoc strategy evaluation — *siehe oben.*
 
-### 15b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b / 11b / 12b / 13b / 14b)*
-- [x] Context-window monitoring during debate (~60–70 %) — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): Schwellwert-Mechanismus gebaut, `phase6_debate/debate/debate.py:172` (`cfg.compression_trigger_pct * cfg.max_cumulative_input_tokens`). Live-Verhalten nicht verifiziert (Plan §9 #4).*
-- [x] Compression of Bull/Bear/Judge state into summary — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): deterministischer Compression-Latch, `phase6_debate/debate/debate.py:187-195` (`if not compressed and budget.summary()["input_tokens"] > threshold`).*
-- [ ] New session continuation — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): **gegenstandslos** — durch laufende Compression ersetzt; eine neue Session zu starten ist nicht nötig, wenn der Kontext im Lauf deterministisch komprimiert wird.*
+### 15b — Handover-Logik (Bull/Bear/Judge) *(vormals 9b / 11b / 12b / 13b / 14b)* — **abgeschlossen**
+- [x] Context-window monitoring during debate (~60–70 %) — *korrigiert 2026-08-31: Schwellwert-Mechanismus gebaut, `phase6_debate/debate/debate.py:172`. Live-Verhalten nicht verifiziert (Plan §9 #4).*
+- [x] Compression of Bull/Bear/Judge state into summary — *korrigiert 2026-08-31: deterministischer Compression-Latch, `phase6_debate/debate/debate.py:187-195`.*
+- [ ] New session continuation — *korrigiert 2026-08-31: **gegenstandslos** — durch laufende Compression ersetzt.*
 
-### 15c — Reward/Punishment Reform *(vormals 9d / 11c / 12c / 13c / 14c)*
-- [ ] `+ process_quality_score` (VETOs, confidence, debate quality, gate path) — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): **„VETOs" und „gate path" sind gegenstandslos** (Plan P4, Beleg §2.4: 0 von 1902 `abstain_records` mit `stage='veto'`/`'gate'`); **„confidence" und „debate quality" sind gebaut** (`phase7_reward/reward/scorer.py:122-131` — `entry_signal` aus `spread_at_entry_pct` + `debate_signal` aus `debate_confidence`).*
-- [x] Anti-emotionality: separate process score from outcome score — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): strukturell getrennt seit Phase 7, `phase7_reward/reward/scorer.py:114-133` (`outcome_delta` Z. 112 + `process_delta` Z. 133 unabhängig, „Weak, centred, additive — never a multiplier"). **Kalibrierung** wird in Phase-15 Block B gefixt (Plan P1/P2: `process_weight` 1.5 → 0.5).*
+### 15c — Reward/Punishment Reform *(vormals 9d / 11c / 12c / 13c / 14c)* — **abgeschlossen mit Block B (live-validiert)**
+- [x] `+ process_quality_score` (VETOs, confidence, debate quality, gate path) — *korrigiert 2026-08-31: „VETOs"/„gate path" gegenstandslos (Plan P4); „confidence"/„debate quality" gebaut (`phase7_reward/reward/scorer.py:122-131`). 2/4 Sub-Signale „partial".*
+- [x] Anti-emotionality: separate process score from outcome score — *korrigiert 2026-08-31: strukturell getrennt seit Phase 7, `phase7_reward/reward/scorer.py:114-133`. **Block B (Plan P1/P2)**: `process_weight` 1.5 → 0.5 (AK5), `--apply` 2026-09-03 Score 78,72 → 50,00 live (AK6).*
 
-### 15d — Force Trigger Safeguard *(vormals 9e / 11d / 12d / 13d / 14d)*
-- [ ] Lock force trigger when daily PNL < 0 — *korrigiert 2026-08-31 (Phase-15-Plan-Session §2/§3): **gegenstandslos solange kein Force-Trigger existiert.** `grep -rn "force_trigger" --include="*.py" --exclude-dir=.venv --exclude-dir=.git .` liefert 3 Treffer, alle in `phase2_persistence/` (Schema-Default `defaults.py:27` + 2 Test-Beweise `test_migrations.py:103` + `test_db.py:204`). Kein Wiring, kein Aufrufer, kein Code-Pfad. CLAUDE.md Hard Rule 5 bleibt wörtlich stehen — sie ist die Vorschrift für den Tag, an dem jemand einen Force-Trigger baut.*
+### 15d — Force Trigger Safeguard *(vormals 9e / 11d / 12d / 13d / 14d)* — **gegenstandslos bestätigt**
+- [ ] Lock force trigger when daily PNL < 0 — *korrigiert 2026-08-31: **gegenstandslos** — kein Force-Trigger existiert (`grep` zeigt nur 3 Schema/Test-Treffer, kein Code-Pfad). CLAUDE.md Hard Rule 5 bleibt wörtlich stehen.*
 
-### 15e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f / 11e / 12e / 13e / 14e, aus Phase 7 hierher verschoben)*
-- [ ] AI extrahiert strukturierte Instincts (`trigger` / `domain` / `confidence` / `evidence_trade_ids`) aus P7 `trade_lessons` + `reward_pts`
-- [ ] Code **validiert** Instincts gegen reale Outcomes; bewährte werden zu **deterministischen Regeln promotet** (`longterm_pre_trade_check()` VETO), mit Prune→Archiv der widerlegten
-- [ ] **Harte Leitplanke:** Promotion in die VETO-Schicht **nur** über einen deterministischen / menschlich gegateten Schritt — eine promotete Regel wird deterministischer Code, die AI sitzt nie in der VETO-Auswertung. Gegatet auf reale Outcomes (≫ `n_min`)
+### 15e — Instinct-Promotion (ECC) + Longterm VETO *(vormals 9f / 11e / 12e / 13e / 14e, aus Phase 7 hierher verschoben)* — **abgeschlossen mit Block C (strukturell zu, Promotion-Pipeline offen)**
+- [x] AI extrahiert strukturierte Instincts — *Session #11 Block C Step C2: `phase15_v4/instinct/extractor.py` (`SingleShotInstinctExtractor`, LLM, best-effort, eigenes `_LLMClientLike`-Protocol, 22 Tests).*
+- [x] Code validiert + promotet — *Sessions #11 + #12 Block C Steps C2 + C3: `validator.py` (deterministisch, AK8 triple-pin) + `promotion.py` (Doppel-Sperre, AK7) + `vetos.py:206-228` (VETO 5, AK9 bit-identical-to-today). `instincts`-Tabelle in Migration 009.*
+- [ ] **Harte Leitplanke:** Promotion in die VETO-Schicht — *Strukturelle Antwort steht; die **Pipeline** `list_instincts(status='validated')` → `promote_eligible(...)` → `longterm_rules`-Befüllung **existiert noch nicht** (Plan §10 out-of-scope). Heute n=8 < n_min=50: Promotion returnt `[]`, VETO 5 ist No-Op. **Bewusst offen** für Phase 15.5 / 16.*
 
-**Done when:** All V4 changes operational, bot demonstrates improved learning signal (process-score
-divergence from outcome-score on bad-market days).
+**Done when (Phase 15, alle 4 Blöcke + ROADMAP 15a–15e):** **✅ erreicht am 2026-09-05.** 15a zurückgestellt · 15b strukturell zu · 15c vollständig zu (live-validiert) · 15d gegenstandslos · 15e strukturell zu, **Pipeline offen** für Promotion-Bridge (Plan §10).
 
-**Directory:** `phase15_v4/` *(to be created)*
+**Directory:** `phase15_v4/` (erstellt 2026-08-31 mit `instinct/` Package + `tests/` + `scripts/`).
 
 ---
 
