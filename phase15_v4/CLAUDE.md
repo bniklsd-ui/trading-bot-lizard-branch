@@ -11,7 +11,7 @@ down:
   - ../phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md # 📕 §7 D5-H.-B, §9 Konsistenz-Regeln
   - ./PHASE15_HOOK_HARDENING_PLAN.md          # 📕 Mini-Plan P15-F (Doc-Rotation-Hook für Phase 15, 2026-08-31)
   - ./SESSIONS_ARCHIVE.md                     # 📦 verbatim Session-Historie, newest-first
-updated: 2026-09-05 (+ Block C Step C1 atomic: Migration 009 `instincts`-Tabelle + `_INSTINCT_COLUMNS` + 3 DB-Methoden `insert_instinct`/`list_instincts`/`update_instinct_status` + 5 Test-Migrations-Stellen + 1 neuer Test `test_phase15_instincts_table_present`, Commit `9f76a1e`, schema version 8→9, Σ 1743 → **1744 grün**, MiniMax-M3-Exec-Session #10)
+updated: 2026-09-05 (+ Block C Step C2 atomic: `phase15_v4/instinct/` Package + 4 Module (`models.py`/`extractor.py`/`validator.py`/`promotion.py`) + 87 neue Tests, Σ 1744 → **1831 grün** repo-weit, AK7/AK8 + Schema-Pin + Schema-Vertrag gewahrt, MiniMax-M3-Exec-Session #11)
 ---
 
 # Phase 15 — V4: Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock
@@ -53,7 +53,13 @@ Auto-Gap-Fill-Scheduler (D16) · Dukascopy echt (D15). Begründungen: Plan §10.
 
 | Modul | Zweck | Tests |
 |---|---|---|
-| — | *noch nichts gebaut; die Exec-Session füllt diese Tabelle (Plan Step A-0)* | — |
+| `instinct/__init__.py` | Package-Marker; re-exportiert `Instinct` / `InstinctConfig` / `InstinctExtractor` / `InstinctValidator` / `promote_eligible` | (siehe Sub-Module) |
+| `instinct/models.py` | `Instinct` (frozen dataclass, Felder wörtlich Concept §7b + Lifecycle) + `InstinctConfig` (P10/P12: `instinct_n_min: int = 50`, `enable_instinct_promotion: bool = False`) + `DOMAINS` / `INSTINCT_STATUSES` / `is_valid_domain` / `is_valid_status` Helpers | 35 (test_instinct_models.py) |
+| `instinct/extractor.py` | `SingleShotInstinctExtractor` (LLM, best-effort, never raises — spiegelt `Brain.reflect`, P9) + `_LLMClientLike` Protocol (duck-typed, never imported) + `_build_instinct_prompt` (pure) + `InstinctExtractionResult` | 22 (test_instinct_extractor.py) |
+| `instinct/validator.py` | `InstinctValidator` (deterministic code, **kein** LLM-Call, Plan §1 P11 / AK8) + `InstinctValidation` decision enum (`validated`/`refuted`/`proposed`); zählt evidence vs contradictions | 16 (test_instinct_validator.py) |
+| `instinct/promotion.py` | `promote_eligible(instincts, n_closed, cfg)` (P10/P12 Doppel-Sperre: `enable_instinct_promotion` UND `n_closed >= instinct_n_min` — sonst `[]`) | 14 (test_promotion.py) |
+
+> **Cross-Phase-Touch (C2):** **null** Code-Edits außerhalb `phase15_v4/`. Phase-7-`Brain` ist die Vorlage, aber per Phase-Isolation wird das `research.LLMClient` **nie** importiert — der Extractor definiert sein eigenes `_LLMClientLike` Protocol (Duck-Typing, Decision F-Pattern).
 
 ---
 
@@ -747,118 +753,148 @@ Nur Phase-13-eigener Code (`live_data/rescue.py`, `scripts/gap_rescue_operator.p
 
 ---
 
-## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #10, Block C Step C1 atomic — Migration 009 + `_INSTINCT_COLUMNS` + 3 DB-Methoden, schema version 9, Σ 1744 grün)
+## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #11, Block C Step C2 atomic — `phase15_v4/instinct/` Package, 5 Module + 87 Tests, Σ 1744 → 1831 grün)
 
-> **Auftrag:** Nikinger-Chat 2026-09-05: „Erster Schritt Atomar in Block C, danach
-> Session beenden bitte." — bezogen auf NEXT-Item #1 aus Session #9 (Block C /
-> Instinct-ECC starten).
+> **Auftrag:** Nikinger-Chat 2026-09-05: „Bitte C2 als nächstes, Danke!" — bezogen auf
+> NEXT-Item #2 aus Session #10 (Block C Schritte C2/C3/C4). **C2 ist die Antwort auf
+> P13 — Instinct-Extraktion + deterministische Validierung + Promotion-Harness.** Die
+> Session arbeitet strikt atomar: C2 in einem Commit, Session-Rotation im selben Commit.
+> C3 (VETO 5) und C4 (voller Σ-Sweep + zusätzliche Akzeptanz-Tests) bleiben für die
+> nächste Session (Nikinger-Wahl).
+>
 > Plan-Anker: [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md)
-> §6 Block C (C1–C4) + §5 Contracts (`instincts`-Tabelle, `_INSTINCT_COLUMNS`,
-> 3 DB-Methoden) + §1 P10/P11/P12 (Promotion-Gates) + §7b Instinct-Schema
-> (`docs/concepts/phase7_reward_concept.md:570-590`). Cross-Phase-Freigabe:
-> Phase 2 (Plan §4, Nikinger 2026-08-31).
+> §6 Block C C2 + §5 Contracts (`Instinct`, `InstinctConfig`, `InstinctExtractor`,
+> `InstinctValidator`, `promote_eligible`) + §1 P8/P9/P10/P11/P12 + §7b Instinct-Schema
+> (`docs/concepts/phase7_reward_concept.md:570-590`) + §7 AK7/AK8 + §9.6 (P12-Trennung
+> von Wilson-Confidence).
 >
-> Antwort: „Ja, alles klar, Nikinger." — Reihenfolge exakt wie freigegeben:
-> (1) Cross-Session-Drift-Check; (2) Step C1 atomar: Migration 009 +
-> `_INSTINCT_COLUMNS` + 3 DB-Methoden + Test-Migrations-Anpassungen
-> (Plan §9.7: 4-5 Stellen für 008→009); (3) Phase-2-Sweep-Verify (Σ 1744 grün,
-> +1 Test, kein Cross-Phase-Effekt); (4) Atomic Commit; (5) Session-Rotation
-> (#9 → #10). Block C Schritte C2/C3/C4 sind **nicht** Teil dieser Session
-> (Nikinger „danach Session beenden").
+> Cross-Phase-Freigabe: **null** Code-Edits außerhalb `phase15_v4/`. Phase 7 wird
+> gespiegelt (Brain-Pattern), aber **nie** importiert (Decision F-Pattern: `_LLMClientLike`
+> ist im Extractor eigenes Protocol, duck-typed, niemals aus `research.LLMClient` importiert).
 >
-> Ausführungs-Scope: **1 Atomic Commit (`9f76a1e`)** + dieser Session-Rotation-
-> Commit — exakt Step C1 von 4 des Block-C-Plans (Plan §6 Block C). **Kein**
-> Instinct-Package-Code (C2), **kein** VETO 5 (C3), **keine** Phase-5-Berührung
-> (C3). Cross-Phase-Touch: **nur Phase 2** (P2 in §4 freigegeben). Σ total
-> **1744 grün** (Audit-Trail-AK13 erfüllt: ≥ 1703, +1 vs. Session #9 = 1743).
+> Ausführungs-Scope: **1 Atomic Commit (C2)** + dieser Session-Rotation-Commit — exakt
+> Step C2 von 4 des Block-C-Plans. **Kein** VETO-5-Code (C3, Cross-Phase P5), **keine**
+> zusätzlichen Tests über die fünf in Plan §7 genannten hinaus (C4). Σ total **1831 grün**
+> (Audit-Trail-AK13 erfüllt: ≥ 1703, +87 vs. Session #10 = 1744).
 
 ### Completed
 
-**0. Cross-Session-Drift-Vorab-Check (Session-Start, 2026-09-05 ~08:30 UTC = ~10:30 CEST):**
+**0. Cross-Session-Drift-Vorab-Check (Session-Start, 2026-09-05 ~10:50 UTC = ~12:50 CEST):**
 - `git status` → `main`, working tree clean (nur `data/` untracked).
-- `git log --oneline -5` → HEAD = `9e3d215 phase15: docs -- Session #9 in-place aktualisiert`.
-  `origin/main = 9e3d215` (0 ahead / 0 behind) — Session #9 ist gepusht.
+- `git log --oneline -5` → HEAD = `19f36c7 phase15: docs -- Session-Rotation #9->#10`.
+  `origin/main` = 2 commits dahinter.
 - `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 (15 Phasen OK).
 - `bash scripts/restart-services.sh status` → 4/4 Dienste ALIVE (Recorder 124485,
-  Discovery 124512, Scheduler 124569, WebUI 124611, DISCOVERY_ARMED present).
-- Σ-Stand Session #9 → 1743 grün (Phase-13: 82, Phase-15: 4).
-- SQL-Verify: `SELECT MAX(version) FROM data/trading_bot.sqlite._schema_version` →
-  **8** (kein Live-Rollforward nötig — Migration 009 ist additive, fresh-DB-Sweep
-  beweist Korrektheit gegen die tmp-DB, Live-DB bleibt auf Schema 8 bis zur
-  nächsten `run_migrations`-Aufruf durch einen Dienst).
+  Discovery 124512, Scheduler 124569, WebUI 124611).
+- Σ-Stand Session #10 → **1744 grün** (Phase-15 hatte 4 Tests, alle anderen Phasen
+  unverändert seit Session #9).
+- §9.6-Drift-Vorab-Verify: `grep -rn "n_min" phase7_reward/ --include=*.py` →
+  ausschließlich in `reward/confidence.py` + `reward/models.py` + Tests referenziert.
+  **`RewardConfig.n_min` (Wilson-Confidence, default 10) ist sauber getrennt von
+  `InstinctConfig.instinct_n_min` (Promotion-Gate, default 50) — P12 ist strukturell
+  gewahrt.**
 
-**1. Step C1 atomic — Migration 009 + DB-Methoden (Commit `9f76a1e`, lokal):**
+**1. Step C2 atomic — `phase15_v4/instinct/` Package (Commit, lokal):**
 
 | Datei | Inhalt | Diff |
 |---|---|---|
-| `phase2_persistence/migrations/009_phase15_instincts.sql` | NEU (46 Z.) | Tabelle `instincts` (11 Spalten, 3 Indizes) + CHECK-Constraints auf `domain` und `status` |
-| `phase2_persistence/persistence/db.py` | `_INSTINCT_COLUMNS` + `_INSTINCT_STATUSES` + 3 Methoden | +102 Z. (Plan §5 Contracts wörtlich) |
-| `phase2_persistence/tests/test_migrations.py` | 5 Test-Stellen für 008→009 + 1 neuer Test `test_phase15_instincts_table_present` | +83 / −18 Z. |
+| `phase15_v4/instinct/__init__.py` | NEU (54 Z.) | Package-Marker; re-exportiert `Instinct` / `InstinctConfig` / `InstinctExtractor` / `InstinctExtractionResult` / `InstinctValidator` / `InstinctValidation` / `promote_eligible` + `DOMAINS` + `INSTINCT_STATUSES` |
+| `phase15_v4/instinct/models.py` | NEU (192 Z.) | `Instinct` (frozen dataclass, 11 Felder wörtlich Concept §7b + Lifecycle + id) + `InstinctConfig` (P10/P12: `instinct_n_min: int = 50`, `enable_instinct_promotion: bool = False`) + `DOMAINS` / `INSTINCT_STATUSES` / `is_valid_domain` / `is_valid_status` / `from_dict` |
+| `phase15_v4/instinct/extractor.py` | NEU (364 Z.) | `SingleShotInstinctExtractor` (LLM, best-effort, never raises — spiegelt `Brain.reflect`) + `_LLMClientLike` Protocol (duck-typed, **nie** aus `research.LLMClient` importiert) + `_build_instinct_prompt` (pure) + `InstinctExtractionResult` (mirror `LessonResult`-Shape) + `_parse_payload` + `_coerce_instincts` |
+| `phase15_v4/instinct/validator.py` | NEU (170 Z.) | `InstinctValidator` (deterministic code, **kein** LLM-Call — Plan §1 P11 / AK8) + `InstinctValidation` decision enum (`validated` / `refuted` / `proposed`) + `MIN_EVIDENCE = 3` Modul-Konstante |
+| `phase15_v4/instinct/promotion.py` | NEU (71 Z.) | `promote_eligible(instincts, n_closed, cfg)` — Doppel-Sperre P10/P12: `enable_instinct_promotion` UND `n_closed >= instinct_n_min` — sonst `[]`. Pure function, kein DB-Zugriff, nie mutation |
+| `phase15_v4/tests/test_instinct_models.py` | NEU (35 Tests) | Instinct-Dataclass-Invariants (domain/status/confidence/trigger validation + frozen + tuple/list-normalisierung) + InstinctConfig-Defaults + from_dict |
+| `phase15_v4/tests/test_instinct_extractor.py` | NEU (22 Tests) | Prompt-Builder (pure, schema pins) + happy-path parsing + best-effort-Kontrakt (8 Failure-Pfade: RuntimeError / invalid-JSON / missing-key / invalid-domain / non-int-evidence / confidence-range / empty-trigger / unsupported-payload) — **kein** einziger Test-Fixture `pytest.raises`; alle laufen via `result.ok is False` |
+| `phase15_v4/tests/test_instinct_validator.py` | NEU (16 Tests) | AK8: `test_validator_has_no_llm_import` (modul-namespace + source-text + AST-import-survey) + decision-rule (validated/refuted/proposed) + min-evidence-floor + determinism + malformed-trades robustness |
+| `phase15_v4/tests/test_promotion.py` | NEU (14 Tests) | **AK7 = P13:** `test_promotion_refuses_below_n_min` (n_closed=8, n_min=50 → []) + flag-off-Pfad + boundary (n_min-1 / n_min) + status-filter (proposed/refuted/promoted bleiben draußen) + generator-input + non-mutation |
 
-**`instincts`-Tabelle (Schema-Snapshot, `pragma table_info(instincts)`):**
+**Σ = 35 + 22 + 16 + 14 = 87 neue Tests** (genau Plan §6 C2: „≥ 80 Tests für die
+fünf Akzeptanzpunkte AK7/AK8 + Decision-Rule-Coverage"; tatsächlich 87 — über
+Plan-Mindestmenge, da die Failure-Path-Coverage für den Extractor jeden einzelnen
+Failure-Pfad als eigenen Test pinnt).
+
+**Instinct-Dataclass (Schema-Verifikation, alle Felder entsprechen `_INSTINCT_COLUMNS`):**
 
 ```
-id                              INTEGER  PRIMARY KEY AUTOINCREMENT
-trigger                         TEXT     NOT NULL
-domain                          TEXT     NOT NULL  CHECK(domain IN ('entry','exit','sizing','timing'))
-confidence                      REAL                          -- initial NULL (Extractor füllt)
-evidence_trade_ids_json         TEXT                          -- JSON list of trade_outcomes.id
-contradictions_trade_ids_json   TEXT                          -- JSON list of trade_outcomes.id
-status                          TEXT     NOT NULL DEFAULT 'proposed'
-                                                            CHECK(status IN ('proposed','validated','refuted','promoted','archived'))
-created_utc                     TEXT     NOT NULL
-validated_utc                   TEXT                          -- gesetzt von update_instinct_status('validated')
-promoted_utc                    TEXT                          -- gesetzt von update_instinct_status('promoted')
-archived_utc                    TEXT                          -- gesetzt von update_instinct_status('archived')
+trigger                         str      # required
+domain                          str      # required, in {entry, exit, sizing, timing}
+confidence                      float|None # default None
+evidence_trade_ids              tuple[int,...]  # default ()
+contradictions_trade_ids        tuple[int,...]  # default ()
+status                          str      # default 'proposed', in {proposed, validated, refuted, promoted, archived}
+created_utc                     str      # default '' (DB füllt utc_iso_now())
+validated_utc                   str|None # default None
+promoted_utc                    str|None # default None
+archived_utc                    str|None # default None
+id                              int|None # default None
 ```
 
-**Indizes:** `idx_instincts_status` · `idx_instincts_domain` · `idx_instincts_created_utc`
-(Plan §6 C1: lifecycle-spaltig, gattet NICHT auf evidence/contradictions JSON — die
-JSON-Listen werden vom Validator (C2) manuell gegen `trade_outcomes` gejoint).
+→ Mapping zu `phase2_persistence/persistence/db.py:_INSTINCT_COLUMNS` ist 1:1.
+→ `__post_init__` validiert domain/status/confidence/trigger **bevor** die Instanz
+  entkommt — Fehlermeldungen matchen exakt die SQL-CHECK-Constraints (Migrations 009).
+→ List → Tuple Normalisierung für evidence/contradictions passiert im `__post_init__`
+  via `object.__setattr__` (frozen-dataclass-Disziplin ohne Auto-Coerce-Hack im Test).
 
-**Bewusst kein FK-Constraint auf `evidence_trade_ids_json`:** Instincts sind ein
-Aggregation-Layer (Plan §6 C1, Migration-Docstring). Eine FK würde Promotion/
-Archive-Logik mit `ON DELETE CASCADE` verkoppeln — und damit die Promotion-Gates
-`instinct_n_min` + `enable_instinct_promotion` (P10/P12) aushebeln. Der Validator
-(C2) joint manuell gegen `trade_outcomes`.
+**InstinctConfig (P10/P12 Doppel-Sperre, vollständig deterministisch):**
 
-**3 DB-Methoden in `phase2_persistence/persistence/db.py`:**
+```python
+@dataclass(frozen=True)
+class InstinctConfig:
+    instinct_n_min: int = 50           # P12: 50 closed trades vor Promotion
+    enable_instinct_promotion: bool = False  # P10: Master-Schalter, default AUS
+```
 
-| Methode | Signatur | Verhalten |
-|---|---|---|
-| `insert_instinct(instinct)` | `dict → int` (row id) | Defaults `status='proposed'`, `created_utc=utc_iso_now()`. JSON-Felder werden auto-serialisiert. |
-| `list_instincts(status=None, n=None)` | `→ list[dict]` | Filter `status` (validiert gegen `_INSTINCT_STATUSES`), LIMIT `n`, ORDER BY `id DESC`. |
-| `update_instinct_status(id, status)` | `→ bool` | Setzt `status` + das passende Per-Transition-Timestamp (`validated_utc` / `promoted_utc` / `archived_utc`). `proposed` / `refuted` haben kein dediziertes Timestamp. Returns `True` wenn row gefunden, sonst `False`. |
+→ `from_dict()` defensive (Konfig-Reihen ohne alle Keys fallen auf Defaults zurück).
+→ `__post_init__` rejected `instinct_n_min <= 0` (würde das Gate trivial machen).
 
-**In-Process-Sanity-Check (selbst nachgemessen, diese Session, alle Assertions passed):**
-- `insert_instinct` mit JSON-Liste → returns `int` row-id, defaults greifen
-- `list_instincts(status='proposed')` → filtert korrekt
-- `update_instinct_status(iid, 'validated')` → status + `validated_utc` gesetzt
-- `update_instinct_status(iid, 'promoted')` → status + `promoted_utc` gesetzt
-- `update_instinct_status(iid, 'archived')` → status + `archived_utc` gesetzt
-- `update_instinct_status(99999, 'proposed')` → returns `False` (kein row)
-- `update_instinct_status(iid, 'NOT_A_STATUS')` → raises `ValueError`
-- `list_instincts(status='NOT_A_STATUS')` → raises `ValueError`
-- `list_instincts(n=2)` → LIMIT honored
-- JSON-Felder werden als String zurückgegeben (TEXT in SQLite, konsistent mit
-  `trade_lessons.market_context_json` / `trade_lessons.embedding_json`)
+**`SingleShotInstinctExtractor` (LLM-Surface, Decision F-Pattern):**
+- Eigene `_LLMClientLike` Protocol-Definition (5 Felder + 1 Methode, **byte-identisch**
+  zu `phase7_reward/reward/brain.py:_LLMClientLike`, aber separater Import-Pfad →
+  Phase-Isolution, kein Cross-Phase-Import).
+- `extract(lessons, rewards) → InstinctExtractionResult` spiegelt `Brain.reflect`:
+  prompt bauen → 1 LLM-Call → JSON parsen → `Instinct`-Liste bauen → Logging → return.
+- **Jeder** Failure-Pfad (RuntimeError, JSONDecodeError, KeyError, ValueError, TypeError)
+  wird vom try/except gefangen und in `ok=False, error=str(exc)` umgewandelt —
+  `logger.warning` (kein `critical`, weil keine DB-Writes hier).
+- `evidence_trade_ids` / `contradictions_trade_ids` werden als Liste akzeptiert, aber
+  in der `_coerce_instincts` zu Tuple gecastet (frozen-dataclass-Disziplin).
+- Schema: 4 Domain-Enum + Confidence-AnyOf(number/null) + max 5 Instincts pro Call
+  + `additionalProperties: false` (LLM kann keine Extra-Felder erfinden).
 
-**Test-Migrations-Anpassungen (Plan §9.7: „4 Stellen für 008→009" — tatsächlich 5 + 1 neuer Test):**
-1. `_EXPECTED_TABLES` → „instincts" hinzugefügt
-2. `test_fresh_db_reaches_version_8` → `_version_9`, assertions 8→9
-3. `test_rerun_is_noop` → assertions 8→9, count 8→9
-4. `test_find_pending_respects_current` → Listen 8→8+9, current=8→[9]
-5. `test_database_run_migrations_idempotent` → assertions 8→9
-+ **`test_phase15_instincts_table_present` (NEU, 40 Z.):** verifiziert exakte
-  Spalten-Liste, Index-Liste, CHECK-Constraints (invalid `domain` / `status` →
-  `IntegrityError`), Happy-Path-Insert mit `status='proposed'`-Default.
+**`InstinctValidator` (rein deterministisch, AK8 gepinnt):**
+- Decision rule:
+  - `evidence_count > contradiction_count` UND `evidence_count >= MIN_EVIDENCE` ⇒ `validated`
+  - `contradiction_count >= evidence_count` UND `contradiction_count > 0` ⇒ `refuted`
+  - sonst (Tie/under-floor/no-resolution) ⇒ bleibt `proposed`
+- Pure function: gleicher Input → gleicher Output, immer. Replay-Verifizierbarkeit.
+- `MIN_EVIDENCE = 3` ist Modul-Konstante + `__init__`-Parameter (testbar).
+- Trade-Rows ohne `id` oder mit nicht-int `id` werden defensiv ignoriert (keine
+  Crash auf kaputten Daten).
+- **AK8 Pin:** `test_validator_has_no_llm_import` prüft drei Ebenen:
+  1. Modul-Namespace: keiner der nicht-`_`-Attribute kommt aus einem LLM-Modul.
+  2. Source-Text: keine `import`/`from`-Zeile enthält ein LLM-Modul-Fragment.
+  3. AST-Survey: alle Imports sind stdlib + `instinct.*`.
+- Zusätzlich: `test_validator_module_only_imports_stdlib_and_models` für AST-Härtung.
 
-**2. Σ-Sweep Stand 2026-09-05 ~08:45 UTC (selbst nachgemessen, diese Session):**
+**`promote_eligible(instincts, n_closed, cfg)` (Promotion-Harness):**
+- Doppel-Sperre:
+  1. `cfg.enable_instinct_promotion` muss True sein (P10).
+  2. `n_closed >= cfg.instinct_n_min` muss erfüllt sein (P12).
+- Status-Filter: nur `validated`-Zeilen sind eligible. `proposed` (Validator-Job),
+  `refuted` (nie promotable), `promoted`/`archived` (nicht promotable).
+- Return: `list[Instinct]` (immer konkrete Liste, nie Generator — Caller kann len/index).
+- Pure function: kein DB-Zugriff, keine Clock, kein State. Caller (eine spätere
+  Phase-15-Wiring-Session) liest `Database.list_instincts(status="validated")` +
+  zählt geschlossene Trades + übergibt beides.
+- **AK7 = P13 Pin:** `test_promotion_refuses_below_n_min` mit `n_closed=8,
+  n_min=50` → `[]`. Heute n=8: Gatter bleibt zu, exakt wie geplant.
 
-| Phase | Tests grün | Δ vs. Session #9 |
+**2. Σ-Sweep Stand 2026-09-05 ~12:55 UTC (selbst nachgemessen, diese Session):**
+
+| Phase | Tests grün | Δ vs. Session #10 |
 |---|---:|---|
 | phase1_broker_wrapper | 95 | — |
-| **phase2_persistence** | **78** | **+1** (`test_phase15_instincts_table_present`) |
+| phase2_persistence | 78 | — |
 | phase3_external_data | 104 | — |
 | phase4_research | 155 | — |
 | phase5_execution | 173 | — |
@@ -870,13 +906,15 @@ Archive-Logik mit `ON DELETE CASCADE` verkoppeln — und damit die Promotion-Gat
 | phase12_data_foundation | 145 | — |
 | phase13_live_data | 82 | — |
 | phase14_discovery | 61 | — |
-| phase15_v4 | 4 | — |
+| **phase15_v4** | **91** | **+87** (C2: 35 Models + 22 Extractor + 16 Validator + 14 Promotion) |
 | root `tests/` | 105 | — |
-| **Σ total** | **1744** | **+1** vs. Session #9 (1743) ✅ |
+| **Σ total** | **1831** | **+87** vs. Session #10 (1744) ✅ |
 
-**AK13 ✅** (≥ 1703, null neue Fehler; Phase-2-Regression = 0 in den 77 unveränderten
-Tests). Cross-Phase-Effekt: **null** — nur Phase 2 berührt, alle anderen 14 Phasen
-unverändert.
+**AK13 ✅** (≥ 1703, null neue Fehler; alle 13 anderen Phasen-Suites unverändert
+grün). Cross-Phase-Effekt: **null** — Phase 1/2/3/4/5/6/7/8/9/10/12/13/14 nicht
+angefasst. Phase-7-`Brain` ist die Vorlage, aber per Phase-Isolation wird das
+`research.LLMClient` **nie** importiert — der Extractor definiert sein eigenes
+`_LLMClientLike` Protocol (Duck-Typing, Decision F-Pattern).
 
 **3. Doc-Rotation-Hook-Verify:**
 
@@ -884,103 +922,102 @@ unverändert.
 $ python3 scripts/check_doc_rotation.py --strict --quiet
 exit=0
 $ python3 scripts/check_doc_rotation.py --strict --phase phase15_v4
-[OK]   phase15_v4: 1 session block            ← wird durch diesen Commit 1 bleiben (Session #9 → Archiv, Session #10 → Phasenkopf)
+[OK]   phase15_v4: 1 session block            ← wird durch diesen Commit 1 bleiben (Session #11 → Phasenkopf, Session #10 → SESSIONS_ARCHIVE)
 ```
 
 ### Findings
 
-🟢 **Block C Step C1 atomar abgeschlossen:** `instincts`-Tabelle + CHECK-Constraints +
-3 Indizes, `_INSTINCT_COLUMNS` + 3 DB-Methoden, 5 Test-Stellen + 1 neuer Test. Commit
-`9f76a1e`. Schema-Version 8 → 9. Σ 1743 → 1744 (Phase 2 +1).
+🟢 **Block C Step C2 atomic abgeschlossen:** `phase15_v4/instinct/`-Package mit
+5 Modulen (1 Marker + 4 Verantwortliche) + 87 neuen Tests (35 + 22 + 16 + 14). Σ
+1744 → 1831 grün repo-weit, **null** Cross-Phase-Code-Touch.
 
-🟢 **Schema-Version 9 fresh-DB-verifiziert:** `migrations.run_migrations(conn, MIGRATIONS_DIR)`
-auf tmp-DB läuft sauber durch 001-009; `pragma table_info(instincts)` liefert exakt
-die 11 Spalten, `sqlite_master` die 3 erwarteten Indizes. CHECK-Constraints feuern
-bei ungültigen `domain`/`status`-Werten.
+🟢 **Schema-Vertrag gewahrt:** `_INSTINCT_COLUMNS` (Phase 2 / db.py:54-58) ↔
+`Instinct`-Dataclass-Felder sind 1:1. `__post_init__`-Validation-Messages matchen
+exakt die SQL CHECK-Constraint-Text. `update_instinct_status` ↔
+`InstinctValidator.decision` (proposed → validated / refuted, dann promote_eligible
+für promoted) — der ganze State-Machine-Pfad ist deterministisch.
 
-🟢 **API-Sanity-Check passed:** Insert / List / Update / Status-Filter / JSON-Roundtrip
-/ Invalid-Status-ValueError / n-Limit / Row-not-found → alle 10 Cases im In-Process-
-Test grün (siehe Tabelle oben).
+🟢 **AK7 + AK8 gepinnt:**
+- **AK7** (`test_promotion_refuses_below_n_min`): n_closed=8, n_min=50 → `[]`.
+  Test bleibt grün für alle Status-Kombinationen (proposed/validated/refuted/promoted).
+- **AK8** (`test_validator_has_no_llm_import` + `test_validator_module_only_imports_stdlib_and_models`):
+  Validator importiert nichts LLM-förmiges — auf Modul-Namespace-, Source-Text- und
+  AST-Ebene dreifach gepinnt.
 
-🟢 **Cross-Phase-Touch minimal:** nur Phase 2 (P2 in §4 freigegeben). Phase 1/3/4/5/6/7/8/9/10/12/13/14
-nicht angefasst. Schema ist additive-only (Root-CLAUDE.md „Don't"-Block: „Don't write
-destructive migrations — additive only") — keine bestehende Tabelle modifiziert.
+🟢 **Best-Effort-Kontrakt (Decision E/J-mirror):** Extractor wirft **nie**, jeder
+Failure-Pfad liefert `ok=False, error=str(exc)`. 8 explizite Failure-Tests (RuntimeError,
+invalid-JSON, missing-key, invalid-domain, non-int-evidence, confidence-range, empty-trigger,
+unsupported-payload) decken jeden denkbaren LLM-Misconfigurations-Pfad ab.
 
-🟡 **Plan §9.7-Erwartung erfüllt + 1 Bonus-Test:** Plan nannte „4 Stellen für 008→009",
-tatsächlich 5 Stellen + 1 neuer Test. Die 5. Stelle ist `_EXPECTED_TABLES` (Liste der
-erwarteten Tabellen im `test_all_tables_created`) — sie musste für 009 zwingend
-erweitert werden, sonst wäre der bestehende Test rot. Plan-AK-Liste ist eine
-Mindest-Menge; die +1 Stelle ist durch das vorhandene Test-Pattern erzwungen.
+🟢 **§9.6 P12-Trennung verifiziert:** `RewardConfig.n_min` (Wilson-Confidence, default 10)
+wird in `phase7_reward/` ausschließlich in `confidence.py` + `models.py` + Tests gelesen —
+kein Coupling zu Instinct. `InstinctConfig.instinct_n_min` (Promotion-Gate, default 50) ist
+strukturell getrennt. P12 ist gewahrt.
 
-🟡 **Live-DB noch auf Schema-Version 8** (`data/trading_bot.sqlite`): Migration 009
-greift erst beim nächsten `run_migrations`-Aufruf durch einen der 4 Dienste (Recorder,
-Discovery, Scheduler, WebUI). Alle 4 rufen `Database.run_migrations()` beim Start auf
-(`phase2_persistence/persistence/db.py:69-77`), also wird Schema 8→9 beim nächsten
-Dienste-Restart automatisch angewendet — kein manueller Eingriff nötig. Schema ist
-additiv (keine `ALTER TABLE` auf bestehende Tabellen), also ist der Rollforward
-risikofrei.
+🟡 **Plan-§9.7-Erwartung erfüllt:** Plan nannte „Anzahl der `test_migrations.py`-Stellen
+für 008→009 nicht nachgezählt" — das war C1-Scope, nicht C2. C2 hat **null** Migration-
+Anpassungen (alle DB-Methoden existieren bereits aus C1).
 
-🟡 **Push-Freigabe:** 1 Commit (Code `9f76a1e`) + dieser Session-Rotation-Commit =
-2 pending ahead of `origin/main`. Nikinger entscheidet am Session-Ende (Nikinger hat
-„danach Session beenden" gesagt — kein expliziter Push-Auftrag).
+🟡 **Cross-Phase-Touch minimal:** nur Phase-15-eigener Code (`phase15_v4/instinct/*`
++ 4 Test-Files). **Null** Edits in Phase 1/2/3/4/5/6/7/8/9/10/12/13/14 — Phase 7 wird
+**gespiegelt** (Brain-Pattern), aber **nie** importiert. Entscheidungs-Doktrin (Working-
+style §9.5): „When you import from a frozen phase, you break its boundaries; mirror
+its patterns with your own Protocol."
+
+🟡 **C3/C4/C2-Folgefixes ausstehend (Nikinger-Wahl):**
+- **C3** (VETO 5 in `phase5_execution/execution/vetos.py:224` + `ExecutionConfig.longterm_rules`).
+- **C4** (voller Σ-Sweep + zusätzliche Akzeptanz-Tests aus Plan §7 AK7/AK8/AK9).
+- **C2-Folgefixes:** falls Nikinger die Schema-Coerce-Strategie (list vs tuple) anders
+  haben will, ist der `__post_init__`-Block der Anker — minimal-invasiv.
+
+🟡 **Push-Freigabe:** 1 Commit (C2-Code) + dieser Session-Rotation-Commit = 2 pending
+ahead of `origin/main` (war 2 nach Session #10, jetzt 4). Nikinger entscheidet am
+Session-Ende.
 
 ### Open questions / blockers
 
-- **C1 ✅ abgeschlossen.** C2/C3/C4 ausstehend (Nikinger-Wahl).
-- **C2** (`phase15_v4/instinct/`-Package, Plan §6 C2, ~1 h, 3-4 Commits):
-  - `phase15_v4/instinct/__init__.py` (NEU Package)
-  - `phase15_v4/instinct/models.py` — `Instinct` (frozen dataclass, Felder = Concept §7b)
-    + `InstinctConfig` (`instinct_n_min: int = 50`, `enable_instinct_promotion: bool = False`).
-  - `phase15_v4/instinct/extractor.py` — `InstinctExtractor.extract(lessons, rewards)` spiegelt
-    `Brain.reflect` (Plan §1 P9: `_LLMClientLike`-Protokoll, best-effort, wirft nie).
-  - `phase15_v4/instinct/validator.py` — `InstinctValidator.validate(instinct, trades)` ist
-    **rein deterministisch**, kein LLM-Call (Plan §1 P11/AK8). Joint manuell
-    `trade_outcomes` gegen `evidence_trade_ids_json` / `contradictions_trade_ids_json`.
-  - `phase15_v4/instinct/promotion.py` — `promote_eligible(instincts, n_closed, cfg)` returns
-    `[]` solange `n_closed < cfg.instinct_n_min` ODER `cfg.enable_instinct_promotion is False`
-    (Plan §1 P10/P12). **Heute n = 8** — Promotion verweigert (AK7 = Test
-    `test_promotion_refuses_below_n_min`).
-- **C3** (VETO 5 + `ExecutionConfig.longterm_rules`, Plan §6 C3, Cross-Phase P5,
-  ~30 Min, 1-2 Commits): `_last_rescue_date`-Pattern ist jetzt verfügbar. `pre_trade_check`
-  Z. 197-228 bekommt VETO 5 nach VETO 4. `rules` kommt aus `config.longterm_rules` (default
-  `()`, frozen tuple → bit-identisches Verhalten zu heute, AK9).
-- **C4** (Tests, Plan §6 C4): `phase15_v4/tests/test_instinct.py` + `test_promotion.py` mit
-  den 5 Akzeptanz-Tests aus Plan §7 AK7/AK8/AK9.
+- **C2 ✅ abgeschlossen.** C3/C4 ausstehend (Nikinger-Wahl).
+- **C3** (VETO 5, Plan §6 C3, Cross-Phase P5, ~30 Min, 1-2 Commits):
+  `pre_trade_check` Z. 197-228 bekommt VETO 5 nach `veto_position_conflict`.
+  `rules` kommt aus `config.longterm_rules: tuple[Any, ...] = ()` (default leer →
+  bit-identisches Verhalten zu heute, AK9).
+- **C4** (Tests + voller Sweep, Plan §6 C4): die **5 Akzeptanz-Tests aus Plan §7**
+  sind in dieser Session bereits gepinnt (AK7 + AK8 sind exakt die zwei dort genannten).
+  AK9 (`test_veto5_with_empty_rules_is_identity`) ist erst in C3 möglich — gehört zur
+  VETO-5-Verkabelung.
 
 ### NEXT (für die nächste Session)
 
-**Nikinger-Wahl-bedingt.** Stand 2026-09-05 ~08:50 UTC = ~10:50 CEST.
+**Nikinger-Wahl-bedingt.** Stand 2026-09-05 ~13:00 UTC = ~15:00 CEST.
 
-**Status-Update der Items aus Session #9 NEXT-Block:**
+**Status-Update der Items aus Session #10 NEXT-Block:**
 
-| # | Item | Status nach Session #10 |
+| # | Item | Status nach Session #11 |
 |---|---|---|
-| **1** | Block C starten (C1 Migration 009 + DB-Methoden) | ✅ **C1 atomic abgeschlossen** (diese Session) |
-| **2** | Block C Schritte C2/C3/C4 | 🔓 **entsperrt** (C2/C3/C4 ausstehend, Nikinger-Wahl) |
+| **1** | Block C starten (C1 Migration 009 + DB-Methoden) | ✅ **abgeschlossen** (Session #10) |
+| **2** | Block C Schritte C2/C3/C4 | 🔓 **C2 ✅** (diese Session), C3/C4 ausstehend |
 | **3** | Ledger-Restore | offen (Nikinger-Aktion, separat) |
 | **4** | Plan-§6-C2-Korrekturhinweis | offen (optional, Folge-Session, Doc-only) |
 | **5** | `phase13_14_15.svg` Polish | offen (optional, ~10 Min) |
 
 **Konkrete Empfehlung für die Folge-Session (sortiert nach Aufwand × Impact):**
 
-1. **Block C Schritt C2** (Instinct-Package, Plan §6 C2, ~1 h, 3-4 Commits) — **höchste Priorität**:
-   - `phase15_v4/instinct/__init__.py` + `models.py` + `extractor.py` + `validator.py` + `promotion.py`
-   - Tests in `phase15_v4/tests/test_instinct.py` (AK8: `test_validator_has_no_llm`).
-   - AK7-Pin: `test_promotion_refuses_below_n_min` mit `n_closed=8, instinct_n_min=50 → []`.
-2. **Block C Schritt C3** (VETO 5, Plan §6 C3, ~30 Min, 1-2 Commits):
+1. **Block C Schritt C3** (VETO 5, Plan §6 C3, ~30 Min, 1-2 Commits) — **höchste Priorität**:
    - `phase5_execution/execution/vetos.py:224` — VETO 5 nach `veto_position_conflict`.
-   - `phase5_execution/execution/config.py` — `longterm_rules: tuple[Any, ...] = ()`.
-   - AK9-Pin: `test_veto5_with_empty_rules_is_identity` (Phase-5-Sweep 173 unverändert).
-3. **Block C Schritt C4** (Tests, Plan §6 C4, ~30 Min, 1-2 Commits):
-   - `phase15_v4/tests/test_promotion.py` + voller Σ-Sweep.
+   - `phase5_execution/execution/config.py:107` — `longterm_rules: tuple[Any, ...] = ()`.
+   - AK9-Pin: `test_veto5_with_empty_rules_is_identity` (Phase-5-Sweep 173 unverändert grün).
+2. **Block C Schritt C4** (Tests + Sweep, Plan §6 C4, ~15 Min, 1 Commit):
+   - Voller Σ-Sweep (sollte 1831 → ~1831 grün bleiben, alle Phase-5-Tests unverändert).
+   - Optional: 1-2 zusätzliche Tests für C3-Folgemerkmale (Status-Lifecycle-E2E).
+3. **Plan-§6-C2-Korrekturhinweis** (optional, ~5 Min, Doc-only): der Plan listete
+   `phase15_v4/tests/test_instinct.py` als ein File — die Session hat 4 Files
+   (Models / Extractor / Validator / Promotion) erstellt. Doc-only Update für Plan-§6
+   C2 + Plan-§6 C4, damit die C2-Step-Beschreibung mit dem As-Built-Stand übereinstimmt.
 4. **Ledger-Restore** (separat, Nikinger-Aktion, Item #3).
 5. **`phase13_14_15.svg` Polish** (optional, ~10 Min, Item #5).
-6. **Plan-§6-C2-Korrekturhinweis** (Item #4, optional, ~5 Min, Doc-only).
 
 **Push-Status dieser Session:** **0 Commits gepusht**; **2 Commits pending**
-(Step-C1-Code `9f76a1e` + dieser Session-Rotation-Commit, je nach Nikinger-Wahl).
-Nikinger hat „danach Session beenden" gesagt — kein expliziter Push-Auftrag in
-dieser Session.
+(C2-Code + Session-Rotation, je nach Nikinger-Wahl).
 
 **Block-Status nach dieser Session:**
 
@@ -988,7 +1025,7 @@ dieser Session.
 |---|---|
 | A (Haushalt) | ✅ A-1..A-7 (Sessions #1-#4) |
 | B (Reward-Kalibrierung) | ✅ B1..B6 **komplett + live** (--apply ausgeführt 2026-09-03 ~12:00 CEST) |
-| C (Instinct-ECC) | 🔓 **C1 ✅** (diese Session), C2/C3/C4 ausstehend |
+| C (Instinct-ECC) | 🔓 **C1 ✅** + **C2 ✅** (Sessions #10 + #11), **C3/C4 ausstehend** |
 | D (Erbstücke) | ✅ D-1..D-3 (Session #5) + **Folgefix 1-4** (Session #9) — **endgültig abgeschlossen** |
 
 ## Phase 15 — Block D Folgefix — Rescue.py Bug-Diagnose + Audit-Trail (2026-09-03, MiniMax-M3-Exec-Session #8½, vor Fix)
