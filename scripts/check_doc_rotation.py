@@ -64,6 +64,7 @@ PHASE_DIRS: tuple[str, ...] = (
     "phase13_live_data",
     "phase14_discovery",
     "phase15_v4",
+    "phase16_activation",
 )
 
 SESSION_HEADING = "## Session stopped"

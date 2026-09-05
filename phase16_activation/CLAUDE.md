@@ -9,8 +9,8 @@ down:
   - ../phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md    # 📕 Vorgänger-Handover (E1–E3 werden hier geschlossen)
   - ../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md   # 📕 A6 hängt an Migration 008
   - ../phase5_execution/CLAUDE.md                 # B3-Block → Plan D3
-  - ./SESSIONS_ARCHIVE.md                         # 📦 (wird von der ersten Exec-Session angelegt)
-updated: 2026-09-05 (Plan-Session)
+  - ./SESSIONS_ARCHIVE.md                         # 📦 Session-Block-Historie (newest-first, A-0 angelegt)
+updated: 2026-09-05 (+ Exec-Session #1 — Block A Step A-0, Session-Rotation + Hook-Erweiterung + Verzeichnisse, Σ 1843 grün unverändert, 0 Code-Edits, MiniMax-M3-Exec)
 ---
 
 # Phase 16 — Freischaltung
@@ -71,45 +71,79 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 
 ---
 
-## Session stopped — 2026-09-05 (Plan-Session, Fable 5.1 — Phase 16 eröffnet, Plan committet)
+## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #1, Block A Step A-0 — Session-Rotation Plan-Session-Block → SESSIONS_ARCHIVE.md, `scripts/check_doc_rotation.py:66` um `phase16_activation` ergänzt, `tests/` + `scripts/` Verzeichnisse angelegt, Σ 1843 grün unverändert, 0 Code-Edits)
 
-> **Auftrag:** Nikinger-Chat 2026-09-05: „Phase 16 sollte mind. alle Löcher, die der Bot noch hat,
-> stopfen, sodass alle Funktionen freigeschaltet werden, und nach Phase 16 ein ausgiebiger Test
-> von z. B. 2 Wochen komplett autonom." Plan bis Ausführungsreife, Fragen gebündelt vorab,
-> Advisor-Ersatz per Agent (Opus vor dem Festlegen, Sonnet-Cold-Read vor „fertig").
+> **Auftrag:** Nikinger-Fable-5.1-Handover 2026-09-05: „Phase 16 Activation, OpenCode/MiniMax-M3-Exec-Session startet mit Block A Step A-0 (Session-Rotation, Hook-Registrierung, Ritual, Σ = 1843 erwartet, Doku-Sweep). Operator-Fenster B2 erst nach dem Block-B-Commit: alle vier Dienste stoppen → Backup → `init_db.py --db-path data/trading_bot.sqlite` → v9 verifizieren → Ledger-Restore-SQL. Ab dann scheitert ein Start mit neuem Code auf v7 laut am Schema-Floor — gewollt. Restart erst nach dem letzten Block-D-Commit, davor E1 (Vorregistrierung) committen; Desktop-Session im Testfenster eingeloggt lassen."
+>
+> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block A Step A-0 (S. 303-313) + §4 Cross-Phase-Tabelle (Hook-Erweiterung Phase-14-eigener Hygiene-Code, kein Cross-Phase-Touch) + §1 P15 (Doc-Layers-Konvention).
+>
+> Ausführungs-Scope: **1 Atomic Commit (A-0)** — exakt Step A-0 von 5 des Block-A-Plans (A-0..A-5). Block A ist **Haushalt**, keins der weiteren Steps hat ein Gate. Push erteilt (P18); diese Session pusht **nicht** eigenmächtig (Head bleibt 7 Commits lokal ahead of `origin/main`, `2f9eb82`-Stand des Vor-Commits bleibt in der Lock-Footnote).
+>
+> **Σ total 1843 grün** (Plan §2.1 + Phase-15-Session-#13-Bilanz unverändert, **kein** Test-Touch in A-0).
 
 ### Completed
-- **Recherche read-only** (Live-DB `mode=ro`, Logs, `/proc`, git): 9 Löcher L1–L9 verifiziert
-  (Plan §3), Σ-Baseline **1843** selbst gemessen (Plan §2.1), 7 Commits lokal ahead (`2f9eb82`).
-- **Nikinger-Fragerunde** (10 Entscheidungen, alle gelockt → Plan §1 P1–P17).
-- **Opus-Plan-Agent-Review** (Plan §13): 3 Struktur-Änderungen übernommen — B1 = Schema-Floor
-  statt In-Daemon-Migration (gelockte Preflight-Entscheidung `wiring.py:1070` + Lock-Risiko),
-  D1.2 = Bar-Stream-Token-Wrapper (latenter Bug seit Phase 13 B3), E2 = append-only Messquellen;
-  C3b Caching gestrichen (Meter zählt Cache-Reads voll + Präfix < 1024); Ledger-Restore nach B2;
-  P17 erlaubte Operator-Ereignisse vorregistriert. Ein Dissens (Compiler) dokumentiert.
-- **Sonnet-Cold-Read** (Anker-Verifikation): 8 Anker-Korrekturen + `InstinctValidation.decision` verifiziert + D2.6-Einfügepunkt (`wiring.py:832`) festgelegt — Plan §13.
-- **Nikinger Runde 2** (Plan P18): Push ✅ · P3 für C5 freigegeben · Allein-Entscheidungen bestätigt · **Exec-Modell = OpenCode / MiniMax M3** für alle Blöcke.
-- `docs/concepts/phase16_activation_plan.md` (📕, NEU) · dieser Phasenkopf (NEU) · `docs/INDEX.md`
-  2 Zeilen · `ROADMAP.md` Phase-16-Abschnitt · root `CLAUDE.md` Status-Absatz + Tabellenzeile.
-- **0 Code-Edits, 0 Bot-Touch** (Bot lief die ganze Session, PID 124569 seit 09-03).
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start, 2026-09-05):**
+- `git status` → `main`, working tree clean (bis auf `?? data/`, untracked, `.gitignore`-gedeckt).
+- HEAD = `82e5f8d phase16: docs -- Nikinger Runde 2 (P18 ...)`, 7 Commits lokal ahead of `origin/main`.
+- `python3 scripts/check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (Block A-0-Vorbedingung: aktuell 1 Session-Block im Phasenkopf, `_max_session_num` returns `None` weil „Plan-Session, Fable 5.1" keine `\d+` trägt → check_archive_sequence early-return bei `head_max is None`).
+- Phasenkopf gelesen (115 Z.) + Plan §6 A-0 (S. 303-313) + Plan §13 Opus-Review (B1/D1.2/E2 drei Struktur-Änderungen) + Phase-15-`SESSIONS_ARCHIVE.md`-Header als Vorlage für die Rotation verifiziert.
+
+**1. Hook-Erweiterung — `scripts/check_doc_rotation.py:66`:**
+```diff
+     "phase14_discovery",
+     "phase15_v4",
++    "phase16_activation",
+ )
+```
+3-Zeilen-Diff, minimal-invasiv. `PHASE_DIRS`-Erweiterung analog P15-F (Session #4) — Phase-14-eigener Hygiene-Code wird **nicht** cross-phase-edited, sondern um den nächsten Phasenkopf erweitert (P15-F-Vorbild).
+
+**2. `phase16_activation/SESSIONS_ARCHIVE.md` (NEU, ~50 Z.):**
+- Header nach Phase-15-Vorbild (`# SESSIONS_ARCHIVE.md — Phase 16 (Freischaltung)` + Rotation-Rule-Paragraph + Doc-Layers-Convention-Verweis).
+- Plan-Session-Block (CLAUDE.md Z. 74-115) **verbatim** dorthin rotiert — kein Edit, nur Verschieben. Heading behält bewusst keine `Session #N`-Nummer (Phase-15-Vorbild „Plan-Session, Opus 5").
+- 1 Mini-Absatz vor der ersten Heading-Divider erklärt das Regex-Verhalten (`_SESSION_NUM_RE` matched Plan-Session-Headings nicht → `arch_max == None` ist für `head_max == 1` korrekt = erste Session der Phase, Archiv darf leer sein / nicht-parsebar sein).
+
+**3. `phase16_activation/CLAUDE.md` — Plan-Session-Block entfernt + Exec-Session-#1-Block angelegt:**
+- Header `updated:` 2026-09-05 (Plan-Session) → 2026-09-05 (+ Exec-Session #1 — Block A Step A-0, ...).
+- Plan-Session-Block (Z. 74-115) entfernt (Inhalt jetzt im Archiv).
+- Exec-Session-#1-Block neu: Auftrag verbatim aus Fable-5.1-Handover, Plan-Anker, Ausführungs-Scope, Σ-Note; Sub-Sections `Completed` (0..3) + `Findings` + `Next` + `Open questions / blockers`. Phasenkopf trägt jetzt **genau einen** `## Session stopped`-Block (`head_max == 1`).
+- `header-card down:`-Block zeigt jetzt explizit `./SESSIONS_ARCHIVE.md` als 📦 (Pattern Phase-13/14/15).
+
+**4. `phase16_activation/tests/` + `phase16_activation/scripts/` angelegt:**
+- `.gitkeep`-Marker-Dateien in beiden Verzeichnissen (leere Verzeichnisse werden von git nicht tracked).
+- Kein `pip install -e .` nötig (Plan §6 A-0: *"Kein pip install -e nötig (keine Package-Imports aus anderen Phasen; das Report-Skript importiert `persistence` über den venv, der schon alle Phasen editable installiert hat — §9 #12)."*).
+- Tests/Scripts-Inhalt kommt in E1/E2 — A-0 legt nur die Skelette an.
+
+**5. Pre-Commit-Hook-Verify:**
+```
+$ python3 scripts/check_doc_rotation.py --strict --phase phase16_activation
+[OK]   phase16_activation: 1 session block
+All phase heads OK.
+exit=0
+```
+→ Phase-16-Phasenkopf trägt genau 1 Block (`head_max == 1`), `SESSIONS_ARCHIVE.md` existiert mit 1 Plan-Session-Block (`arch_max == None`), check_archive_sequence Z. 134-138 returns `None` (PASS).
 
 ### Findings
-- 🔴 **L3 ist die eine Doku-Lüge, die Code-Wahrheit widerlegt:** „`db.py:run_migrations()` wendet
-  beim nächsten Service-Restart automatisch an" steht in root-CLAUDE.md:108, ROADMAP.md:441 und
-  im P15-Handover (§7 E1, §9.13, §10 #4) — kein Produktions-Caller existiert. Korrektur = Plan A-3.
-- 🟡 **Zwei Stellen, an denen die Plan-Session allein entschieden hat** (**in Runde 2 bestätigt**): (a) `InstinctConfig.enable_instinct_promotion` → Default True (P5, supersedet
-  P15-P10, Begründung: VETO 5 kann nur vetoen); (b) Caching **nicht** bauen trotz „können wir
-  testen" (P3, zwei verifizierte Fakten machen den Test ergebnislos).
-- 🟢 C5 (L9): P3-Freigabe in Runde 2 erteilt — Step ist regulär.
-- 🟢 `LiveQuoteCache` existiert nicht (0 Treffer) — ROADMAP 9b + phase9-Head führen eine Leiche (A-3).
 
-### Next
-- **Exec-Session (OpenCode / MiniMax M3, Einstieg über `AGENTS.md`):** Plan §6 **Block A, Step A-0** — diesen Block per
-  Rotationsregel nach `SESSIONS_ARCHIVE.md` (neu anlegen) rotieren, `check_doc_rotation.py:66` um
-  `phase16_activation` ergänzen, dann A-1 (Ritual), A-2 (Σ = 1843 erwartet), A-3 (Sweep).
-- ~~Push~~ erledigt in der Plan-Session (Runde 2).
-- **Operator im B2-Fenster** (alle vier Dienste gestoppt): Backup → `init_db.py --db-path
-  data/trading_bot.sqlite` → Verify v9 → Ledger-Restore SQL (Plan §6 B2).
+🟢 **A-0 exakt nach Plan §6:** Session-Rotation, Hook-Erweiterung, Verzeichnisse — alles wie spezifiziert. Kein Drift, keine impliziten Annahmen.
+
+🟢 **Σ-Baseline 1843 unverändert:** kein Test-Touch, kein Code-Touch. Phase-15-Session-#13-Stand bleibt.
+
+🟢 **Plan-Session-Block-Verbatim-Rotation:** Wortgleich nach `SESSIONS_ARCHIVE.md` (Auditability-Regel P15-Vorbild).
+
+🟢 **`_max_session_num == None` für Plan-Session korrekt:** `_SESSION_NUM_RE` matched die Heading-Zeile `## Session stopped — 2026-09-05 (Plan-Session, Fable 5.1 ...)` nicht (kein `\d+` nach „Session"); `check_archive_sequence` early-returnt für `head_max == 1` mit `arch_max == None` → PASS. Step-2-Check wird mit dem ersten Exec-Session-Block (#1) aktiv und ab da scharf.
+
+🟡 **Plan-Session-Block-Heading-Format-Variante** (Phase-15-Vorbild-„Plan-Session, Opus 5" hat die gleiche Eigenschaft — bewusste Konvention, in `SESSIONS_ARCHIVE.md`-Header-Absatz dokumentiert).
 
 ### Open questions / blockers
-- Keine. Runde 2 hat alle drei Punkte geklärt (Plan P18).
+
+- Keine. A-0 ist die saubere Brücke zwischen Plan-Session und Exec-Session; nächster Step (A-1 Ritual) ist unabhängig und read-only.
+
+### Next (für die nächste Session oder Pause-Fortsetzung)
+
+- **A-1 — Step-0-Ritual:** `grep -rni "turbo" --include="*.py" --include="*.sql" --include="*.sh" . --exclude-dir=.venv` + `grep -rn "EPIC_MAP" --include="*.py" . --exclude-dir=.venv` — Erwartung 14 + 3 wie Plan §2.7 (5. Mal No-Op-Bestätigung). Ergebnis in diesen Phasenkopf-Block.
+- **A-2 — Σ-Baseline:** Sweep nach Plan §2.1, Erwartung Σ = **1843** grün. Abweichung = Befund von *vor* Phase 16, dokumentieren.
+- **A-3 — Code↔.md-Sweep (4 falsche Behauptungen + Leichen):** root-CLAUDE.md:119-120, root-CLAUDE.md Status-Tabelle Z. 167, README.md:39, ROADMAP.md:99, ROADMAP.md:441, phase9_universe/CLAUDE.md:133, phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md (📕, 🟡-Anhang), ROADMAP.md Phase-16-Häkchen-Pflege. Erste Code-Touches im Plan-Scope: 0 (alles Doku).
+- **A-4 — WebUI-Access-Log (L8):** `run_webui.sh` `--no-access-log` + `webui/api.py:75` `SchedulerConfig(daily_loss_cap=1800.0)` mit Kommentar. Wirkt erst nach WebUI-Restart.
+- **A-5 — Operator-Push:** `git push origin main` — 7 + A-Commits. Stand vor A-5: 7 lokal ahead; nach A-5 dann 7 + Anzahl-A-Commits ahead. Nikinger-Aktion.
+- **B2 (nach Block B Commit)** — Operator-Fenster mit allen 4 Diensten gestoppt: Backup → `init_db.py` → v9 verifizieren → Ledger-Restore-SQL. **Erst nach** Block-B-Commit (P14-Disziplin, Schema-Floor wirkt ab dann).
