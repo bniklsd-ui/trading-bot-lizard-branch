@@ -7,6 +7,282 @@ contract, and [`../docs/DOC_LAYERS_CONVENTION.md`](../docs/DOC_LAYERS_CONVENTION
 the L0/L1/L2/L3 model.
 
 ---
+## Session stopped — 2026-09-03 (MiniMax-M3-Exec-Session #9, Block D Folgefix Variante C komplett — rescue.py Signatur + Spend-Logik + Mock + Regressions-Pin, Σ 1743 grün)
+
+> **Auftrag:** Nikinger-Chat 2026-09-03 (Anschluss an Session #8½ Pfad-A-Scharfschaltung):
+> Frage-Slot-Antwort „**vollständige Variante des fixes, arbeite den ersten Schritt
+> atomar ab und halte dann Rücksprache mit mir**" — bezogen auf NEXT-Item #5 aus
+> Session #8 (Block-D-Folgefix Variante C, alle 4 Schritte).
+>
+> Schritt 1 atomar ausgeführt (Commit `ded279e`), RED-Status exakt wie Audit-Trail
+> vorhergesagt (3/18 Phase-13-Tests rot). Anschließend Schritt 2 (Commit `066f385`),
+> Schritt 3 + 4 (Commit `ca04793`) unter Nikinger-Pushfreigabe ausgeführt.
+> Plan-Anker: [`../docs/concepts/phase15_v4_plan.md`](../docs/concepts/phase15_v4_plan.md)
+> §6 D3 + Audit-Trail-Block in diesem Phasenkopf (Z. 952-1306). Cross-Phase-Freigabe:
+> Phase 13 (Plan §4, Nikinger 2026-08-31; Block D Step D3 hat Phase 13 explizit
+> freigegeben, Folgefix im selben Modul `live_data.rescue`).
+>
+> Antwort: „Ja, alles klar, Nikinger." (Schritt 1) + „Pushfreigabe, danach bitte den
+> nächsten Schritt laut Plan." (Schritte 2-4). Reihenfolge exakt wie freigegeben:
+> (1) Cross-Session-Drift-Check; (2) Schritt 1 (Audit-Trail §Plan für Fix):
+> Signatur-Korrektur in `rescue.py`; (3) pytest-Verify RED-Status; (4) Atomic
+> Commit + Push; (5) Schritte 2-4 (Spend-Logik + Mock-Update + Regressions-Pin);
+> (6) Volle Σ-Sweep = 1743 grün.
+>
+> Ausführungs-Scope: **3 Code/Test-Commits** (`ded279e` Schritt 1 + `066f385`
+> Schritt 2 + `ca04793` Schritte 3+4) **+ 1 Doc-Commit** (`341343c` Session-Rotation)
+> — exakt Block-D-Folgefix Variante C komplett (Audit-Trail §Plan für Fix
+> Z. 1183-1297). **Kein** Phase-1-Touch (ABC-Vertrag bleibt unverändert — die
+> Bug-Signatur saß in Phase 13), **kein** Phase-2/5/7-Touch. Σ total
+> **1743 grün** (Audit-Trail-Erwartung 1744, Differenz erklärt im Findings-Block).
+
+### Completed
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start, 2026-09-03 ~13:00 UTC = ~15:00 CEST):**
+- `git status` → `main`, working tree clean (nur `data/` untracked).
+- `git log --oneline -5` → HEAD = `2f64511 phase15: docs -- Block-D-Folgefix-Diagnose +
+  Audit-Trail`. `origin/main = 2f64511` (0 ahead / 0 behind) — Session #8½ ist gepusht.
+- `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 (15 Phasen OK).
+- `bash scripts/restart-services.sh status` → 4/4 Dienste ALIVE seit 2026-09-03 ~12:00
+  CEST (Recorder 124485, Discovery 124512, Scheduler 124569, WebUI 124611),
+  DISCOVERY_ARMED present.
+- Σ-Stand Session #8 → 1742 grün (Phase-13: 81, Phase-15: 4).
+
+**1. Schritt 1 von 4 — `rescue.py` Signatur-Fix (Commit `ded279e`):**
+
+| Datei | Zeile | Vorher | Nachher |
+|---|---|---|---|
+| `phase13_live_data/live_data/rescue.py` | 217 | `env = self._call_history(epic, gap_start, gap_end, points)` | `env = self._call_history(epic, gap_start, gap_end)` |
+| `phase13_live_data/live_data/rescue.py` | 255 | `def _call_history(self, epic: str, start_utc: str, end_utc: str, count: int) -> Any:` | `def _call_history(self, epic: str, start_utc: str, end_utc: str) -> Any:` |
+| `phase13_live_data/live_data/rescue.py` | 256-259 | alte Docstring „Bereichs-API per Plan §6 C2, duck-typed, same shape as get_ohlcv envelope" | neue Docstring: „Range-basiert … siehe Plan §6 C2 + rescue.py Module-Docstring Z. 9-11 + ig_adapter.py:449" + datierter Audit-Trail-Vermerk mit der Konkret-Reproduktion des Live-Fehlers |
+| `phase13_live_data/live_data/rescue.py` | 264 | `return method(epic, "MINUTE", count, from_dt=start_utc, to_dt=end_utc)` | `return method(epic, start_utc, end_utc, "MINUTE")` |
+
+**Was passierte arithmetisch:** der alte Aufruf füllte alle 4 named slots des
+ABC-Vertrags `(epic, from_dt, to_dt, resolution)` — `epic=epic`, `from_dt="MINUTE"`,
+`to_dt=count`, `resolution` blieb unbound — plus kwargs `from_dt=start_utc, to_dt=end_utc`
+→ „got multiple values for argument 'from_dt'" (Live-Fehler 2026-09-03 Pfad-A-Scharfschaltung).
+Der neue Aufruf: `epic=epic`, `from_dt=start_utc`, `to_dt=end_utc`, `resolution="MINUTE"`
+— 4 positionelle Args in Vertrag-Reihenfolge, kein `count`, keine kwargs.
+
+**Vertrag-Beleg (doppelt verifiziert gegen den ABC):**
+- `phase1_broker_wrapper/broker_wrapper/adapters/base.py:49-52` (ABC):
+  ```python
+  def get_historical_ohlcv(self, epic: str, from_dt: str, to_dt: str, resolution: str) -> Envelope:
+  ```
+- `phase1_broker_wrapper/broker_wrapper/adapters/ig_adapter.py:449-451` (Implementation):
+  ```python
+  def get_historical_ohlcv(self, epic: str, from_dt: str, to_dt: str, resolution: str) -> Envelope:
+  ```
+- `phase1_broker_wrapper/broker_wrapper/cli.py:157-159` (Happy-Path-Aufrufer, korrekt):
+  `broker.get_historical_ohlcv(args.epic, args.from_dt, args.to_dt, args.resolution)`
+- `phase1_broker_wrapper/tests/test_ig_adapter.py:527-529` (Happy-Path-Test, korrekt):
+  `a.get_historical_ohlcv("IX.D.DAX.IFMM.IP", "2026-07-01T00:00:00", "2026-07-02T00:00:00", "DAY")`
+
+**`count`-Parameter war ungenutzt:** der Aufruf-Plan §6 C2 Z. 1107-1108 zitiert den
+Bereichs-API-Vertrag, und die `count`-Variable wurde nur als positional filler in den
+`from_dt`/`to_dt`-Slots gemapst. Das Entfernen hat **keine** Verhaltens-Änderung
+außer der Vertrag-Korrektheit — `rescue.py:212-213` berechnet den Spend
+(`minutes = max(1, int(...gap_minutes...))`, `points = min(minutes, max_points_per_call)`)
+vom `_find_oldest_gap`-Pfad, **unabhängig** vom `_call_history`-Pfad.
+
+**Spend-Booking-Reihenfolge noch nicht angefasst:** Schritt 1 hat den
+`record_spend`-Call **nicht** aus dem Pre-Exception-Pfad verschoben (Z. 217-225
+verbatim). Das ist Audit-Trail Bug 3 — wird in **Schritt 2** (Spend-Logik-Korrektur)
+gefixt. Folge: die RED-Tests buchen weiterhin `points_spent == 5` korrekt (Spend
+ist gebucht), die Reports tragen aber `skipped_reason="not_ok"` statt der
+ursprünglich erwarteten Werte.
+
+**2. Σ-Verify Step 1 (selbst nachgemessen, diese Session):**
+
+| Phase | Tests grün | Δ vs. Session #8 |
+|---|---:|---|
+| phase13_live_data | **78** | **−3** (3 Tests rot: Mock-Signatur noch auf Bug-Stand) |
+| alle anderen Phasen | unverändert | — |
+| root tests | unverändert | — |
+| **Σ total** | **1739** | **−3** vs. 1742 ✅ erwarteter RED-Stand |
+
+**RED-Tests (Erwartung exakt eingetroffen, Audit-Trail Z. 1166-1181):**
+
+| Test | Assertion | Diagnostik |
+|---|---|---|
+| `test_old_gap_calls_history_and_writes_bars` | `out.skipped_reason is None` ❌ (actual: `"not_ok"`) | Mock wirft TypeError → `_Env(False, "exception")` → env.ok=False |
+| `test_throttle_blocks_second_call_same_day` | `out1.bars_written == 1` ❌ (actual: `0`) | wie oben (erster Aufruf, Mock wirft) |
+| `test_stale_response_is_rejected_and_spend_still_booked` | `out.skipped_reason == "stale_history"` ❌ (actual: `"not_ok"`) | wie oben |
+
+**Mock-Signatur-Defekt (Audit-Trail Bug 2):** `phase13_live_data/tests/test_rescue.py:36`
+```python
+def get_historical_ohlcv(self, epic, resolution, count, **kwargs):
+```
+nimmt 3 positionelle Args + kwargs. Der neue Aufruf
+`method(epic, start_utc, end_utc, "MINUTE")` übergibt 4 positionelle Args → der
+4. („MINUTE") landet in keinem Slot → `TypeError: ... takes 4 positional arguments
+but 5 were given`. Der `try/except` in `_call_history` schluckt es, aber
+`skipped_reason="not_ok"` (statt None) macht die Tests rot. **Das ist exakt der
+gewünschte RED-Stand** — Schritt 3 (Mock-Update auf ABC-Vertrag) wird sie zurück
+auf grün bringen.
+
+**3. Doc-Rotation-Hook-Verify (Schritt 1):**
+
+```
+$ python3 scripts/check_doc_rotation.py --strict --quiet
+exit=0
+$ python3 scripts/check_doc_rotation.py --strict --phase phase15_v4
+[OK]   phase15_v4: 1 session block            ← bleibt 1 nach Session-Rotation
+```
+
+**4. Schritt 2 von 4 — `rescue.py` Spend-Booking-Logik (Commit `066f385`, gepusht):**
+
+| Datei | Zeile | Vorher | Nachher |
+|---|---|---|---|
+| `phase13_live_data/live_data/rescue.py` | 217-238 | `env = call_history(...); record_spend(points); _last_rescue_date[epic]=today; if not env.ok: return points_spent=points, "not_ok"` | `_last_rescue_date[epic]=today; env = call_history(...); if not env.ok: return points_spent=0, "not_ok"; record_spend(points)` |
+
+**Was sich ändert:** `record_spend` läuft jetzt **nach** dem `env.ok`-Check. Bei
+`not_ok` (Exception + nicht-OK-Antwort) wird **kein** Spend gebucht. Bei erfolgreicher
+IG-Antwort mit stale/empty Daten bleibt der Spend weiterhin gebucht (L8-Logik aus A4 —
+IG hat den Call gesehen). `_last_rescue_date[epic] = today` muss **vor** dem Call
+passieren, sonst blockiert eine Exception die Throttle für denselben Tag.
+
+**Σ nach Schritt 2:** 1739 → **1738** (ein zusätzlicher Test rot: `test_broker_not_ok_returns_not_ok_report`
+asserted `points_spent == 5`, jetzt ist der Wert korrekt `0` — Pin-Update kommt in
+Schritt 3). Audit-Trail Schritt 3 Z. 1262-1263 sagt genau das voraus.
+
+**5. Schritt 3 + 4 — `test_rescue.py` Mock-Update + Test-Pin-Fix + Regressions-Pin (Commit `ca04793`, gepusht):**
+
+| Datei | Zeile | Vorher | Nachher |
+|---|---|---|---|
+| `phase13_live_data/tests/test_rescue.py` | 36 | `def get_historical_ohlcv(self, epic, resolution, count, **kwargs):` | `def get_historical_ohlcv(self, epic, from_dt, to_dt, resolution):` |
+| `phase13_live_data/tests/test_rescue.py` | 242-264 (test_broker_not_ok_returns_not_ok_report) | `assert out.points_spent == 5  # the spend is still booked (IG billed)` | `assert out.points_spent == 0` + `assert budget.spent_in_window() == 0` + Docstring aktualisiert (Not_OK bucht keinen Spend mehr) |
+| `phase13_live_data/tests/test_rescue.py` | neu Z. 285-336 | — | `test_call_history_uses_correct_signature` (Spy-Broker pinnt exakte 4-Args-Reihenfolge der ABC-Vertrag) |
+
+**Was sich ändert:** der `_FakeBroker`-Mock folgt jetzt der ABC-Vertrag-Signatur
+`(epic, from_dt, to_dt, resolution)`. Test-Pin für `test_broker_not_ok_returns_not_ok_report`
+wechselt von `points_spent == 5` auf `points_spent == 0` (Bug-3-Fix: not_ok bucht
+keinen Spend). Neuer Regressionstest `test_call_history_uses_correct_signature` pinnt
+die exakte 4-Args-Reihenfolge per Spy-Broker — verhindert, dass genau dieser
+Integrationsfehler jemals wiederkehrt.
+
+**Σ nach Schritt 3 + 4:** 1738 → 1742 (Mock-Update macht die 3 RED-Tests aus
+Schritt 1 wieder grün) → **1743 grün** (+1 Regressionstest).
+
+**6. Σ-Sweep finale Stand 2026-09-03 ~13:45 UTC (selbst nachgemessen, diese Session):**
+
+| Phase | Tests grün | Δ vs. Session #8 |
+|---|---:|---|
+| phase1_broker_wrapper | 95 | — |
+| phase2_persistence | 77 | — |
+| phase3_external_data | 104 | — |
+| phase4_research | 155 | — |
+| phase5_execution | 173 | — |
+| phase6_debate | 76 | — |
+| phase7_reward | 166 | — |
+| phase8_scheduler | 248 | — |
+| phase9_universe | 87 | — |
+| phase10_v3 | 165 | — |
+| phase12_data_foundation | 145 | — |
+| **phase13_live_data** | **82** | **+1** (Regressions-Pin) |
+| phase14_discovery | 61 | — |
+| phase15_v4 | 4 | — |
+| root `tests/` | 105 | — |
+| **Σ total** | **1743** | **+1** vs. Session #8 (1742) ✅ |
+
+**7. Doc-Rotation-Hook-Verify (final):**
+
+```
+$ python3 scripts/check_doc_rotation.py --strict --quiet
+exit=0
+$ python3 scripts/check_doc_rotation.py --strict --phase phase15_v4
+[OK]   phase15_v4: 1 session block            ← bleibt 1 (Session #9 in-place aktualisiert)
+```
+
+### Findings
+
+🟢 **Block D endgültig abgeschlossen** (D-1 + D-2 + D-3 + D-Folgefix 1-4):
+- **AK10** ✅ (Session #5)
+- **AK11** ✅ (Session #5)
+- **AK12** ✅ (Session #5)
+- **AK13** ✅ Σ-Sweep ≥ 1703 — exakt **1743 grün** (Audit-Trail-Erwartung 1744, +1 statt +2 — siehe unten)
+- **D-Folgefix-Variante-C** ✅ (diese Session): Bug 1 (Signatur), Bug 2 (Mock-Signatur), Bug 3 (Spend-Logik) + Regressions-Pin
+
+🟢 **Auditability gesichert:**
+- `rescue.py` Module-Docstring (Z. 1-31) bleibt unverändert (Range-API, default AUS, Doppel-Sperre).
+- `RescueConfig` (Phase-15-Block-D-Step-D3, Z. 46-86) bleibt unverändert — `enable_gap_rescue` Default `False`.
+- Bug-Trail vollständig in `rescue.py:217-238` (Schritt 1 + 2 Docstrings mit Verweis auf Audit-Trail §Bug 3 + Z. 1219-1240).
+- Regressions-Pin in `test_rescue.py:285-336` — Spy-Broker stellt sicher, dass genau dieser Integrationsfehler (count in from_dt-Slot) nie wiederkehrt.
+
+🟢 **Cross-Phase-Touches minimal:**
+- **Schritt 1**: nur `phase13_live_data/live_data/rescue.py` (Cross-Phase P13 freigegeben §4)
+- **Schritt 2**: nur `phase13_live_data/live_data/rescue.py` (gleiche Datei, gleiche Cross-Phase-Freigabe)
+- **Schritt 3+4**: nur `phase13_live_data/tests/test_rescue.py` (Phase-13-eigener Test-Code)
+- **Phase 1 Scheduler/Broker**: **nicht** angefasst (ABC-Vertrag `base.py:49-52` ist die Quelle der Wahrheit und bleibt unverändert)
+
+🟡 **Σ-Erwartung-Drift:** Audit-Trail-Erwartung 1744, tatsächlich **1743** (+1 statt +2).
+Erklärung: Audit-Trail §Σ-Sweep-Erwartung listete „+2 (neuer Regressionstest + Mock-Anpassung-Test)" —
+die Mock-Anpassung selbst ist **kein** neuer Test, sondern eine Änderung an der bestehenden
+`_FakeBroker`-Mock-Klasse (kein Test-Count-Change). Nur der Regressions-Pin ist +1.
+**Konsequenz:** Σ liegt 1 Test unter der Audit-Trail-Erwartung; alle 82 Phase-13-Tests
+sind grün, keine offene Regression. Keine Aktion nötig.
+
+🟡 **Ledger-Restore bleibt Nikinger-Aktion:** 250 gebuchte Punkte aus dem Fehl-Lauf
+in `data/bars.sqlite.source_spend WHERE kind='rescue'` löschen — manuell, kein
+Code-Touch, kein Commit (Audit-Trail §Ledger-Recovery Z. 1300-1311).
+
+🟡 **Plan-§6-C2-Korrekturhinweis bleibt offen:** `docs/concepts/phase13_live_data_plan.md`
+Z. 1112-1113 dokumentiert „Spend wird gebucht vor Call" als **geplant**; der Fix
+(Schritt 2) macht daraus „Spend wird gebucht nur bei erfolgreichem Call". Datierter
+Vermerk für Folge-Session (Audit-Trail-Item #7, optional, ~5 Min, Doc-only).
+
+🟡 **Push-Status:** 4 Commits gepusht (Schritt 1 `ded279e` + Session-Rotation `341343c`
+in Schritt-1-Runde; Schritt 2 `066f385` + Schritt 3+4 `ca04793` in Schritt-2-4-Runde),
+`origin/main` = `ca04793`, working tree clean (nur `data/` untracked, gitignored).
+
+### Open questions / blockers
+
+- **Block D endgültig abgeschlossen** ✅ (D-1 + D-2 + D-3 + D-Folgefix 1-4, alle in dieser und vorhergehenden Sessions).
+- **Block C (Instinct-ECC)** kann jetzt starten. Cross-Phase Phase 2 + Phase 5 sind in §4 für Phase 15 freigegeben. Reihenfolge: C1 Migration 009 + DB-Methoden → C2 `phase15_v4/instinct/`-Package → C3 VETO 5 + `ExecutionConfig.longterm_rules` → C4 Tests. ~2-3 h inkl. Sweep.
+- **Phase-12-Reconcile-Timing Live-Verify (A6)** weiterhin ausstehend — wartet auf nächsten OPEN-Trade + 24 h Beobachtung (Backoff replay-verifiziert, Mini-Session 26).
+- **Ledger-Restore** (250 Punkte): Nikinger-Aktion, manuell, kein Code-Touch.
+- **Plan-§6-C2-Korrekturhinweis** (optional, Doc-only, ~5 Min).
+
+### NEXT (für die nächste Session)
+
+**Nikinger-Wahl-bedingt.** Stand 2026-09-03 ~13:50 UTC = ~15:50 CEST.
+
+**Status-Update der Items aus Session #8 NEXT-Block:**
+
+| # | Item | Status nach Session #9 |
+|---|---|---|
+| **5** | Phase-15-Block-D-Folgefix (Audit-Trail §Plan für Fix) | ✅ **endgültig abgeschlossen** (diese Session, alle 4 Schritte) |
+| **6** | Ledger-Restore | offen (Nikinger-Aktion, separat) |
+| **7** | Plan-§6-C2-Korrekturhinweis | offen (optional, Folge-Session, Doc-only) |
+
+**Konkrete Empfehlung für die Folge-Session (sortiert nach Aufwand × Impact):**
+
+1. **Block C (Instinct-ECC)** starten (~2-3 h inkl. Sweep, ~6-8 Commits) — **höchste Priorität**:
+   - C1: Migration 009 + `_INSTINCT_COLUMNS` + 3 DB-Methoden in
+     `phase2_persistence/persistence/db.py` + Test-Migrations-Anpassungen.
+     ⚠ Plan §9.7: 4 Stellen in `test_migrations.py` für 008→009 anpassen
+     (Präzedenzfall: Mini-Session 26 für 008).
+   - C2: `phase15_v4/instinct/`-Package (Models + Extractor + Validator + Promotion).
+   - C3: VETO 5 + `ExecutionConfig.longterm_rules` in Phase 5.
+   - C4: Tests + Phase-5-Sweep-Verify.
+2. **Ledger-Restore** (separat, Nikinger-Aktion, Item #6).
+3. **`phase13_14_15.svg` Polish** (optional, ~10 Min): Spalten-Abstände / Callout-Positionen.
+4. **Plan-§6-C2-Korrekturhinweis** (Item #7, optional, ~5 Min, Doc-only).
+
+**Push-Status dieser Session:** **4 Commits gepusht** auf `origin/main` (= `ca04793`),
+0 ahead / 0 behind, working tree clean (nur `data/` untracked, gitignored).
+
+**Block-Status nach dieser Session:**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ A-1..A-7 (Sessions #1-#4) |
+| B (Reward-Kalibrierung) | ✅ B1..B6 **komplett + live** (--apply ausgeführt 2026-09-03 ~12:00 CEST) |
+| C (Instinct-ECC) | 🔓 entsperrt, kann starten |
+| D (Erbstücke) | ✅ D-1..D-3 (Session #5) + **Folgefix 1-4** (diese Session) — **endgültig abgeschlossen** |
+
+---
+
 ## Session stopped — 2026-09-03 (MiniMax-M3-Exec-Session #8, Block B B6 --apply ausgeführt unter Nikinger-Freigabe, AK6 ✅, Score 78.72 → 50.00 live, Backup archiviert)
 
 > **Auftrag:** Nikinger-Chat 2026-09-03 morgens: „Zusammen die letzten offenen Items aus
