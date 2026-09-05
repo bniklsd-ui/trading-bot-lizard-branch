@@ -32,6 +32,7 @@ from universe.models import (
     STATUS_DISCOVERED,
     STATUS_QUARANTINED,
     STATUS_VERIFIED,
+    is_weekend_market,
 )
 from universe.pricing import confirm_curated, resolve_point_value
 from universe.store import UniverseStore
@@ -250,6 +251,12 @@ def run_promotion_cycle(
     # -- Step 2: auto-activate verified candidates up to the cap ------------------
     active_count = len(store.active_universe())
     for rec in store.list_by_status(STATUS_VERIFIED):
+        # Phase 16 B3 (2026-09-05): never activate a weekend market — EDITS_ONLY
+        # Mon–Fri, doesn't fit the scheduler's 09:00–17:30 window. Pure structural
+        # filter via is_weekend_market (Epic-pattern .SUN or name marker).
+        if is_weekend_market(rec.epic, rec.name):
+            report.unchanged += 1
+            continue
         if active_count >= max_active:
             report.unchanged += 1
             continue
@@ -260,6 +267,21 @@ def run_promotion_cycle(
 
     # -- Step 3: health-recheck actives (+ curated-pricing confirmation) ---------
     for rec in store.active_universe():
+        # Phase 16 B3 (2026-09-05): demote any weekend market that slipped into
+        # ``active`` in a previous run (e.g. before this filter shipped — the live
+        # DB at 2026-09-05 has 3 active ``IX.D.SUN*`` rows from this loophole, see
+        # Plan §3 L5). Quarantined, not deleted — the ``universe_demote`` event is
+        # emitted so the operator-side ``autonomy_report`` can count this clearly.
+        if is_weekend_market(rec.epic, rec.name):
+            store.set_status(
+                rec.epic, STATUS_QUARANTINED, checks={"reason": "weekend_market"}
+            )
+            report.demoted.append(rec.epic)
+            _emit(
+                health_sink,
+                {"event": "universe_demote", "epic": rec.epic, "reason": "weekend_market"},
+            )
+            continue
         # Skip instruments activated in Step 2 of THIS cycle (2026-07-04 review
         # polish): they carry a full verify PASS from Step 1 moments ago — a second
         # verify_instrument here is pure duplicate paced IG/yF traffic with no new

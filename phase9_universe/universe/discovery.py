@@ -24,7 +24,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from universe.models import SOURCE_RESEARCH_PROMOTED, STATUS_DISCOVERED, UniverseRecord
+from universe.models import (
+    SOURCE_RESEARCH_PROMOTED,
+    STATUS_DISCOVERED,
+    UniverseRecord,
+    is_weekend_market,
+)
 from universe.store import UniverseStore, utc_iso_now
 
 # Curated seed longlist of search TERMS (not epics) — both German and English market
@@ -121,6 +126,14 @@ def _passes_code_filter(
     """Apply every discovery criterion; bump ``filtered[reason]`` on the first failure."""
     if not hit.get("market_info_ok"):
         _bump(filtered, "market_info_fail")
+        return False
+    # Phase 16 B3 (2026-09-05): weekend-market filter. IG's ``IX.D.SUN*`` indices are
+    # EDITS_ONLY Mon–Fri, so they never fit the 09:00–17:30 scheduler window and cost
+    # 30–50 % of the daily IG-Research budget for nothing (Plan §3 L5). Checked BEFORE
+    # ``market_status`` because the latter can flip ``TRADEABLE`` on IG's side at any
+    # moment — the Epic / name marker is structural and stable.
+    if is_weekend_market(hit.get("epic"), hit.get("name")):
+        _bump(filtered, "weekend_market")
         return False
     if hit.get("currency") != "EUR":
         _bump(filtered, "currency")

@@ -77,6 +77,33 @@ _VALID_SYMBOL_SOURCES = frozenset(
 )
 
 
+# Phase 16 B3 (2026-09-05): weekend-market markers. IG's ``IX.D.SUN*`` weekend indices are
+# EDITS_ONLY Monday–Friday (Plan §3 L5), so they never fit the 09:00–17:30 trading window the
+# scheduler enforces. The Epic pattern ``.SUN`` is the structural marker; the German/English
+# name markers are belt-and-braces for any future variants that drop the pattern. Pure (no
+# I/O, no LLM) and lives next to the other Universe constants — consumed by
+# :func:`universe.discovery._passes_code_filter` and
+# :func:`universe.promotion.run_promotion_cycle`.
+WEEKEND_NAME_MARKERS: tuple[str, ...] = ("wochenend", "weekend")
+
+
+def is_weekend_market(epic: str | None, name: str | None) -> bool:
+    """Return True iff this market is a weekend-only IG instrument (Plan §6 B3).
+
+    Matches by Epic pattern (``.SUN`` substring, case-insensitive) **or** by name marker
+    (case-insensitive ``wochenend`` / ``weekend`` substring). ``None`` values for either
+    field are tolerated — the function still evaluates the other side. Fail-open towards
+    "filter": if either side matches, the market is treated as weekend (cheaper to
+    quarantine one healthy weekday market by mistake than to let a weekend market slip
+    into the active universe and cost 30–50 % of the daily IG-Research budget for nothing).
+    """
+    e = (epic or "").upper()
+    n = (name or "").lower()
+    if ".SUN" in e:
+        return True
+    return any(marker in n for marker in WEEKEND_NAME_MARKERS)
+
+
 @dataclass(frozen=True)
 class UniverseRecord:
     """One row of ``instrument_universe`` (migration 004).
