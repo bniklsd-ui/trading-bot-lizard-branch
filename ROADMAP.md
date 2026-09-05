@@ -7,7 +7,7 @@ up: CLAUDE.md
 down:
   - docs/concepts/          # one snapshot concept/plan per phase
   - ROADMAP_ARCHIVE.md      # 📦 Phases 1–8 verbatim archive (closed, A-5 2026-08-31)
-updated: 2026-08-31
+updated: 2026-09-05
 ---
 # Roadmap
 
@@ -57,19 +57,15 @@ Done-When-Checkboxen, Missions, Hotfix-Tracks, Concept-Links verbatim).
 
 ## Phase 9 — V2: Foundation (Autonome Epic-Research + Daten-Input-Zuverlässigkeit)
 
-> **Status: in Arbeit (Stand 2026-07-07).** Steps 1–6 + 7a gebaut (7b ohne Fix-Target — die
-> LS-Diagnose fand keinen Bug); **Live-Baseline-Lauf seit 2026-07-06** — Tag 1: Pipeline
-> end-to-end bewiesen (8 active / 7 verified / 0 quarantined, alle `point_value` via
-> `ig_fields`), erster DB-Universum-Pick (CAC). Offen: Neustart-Pickup, Trade unter V2,
-> `--enable-ig-bars`. Tag-1-Ergebnisse:
+> **Status: in Arbeit (Stand 2026-07-07; gekürzt 2026-09-05, Phase-16-Plan-Session — Wortlaut
+> bis dahin in `git log -p ROADMAP.md`).** Steps 1–6 + 7a gebaut (7b ohne Fix-Target);
+> Live-Baseline-Lauf seit 2026-07-06, Tag 1 end-to-end bewiesen, erster DB-Universum-Pick (CAC).
+> Offen: V2-Baseline-Auswertung (echter `open→close`-Trade unter V2 + Variety-These) — seit
+> 2026-07-02 acht autonome Trades (id 4–11 CLOSED, davon 4 seit 08-25) und damit faktisch erbracht; `--enable-ig-bars`
+> durch Phase-12 `enable_bar_service` abgelöst. Handover:
 > [`phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md`](./phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md) ·
 > Plan: [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md) ·
 > Phase-Head: [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md).
->
-> **Offen (kein Blocker, separater docs-only-Auftrag):** V2-Baseline-Auswertung — ein echter
-> `open→close`-Trade unter dem V2-Universum + die Variety-These (sinkt die Abstain-Quote mit
-> 8 statt 2–4 aktiven Epics?). Nicht Teil von Meta-Phase M1 (orthogonal); einzuschieben, sobald
-> der Baseline-Lauf genug Marktdaten geliefert hat.
 
 **Goal:** die zwei strukturellen Lücken schließen, die den gesamten v1.5→v1.7-Hotfix-Arc
 getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 15/V4)
@@ -468,6 +464,32 @@ dann "Phase 13", dann "Phase 14", jetzt Phase 15 — umnummeriert 2026-08-11, 20
 **Done when (Phase 15, alle 4 Blöcke + ROADMAP 15a–15e):** **✅ erreicht am 2026-09-05.** 15a zurückgestellt · 15b strukturell zu · 15c vollständig zu (live-validiert) · 15d gegenstandslos · 15e strukturell zu, **Pipeline offen** für Promotion-Bridge (Plan §10).
 
 **Directory:** `phase15_v4/` (erstellt 2026-08-31 mit `instinct/` Package + `tests/` + `scripts/`).
+
+---
+
+## Phase 16 — Freischaltung *(eröffnet 2026-09-05, Plan-Session Fable 5.1)*
+
+> **Status: 🔄 in Arbeit seit 2026-09-05.** Execution-ready Plan
+> [`docs/concepts/phase16_activation_plan.md`](./docs/concepts/phase16_activation_plan.md)
+> (P1–P17, L1–L9, Blöcke A–E, AK1–AK16). Phasenkopf:
+> [`phase16_activation/CLAUDE.md`](./phase16_activation/CLAUDE.md).
+
+**Goal:** jedes gebaute Feature läuft, jeder Bruch ist zu, ein vorregistrierter 2-Wochen-Lauf
+(Demo) beweist Autonomie ohne Hand. Der Bot ist seit 2026-08-31 faktisch tot (100 % Research-
+Abstain) — Ursache Infrastruktur, nicht Strategie.
+
+- [ ] **A Haushalt** — Ritual, Σ-Baseline 1843, Code↔.md-Sweep, WebUI-Log, Push
+- [ ] **B Substrat** — Schema-Floor (Live-DB v7, Migrations 008/009 nie angewendet) + Operator-
+  Apply + Ledger-Restore; Wochenend-Epics raus
+- [ ] **C Research-Loop** — 14-Tage-Fenster für die Trade-Historie + ein Prompt-Satz; Token-Budget
+  300 k; Breaker-Semantik (P3-Freigabe offen)
+- [ ] **D Freischaltung** — vier Arme **Default ON** (`--no-*`), Bar-Stream-Token-Wrapper,
+  Promotion-Bridge + Compiler (Gatter n ≥ 50 bleibt), Margin-Headroom (B3)
+- [ ] **E 2-Wochen-Autonomie-Test** — Vorregistrierung, `autonomy_report.py`, Runbook, Closeout
+
+**Done when:** AK1–AK16 des Plans, insbesondere AK15 (sieben PASS-Kriterien; Profit ist keines).
+
+**Directory:** `phase16_activation/`
 
 ---
 
