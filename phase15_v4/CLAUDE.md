@@ -1304,6 +1304,75 @@ oder anderen L3-Snapshots.
 > aktuelle Footer wurde mit dem Session-#6-Rotation-Commit aktualisiert (siehe
 > `## Session stopped — 2026-09-02` weiter oben).
 
+## Phase 15 — Sonderhinweis: Block-Status-Korrektur Session #12 (2026-09-05, MiniMax-M3-Exec-Session #12)
+
+> **Hinweis:** diese Sektion ist **kein** `## Session stopped`-Block und triggert
+> damit **keine** Doc-Rotation (`scripts/check_doc_rotation.py` zählt nur
+> `Session stopped`-Header — der Titel hier beginnt mit „## Phase 15 —",
+> nicht mit „## Session stopped"). Sie ist ein Phase-15-interner
+> Korrektur-Vermerk analog zum Gate-P7-Status-Notiz-Pattern (Session #6
+> oben).
+>
+> **Auditability-Lücken-Schluss — was diese Session tatsächlich geleistet hat:**
+
+### Befund (Nikinger-Rückfrage 2026-09-05: „Meinst du Phase 15 ist hiermit vollständig abgeschlossen?")
+
+Session #12 schloss mit der Aussage **„Phase 15 ist endgültig abgeschlossen"**
+und listete **„✅ C1 + C2 + C3 + C4 — komplett"** als Block-C-Status. Diese
+Aussage war **zu stark** formuliert — Working-Style §6 (CLAUDE.md):
+„Report outcomes faithfully ... A wrong 'it works' costs more than an honest
+'it's broken'." Die ehrliche Differenzierung lautet:
+
+| Ebene | Status |
+|---|---|
+| **Block C Code (C1 + C2 + C3 + C4)** | ✅ **endgültig abgeschlossen** — DB-Substrat, Instinct-Package, VETO 5, Tests, Σ 1843 grün |
+| **Phase 15 formal** | ⚠️ **noch offen** — zwei Folge-Arbeiten fehlen: |
+
+### Was tatsächlich noch offen ist (Nikinger-Folge-Liste, 2026-09-05 bestätigt)
+
+1. **Phase-15-Closeout-Handover** (Pattern wie Phase-12/13/14):
+   `PHASE15_CLOSEOUT_HANDOVER.md` mit §0 BLUF + 5-Zeilen-Bilanz, §1 Architektur,
+   §2 Locks P1–P16, §3 Akzeptanz A1–A14, §4 As-Built-Zahlen heute,
+   §5 Test/Live/Produktion, §6 Delta seit 2026-08-31-Plan-Commit,
+   §7 offene Entscheidungen (E1–E9 aus Plan §7 + die zwei hier dokumentierten
+   Lücken), §8 Datei-Anker, §9 Konsistenz-Regeln, §10 Don'ts, §11 Was diese
+   Session gemacht hat. **Wird eine neue Session bauen** (Nikinger 2026-09-05).
+2. **Promotion-Bridge** (Phase-15-Instinct-Rows → deterministische Prädikate →
+   `config.longterm_rules`): die Pipeline
+   `Database.list_instincts(status="validated")` → `promote_eligible(...)` →
+   Prädikat-Kompilierung → `config.longterm_rules`-Befüllung existiert **nicht**.
+   VETO 5 ist heute ein **toter Briefkasten** — bei n=8 eh No-Op, aber die
+   strukturelle Schließung des C-Blocks (Draht Instincts → VETO-Schicht) fehlt.
+   Plan §10 listet das als out-of-scope, also **bewusst offen**, muss aber im
+   Closeout-Handover explizit als „deliberately deferred to post-Phase-15 wiring
+   session" markiert werden.
+
+### Zugehörige Doku-Korrektur in dieser Session
+
+- **Plan §6 C4 Korrekturhinweis** (Commit `7b5edf0`, datiert 2026-09-05): macht
+  sichtbar, dass `phase15_v4/tests/test_instinct.py` As-Built in **4 Files**
+  aufgeteilt ist (test_instinct_models/extractor/validator + test_promotion),
+  und dass `test_veto5_with_empty_rules_is_identity` in **Phase 5** lebt
+  (Cross-Phase-Touch Plan §4). Beides ist im Plan-📕-Snapshot per 🟡-Hinweis
+  annotiert.
+
+### Empfehlung für die nächste Session (Nikinger-Wahl)
+
+1. **Phase-15-Closeout-Handover bauen** (~1 h, Pattern wie
+   Phase-12/13/14-CLOSE-OUT-HANDOVER) — **höchste Priorität**, weil Block C
+   vollständig ist und das offizielle Ende-Dokument fehlt.
+2. **Promotion-Bridge-Plan** (eigene Mini-Session-Skizze): welche Phasen die
+   Brücke bauen, wo die Prädikat-Kompilierung lebt, wann sie live geht
+   (n ≥ instinct_n_min + enable_instinct_promotion=True).
+
+### Konsequenz für Block-Status-Tabelle (Session #12)
+
+Die Tabelle in Session #12 listet **„✅ C1 + C2 + C3 + C4 — komplett"**
+unter Block C — das **stimmt** auf Block-Ebene. Auf Phase-15-Ebene fehlt die
+Closeout-Handover-Phase. Der Phase-15-Row im root `CLAUDE.md` trägt
+**„🔄 in Arbeit seit 2026-08-31"** — auch das stimmt weiterhin, weil Block C
+zwar Code-vollständig ist, aber die formale Phase-15-Schließung aussteht.
+
 
 ---
 
