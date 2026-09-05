@@ -1,8 +1,8 @@
-"""The pre-trade VETO layer — ``pre_trade_check()`` = 4 HARD VETOs (concept §5).
+"""The pre-trade VETO layer — ``pre_trade_check()`` = 5 HARD VETOs (concept §5 + Phase 15 C3).
 
 Where the gates (``gates.py``) ask *is this candidate eligible?*, the VETOs ask *is
 reality still safe **right now**?* — a last-millisecond reality check on a **fresh**
-snapshot taken immediately before the order. All four are **hard** (any fail = no
+snapshot taken immediately before the order. All five are **hard** (any fail = no
 trade) and **fail-closed**: a data error, a not-``ok`` envelope, or too few bars is a
 veto, never a silent pass. There is no soft warning here — a soft warning that trades
 anyway is exactly the Force-Trigger anti-pattern (Decision B).
@@ -13,11 +13,20 @@ anyway is exactly the Force-Trigger anti-pattern (Decision B).
   real-time bars (``broker.get_ohlcv``), **never** Phase-3 ``get_momentum()`` (delayed).
 - **VETO 4** ``veto_position_conflict`` — no open opposite position, room under
   ``max_parallel_positions``.
+- **VETO 5** ``longterm_pre_trade_check`` — deterministic predicates from promoted
+  Phase-15 Instincts (``config.longterm_rules``). Empty tuple by default ⇒ inactive
+  ⇒ bit-identical to pre-C3 behaviour (Phase 15 AK9). Promotion is gated upstream
+  by ``promote_eligible`` (``phase15_v4/instinct/promotion.py``) — a predicate
+  cannot reach here without ``n_closed >= instinct_n_min`` AND
+  ``enable_instinct_promotion is True``.
 
 Pure where possible: VETO 1/2/4 take pre-fetched envelopes; VETO 3 fetches its own
-bars (the broker is duck-typed — passed in, never imported). The window predicate is
-reused from ``gates.gate_time_window`` (same package) so the tz logic lives once.
-Phase-isolated: ``execution.*`` + stdlib only, no sibling-package imports.
+bars (the broker is duck-typed — passed in, never imported). VETO 5 takes the
+already-built candidate dict + the config's rule tuple — no broker, no clock.
+The window predicate is reused from ``gates.gate_time_window`` (same package) so the
+tz logic lives once. Phase-isolated: ``execution.*`` + stdlib only, no sibling-package
+imports (``phase15_v4/instinct/*`` is **never** imported here — the rules travel as
+plain callables in the config, see ``vetos.py`` §C3 docstring).
 """
 
 from __future__ import annotations
@@ -194,15 +203,73 @@ def veto_position_conflict(
     return VetoVerdict(ok=True, veto="position_conflict", reason="")
 
 
+def longterm_pre_trade_check(
+    candidate: dict[str, Any], rules: tuple[Any, ...]
+) -> VetoVerdict:
+    """VETO 5: deterministic, promoted Phase-15 Instinct predicates.
+
+    Each rule in ``rules`` is ``Callable[[dict], bool]`` — ``True`` means "this
+    candidate passes the rule", ``False`` means "vetoed". Empty tuple (the
+    ``ExecutionConfig.longterm_rules`` default) ⇒ ``ok=True`` ⇒ **bit-identical**
+    to pre-C3 behaviour (Phase 15 AK9).
+
+    **Fail-closed on exceptions:** a rule that raises is a hard veto — same
+    discipline as VETO 1–4 (a faulty long-term rule must never let a trade slip
+    through). The exception's message is captured into ``reason`` so the operator
+    log shows exactly which rule misfired.
+
+    **Where ``rules`` comes from (Phase-15 wiring, not built here):**
+    ``phase5_execution`` never imports ``phase15_v4``. The promotion-gate
+    (``phase15_v4/instinct/promotion.py:promote_eligible``) returns the validated
+    Instinct rows; a later wiring step (out of C3 scope) compiles each row into a
+    plain deterministic predicate and bundles them into ``config.longterm_rules``.
+    A predicate reaches VETO 5 **only** if ``promote_eligible`` opens both gates
+    (``n_closed >= instinct_n_min`` AND ``enable_instinct_promotion is True`` —
+    Phase 15 P10/P12). Until then, the field stays at its default ``()`` and VETO 5
+    is a no-op.
+
+    Args:
+        candidate: the already-built trade candidate dict (the same one passed
+            through VETO 1–4). Read-only — predicates must not mutate it.
+        rules: tuple of ``Callable[[dict], bool]``. May be empty.
+
+    Returns:
+        ``VetoVerdict(ok=True, veto="longterm", reason="")`` if every rule passes
+        (or there are no rules). The first rule that returns ``False`` or raises
+        short-circuits with ``ok=False`` and a precise ``reason`` — the same shape
+        as VETO 1–4.
+    """
+    if not rules:
+        return VetoVerdict(ok=True, veto="longterm", reason="")
+
+    for idx, rule in enumerate(rules):
+        try:
+            decision = rule(candidate)
+        except Exception as exc:  # noqa: BLE001 — fail-closed, mirror VETO 1-4 discipline
+            return VetoVerdict(
+                ok=False,
+                veto="longterm",
+                reason=f"rule[{idx}] raised: {exc}",
+            )
+        if not decision:
+            return VetoVerdict(
+                ok=False,
+                veto="longterm",
+                reason=f"rule[{idx}] vetoed",
+            )
+    return VetoVerdict(ok=True, veto="longterm", reason="")
+
+
 def pre_trade_check(
     broker: Any, candidate: dict[str, Any], now: datetime, config: ExecutionConfig
 ) -> VetoVerdict:
-    """Run all 4 VETOs on a FRESH snapshot; return the first ``ok=False``.
+    """Run all 5 VETOs on a FRESH snapshot; return the first ``ok=False``.
 
     Each VETO reads its own fresh data (a single ``get_price`` feeds VETO 1+2; VETO 3
-    fetches its own ``get_ohlcv``; VETO 4 a fresh ``get_open_positions``). The first
-    failing veto short-circuits — a status veto must not even reach ``get_ohlcv``. No
-    AI, no delayed data. All clear ⇒ ``ok=True``.
+    fetches its own ``get_ohlcv``; VETO 4 a fresh ``get_open_positions``; VETO 5
+    uses the already-built candidate + ``config.longterm_rules`` — no broker, no
+    clock). The first failing veto short-circuits — a status veto must not even
+    reach ``get_ohlcv``. No AI, no delayed data. All clear ⇒ ``ok=True``.
     """
     epic = candidate["epic"]
     direction = candidate["direction"]
@@ -222,6 +289,10 @@ def pre_trade_check(
         return verdict
 
     verdict = veto_position_conflict(broker.get_open_positions(), candidate, config)
+    if not verdict.ok:
+        return verdict
+
+    verdict = longterm_pre_trade_check(candidate, config.longterm_rules)
     if not verdict.ok:
         return verdict
 

@@ -25,6 +25,7 @@ verified against ``ig_adapter.py`` / ``filters.py``):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -107,6 +108,15 @@ class ExecutionConfig:
     momentum_resolution: str = "MINUTE_5"  # VETO 3 — IG real-time bars
     momentum_count: int = 12               # ≈ 1 h of MINUTE_5 bars
     momentum_veto_threshold_pct: float = 0.15  # v1, tune at profit
+    # Phase 15 Block C Step C3 (VETO 5 — long-term promoted instincts, AK9):
+    # tuple of deterministic, promoted instinct predicates (``Callable[[dict], bool]``)
+    # evaluated by ``longterm_pre_trade_check`` after VETO 4. Empty tuple (default)
+    # ⇒ VETO 5 inactive ⇒ bit-identical to pre-C3 behaviour (Plan §6 C3). A promoted
+    # instinct never reaches VETO 5 until ``n_closed >= InstinctConfig.instinct_n_min``
+    # AND ``enable_instinct_promotion is True`` (Phase 15 P10/P12 + promote_eligible
+    # gate). ``tuple`` (not ``list``) so the default is immutable and shared safely
+    # across instances — mutable-default trap guard (Plan §8 second suspect).
+    longterm_rules: tuple[Any, ...] = ()
 
     # --- sizing (Gate 4) ---
     risk_pct_conservative: float = 2.0     # percent; sizing.py divides by 100

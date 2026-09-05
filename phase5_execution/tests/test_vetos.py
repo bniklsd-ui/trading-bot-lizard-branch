@@ -1,8 +1,13 @@
-"""Step 5 — the 4 hard VETOs + ``pre_trade_check`` orchestrator.
+"""Step 5 — the 5 hard VETOs + ``pre_trade_check`` orchestrator (Phase 15 C3 added VETO 5).
 
 All mocked, no network, no real order/credentials. Envelopes are the duck-typed
 ``_FakeEnv``; VETO 3 reads bars from a ``FakeBroker`` (``make_bars`` builds the
 ``get_ohlcv`` bar dicts). ``now`` is a fixed in-window timestamp.
+
+**VETO 5** (``longterm_pre_trade_check``) takes the already-built candidate dict
+plus ``config.longterm_rules`` (a tuple of ``Callable[[dict], bool]``). Empty tuple
+by default ⇒ inactive ⇒ bit-identical to pre-C3 (Phase 15 AK9). The rule predicates
+travel through ``ExecutionConfig`` — Phase 5 never imports ``phase15_v4``.
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ import pytest
 
 from execution.config import ExecutionConfig
 from execution.vetos import (
+    longterm_pre_trade_check,
     pre_trade_check,
     veto_momentum,
     veto_position_conflict,
@@ -201,3 +207,209 @@ def test_pre_trade_check_aborts_on_first_fail_before_ohlcv(
     assert not v.ok and v.veto == "status_window"
     assert broker.get_ohlcv_calls == []
     assert broker.get_open_positions_calls == 0
+
+
+# --- VETO 5 — longterm_pre_trade_check (Phase 15 Block C Step C3) ----------- #
+
+
+def test_longterm_pre_trade_check_empty_rules_passes() -> None:
+    """Empty rules tuple ⇒ ``ok=True`` (Plan §6 C3 default path, AK9 bit-identical)."""
+    v = longterm_pre_trade_check({"epic": "X", "direction": "BUY"}, ())
+    assert v.ok is True
+    assert v.veto == "longterm"
+    assert v.reason == ""
+
+
+def test_longterm_pre_trade_check_all_rules_pass() -> None:
+    """All rules return True ⇒ ``ok=True`` (no short-circuit on success path)."""
+    candidate = {"epic": "X", "direction": "BUY"}
+    calls: list[dict] = []
+
+    def rule_a(c: dict) -> bool:
+        calls.append(c)
+        return True
+
+    def rule_b(c: dict) -> bool:
+        calls.append(c)
+        return True
+
+    v = longterm_pre_trade_check(candidate, (rule_a, rule_b))
+    assert v.ok is True
+    assert v.veto == "longterm"
+    assert v.reason == ""
+    # Both rules ran, in order, on the same candidate.
+    assert len(calls) == 2
+    assert calls[0] is candidate
+    assert calls[1] is candidate
+
+
+def test_longterm_pre_trade_check_first_false_vetoes() -> None:
+    """First rule that returns False short-circuits with a precise reason."""
+    calls: list[str] = []
+
+    def rule_a(c: dict) -> bool:
+        calls.append("a")
+        return True
+
+    def rule_b(c: dict) -> bool:
+        calls.append("b")
+        return False
+
+    def rule_c(c: dict) -> bool:
+        calls.append("c")
+        return True
+
+    v = longterm_pre_trade_check({}, (rule_a, rule_b, rule_c))
+    assert v.ok is False
+    assert v.veto == "longterm"
+    assert "rule[1]" in v.reason
+    # rule_b vetoed ⇒ rule_c never runs (short-circuit).
+    assert calls == ["a", "b"]
+
+
+def test_longterm_pre_trade_check_raising_rule_vetoes() -> None:
+    """A rule that raises is **fail-closed**: ok=False with the exception captured."""
+    calls: list[str] = []
+
+    def rule_a(c: dict) -> bool:
+        calls.append("a")
+        return True
+
+    def rule_b(c: dict) -> bool:
+        calls.append("b")
+        raise RuntimeError("rule-b broken")
+
+    def rule_c(c: dict) -> bool:
+        calls.append("c")
+        return True
+
+    v = longterm_pre_trade_check({}, (rule_a, rule_b, rule_c))
+    assert v.ok is False
+    assert v.veto == "longterm"
+    assert "rule[1]" in v.reason
+    assert "rule-b broken" in v.reason
+    # rule_c never runs (short-circuit, same discipline as a returning-False rule).
+    assert calls == ["a", "b"]
+
+
+def test_longterm_pre_trade_check_does_not_mutate_candidate() -> None:
+    """The candidate dict is passed read-only — predicates must not mutate it.
+
+    The function does not pass a defensive copy (it's the same object every time);
+    the test just confirms no implicit mutation happens inside VETO 5 itself.
+    """
+    candidate = {"epic": "X", "direction": "BUY", "tags": []}
+    snapshot = dict(candidate)
+    longterm_pre_trade_check(candidate, (lambda _c: True,))
+    assert candidate == snapshot
+
+
+# --- pre_trade_check + VETO 5 integration (Phase 15 AK9) ------------------ #
+
+
+def test_pre_trade_check_veto5_empty_rules_is_identity(
+    config: ExecutionConfig, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """AK9 (Plan §7): ``pre_trade_check`` with empty ``longterm_rules`` is bit-
+    identical to pre-C3 behaviour — passes when the other 4 VETOs pass."""
+    broker = FakeBroker()
+    candidate = make_candidate(direction="BUY", epic=DEFAULT_EPIC)
+    v = pre_trade_check(broker, candidate, NOW_IN_WINDOW, config)
+    assert v.ok is True
+    # All 4 fresh snapshots still taken (VETO 5 needs nothing extra — no broker, no clock).
+    assert broker.get_price_calls == [DEFAULT_EPIC]
+    assert len(broker.get_ohlcv_calls) == 1
+    assert broker.get_open_positions_calls == 1
+
+
+def test_pre_trade_check_veto5_short_circuits_after_veto4(
+    config: ExecutionConfig, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """VETO 4 fail ⇒ VETO 5 never runs (short-circuit ordering preserved)."""
+    broker = FakeBroker(
+        positions_env=_FakeEnv(
+            ok=True,
+            data={"positions": [{"epic": DEFAULT_EPIC, "direction": "SELL"}]},
+        )
+    )
+    candidate = make_candidate(direction="BUY", epic=DEFAULT_EPIC)
+
+    # A rule that would veto if reached — but VETO 4 short-circuits first.
+    rule_calls: list[dict] = []
+
+    def rule(c: dict) -> bool:
+        rule_calls.append(c)
+        return False
+
+    config_longterm = ExecutionConfig(longterm_rules=(rule,))
+    v = pre_trade_check(broker, candidate, NOW_IN_WINDOW, config_longterm)
+    assert v.ok is False
+    assert v.veto == "position_conflict"
+    # VETO 5 must NOT have been evaluated.
+    assert rule_calls == []
+
+
+def test_pre_trade_check_veto5_vetoes_when_rule_returns_false(
+    config: ExecutionConfig, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """All other 4 VETOs pass + VETO 5 rule returns False ⇒ ``veto="longterm"``,
+    short-circuits the pre_trade_check before the final ok=True return."""
+    broker = FakeBroker()
+    candidate = make_candidate(direction="BUY", epic=DEFAULT_EPIC)
+
+    def always_veto(_c: dict) -> bool:
+        return False
+
+    config_with_rule = ExecutionConfig(longterm_rules=(always_veto,))
+    v = pre_trade_check(broker, candidate, NOW_IN_WINDOW, config_with_rule)
+    assert v.ok is False
+    assert v.veto == "longterm"
+    assert "rule[0]" in v.reason
+
+
+def test_pre_trade_check_veto5_passes_when_all_rules_pass(
+    config: ExecutionConfig, make_candidate: Callable[..., dict[str, Any]]
+) -> None:
+    """All 4 VETOs pass + all 5 VETO-5 rules pass ⇒ ``ok=True`` (the pre-C3
+    success path, with the new layer active)."""
+    broker = FakeBroker()
+    candidate = make_candidate(direction="BUY", epic=DEFAULT_EPIC)
+
+    def rule_a(_c: dict) -> bool:
+        return True
+
+    def rule_b(_c: dict) -> bool:
+        return True
+
+    config_with_rules = ExecutionConfig(longterm_rules=(rule_a, rule_b))
+    v = pre_trade_check(broker, candidate, NOW_IN_WINDOW, config_with_rules)
+    assert v.ok is True
+    assert v.veto == "pre_trade_check"
+
+
+# --- ExecutionConfig.longterm_rules default invariants -------------------- #
+
+
+def test_longterm_rules_default_is_empty_tuple_not_list() -> None:
+    """Mutable-default trap guard (Plan §8): default must be ``tuple``, not ``list``
+    — a shared mutable default would let one instance's rules leak into another."""
+    cfg = ExecutionConfig()
+    assert cfg.longterm_rules == ()
+    assert isinstance(cfg.longterm_rules, tuple)
+
+
+def test_longterm_rules_is_frozen_via_config() -> None:
+    """``ExecutionConfig`` is ``frozen=True`` → ``longterm_rules`` is immutable
+    at the config level; replacing it requires a new config instance."""
+    cfg = ExecutionConfig()
+    with pytest.raises(Exception):  # FrozenInstanceError
+        cfg.longterm_rules = (lambda _c: True,)  # type: ignore[misc]
+
+
+def test_longterm_rules_supports_arbitrary_callables() -> None:
+    """Type is ``tuple[Any, ...]`` — any callable signature is accepted. The
+    discipline (single-arg predicate returning bool) is the wiring's
+    responsibility, not the config's."""
+    cfg = ExecutionConfig(longterm_rules=(lambda _c: True, lambda _c: False))
+    assert len(cfg.longterm_rules) == 2
+    assert all(callable(r) for r in cfg.longterm_rules)
