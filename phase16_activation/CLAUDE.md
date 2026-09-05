@@ -10,7 +10,7 @@ down:
   - ../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md   # 📕 A6 hängt an Migration 008
   - ../phase5_execution/CLAUDE.md                 # B3-Block → Plan D3
   - ./SESSIONS_ARCHIVE.md                         # 📦 Session-Block-Historie (newest-first, A-0 angelegt)
-updated: 2026-09-05 (+ Exec-Session #2 Block A endgültig in code; Exec-Session #3 startet Block B)
+updated: 2026-09-05 (+ Exec-Session #3 Block B B1+B3 endgültig in code, Σ 1856 grün, B2 = Operator; Exec-Session #4 startet Block C nach B2)
 ---
 
 # Phase 16 — Freischaltung
@@ -90,9 +90,11 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 
 | Step | Commit | Scope | Σ-Delta | Akzeptanz |
 |---|---|---|---|---|
-| **B1** Schema-Floor | `phase16+phase8:` | `wiring.py` `REQUIRED_SCHEMA_VERSION = 9` + `assert_schema_floor(conn)` Modul-Funktion + `preflight_fn`-Aufruf danach + `phase8_scheduler/tests/test_wiring_schema_floor.py` (3 Tests) | +3 (P8) | AK4 ✅ |
-| **B3** Wochenend-Filter | `phase16+phase9:` | `models.py` `WEEKEND_NAME_MARKERS` + `is_weekend_market(epic, name)` + `discovery.py` neuer Filter am Anfang von `_passes_code_filter` + `promotion.py` Demotion in Step 3 active_loop + Skip in Step 2 verified→active + `phase9_universe/tests/test_weekend_market.py` (4 Tests) | +4 (P9) | AK9 ✅ |
-| **Session-Rotation** | `phase16: docs --` | Phasenkopf Exec-#2 → SESSIONS_ARCHIVE.md + Exec-#3 → Phasenkopf | 0 | Doc-Rotation ✅ |
+| **B1** Schema-Floor | `ac3d1c2` phase16+phase8: code | `wiring.py` `REQUIRED_SCHEMA_VERSION = 9` + `assert_schema_floor(conn)` Modul-Funktion + `preflight_fn`-Aufruf danach + `phase8_scheduler/tests/test_wiring_schema_floor.py` (5 Tests, 3 vom Plan + 2 Belt-and-Braces) | +5 (P8: 248→253) | AK4 ✅ |
+| **B3** Wochenend-Filter | `d82922e` phase16+phase9: code | `models.py` `WEEKEND_NAME_MARKERS` + `is_weekend_market(epic, name)` + `discovery.py` neuer Filter am Anfang von `_passes_code_filter` (vor `market_status`) + `promotion.py` Skip in Step 2 verified→active + Demotion in Step 3 active_loop + `phase9_universe/tests/test_weekend_market.py` (8 Tests, 4 vom Plan + 4 Belt-and-Braces auf `is_weekend_market`) | +8 (P9: 87→95) | AK9 ✅ |
+| **Session-Rotation** | `36d1553` phase16: docs | Phasenkopf Exec-#2 → SESSIONS_ARCHIVE.md + Exec-#3 → Phasenkopf | 0 | Doc-Rotation ✅ |
+
+**2. Σ-Sweep nach Block B (verifiziert 2026-09-05):** **1856 grün (= 1843 + 13 neue Tests).** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/root = 95+78+104+155+185+76+166+253+95+165+145+82+61+91+105 = 1856 ✅ exakt Plan-Akzeptanz AK2 erfüllt.
 
 **2. Σ-Sweep nach Block B:** wird am Session-Ende durchgeführt (Erwartung ≥ 1850 = 1843 + 3 P8 + 4 P9).
 
