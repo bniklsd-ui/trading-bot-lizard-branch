@@ -28,12 +28,21 @@ from live_data.rescue import GapRescue, RescueConfig, RescueReport, _age_minutes
 
 @dataclass
 class _FakeBroker:
-    """Returns canned envelopes for ``get_historical_ohlcv``."""
+    """Returns canned envelopes for ``get_historical_ohlcv``.
+
+    Phase 15 Block-D-Folgefix Schritt 3 (2026-09-03): Signatur an den ABC-Vertrag
+    ``(epic, from_dt, to_dt, resolution)`` aus
+    ``phase1_broker_wrapper/broker_wrapper/adapters/base.py:49-52`` angepasst.
+    Der vorherige Mock ``(epic, resolution, count, **kwargs)`` pinnte die
+    Bug-Signatur aus ``rescue.py:264`` und schluckte mit ``**kwargs`` die
+    ``from_dt``/``to_dt``-Argumente — er hätte genau diesen Integrationsfehler
+    niemals gefangen.
+    """
     ok: bool = True
     bars: list[dict] | None = None
     raise_exc: bool = False
 
-    def get_historical_ohlcv(self, epic, resolution, count, **kwargs):
+    def get_historical_ohlcv(self, epic, from_dt, to_dt, resolution):
         if self.raise_exc:
             raise RuntimeError("boom")
         if not self.ok:
@@ -231,8 +240,9 @@ def test_stale_response_is_rejected_and_spend_still_booked(archive, budget):
 
 
 def test_broker_not_ok_returns_not_ok_report(archive, budget):
-    """``get_historical_ohlcv`` returns ok=False ⇒ the spend is booked
-    (IG billed the call) but no write happens, and skipped_reason='not_ok'."""
+    """``get_historical_ohlcv`` returns ok=False ⇒ the spend is **NOT**
+    booked (Call hat IG nie erreicht oder hat nicht_ok geantwortet — Step-2-Fix,
+    Audit-Trail §Bug 3), no write happens, and skipped_reason='not_ok'."""
     epic = "IX.D.DAX.IFMM.IP"
     day_start = "2026-08-19T09:00:00.000Z"
     day_end = "2026-08-19T09:06:00.000Z"
@@ -249,7 +259,12 @@ def test_broker_not_ok_returns_not_ok_report(archive, budget):
     out = rec.rescue_epic(epic, day_start, day_end)
     assert out.skipped_reason == "not_ok"
     assert out.bars_written == 0
-    assert out.points_spent == 5  # the spend is still booked (IG billed)
+    # Phase 15 Block-D-Folgefix Schritt 2 (Audit-Trail Bug 3): record_spend
+    # läuft NACH dem env.ok-Check. Bei ok=False buchen wir **keinen** Spend
+    # (Call hat IG nie erreicht / hat nicht_ok geantwortet). Vorher buchte
+    # der Code hier 5 Punkte für einen Call, der IG nie gesehen hat.
+    assert out.points_spent == 0
+    assert budget.spent_in_window() == 0
 
 
 def test_broker_exception_is_caught(archive, budget):
@@ -265,6 +280,53 @@ def test_broker_exception_is_caught(archive, budget):
     assert out.skipped_reason == "scan_error"
     assert out.bars_written == 0
     assert out.points_spent == 0
+
+
+def test_call_history_uses_correct_signature(archive, budget):
+    """Regressions-Pin (Phase 15 Block-D-Folgefix Schritt 4, Nikinger
+    2026-09-03, Pfad-A-Scharfschaltung): ``rescue.py:_call_history`` muss
+    ``get_historical_ohlcv`` mit der ABC-Vertrag-Signatur
+    ``(epic, from_dt, to_dt, resolution)`` aufrufen, NICHT mit der
+    count-basierten ``get_ohlcv``-Signatur.
+
+    Vor dem Fix rief ``_call_history`` mit
+    ``method(epic, "MINUTE", count, from_dt=start_utc, to_dt=end_utc)``
+    auf → ``TypeError: got multiple values for argument 'from_dt'``.
+    IG antwortete nie, der Bot buchte trotzdem 250 Punkte für 5 Calls
+    (Audit-Trail §Diagnose). Dieser Test pinnt die korrekte 4-Args-
+    Reihenfolge und schlägt sofort an, falls jemand die Signatur
+    wieder verdreht — _vor_ dem nächsten Live-Lauf, der das Geld kostet.
+    """
+    seen: dict = {}
+
+    class _SpyBroker:
+        def get_historical_ohlcv(self, epic, from_dt, to_dt, resolution):
+            seen["call"] = (epic, from_dt, to_dt, resolution)
+            return SimpleNamespace(ok=False, error="not_ok")
+
+    # Need a yF bar so ``_find_oldest_gap`` finds a gap and the call proceeds.
+    epic = "IX.D.DAX.IFMM.IP"
+    archive.insert_bars([Bar(
+        epic=epic, resolution="1m",
+        ts_utc="2026-08-19T09:00:00.000Z",
+        open=100, high=100, low=100, close=100, volume=1, source="yf",
+        fetched_at="2026-08-19T09:00:01.000Z",
+    )])
+    now = datetime(2026, 8, 19, 10, 35, tzinfo=timezone.utc)  # +1.5h, gap > min_gap_age_min
+
+    rec = GapRescue(_SpyBroker(), budget, archive, now_fn=lambda: now)
+    rec.rescue_epic(
+        epic,
+        "2026-08-19T09:00:00.000Z",
+        "2026-08-19T09:06:00.000Z",
+    )
+
+    assert "call" in seen, "_call_history did not invoke get_historical_ohlcv"
+    captured_epic, captured_from, captured_to, captured_resolution = seen["call"]
+    assert captured_epic == "IX.D.DAX.IFMM.IP"
+    assert captured_from == "2026-08-19T09:00:00.000Z"
+    assert captured_to == "2026-08-19T09:06:00.000Z"
+    assert captured_resolution == "MINUTE"
 
 
 def test_default_aus_class_does_not_exist_when_not_built(archive, budget):
