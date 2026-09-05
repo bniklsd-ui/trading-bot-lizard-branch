@@ -43,6 +43,26 @@ _LESSON_COLUMNS = (
     "used_in_research", "last_used_ts", "embedding_json", "embedding_model",
     "extracted_at",
 )
+# Phase 15 §6 Block C — Instinct-ECC layer (migrated to schema version 9).
+# Schema fields wörtlich nach `docs/concepts/phase7_reward_concept.md §7b`:
+#   trigger / domain(entry/exit/sizing/timing) / confidence /
+#   evidence_trade_ids[] / contradictions_trade_ids[]
+# plus the lifecycle status (Plan §6 C1) and per-transition timestamps.
+# `evidence_trade_ids_json` / `contradictions_trade_ids_json` are JSON-serialized
+# lists of `trade_outcomes.id` values (deliberately no FK — instincts are an
+# aggregation layer, see migration 009 docstring for rationale).
+_INSTINCT_COLUMNS = (
+    "trigger", "domain", "confidence", "evidence_trade_ids_json",
+    "contradictions_trade_ids_json", "status", "created_utc",
+    "validated_utc", "promoted_utc", "archived_utc",
+)
+# Allowed transitions for `Database.update_instinct_status`. The Validator
+# (Phase 15 C2) is the only authority that may move an instinct through these
+# states; `promote_eligible` (C2) gates the *promoted* step on
+# `n_closed >= cfg.instinct_n_min` and `cfg.enable_instinct_promotion` (P10/P12).
+_INSTINCT_STATUSES = (
+    "proposed", "validated", "refuted", "promoted", "archived",
+)
 # Score at/below which the bot stays conservative. The neutral start score is
 # 50.0 (see defaults.py), which maps to KONSERVATIV — the bot earns AGGRESSIV
 # only by pushing the score above neutral.
@@ -390,6 +410,88 @@ class Database:
             (utc_iso_now(), lesson_id),
         )
         self.conn.commit()
+
+    # -- instincts ----------------------------------------------------------
+
+    def insert_instinct(self, instinct: dict[str, Any]) -> int:
+        """Insert an instinct. Defaults: ``status='proposed'``, ``created_utc=now``.
+
+        Phase 15 §6 Block C: the Instinct-ECC layer (Plan §6 C1, schema version 9).
+        The caller passes the schema fields per ``_INSTINCT_COLUMNS``; missing
+        keys are dropped (whitelist intersect). JSON fields
+        (``evidence_trade_ids_json``, ``contradictions_trade_ids_json``) are
+        auto-serialized when given as list/dict. Returns the new row id.
+        """
+        record = dict(instinct)
+        record.setdefault("status", "proposed")
+        record.setdefault("created_utc", utc_iso_now())
+        return self._insert(
+            "instincts", record, _INSTINCT_COLUMNS,
+            json_fields=("evidence_trade_ids_json", "contradictions_trade_ids_json"),
+        )
+
+    def list_instincts(
+        self,
+        status: str | None = None,
+        n: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return instincts, optionally filtered by ``status``, newest first.
+
+        Phase 15 §6 Block C: read-side for the Extractor (C2) and the
+        Validator (C2). ``status`` is one of ``_INSTINCT_STATUSES``; ``None``
+        returns all rows. ``n`` limits the row count (no limit if ``None``).
+        """
+        if status is not None and status not in _INSTINCT_STATUSES:
+            raise ValueError(
+                f"status must be one of {_INSTINCT_STATUSES}, got {status!r}"
+            )
+        sql = "SELECT * FROM instincts"
+        params: tuple[Any, ...] = ()
+        if status is not None:
+            sql += " WHERE status = ?"
+            params = (status,)
+        sql += " ORDER BY id DESC"
+        if n is not None:
+            sql += " LIMIT ?"
+            params = params + (n,)
+        cur = self.conn.execute(sql, params)
+        return self._rows(cur)
+
+    def update_instinct_status(self, instinct_id: int, status: str) -> bool:
+        """Update ``status`` and stamp the matching per-transition timestamp.
+
+        Phase 15 §6 Block C (Plan §6 C1): only the Validator (C2) is allowed
+        to drive these transitions; ``promote_eligible`` (C2) gates the
+        ``promoted`` step on ``n_closed >= cfg.instinct_n_min`` and
+        ``cfg.enable_instinct_promotion`` (Plan §1 P10/P12). The matching
+        timestamp column is set to ``utc_iso_now()`` on each transition —
+        ``proposed`` and ``refuted`` have no dedicated timestamp column;
+        ``validated`` → ``validated_utc``; ``promoted`` → ``promoted_utc``;
+        ``archived`` → ``archived_utc``. Returns ``True`` if a row was
+        updated, ``False`` if no instinct with that id exists.
+        """
+        if status not in _INSTINCT_STATUSES:
+            raise ValueError(
+                f"status must be one of {_INSTINCT_STATUSES}, got {status!r}"
+            )
+        ts_col = {
+            "validated": "validated_utc",
+            "promoted": "promoted_utc",
+            "archived": "archived_utc",
+        }.get(status)
+        now = utc_iso_now()
+        if ts_col is None:
+            cur = self.conn.execute(
+                "UPDATE instincts SET status = ? WHERE id = ?",
+                (status, instinct_id),
+            )
+        else:
+            cur = self.conn.execute(
+                f"UPDATE instincts SET status = ?, {ts_col} = ? WHERE id = ?",
+                (status, now, instinct_id),
+            )
+        self.conn.commit()
+        return cur.rowcount > 0
 
     # -- ig_config_state ----------------------------------------------------
 

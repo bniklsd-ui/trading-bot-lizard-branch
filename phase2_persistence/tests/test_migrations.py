@@ -19,6 +19,7 @@ _EXPECTED_TABLES = {
     "abstain_records",
     "paper_trades",
     "instrument_source_availability",
+    "instincts",
 }
 
 
@@ -33,16 +34,17 @@ def test_get_version_zero_on_empty_db(tmp_path):
     assert migrations._get_schema_version(conn) == 0
 
 
-def test_fresh_db_reaches_version_8(tmp_path):
+def test_fresh_db_reaches_version_9(tmp_path):
     conn = sqlite3.connect(str(tmp_path / "x.sqlite"))
     conn.row_factory = sqlite3.Row
     version = migrations.run_migrations(conn, MIGRATIONS_DIR)
     # 001_initial + 002_phase7_reward + 003_phase8_trade_provenance +
     # 004_phase9_instrument_universe + 005_v3_learning + 006_phase12_data_foundation +
     # 007_phase14_source_availability (Phase 14 D1) +
-    # 008_phase12_reconcile_backoff (Phase 7+8 Backoff, Mini-Session 26, 2026-08-31)
-    assert version == 8
-    assert migrations._get_schema_version(conn) == 8
+    # 008_phase12_reconcile_backoff (Phase 7+8 Backoff, Mini-Session 26, 2026-08-31) +
+    # 009_phase15_instincts (Phase 15 Block C, 2026-09-03)
+    assert version == 9
+    assert migrations._get_schema_version(conn) == 9
 
 
 def test_all_tables_created(tmp_path):
@@ -77,23 +79,24 @@ def test_rerun_is_noop(tmp_path):
     migrations.run_migrations(conn, MIGRATIONS_DIR)
     # Second run must not raise and must not advance the version.
     version = migrations.run_migrations(conn, MIGRATIONS_DIR)
-    assert version == 8
-    # One version row per applied migration (001-008), and no more on rerun.
+    assert version == 9
+    # One version row per applied migration (001-009), and no more on rerun.
     count = conn.execute("SELECT COUNT(*) FROM _schema_version").fetchone()[0]
-    assert count == 8
+    assert count == 9
 
 
 def test_find_pending_respects_current(tmp_path):
     pending = migrations._find_pending(MIGRATIONS_DIR, current=0)
-    assert [v for v, _ in pending] == [1, 2, 3, 4, 5, 6, 7, 8]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=1)] == [2, 3, 4, 5, 6, 7, 8]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=2)] == [3, 4, 5, 6, 7, 8]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=3)] == [4, 5, 6, 7, 8]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=4)] == [5, 6, 7, 8]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=5)] == [6, 7, 8]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=6)] == [7, 8]
-    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=7)] == [8]
-    assert migrations._find_pending(MIGRATIONS_DIR, current=8) == []
+    assert [v for v, _ in pending] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=1)] == [2, 3, 4, 5, 6, 7, 8, 9]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=2)] == [3, 4, 5, 6, 7, 8, 9]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=3)] == [4, 5, 6, 7, 8, 9]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=4)] == [5, 6, 7, 8, 9]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=5)] == [6, 7, 8, 9]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=6)] == [7, 8, 9]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=7)] == [8, 9]
+    assert [v for v, _ in migrations._find_pending(MIGRATIONS_DIR, current=8)] == [9]
+    assert migrations._find_pending(MIGRATIONS_DIR, current=9) == []
 
 
 def test_database_run_migrations_seeds_defaults(db):
@@ -106,8 +109,8 @@ def test_database_run_migrations_seeds_defaults(db):
 def test_database_run_migrations_idempotent(tmp_path):
     path = str(tmp_path / "x.sqlite")
     d = Database(path)
-    assert d.run_migrations() == 8
-    assert d.run_migrations() == 8  # no error, no change
+    assert d.run_migrations() == 9
+    assert d.run_migrations() == 9  # no error, no change
     d.close()
 
 
@@ -253,3 +256,65 @@ def test_phase12_data_foundation_columns_present(tmp_path):
     assert row["data_source_status"] == "unverified"
     assert row["symbol_source"] is None
     assert row["symbol_checked_at"] is None
+
+
+def test_phase15_instincts_table_present(tmp_path):
+    """Migration 009 (Phase 15 Block C, 2026-09-03) adds the ``instincts`` table.
+
+    Schema wörtlich nach ``docs/concepts/phase7_reward_concept.md §7b``:
+    ``trigger`` / ``domain`` ∈ {entry,exit,sizing,timing} / ``confidence`` /
+    ``evidence_trade_ids[]`` / ``contradictions_trade_ids[]`` plus the
+    lifecycle status (Plan §6 C1) and per-transition timestamps
+    (validated_utc / promoted_utc / archived_utc). The CHECK constraints
+    on ``domain`` and ``status`` are SQLite-enforced — invalid values
+    raise ``IntegrityError`` at INSERT time (the schema-level gatekeeper;
+    the runtime ``Database.update_instinct_status`` whitelists the same
+    values and ``_INSTINCT_STATUSES`` keeps them in lock-step).
+    """
+    conn = sqlite3.connect(str(tmp_path / "x.sqlite"))
+    conn.row_factory = sqlite3.Row
+    migrations.run_migrations(conn, MIGRATIONS_DIR)
+
+    def _columns(table: str) -> set[str]:
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return {r["name"] for r in rows}
+
+    assert _columns("instincts") == {
+        "id", "trigger", "domain", "confidence",
+        "evidence_trade_ids_json", "contradictions_trade_ids_json",
+        "status", "created_utc", "validated_utc", "promoted_utc", "archived_utc",
+    }
+    # Indexes (Plan §6 C1 + Phase 14 D1-Pattern: index the lifecycle columns).
+    names = {r["name"] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='instincts'"
+    ).fetchall()}
+    assert {
+        "idx_instincts_status", "idx_instincts_domain", "idx_instincts_created_utc",
+    }.issubset(names)
+    # CHECK constraints fire on bad values.
+    import pytest
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO instincts (trigger, domain, status, created_utc) "
+            "VALUES ('x', 'NOT_A_DOMAIN', 'proposed', '2026-09-03T00:00:00.000Z')"
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO instincts (trigger, domain, status, created_utc) "
+            "VALUES ('x', 'entry', 'NOT_A_STATUS', '2026-09-03T00:00:00.000Z')"
+        )
+    # Happy-path insert with default status = 'proposed'.
+    conn.execute(
+        "INSERT INTO instincts (trigger, domain, created_utc) "
+        "VALUES ('tight-spread bounce in trending bar', 'entry', '2026-09-03T00:00:00.000Z')"
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT status, confidence, validated_utc, promoted_utc, archived_utc "
+        "FROM instincts ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    assert row["status"] == "proposed"
+    assert row["confidence"] is None
+    assert row["validated_utc"] is None
+    assert row["promoted_utc"] is None
+    assert row["archived_utc"] is None
