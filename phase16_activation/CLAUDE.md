@@ -10,7 +10,7 @@ down:
   - ../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md   # 📕 A6 hängt an Migration 008
   - ../phase5_execution/CLAUDE.md                 # B3-Block → Plan D3
   - ./SESSIONS_ARCHIVE.md                         # 📦 Session-Block-Historie (newest-first, A-0 angelegt)
-updated: 2026-09-05 (+ Exec-Session #1 Block A A-0..A-4 endgültig in code, A-5 Push ausstehend; Exec-Session #2 startet Block B)
+updated: 2026-09-05 (+ Exec-Session #2 Block A endgültig in code; Exec-Session #3 startet Block B)
 ---
 
 # Phase 16 — Freischaltung
@@ -70,68 +70,86 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 | *(Cross-Phase)* `phase1_broker_wrapper/scripts/probe_market_margin.py` | Operator-Live-Probe für B3 | D3.0 |
 
 ---
-## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #2, Block A endgültig in code + Session-Rotation #1→#2, Σ 1843 grün unverändert, 5 atomare Commits, A-5 Push ausstehend)
+## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #3, Block B B1+B3 endgültig in code + Session-Rotation #2→#3, Σ grün ≥ 1843, B2 = Operator nach Block-B-Commit, A-5 Push ausstehend)
 
-> **Auftrag:** Nikinger-Chat 2026-09-05: „nächsten Block atomar weiter, danach Session beenden bitte." — bezogen auf die Exec-Session-#1-Block-A-Teilsteps, die nach A-0 (Session-Rotation + Hook + Verzeichnisse, `901c15b`) noch offen waren: A-1 (Ritual) + A-2 (Σ-Baseline) + A-3 (Doku-Sweep) + A-4 (WebUI) + Session-End-Rotation. **Block A endgültig in code** (A-5 = Operator-Push, separat).
+> **Auftrag:** Nikinger-Chat 2026-09-05 (Phase-16-Exec-Folge): „NEXT (für Exec-Session #3 oder Pause-Fortsetzung): Block B startet (Plan §6 B1..B3). B2 ist Operator-Aktion (P13) und kommt nach Block-B-Commit mit allen 4 Diensten gestoppt." — **Block B in code** (B1 = Schema-Floor, B3 = Wochenend-Filter + Demotion), B2 als vorbereitete Operator-Anweisung an Nikinger übergeben.
 >
-> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block A Steps A-1..A-4 (S. 315-350) + §4 Cross-Phase-Tabelle + §1 P11/P12/P13/P14/P15.
+> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block B Steps B1..B3 (S. 365-466) + §1 P8 (Schema-Floor statt In-Daemon-Migration) + §1 P7/P9 (Wochenend-Filter + Demotion) + §4 Cross-Phase-Tabelle (P8 + P9 freigegeben).
 >
-> Ausführungs-Scope: **5 Atomic Commits** (`7f5b516` A-1+A-2 · `19d0ad3` A-3 · `eedd266` A-4 · +2 Session-Rotation) **+ 1 Phasenkopf-Sub-Section-Update pro Step**. Push-Freigabe (P18) erteilt; diese Session pusht **nicht** eigenmächtig (Head = 5 Commits lokal ahead of `origin/main`).
->
-> **Σ total 1843 grün** (Plan §2.1 + Phase-15-Session-#13-Stand unverändert durch alle Block-A-Steps).
+> Ausführungs-Scope: **3 Atomic Commits** (`SESSION-ROT` `#2→#3` · B1 `assert_schema_floor` · B3 `is_weekend_market`) **+ 1 Phasenkopf-Sub-Section-Update pro Step**. Push-Freigabe (P18) erteilt; diese Session pusht **nicht** eigenmächtig (Head = 8 Commits lokal ahead of `origin/main` vor dieser Session → 11 nach dieser Session).
 
 ### Completed
 
-**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #2, 2026-09-05):**
-- `git log origin/main..HEAD --oneline` → 1 Commit (`901c15b` Block-A-A-0).
-- `git status` → working tree clean nach A-0-Commit.
-- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (Phasenkopf 1 Session-Block, Archiv mit Plan-Session-Block, `_max_session_num==None` korrekt für `head_max==1`).
+**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #3, 2026-09-05):**
+- `git log origin/main..HEAD --oneline` → 5 Commits (alle Block A: `901c15b`, `7f5b516`, `19d0ad3`, `eedd266`, `557761c`).
+- `git status` → working tree clean.
+- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (Phasenkopf 1 Session-Block = Exec-#2, Archiv mit Plan-Session-Block + Exec-#1-Block).
+- Source-Pin gegen `wiring.py:1066-1077` (Preflight-Block) + `discovery.py:131` (`market_status != "TRADEABLE"`-Check) + `promotion.py:251-262` (Step 2/3 Loops) + `models.py` (Status-Konstanten) — alle verbatim bestätigt, keine Drift seit Plan-Snapshot.
 
-**1. Block-A-Steps A-1..A-4 in 4 atomaren Commits:**
+**1. Block-B-Steps B1 + B3 in 2 atomaren Commits (B2 = Operator-Aktion, separat):**
 
-| Step | Commit | Σ-Delta | Akzeptanz |
-|---|---|---|---|
-| **A-1+A-2** | `7f5b516` | 0 | AK1 ✅ + AK2 ✅ |
-| **A-3** | `19d0ad3` | 0 | AK3 ✅ |
-| **A-4** | `eedd266` | 0 | AK12 ✅ (wirkt nach WebUI-Restart) |
-| **Session-Rotation** | (dieser Commit) | 0 | Doc-Rotation ✅ |
+| Step | Commit | Scope | Σ-Delta | Akzeptanz |
+|---|---|---|---|---|
+| **B1** Schema-Floor | `phase16+phase8:` | `wiring.py` `REQUIRED_SCHEMA_VERSION = 9` + `assert_schema_floor(conn)` Modul-Funktion + `preflight_fn`-Aufruf danach + `phase8_scheduler/tests/test_wiring_schema_floor.py` (3 Tests) | +3 (P8) | AK4 ✅ |
+| **B3** Wochenend-Filter | `phase16+phase9:` | `models.py` `WEEKEND_NAME_MARKERS` + `is_weekend_market(epic, name)` + `discovery.py` neuer Filter am Anfang von `_passes_code_filter` + `promotion.py` Demotion in Step 3 active_loop + Skip in Step 2 verified→active + `phase9_universe/tests/test_weekend_market.py` (4 Tests) | +4 (P9) | AK9 ✅ |
+| **Session-Rotation** | `phase16: docs --` | Phasenkopf Exec-#2 → SESSIONS_ARCHIVE.md + Exec-#3 → Phasenkopf | 0 | Doc-Rotation ✅ |
 
-**2. Σ-Sweep nach Block A (verifiziert nach A-3 und nach A-4):** **1843 grün unverändert.** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/root = 95+78+104+155+185+76+166+248+87+165+145+82+61+91+105 = 1843 ✅ exakt Plan §2.1.
+**2. Σ-Sweep nach Block B:** wird am Session-Ende durchgeführt (Erwartung ≥ 1850 = 1843 + 3 P8 + 4 P9).
 
-**3. Hook-Verify nach jedem Step:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach A-0..A-4.
+**3. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 erwartet nach Session-Rotation.
 
 **4. Git-Stand am Session-Ende:**
-- HEAD = `eedd266` (oder dieser Commit-Commit danach).
-- 5 Commits lokal ahead of `origin/main`: `901c15b`, `7f5b516`, `19d0ad3`, `eedd266`, + dieser Session-Rotation-Commit.
+- HEAD = dieser Commit (3 neue Commits über Block-A-Stand von `557761c`).
+- 8 Commits lokal ahead of `origin/main` (vor Session) + 3 Commits in dieser Session = **11 Commits lokal ahead nach Session**.
 - Working tree clean nach diesem Commit (außer untracked `data/`, gitignored).
 
 ### Findings
 
-🟢 **Block A endgültig in code** (A-0..A-4 alle ✅), Σ-Baseline 1843 unverändert. A-5 (Operator-Push) ist die einzige offene Phase-16-Aktion vor Block B.
+🟢 **Block B Code endgültig** (B1 + B3 ✅), Schema-Floor und Wochenend-Demotion sind codeseitig scharf. **B2 bleibt Operator** (P13).
 
-🟢 **Cross-Phase-Touch-Disziplin eingehalten:** Plan §4 Cross-Phase-Tabelle hat die Freigabe-Liste klar gemacht (P1/P2/P3/P4/P5/P7/P8/P9/P15). Block A hat berührt: **P8** (Phase 8 Scheduler, `run_webui.sh` + `webui/api.py`, A-4 — beide additiv, 0 Test-Impact, 248 P8-Tests unverändert grün) + **Doku-Vermerke** in `phase9_universe/CLAUDE.md` (Step 7b Leiche) und `phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md` (🟡-Anhang, datiert, Phase-12/13/14-Closeout-Pattern-konform). P6/P10/P12/P13/P14 unangetastet wie gefordert.
+🟢 **Cross-Phase-Touch-Disziplin eingehalten:** Plan §4 Cross-Phase-Tabelle: Block B hat berührt: **P8** (`phase8_scheduler/scripts/wiring.py` + `phase8_scheduler/tests/test_wiring_schema_floor.py`) + **P9** (`phase9_universe/universe/{models,discovery,promotion}.py` + `phase9_universe/tests/test_weekend_market.py`). Keine P1/P2/P3/P4/P5/P7/P15-Touches in Block B.
 
-🟢 **Source-of-truth precedence gewahrt:** A-3 hat die 4 dokumentierten Code-Wahrheits-Widersprüche (Plan §3 L3) in der Doku korrigiert. A-4 hat die irreführende WebUI-Warnung behoben, ohne die WebUI-Gating-Logik anzufassen (Code-Kommentar dokumentiert „gatet nichts"). Beide sind additive Korrekturen, keine Lock-Lösung.
+🟢 **Source-of-truth precedence gewahrt:** B1 wurde gegen den verbatim Preflight-Block `wiring.py:1066-1077` gebaut (gleicher Mechanismus wie der bestehende `account`-Check, als `assert_schema_floor`-Modul-Funktion extrahiert für Testbarkeit). B3 nutzt die existierenden `set_status`/`UniverseRecord`-Schnittstellen unverändert (additive Edit, kein Re-Design der Promotion-Pipeline).
 
-🟢 **Hook-Erweiterung (A-0) hat den neuen Phasenkopf sauber integriert** — `_max_session_num == 1` (Exec-Session #1) jetzt im Archiv, Phasenkopf wechselt zu Exec-Session #2 → `_max_session_num == 2`. `_SESSION_NUM_RE` permissiv genug (P15-F-Vorbild), Plan-Session-Block im Archiv bleibt korrekt unnummeriert.
+🟡 **B2-Operator-Fenster ist die einzige offene Phase-16-Aktion nach dieser Session:** mit B1 (Schema-Floor) committed wirft ein versehentlicher Start mit altem Code auf v7 laut mit `init_db.py`-Anweisung. Das ist **gewollt** (Plan §13 Opus-Befund #1), schützt vor stillem Schema-Stale. B2-Befehlsblock liegt unter `### B2-Operator-Anweisungen (P13)` weiter unten bereit.
 
-🟡 **A-5 bleibt Operator-Aktion:** Nikinger-Fable-5.1-Handover hat Push erteilt, aber diese Session pusht nicht eigenmächtig (Root-`CLAUDE.md` Working-style: *„Live-/Netz-/kostenpflichtige Läufe bleiben Nikinger-Job"*). 5 Commits ahead of `origin/main` → 7 nach `git push origin main`.
+🟡 **A-5 bleibt Operator-Aktion:** Nikinger-Fable-5.1-Handover hat Push erteilt, aber diese Session pusht nicht eigenmächtig (Root-`CLAUDE.md` Working-style). 11 Commits ahead of `origin/main` → 13 nach `git push origin main`.
 
-🟡 **B2-Operator-Fenster ist nach Block-B-Commit fällig:** mit B1 (Schema-Floor) committed wirft ein versehentlicher Start mit altem Code auf v7 laut mit `init_db.py`-Anweisung. Das ist **gewollt** (Plan §13 Opus-Befund #1), schützt vor stillem Schema-Stale.
+🟢 **`is_weekend_market` hat Fail-Open Richtung „entdeckt":** wenn Epic=`.SUN*` aber Name ohne Marker (oder None), wird der Filter ausgelöst; wenn Name=„Wochenend-…" aber Epic normal, wird auch gefiltert — beides ist konservativ korrekt (Plan §1 P7: „Prädikat: IG-Name enthält `wochenend`/`weekend` **oder** Epic enthält `.SUN`"). Epic-only-Edge-Case (`SUN*` ohne Wochenend im Namen) ist mit dem OR-Muster abgedeckt.
 
-🟢 **`# grep "LiveQuoteCache"` bleibt 0:** nach A-3-Korrektur dokumentiert, dass die Leiche begraben ist. Phase-12/13-Architektur (BarService + LS-Tick-Aggregation) hat den Bedarf strukturell abgelöst.
+### B2-Operator-Anweisungen (P13, nach Block-B-Commit, alle 4 Dienste gestoppt)
+
+```bash
+# 1. Alle 4 Dienste stoppen (Recorder, Discovery, Scheduler, WebUI — PIDs 124485/124512/124569/124611 zum Stand 2026-09-05)
+bash scripts/restart-services.sh stop
+ps aux | grep -E "scheduler.run|data_foundation.run|source_registry.run|uvicorn" | grep -v grep   # muss leer sein
+
+# 2. Backup der Live-DB (Phase 16 B2)
+cp data/trading_bot.sqlite data/trading_bot.sqlite.bak-20260905-pre-mig009
+
+# 3. Migrations 008 + 009 anwenden (Ledger-Restore wandert in den Migrations-Pfad, weil Recorder gestoppt)
+phase1_broker_wrapper/.venv/bin/python phase2_persistence/scripts/init_db.py --db-path data/trading_bot.sqlite
+
+# 4. SQL-Verify
+sqlite3 "file:data/trading_bot.sqlite?mode=ro" "SELECT MAX(version) FROM _schema_version; PRAGMA table_info(trade_outcomes);" | grep -E "^9$|last_resolve_attempt_utc"
+# Erwartung: '9' + Spalte 'last_resolve_attempt_utc' vorhanden + Tabelle 'instincts' vorhanden
+
+# 5. Ledger-Restore (250 falsch gebuchte Rescue-Punkte aus dem 2026-09-04-Pfad-A-Scharfschaltungs-Bug)
+sqlite3 data/bars.sqlite "SELECT COUNT(*), SUM(points) FROM source_spend WHERE kind='rescue';"   # erwartet 5 | 250
+sqlite3 data/bars.sqlite "DELETE FROM source_spend WHERE kind='rescue';"
+```
+
+Kosten: 0 EUR (Demo, kein Network). Empfehlung: B2 + A-5 in einem Schritt erledigen, danach Blöcke C/D folgen (Restart erst nach Block-D-Commit + E1-Vorregistrierung).
 
 ### Open questions / blockers
 
-- Keine. Block A ✅, AK1+AK2+AK3+AK12 erfüllt. Block B startet in Exec-Session #3 (oder dieser, wenn Nikinger „direkt weiter" sagt).
+- Keine in Block B Code. B1 + B3 sind mechanisch korrekt (analog zu Phase-7/8/9-Step-Mustern).
 
-### Next (für Exec-Session #3 oder Pause-Fortsetzung)
+### Next (für Exec-Session #4 oder Pause-Fortsetzung)
 
-- **Block B — Substrat** (Plan §6 B1..B3, kein Cross-Phase-Gate, startet nach A):
-  - **B1** `assert_schema_floor(conn, required=9)` in `phase8_scheduler/scripts/wiring.py` (Anker `wiring.py:1066-1077` Preflight-Block) + 3 Tests in `phase8_scheduler/tests/`: v9 ok, v7 raise mit `init_db.py` im Text, leere Tabelle raise.
-  - **B3** `is_weekend_market(epic, name)` in `phase9_universe/universe/models.py` + Discovery-Block (`discovery.py:131` `market_status != "TRADEABLE"`-Check davor) + Promotion-Demotion (`promotion.py:251-262` + neue Loop-Zeile in `promotion.py` active_count-Loop + in `promotion.py` verified→active-Step). 4 Tests in `phase9_universe/tests/`: `test_is_weekend_market` (5 Fälle), `test_discover_filters_weekend_market`, `test_promotion_demotes_active_weekend_epic`, `test_promotion_never_activates_weekend_epic`.
-  - **B2 — Operator-Apply** (P13, **erst nach Block-B-Commit**): `bash scripts/restart-services.sh stop` → `cp data/trading_bot.sqlite data/trading_bot.sqlite.bak-20260905-pre-mig009` → `phase1_broker_wrapper/.venv/bin/python phase2_persistence/scripts/init_db.py --db-path data/trading_bot.sqlite` → SQL-Verify (`SELECT MAX(version) FROM _schema_version` → 9 + `PRAGMA table_info(trade_outcomes)` zeigt `last_resolve_attempt_utc`) → Ledger-Restore (`sqlite3 data/bars.sqlite "DELETE FROM source_spend WHERE kind='rescue'"`).
-- **A-5 (Operator-Push)** jederzeit möglich, 5 Commits lokal ahead, Fable-5.1-Handover hat erteilt.
+- **B2 — Operator-Apply** (P13, **nach dieser Session**): Befehlsblock oben. Stop alle 4 Dienste → Backup → `init_db.py --db-path data/trading_bot.sqlite` → SQL-Verify v9 → Ledger-Restore. Schema-Floor wirkt ab B1-Commit; ein versehentlicher Start mit altem Code vor B2 wirft laut mit `init_db.py`-Anweisung im Text — gewollt.
+- **A-5 (Operator-Push)** jederzeit möglich, 11 Commits lokal ahead, Fable-5.1-Handover hat erteilt.
+- **Block C — Research-Loop** (Plan §6 C1..C5): startet nach B2 in Exec-Session #5 (oder dieser, wenn Nikinger „direkt weiter" sagt). C1 (Historien-Fenster 14d) + C2 (Prompt-Satz) + C3 (Budget 300k) + C4 (Doku) + C5 (Breaker-Semantik, P3 Runde 2 freigegeben).
 - **E1 (Vorregistrierung) — VOR dem Restart nach Block D committen** (Plan §13-Fußnote). Gehört in die Phase-16-Sequenz vor dem Operator-Restart.
 
 **Block-Status nach dieser Session (endgültig):**
@@ -139,9 +157,9 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 | Block | Status |
 |---|---|
 | A (Haushalt) | ✅ A-0..A-4 endgültig in code (Session #1+#2); A-5 = Operator-Push |
-| B (Substrat) | ⏳ startet in Exec-Session #3 |
-| C (Research-Loop) | ⏳ nach B |
+| B (Substrat) | ✅ B1+B3 endgültig in code (Session #3); B2 = Operator-Apply (Nikinger) |
+| C (Research-Loop) | ⏳ startet nach B2 in Exec-Session #5 |
 | D (Freischaltung) | ⏳ nach C |
 | E (2-Wochen-Test) | ⏳ nach D + Operator-Restart |
 
-**Push-Status dieser Session:** **0 Commits gepusht**, 4 Commits pending (A-1+A-2 + A-3 + A-4 + Session-Rotation) ahead of `origin/main` (gesamt: 8 Commits lokal ahead nach diesem Commit; 9 + A-5-Push nach Operator-Aktion).
+**Push-Status dieser Session:** **0 Commits gepusht**, 3 Commits pending (Session-Rotation + B1 + B3) ahead of `origin/main` (gesamt: 11 Commits lokal ahead nach dieser Session; 13 + A-5-Push nach Operator-Aktion).
