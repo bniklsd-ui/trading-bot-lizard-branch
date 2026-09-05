@@ -215,14 +215,29 @@ class GapRescue:
             return RescueReport(epic=epic, gaps_found=1, bars_written=0,
                                points_spent=0, skipped_reason="budget")
         env = self._call_history(epic, gap_start, gap_end)
-        # Plan §6 C2: Spend is booked **before** the bars are written.
-        # Even a stale response is a spent call. This is the same
-        # trap-of-omission L8 warns about, repeated here for emphasis.
-        self._budget.record_spend(points, "rescue")
+        # Phase 15 Block-D-Folgefix Schritt 2 (2026-09-03): Spend-Booking-
+        # Logik korrigiert (Audit-Trail §Bug 3, Z. 1106-1126 + Z. 1219-1240).
+        # Der vorherige Pfad buchte `record_spend` VOR dem `env.ok`-Check —
+        # korrekt für IG-Antworten egal welchen Inhalts (leer, stale, partial:
+        # Call hat stattgefunden, IG hat abgerechnet), aber FALSCH für
+        # Exception-Fälle (z.B. TypeError aus Step 1): Call hat IG nie erreicht,
+        # wir buchen trotzdem. Heute live geschehen: 250 Punkte für 5 Calls,
+        # die IG nie gesehen hat.
+        #
+        # Fix: `record_spend` läuft **nach** dem `env.ok`-Check. Bei `not_ok`
+        # (Exception + nicht-OK-Antwort) wird KEIN Spend gebucht. Bei
+        # erfolgreicher IG-Antwort mit stale/empty Daten bleibt der Spend
+        # weiterhin gebucht (L8-Logik aus A4 — IG hat den Call gesehen).
+        #
+        # `_last_rescue_date[epic] = today` muss **vor** dem Call passieren,
+        # sonst blockiert eine Exception die Throttle für denselben Tag.
         self._last_rescue_date[epic] = today
         if not getattr(env, "ok", False):
+            # Call hat IG nie erreicht (Exception) oder hat nicht_ok geantwortet
+            # → KEIN Spend, kein Throttle-Reset nötig (oben bereits gesetzt).
             return RescueReport(epic=epic, gaps_found=1, bars_written=0,
-                               points_spent=points, skipped_reason="not_ok")
+                               points_spent=0, skipped_reason="not_ok")
+        self._budget.record_spend(points, "rescue")
         raw_bars = (getattr(env, "data", None) or {}).get("bars") or []
         if not raw_bars:
             return RescueReport(epic=epic, gaps_found=1, bars_written=0,
