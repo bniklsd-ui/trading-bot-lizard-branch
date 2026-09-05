@@ -88,6 +88,34 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DATA_DIR = _REPO_ROOT / "data"
 _DB_PATH = _DATA_DIR / "trading_bot.sqlite"           # the real Phase-2 DB
 _BARS_DB_PATH = _DATA_DIR / "bars.sqlite"             # Phase-12 bar archive + budget ledger (D4)
+
+# Phase 16 B1 (2026-09-05): schema floor. The live DB sat on v7 across two restarts while
+# docs claimed migrations "apply automatically" — nothing in production ever called
+# ``run_migrations()``. Same discipline as the existing preflight account check: verify,
+# never mutate. Bump ``REQUIRED_SCHEMA_VERSION`` when a migration lands that the daemon
+# relies on. Migration 008 added the reconcile-backoff column ``trade_outcomes.
+# last_resolve_attempt_utc`` (Phase 7 / Phase-12-Reconcile-Timing); 009 added the
+# ``instincts`` table (Phase 15). Both are silently inert if their DDL was never applied.
+REQUIRED_SCHEMA_VERSION = 9
+
+
+def assert_schema_floor(conn: Any, required: int = REQUIRED_SCHEMA_VERSION) -> int:
+    """Phase 16 B1: fail-closed if the live DB schema lags behind the daemon's expectations.
+
+    Mirrors the discipline of the existing ``account``-column check in :func:`build_scheduler`'s
+    ``preflight_fn``: the daemon **verifies** schema state, it never **mutates** it. A schema
+    behind the required version raises ``RuntimeError`` with the operator-actionable instruction
+    (backup + run ``init_db.py``). Returns the current schema version on success.
+    """
+    row = conn.execute("SELECT MAX(version) FROM _schema_version").fetchone()
+    version = int(row[0]) if row and row[0] is not None else 0
+    if version < required:
+        raise RuntimeError(
+            f"DB schema out of date (version {version} < required {required}). "
+            "Stop all four services, back up data/trading_bot.sqlite, then run "
+            "`python phase2_persistence/scripts/init_db.py --db-path data/trading_bot.sqlite`."
+        )
+    return version
 _STATE_DIR = _DATA_DIR / "state"
 _CACHE_DIR = _DATA_DIR / "cache"
 _USAGE_LOG = _STATE_DIR / "llm_usage.json"            # shared 8-field token meter
@@ -1064,7 +1092,7 @@ def build_scheduler(
                 )
 
     def preflight_fn() -> None:
-        """Fail-closed startup probe: keyring reachable + DB migration 002 applied."""
+        """Fail-closed startup probe: keyring reachable + DB schema floor + migration 002 applied."""
         # 1) Keyring / Secret-Service reachable (the deployment top-risk, concept Q3). Raises if the
         #    demo cred cannot be read from the keyring (or the env fallback).
         get_credential(IG_DEMO_API_KEY, fallback_env=True)
@@ -1076,6 +1104,11 @@ def build_scheduler(
                 "DB schema out of date (migration 002 not applied — 'account' column missing). "
                 "Run `python phase2_persistence/scripts/init_db.py` before starting the daemon."
             )
+        # 3) Phase 16 B1 (2026-09-05): schema floor. Migrations 008 + 009 are silently inert if their
+        #    DDL was never applied (the A6 reconcile-backoff column + the instincts table). Same
+        #    verify-not-mutate discipline as the migration 002 check above. See the module-level
+        #    ``assert_schema_floor`` for the operator-actionable error message.
+        assert_schema_floor(db.conn)
 
     # Phase 13 §6 B0/B3: build the live-bar recorder when the operator has
     # armed ``enable_bar_stream``. Default ``None`` keeps pre-B3 behaviour
