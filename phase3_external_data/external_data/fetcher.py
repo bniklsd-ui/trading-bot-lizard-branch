@@ -408,8 +408,17 @@ class MarketDataFetcher:
         self._rate_limiter.wait()
         try:
             df = _fetch_with_retry(symbol, period=period, interval=interval, min_expected=min_expected)
-        except (DataUnavailableError, RateLimitError):
+        except RateLimitError:
+            # Transport-side rate-limit (HTTP 429 / YFRateLimitError): genuine outage signal,
+            # record_failure is appropriate. Circuit may open after open_after consecutive 429s.
             self._circuit.record_failure(symbol)
+            raise
+        except DataUnavailableError:
+            # Phase 16 C5 (2026-09-05, L9): empty-at-open is a DATA judgment, not an outage.
+            # Yahoo has no intraday bars for the new trading day until ~09:05; the same recorder
+            # is busy writing 500+ 1m-bars/min for the same ticker — opening the circuit here
+            # would lock out the ticker for 15 min on a clock artefact. Re-raise (caller still
+            # sees the unavailability) but do NOT count toward circuit-open.
             raise
         self._circuit.record_success(symbol)
         records = _df_to_records(df)

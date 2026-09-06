@@ -11,12 +11,20 @@ import pandas as pd
 import pytest
 
 from external_data import fetcher
-from external_data.exceptions import CircuitOpenError, DataUnavailableError
+from external_data.exceptions import CircuitOpenError, DataUnavailableError, RateLimitError
 from external_data.fetcher import MarketDataFetcher, RateLimiter, _TickerCircuit
 from external_data.ticker_map import TickerMapper
 
 EPIC = "IX.D.DAX.IFMM.IP"
 SYMBOL = "^GDAXI"
+
+
+class YFRateLimitError(Exception):
+    """Stand-in for ``yfinance.exceptions.YFRateLimitError`` (matched by class name).
+
+    Mirrors the local definition in ``test_fetcher.py`` — duplicating the 2-line shim is
+    cleaner than introducing a cross-test dependency.
+    """
 
 
 # -- pure _TickerCircuit ------------------------------------------------------
@@ -115,22 +123,80 @@ def always_empty_download(monkeypatch):
     return calls
 
 
+@pytest.fixture
+def always_rate_limit(monkeypatch):
+    """Every fetch raises ``YFRateLimitError`` -> ``RateLimitError`` after retries.
+
+    The fetcher matches the class name ``YFRateLimitError`` (see ``_RATE_LIMIT_EXC_NAMES``
+    in ``fetcher.py``); yfinance itself does not need to be installed. Used to verify
+    that genuine rate-limit outages still open the circuit (Phase 16 C5: only the
+    empty-frame path was decoupled — the rate-limit path keeps the prior behaviour).
+    """
+    calls: list[str] = []
+
+    def _fake(symbol, *, period, interval):
+        calls.append(symbol)
+        raise YFRateLimitError("429 Too Many Requests")
+
+    monkeypatch.setattr(fetcher, "_raw_download", _fake)
+    return calls
+
+
 def test_circuit_opens_after_repeated_get_history_failures(
-    no_sleep, always_empty_download, tmp_cache
+    no_sleep, always_rate_limit, tmp_cache
 ):
+    """Phase 16 C5 (2026-09-05): only ``RateLimitError`` opens the circuit.
+
+    The empty-frame path (``DataUnavailableError``) is decoupled in C5 and covered by
+    ``test_empty_frame_does_not_open_circuit`` below — rate-limit (HTTP 429) remains a
+    genuine transport-side outage signal, so the circuit opens after ``open_after``
+    consecutive occurrences (4 here).
+    """
     now_fn, _ = _clock()
     circuit = _TickerCircuit(open_after=4, now_fn=now_fn)
     mdf = MarketDataFetcher(TickerMapper(), tmp_cache, circuit=circuit)
 
     for _ in range(4):
-        with pytest.raises(DataUnavailableError):
+        with pytest.raises(RateLimitError):
             mdf.get_history(EPIC, days=5)
 
-    calls_before_open = len(always_empty_download)
+    calls_before_open = len(always_rate_limit)
     with pytest.raises(CircuitOpenError):
         mdf.get_history(EPIC, days=5)
     # The 5th call never touched _raw_download — the circuit degraded immediately.
-    assert len(always_empty_download) == calls_before_open
+    assert len(always_rate_limit) == calls_before_open
+
+
+def test_empty_frame_does_not_open_circuit(
+    no_sleep, always_empty_download, tmp_cache
+):
+    """Phase 16 C5 (2026-09-05, L9): an empty frame at open is a DATA judgment,
+    not an outage — it MUST NOT open the circuit.
+
+    L9 root cause (Plan §3 L9): Yahoo returns no intraday bars until ~09:05; the prior
+    breaker counted ``DataUnavailableError`` (empty frame after 3 retries) toward
+    circuit-open at 4 consecutive failures — locking out ``^GDAXI`` / ``^FCHI`` /
+    ``^IBEX`` for 15 min every morning even though the same recorder was busy writing
+    500+ 1m-bars/min for the same tickers. After C5 the empty-frame path re-raises
+    ``DataUnavailableError`` unchanged but does **not** record_failure on the circuit.
+    """
+    now_fn, _ = _clock()
+    circuit = _TickerCircuit(open_after=4, now_fn=now_fn)
+    mdf = MarketDataFetcher(TickerMapper(), tmp_cache, circuit=circuit)
+
+    # 4 empty-frame attempts: each raises DataUnavailableError but circuit stays closed.
+    for _ in range(4):
+        with pytest.raises(DataUnavailableError):
+            mdf.get_history(EPIC, days=5)
+    assert circuit.is_open(SYMBOL) is False
+
+    # 5th call: still attempts the network (circuit isn't open to degrade), still raises.
+    # _fetch_with_retry does 3 internal _raw_download attempts per call.
+    calls_before = len(always_empty_download)
+    with pytest.raises(DataUnavailableError):
+        mdf.get_history(EPIC, days=5)
+    assert len(always_empty_download) > calls_before  # network was actually attempted
+    assert circuit.is_open(SYMBOL) is False
 
 
 def test_circuit_success_after_failures_resets(
