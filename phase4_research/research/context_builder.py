@@ -32,7 +32,8 @@ no-``broker_wrapper``-import isolation stance.
 from __future__ import annotations
 
 import logging
-from typing import Any, Protocol
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Protocol
 
 from research.models import ResearchConfig, ResearchContext
 
@@ -43,6 +44,54 @@ _TRADEABLE = "TRADEABLE"
 # default. The allow-list is code-curated DAX-CFD epics, all EUR; this is a cheap
 # defensive sanity check, not a discovery filter.
 _REQUIRED_CURRENCY = "EUR"
+
+
+def _parse_trade_ts(raw: str | None) -> datetime | None:
+    """Parse an ISO 8601 UTC string (handles both ``+02:00`` and ``Z`` suffixes).
+
+    Phase 16 C1 helper: returns ``None`` for malformed input so the caller can
+    fail-open (keep the trade). Phase isolation — mirrors ``phase9_universe/
+    promotion.py::_parse_iso`` (no cross-phase import).
+    """
+    if not raw:
+        return None
+    normalized = raw.replace("Z", "+00:00") if raw.endswith("Z") else raw
+    try:
+        dt = datetime.fromisoformat(normalized)
+    except (ValueError, TypeError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _drop_older_than(
+    trades: list[dict[str, Any]],
+    max_age_days: int,
+    *,
+    now_fn: Callable[[], datetime] | None = None,
+) -> list[dict[str, Any]]:
+    """Phase 16 C1 (2026-09-05, L1): drop trades older than ``max_age_days``.
+
+    Pure, deterministic, no I/O. Uses ``close_ts`` first, falls back to ``open_ts``,
+    and **fails open** (keeps the trade) when neither timestamp is parseable —
+    "LLM sees more, never less" is the conservative direction. ``now_fn`` is
+    injectable so tests can pin "today" without monkey-patching the clock.
+    """
+    if max_age_days is None or max_age_days < 0:
+        return list(trades)
+    now = (now_fn or (lambda: datetime.now(timezone.utc)))()
+    cutoff = now - timedelta(days=max_age_days)
+    survivors: list[dict[str, Any]] = []
+    for trade in trades:
+        ts_raw = trade.get("close_ts") or trade.get("open_ts")
+        parsed = _parse_trade_ts(ts_raw)
+        if parsed is None:
+            survivors.append(trade)  # fail-open
+            continue
+        if parsed >= cutoff:
+            survivors.append(trade)
+    return survivors
 
 
 class _BrokerLike(Protocol):
@@ -254,6 +303,15 @@ def build_context(
         quarantine_before=config.recent_trades_quarantine_before,
         exclude_provenance=config.recent_trades_exclude_provenance,
     )
+    # Phase 16 C1 (2026-09-05, L1): apply the configured age window as a post-filter
+    # on top of the DB query (which already returns up to 8 trades newest-first).
+    # ``None`` (or negative) ⇒ no filter — bit-identical to pre-P16. ``_drop_older_than``
+    # is fail-open on unparseable timestamps, so a malformed row can never *narrow*
+    # the LLM's view by accident.
+    if config.recent_trades_max_age_days is not None:
+        recent_trades = _drop_older_than(
+            recent_trades, config.recent_trades_max_age_days,
+        )
     # v1.5 (Phase-8 hotfix Step 4 A): filter verification-trade lessons out of the prompt.
     # Precise provenance tag (written since v1.5) + hold-time fallback (catches pre-tag
     # polluted lessons) + optional reversible date quarantine — all driven by config, applied
@@ -311,4 +369,5 @@ def build_context(
         anchor_epic=anchor_epic,
         brain_contexts=brain_contexts,
         brain_context_health=brain_context_health,
+        recent_trades_max_age_days=config.recent_trades_max_age_days,
     )

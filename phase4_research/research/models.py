@@ -194,6 +194,11 @@ class ResearchContext:
     anchor_epic: str
     brain_contexts: dict[str, dict[str, Any] | None] = field(default_factory=dict)
     brain_context_health: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Phase 16 C1 (2026-09-05): the configured post-filter window for ``recent_trades``.
+    # Propagated from ``ResearchConfig.recent_trades_max_age_days`` so ``build_prompt``
+    # can render the matching header without re-parsing config. ``None`` = off
+    # (bit-identical to pre-P16 — the filter step in ``build_context`` is also skipped).
+    recent_trades_max_age_days: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -679,6 +684,11 @@ class ResearchConfig:
     recent_trades_exclude_provenance: tuple[str, ...] = ("verification",)
     recent_trades_min_hold_min: float = 2.0
     recent_trades_quarantine_before: str | None = None
+    # Phase 16 C1 (2026-09-05, L1): a trade older than this many calendar days no longer
+    # appears in the prompt's recent-trades table. Without a window the table only changes
+    # when a new trade closes — and after the 7th loss the LLM abstained on that table alone,
+    # 77×/day, for five days (an absorbing state). None = off (bit-identical to pre-P16).
+    recent_trades_max_age_days: int | None = 14
 
     # --- token meter (USD + EUR) ---
     pricing_usd_per_mtok: dict[str, tuple[float, float]] = field(

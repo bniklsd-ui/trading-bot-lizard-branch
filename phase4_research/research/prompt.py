@@ -118,11 +118,25 @@ def _render_per_epic_snapshots(
     return "\n".join(blocks)
 
 
-def _render_trades(trades: list[dict[str, Any]]) -> str:
-    """Render up to the last trades as a compact table (defensive ``.get()``)."""
+def _render_trades(
+    trades: list[dict[str, Any]],
+    *,
+    max_age_days: int | None = None,
+) -> str:
+    """Render up to the last trades as a compact table (defensive ``.get()``).
+
+    Phase 16 C1 (2026-09-05, L1): when ``max_age_days`` is set (the configured
+    post-filter window), the header advertises it so the LLM knows the recent-trades
+    block is a *windowed* sample, not a complete tail. ``None`` (or omitted) ⇒
+    header is bit-identical to pre-P16 („Recent trades (newest first):").
+    """
     if not trades:
         return "Recent trades: none on record."
-    rows = ["Recent trades (newest first):", "date | direction | epic | pnl | status"]
+    if max_age_days is not None and max_age_days >= 0:
+        header = f"Recent trades (last {max_age_days} days, newest first):"
+    else:
+        header = "Recent trades (newest first):"
+    rows = [header, "date | direction | epic | pnl | status"]
     for t in trades:
         date = t.get("session_date") or t.get("close_ts") or t.get("open_ts") or _NA
         rows.append(
@@ -267,7 +281,10 @@ def build_prompt(
         _render_per_epic_snapshots(
             context.tradeable_epics, context.brain_contexts, context.anchor_epic
         ),
-        _render_trades(context.recent_trades),
+        _render_trades(
+            context.recent_trades,
+            max_age_days=context.recent_trades_max_age_days,
+        ),
         _render_lessons(context.recent_lessons),
     ]
     # Phase 10 (V3, S6) — both default off, appended only when explicitly requested
