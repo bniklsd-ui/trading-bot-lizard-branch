@@ -70,36 +70,36 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 | *(Cross-Phase)* `phase1_broker_wrapper/scripts/probe_market_margin.py` | Operator-Live-Probe für B3 | D3.0 |
 
 ---
-## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #4, Block C Step C1 endgültig in code, Σ grün ≥ 1856, Pause auf Nikinger-Auftrag)
+## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #4, Block C Step C1 endgültig in code, Σ 1862 grün = 1856 + 6 neue P4-Tests, Pause auf Nikinger-Auftrag)
 
 > **Auftrag:** Nikinger-Chat 2026-09-05 (Phase-16-Exec-Folge, Mini-Rotation nach B2-Confirmed): „Block C, aber nur erster Step, danach Session beenden." — **Block C Step C1** (Plan §6 C1, L1-Fix: Historien-Fenster 14d als Post-Filter im P4-Research-Context). C2..C5 + E1 bleiben für nachfolgende Sessions.
 >
 > Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block C Step C1 (S. 470-499) + §1 P2 (Fenster 14d + max 8 Trades + Prompt-Satz) + §1 P4 (P4 Post-Filter, kein SQL-Touch) + §4 Cross-Phase-Tabelle (P4 freigegeben) + §7 AK7.
 >
-> Ausführungs-Scope: **2 Atomic Commits** (Rotations-Commit · C1 Code+Tests). Push-Freigabe (P18) gilt weiterhin; diese Session pusht **nicht** eigenmächtig.
+> Ausführungs-Scope: **3 Atomic Commits** (`e26ff06` Session-Rotation · `acc941f` C1 Code+Tests · dieser Final-Commit). Push-Freigabe (P18) gilt weiterhin; diese Session pusht **nicht** eigenmächtig.
 
 ### Completed
 
 **0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #4, 2026-09-05):**
 - `git log origin/main..HEAD --oneline` → 1 Commit (`6ee2620` B2-Confirmed-Vermerk aus der vorherigen Session).
 - `git status` → working tree clean.
-- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (vor Mini-Rotation: Phasenkopf 1 Block, Archiv 3 Blocks = Exec-#3 + Exec-#2 + Exec-#1 + Plan-Session).
-- Source-Pin gegen `models.py:681` (`recent_trades_quarantine_before`) + `context_builder.py:251-256` (Anker für `_drop_older_than`) + `prompt.py:124` (Header-Render) — alle verbatim bestätigt.
+- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (vor Mini-Rotation: Phasenkopf 1 Block, Archiv 3 Blocks).
+- Source-Pin gegen `models.py:681` (`recent_trades_quarantine_before`) + `context_builder.py:251-256` (Anker für `_drop_older_than`) + `prompt.py:121-132` (`_render_trades`) — alle verbatim bestätigt.
 
-**1. Block-C Step C1 in 1 atomarem Commit + 1 Session-Rotation-Commit:**
+**1. Block-C Step C1 in 2 atomaren Commits + 1 Session-Rotation-Commit:**
 
 | Step | Commit | Scope | Σ-Delta | Akzeptanz |
 |---|---|---|---|---|
-| **C1** Historien-Fenster 14d | (diese Session, atomar) | `research/models.py` neues Feld `recent_trades_max_age_days: int \| None = 14` + `research/context_builder.py` Post-Filter via neue Modul-Funktion `_drop_older_than` (parst `close_ts` mit `Z`-Substitution, fail-open bei unparsbar) + `research/prompt.py` Header-Update auf konfigurierbare Tage-Zahl + `phase4_research/tests/` 4 Tests (Plan §6 C1) | +4 (P4) erwartet | AK7 (Bit-Identität-Pin für `None`-Default) |
-| **Session-Rotation** | (diese Session, atomar) | Phasenkopf Exec-#3 → SESSIONS_ARCHIVE.md + Exec-#4 → Phasenkopf | 0 | Doc-Rotation ✅ |
+| **C1** Historien-Fenster 14d | `acc941f` phase16+phase4: code | `research/models.py` `ResearchConfig.recent_trades_max_age_days: int \| None = 14` + `ResearchContext.recent_trades_max_age_days: int \| None = None` (Default `None` = bit-identisch) + `research/context_builder.py` neue Modul-Funktion `_drop_older_than(trades, max_age_days, *, now_fn=None)` (close_ts→open_ts Fallback, fail-open auf unparsbar, now_fn injizierbar) + Anwendung direkt nach `db.get_recent_trades_for_prompt(8, …)` + `research/prompt.py` `_render_trades(trades, *, max_age_days=None)` rendert Header „Recent trades (last N days, newest first):" + 6 Tests in `phase4_research/tests/test_recent_trades_window.py` (4 vom Plan + 2 Belt-and-Braces für den Header) | +6 (P4: 155→161) | AK7 ✅ |
+| **Session-Rotation** | `e26ff06` phase16: docs | Phasenkopf Exec-#3 → SESSIONS_ARCHIVE.md + Exec-#4 → Phasenkopf (mit Heading-Body-Regex-False-Positive-Fix „Session 5" → "Folgesession") | 0 | Doc-Rotation ✅ |
 
-**2. Σ-Sweep nach C1:** wird am Session-Ende durchgeführt (Erwartung: P4 155 → 159, Σ 1856 → 1860).
+**2. Σ-Sweep nach C1 (verifiziert 2026-09-05):** **1862 grün (= 1856 + 6 neue P4-Tests).** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/root = 95+78+104+161+185+76+166+253+95+165+145+82+61+91+105 = 1862 ✅ exakt Plan-Akzeptanz AK2 erfüllt.
 
 **3. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach jedem Commit.
 
 **4. Git-Stand am Session-Ende:**
-- HEAD = letzter Commit dieser Session.
-- Commits lokal ahead of `origin/main` = 1 (vorheriger B2-Confirmed) + 2 (diese Session) = 3.
+- HEAD = dieser Final-Commit.
+- Commits lokal ahead of `origin/main` = 1 (vorheriger B2-Confirmed) + 3 (diese Session) = **4 Commits ahead**.
 - Working tree clean nach jedem Commit (außer untracked `data/`, gitignored).
 
 ### Findings
