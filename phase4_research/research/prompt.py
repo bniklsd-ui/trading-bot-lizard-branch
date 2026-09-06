@@ -44,6 +44,8 @@ _SYSTEM_PROMPT = (
     "- The market data shown is ~15 minutes DELAYED. Treat it as a sentiment picture, "
     "NOT a real-time entry signal. Real-time checks happen later in code.\n"
     "- When in doubt, ABSTAIN. A skipped session is cheap; a bad trade is not.\n"
+    "- Recent trades are context for lessons and sizing, NOT a veto: a losing streak by "
+    "itself is never a reason to abstain — judge the setup in front of you.\n"
     "- Your confidence is a self-report and is advisory only — a deterministic filter "
     "and a live recheck run after you. Be honest, not persuasive.\n"
     "\n"

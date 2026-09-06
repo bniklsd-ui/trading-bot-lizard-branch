@@ -17,7 +17,7 @@ def test_defaults() -> None:
     args = parse_args([])
     assert args.daily_loss_cap == 1800.0
     assert args.no_loss_cap is False
-    assert args.daily_token_budget == 200_000   # armed by default (runaway breaker ≈ €0.8/day)
+    assert args.daily_token_budget == 300_000   # armed by default (runaway breaker ≈ €1.2/day, Phase 16 C3 was 200k)
     assert args.no_token_budget is False
     assert args.max_trades == 5
     assert args.cycle_interval_min == 5
@@ -49,7 +49,7 @@ def test_config_from_args_is_demo_locked_with_caps() -> None:
     assert isinstance(cfg, SchedulerConfig)
     assert cfg.account == "demo"                 # hard demo-lock, regardless of args
     assert cfg.daily_loss_cap == 1800.0
-    assert cfg.daily_token_budget == 200_000     # armed by default
+    assert cfg.daily_token_budget == 300_000     # armed by default (Phase 16 C3)
     assert cfg.max_trades_per_day == 5
     assert cfg.cycle_interval_min == 5
     assert cfg.max_consecutive_failures == 3

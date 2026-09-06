@@ -57,8 +57,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument("--daily-loss-cap", type=float, default=1800.0, help="daily-loss breaker (default 1800).")
     p.add_argument(
-        "--token-budget", type=int, default=200_000,
-        help="daily LLM token budget — runaway breaker (default 200000 ≈ €0.8/day; 0 → disabled).",
+        "--token-budget", type=int, default=300_000,
+        help="daily LLM token budget — runaway breaker (default 300000 ≈ €1.2/day, Phase 16 C3 was 200000; 0 → disabled).",
     )
     return p.parse_args(argv)
 

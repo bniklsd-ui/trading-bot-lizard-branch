@@ -59,9 +59,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--daily-token-budget",
         type=int,
-        default=200_000,
-        help="daily LLM token budget over the shared meter (default 200000 ≈ €0.8/day runaway breaker). "
-        "Use --no-token-budget to disable (NOT recommended).",
+        default=300_000,
+        help="daily LLM token budget over the shared meter (default 300000 ≈ €1.2/day runaway breaker; "
+        "Phase 16 C3, was 200000 — exhausted daily at ~15:48). Use --no-token-budget to disable (NOT recommended).",
     )
     parser.add_argument(
         "--no-token-budget",

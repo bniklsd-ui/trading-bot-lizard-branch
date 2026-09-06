@@ -251,3 +251,26 @@ def test_both_flags_on_renders_both_sections(research_context: ResearchContext) 
     )
     assert "Abstain lessons:" in user
     assert "Paper-trade lessons:" in user
+
+
+# --- Phase 16 C2 (2026-09-05, L1) — recent trades are CONTEXT, not a VETO ---- #
+
+
+def test_system_prompt_names_history_as_context_not_veto(
+    research_context: ResearchContext,
+) -> None:
+    """Phase 16 C2: the system prompt explicitly frames the recent-trades block
+    as context-for-lessons-and-sizing, NOT as a reason to abstain.
+
+    L1 root cause (Plan §3 L1): 100 % Research-Abstain since 2026-08-31 was driven
+    by the LLM naming a "5–6 of 7 losses" pattern from the un-windowed recent-trades
+    table as the abstain reason. C1 added the 14-day window; C2 names the role so
+    the LLM can't repeat the same mistake after a fresh losing streak.
+
+    Substring-pin (Plan §9 #2 — no existing test in phase4_research/tests/ pins the
+    "When in doubt" / "Recent trades" header text; grep 2026-09-05 was empty).
+    """
+    system, _user, _schema = build_prompt(research_context, THRESHOLD, BOTH)
+
+    assert "Recent trades are context for lessons and sizing, NOT a veto" in system
+    assert "a losing streak by itself is never a reason to abstain" in system

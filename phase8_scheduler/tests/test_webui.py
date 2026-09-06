@@ -335,8 +335,8 @@ def test_token_usage_counts_today_only(client) -> None:
     assert body["consumed_tokens"] == 1800          # (1000+200)+(500+100); yesterday excluded
     assert body["calls_today"] == 2
     assert abs(body["cost_eur_today"] - 0.0064) < 1e-9
-    assert body["budget"] == 200_000                # the armed default
-    assert body["percent"] == 0.9                   # 100*1800/200000
+    assert body["budget"] == 300_000                # the armed default (Phase 16 C3, was 200_000)
+    assert body["percent"] == 0.6                   # 100*1800/300000
 
 
 def test_token_usage_missing_log_is_zeros(client) -> None:
@@ -345,7 +345,7 @@ def test_token_usage_missing_log_is_zeros(client) -> None:
     assert body["consumed_tokens"] == 0
     assert body["calls_today"] == 0
     assert body["percent"] == 0.0
-    assert body["budget"] == 200_000
+    assert body["budget"] == 300_000
 
 
 def test_token_usage_budget_disabled_percent_none(tmp_path) -> None:

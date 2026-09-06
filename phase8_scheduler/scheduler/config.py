@@ -78,12 +78,18 @@ class SchedulerConfig:
 
     Budget (consumed by ``budget.py``):
         daily_token_budget: per-day LLM token budget over the reused 8-field
-            ``token_meter`` / ``llm_usage.json`` (Decision 12). Default ``200_000``
-            (v1 runaway circuit breaker ≈ €0.8/day at the Sonnet-research rate that
-            dominates a stuck loop — armed by default so the daemon is cost-safe even
-            if an operator forgets the flag). ``None`` ⇒ **explicitly disabled** (never
-            exhausted); that WARNING lives in ``budget.py`` (§7), not here, to keep one
-            warning per responsibility.
+            ``token_meter`` / ``llm_usage.json`` (Decision 12). Default ``300_000``
+            (v1 runaway circuit breaker ≈ €1.2/day worst case at the Sonnet-research
+            rate that dominates a stuck loop — armed by default so the daemon is
+            cost-safe even if an operator forgets the flag). ``None`` ⇒ **explicitly
+            disabled** (never exhausted); that WARNING lives in ``budget.py`` (§7),
+            not here, to keep one warning per responsibility. Phase 16 C3
+            (2026-09-05): raised from ``200_000`` — the prior default was hit daily at
+            ~15:48 (77 research calls × ~2.6 k tokens), starving the bot of the last
+            ~1h42m of market data each day. ``cache_system=True`` was considered and
+            rejected (Plan §1 P3): the meter counts cache-reads fully
+            (``budget.py:70-75``) and Sonnet 4.6 caches only above 1024 prefix
+            tokens while the system prompt is ~250 → expected saving 0.
 
     Reconcile (consumed by ``reconcile.py``):
         reconcile_interval_min: cadence of the idempotent ``CLOSED_BY_BROKER`` P&L
@@ -131,7 +137,7 @@ class SchedulerConfig:
     backoff_cap_s: float = 600.0
 
     # --- budget ---
-    daily_token_budget: int | None = 200_000  # v1 runaway breaker ≈ €0.8/day; None ⇒ explicitly disabled (WARNING in budget.py)
+    daily_token_budget: int | None = 300_000  # Phase 16 C3 (2026-09-05): raised from 200k — exhausted daily at ~15:48; None ⇒ explicitly disabled (WARNING in budget.py)
 
     # --- reconcile ---
     reconcile_interval_min: int = 15
