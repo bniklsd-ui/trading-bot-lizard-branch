@@ -11,13 +11,87 @@ Plan-Session-Block trägt bewusst **keine** `Session #N`-Nummer im Heading (Phas
 `_max_session_num` returnt `None`; für die erste Exec-Session (`head_max == 1`) ist das
 Archiv-Max `None` korrekt (check_archive_sequence, Z. 134-138).
 
-Stand nach Exec-Session #3 (2026-09-05): Archiv trägt **3** Einträge — `#2` (Block A
-endgültig in code, 5 atomare Commits, A-5 Push ausstehend) + `#1` (Block A A-0) +
-Plan-Session. Phasenkopf trägt genau **1** Block (Exec-Session #3, B2-Confirmed;
-startet Block C in Exec-Session #4 nach Mini-Rotation).
+Stand nach Exec-Session #4 (2026-09-05): Archiv trägt **4** Einträge — `#3` (Block B
+B1+B3 + B2 Operator-Apply + A-5-Push, Σ 1856) + `#2` (Block A endgültig in code) + `#1`
+(Block A A-0) + Plan-Session. Phasenkopf trägt genau **1** Block (Exec-Session #4,
+C1 endgültig in code, Σ 1862; startet C2+C3+C5 in Exec-Session #5 nach Mini-Rotation).
 
 ---
 
+## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #4, Block C Step C1 endgültig in code, Σ 1862 grün = 1856 + 6 neue P4-Tests, Pause auf Nikinger-Auftrag)
+
+> **Auftrag:** Nikinger-Chat 2026-09-05 (Phase-16-Exec-Folge, Mini-Rotation nach B2-Confirmed): „Block C, aber nur erster Step, danach Session beenden." — **Block C Step C1** (Plan §6 C1, L1-Fix: Historien-Fenster 14d als Post-Filter im P4-Research-Context). C2..C5 + E1 bleiben für nachfolgende Sessions.
+>
+> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block C Step C1 (S. 470-499) + §1 P2 (Fenster 14d + max 8 Trades + Prompt-Satz) + §1 P4 (P4 Post-Filter, kein SQL-Touch) + §4 Cross-Phase-Tabelle (P4 freigegeben) + §7 AK7.
+>
+> Ausführungs-Scope: **3 Atomic Commits** (`e26ff06` Session-Rotation · `acc941f` C1 Code+Tests · Final-Commit). Push-Freigabe (P18) gilt weiterhin; diese Session pusht **nicht** eigenmächtig.
+
+### Completed
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #4, 2026-09-05):**
+- `git log origin/main..HEAD --oneline` → 1 Commit (`6ee2620` B2-Confirmed-Vermerk aus der vorherigen Session).
+- `git status` → working tree clean.
+- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (vor Mini-Rotation: Phasenkopf 1 Block, Archiv 3 Blocks).
+- Source-Pin gegen `models.py:681` (`recent_trades_quarantine_before`) + `context_builder.py:251-256` (Anker für `_drop_older_than`) + `prompt.py:121-132` (`_render_trades`) — alle verbatim bestätigt.
+
+**1. Block-C Step C1 in 2 atomaren Commits + 1 Session-Rotation-Commit:**
+
+| Step | Commit | Scope | Σ-Delta | Akzeptanz |
+|---|---|---|---|---|
+| **C1** Historien-Fenster 14d | `acc941f` phase16+phase4: code | `research/models.py` `ResearchConfig.recent_trades_max_age_days: int \| None = 14` + `ResearchContext.recent_trades_max_age_days: int \| None = None` (Default `None` = bit-identisch) + `research/context_builder.py` neue Modul-Funktion `_drop_older_than(trades, max_age_days, *, now_fn=None)` (close_ts→open_ts Fallback, fail-open auf unparsbar, now_fn injizierbar) + Anwendung direkt nach `db.get_recent_trades_for_prompt(8, …)` + `research/prompt.py` `_render_trades(trades, *, max_age_days=None)` rendert Header „Recent trades (last N days, newest first):" + 6 Tests in `phase4_research/tests/test_recent_trades_window.py` (4 vom Plan + 2 Belt-and-Braces für den Header) | +6 (P4: 155→161) | AK7 ✅ |
+| **Session-Rotation** | `e26ff06` phase16: docs | Phasenkopf Exec-#3 → SESSIONS_ARCHIVE.md + Exec-#4 → Phasenkopf (mit Heading-Body-Regex-False-Positive-Fix „Session 5" → "Folgesession") | 0 | Doc-Rotation ✅ |
+
+**2. Σ-Sweep nach C1 (verifiziert 2026-09-05):** **1862 grün (= 1856 + 6 neue P4-Tests).** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/root = 95+78+104+161+185+76+166+253+95+165+145+82+61+91+105 = 1862 ✅ exakt Plan-Akzeptanz AK2 erfüllt.
+
+**3. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach jedem Commit.
+
+**4. Git-Stand am Session-Ende:**
+- HEAD = `a329180` (Final-Commit).
+- Commits lokal ahead of `origin/main` = 1 (vorheriger B2-Confirmed) + 3 (diese Session) = **4 Commits ahead**.
+- Working tree clean nach jedem Commit (außer untracked `data/`, gitignored).
+
+### Findings
+
+🟢 **C1 ist der deterministische Fix für L1:** ohne Zeitfenster altert die Tabelle „8 jüngste Trades" nur, wenn ein neuer Trade die Reihenfolge ändert — und nach dem 7. Verlust war das ein absorbierender Zustand (77 Calls/Tag für 5 Tage). 14-Tage-Fenster als Post-Filter lässt den LLM weiterhin die letzten 8 **oder weniger** Trades sehen, aber abgeschnitten am 14-Tage-Cutoff. Plus Prompt-Satz (C2, später) macht die Historie-Rolle explizit („context for lessons and sizing, NOT a veto").
+
+🟢 **Fail-Open Semantik korrekt:** `_drop_older_than` parst `close_ts` (Fallback `open_ts`) mit `datetime.fromisoformat`, ersetzt vorher `Z` → `+00:00`. Bei unparsbarem Timestamp → **behalten** (LLM sieht mehr, nie weniger — defensiv).
+
+🟢 **`now` injizierbar:** über `now_fn`-Parameter testbar; Default `datetime.now(timezone.utc)`.
+
+🟡 **`recent_trades_max_age_days=None` muss bit-identisch zum Pre-P16-Verhalten sein** (Plan §1 P2: „None = off"). Test `test_window_none_is_bit_identical` pinnt das.
+
+🟡 **Pre-LLM-Limit auf 8 bleibt:** die `_drop_older_than`-Funktion filtert NACH `db.get_recent_trades_for_prompt(8, …)` (siehe `context_builder.py:251`). Es ist also „8 jüngste aus DB → dann 14-Tage-Filter" — bei 8×20 Tage alten Trades bleibt 0 im Kontext (das ist **gewollt**: leerer recent-trades-Block ist ehrlicher als „6 von 7 Verluste"-Narrativ).
+
+🟢 **Cross-Phase-Touch-Disziplin:** Block C Step C1 berührt **nur P4** (`research/{models,context_builder,prompt}.py` + Tests). Keine P1/P2/P3/P5/P7/P8/P9/P15-Touches. P4 war schon in Plan §4 freigegeben.
+
+🟢 **Header-Render aus Config:** `"Recent trades (last {config.recent_trades_max_age_days} days, newest first):"` — Zahl kommt aus der Config, nicht hardcoden. Bei `None` → fällt auf `"Recent trades (newest first):"` zurück (Pre-P16-String).
+
+### Open questions / blockers
+
+- Keine. C1 ist mechanisch korrekt und orthogonal zu C2..C5 (C2 = Prompt-Satz in derselben `prompt.py`, C3 = Budget 300k in P8, C5 = Breaker-Semantik in P3, alle unabhängig).
+
+### Next (für die Folgesession)
+
+- **Block C Step C2** (Plan §6 C2): Prompt-Satz `"- Recent trades are context for lessons and sizing, NOT a veto: a losing streak by itself is never a reason to abstain — judge the setup in front of you.\n"` in `research/prompt.py` nach `"- When in doubt, ABSTAIN. A skipped session is cheap; a bad trade is not.\n"`. 1 Test (`test_system_prompt_names_history_as_context_not_veto`).
+- **Block C Step C3** (Plan §6 C3): Budget 200k → 300k in `scheduler/config.py:134` + `scheduler/run.py:57` CLI-Default. Tests in `phase8_scheduler/tests/test_run.py:20,52`, `test_config.py:39`, `test_webui.py:338-348` (Prozent-Pin 0.6). **Kein** `cache_system=True` (P3-Begründung).
+- **Block C Step C5** (Plan §6 C5, P3 Runde 2 freigegeben): Breaker-Semantik in `external_data/fetcher.py:407-411` — leerer Frame öffnet Circuit nicht (nur `RateLimitError`). Test `test_empty_frame_does_not_open_circuit`.
+- **E1 (Vorregistrierung)** muss vor Block-D-Operator-Restart committet sein.
+
+**Block-Status nach dieser Session (endgültig):**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ A-0..A-4 + A-5 Push (frühere Sessions) |
+| B (Substrat) | ✅ B1+B3 code + B2 Operator-Apply + A-5 Push (vorherige Session) |
+| C (Research-Loop) | 🔄 C1 endgültig in code; C2+C3+C5 offen |
+| D (Freischaltung) | ⏳ nach C |
+| E (2-Wochen-Test) | ⏳ nach D + Operator-Restart |
+
+**Push-Status dieser Session:** **0 Commits gepusht**, 2 Commits pending (Session-Rotation + C1) ahead of `origin/main` (gesamt: 3 Commits lokal ahead nach dieser Session).
+
+---
+
+---
 ## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #3, Block B B1+B3 endgültig in code + Session-Rotation #2→#3 + B2-Operator-Apply + A-5-Push, Σ 1856 grün, alle 4 Dienste gestoppt, Live-DB Schema v9 erreicht, Ledger-Restore 5|250 angewendet)
 
 > **Auftrag:** Nikinger-Chat 2026-09-05 (Phase-16-Exec-Folge): „NEXT (für Exec-Session #3 oder Pause-Fortsetzung): Block B startet (Plan §6 B1..B3). B2 ist Operator-Aktion (P13) und kommt nach Block-B-Commit mit allen 4 Diensten gestoppt." — **Block B in code** (B1 = Schema-Floor, B3 = Wochenend-Filter + Demotion), B2 als vorbereitete Operator-Anweisung an Nikinger übergeben. Nach Block-B-Commit hat Nikinger A-5 (Push) + B2 (Operator-Apply) am Stück ausgeführt.
