@@ -11,10 +11,128 @@ Plan-Session-Block trägt bewusst **keine** `Session #N`-Nummer im Heading (Phas
 `_max_session_num` returnt `None`; für die erste Exec-Session (`head_max == 1`) ist das
 Archiv-Max `None` korrekt (check_archive_sequence, Z. 134-138).
 
-Stand nach Exec-Session #2 (2026-09-05): Archiv trägt **3** Einträge — `#2` (Block A
-endgültig in code: 5 atomare Commits A-0..A-4 inkl. Session-Rotation, A-5 Push ausstehend)
-+ `#1` (Block A A-0) + Plan-Session. Phasenkopf trägt genau **1** Block (Exec-Session #3,
-startet Block B).
+Stand nach Exec-Session #3 (2026-09-05): Archiv trägt **3** Einträge — `#2` (Block A
+endgültig in code, 5 atomare Commits, A-5 Push ausstehend) + `#1` (Block A A-0) +
+Plan-Session. Phasenkopf trägt genau **1** Block (Exec-Session #3, B2-Confirmed;
+startet Block C in Exec-Session #4 nach Mini-Rotation).
+
+---
+
+## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #3, Block B B1+B3 endgültig in code + Session-Rotation #2→#3 + B2-Operator-Apply + A-5-Push, Σ 1856 grün, alle 4 Dienste gestoppt, Live-DB Schema v9 erreicht, Ledger-Restore 5|250 angewendet)
+
+> **Auftrag:** Nikinger-Chat 2026-09-05 (Phase-16-Exec-Folge): „NEXT (für Exec-Session #3 oder Pause-Fortsetzung): Block B startet (Plan §6 B1..B3). B2 ist Operator-Aktion (P13) und kommt nach Block-B-Commit mit allen 4 Diensten gestoppt." — **Block B in code** (B1 = Schema-Floor, B3 = Wochenend-Filter + Demotion), B2 als vorbereitete Operator-Anweisung an Nikinger übergeben. Nach Block-B-Commit hat Nikinger A-5 (Push) + B2 (Operator-Apply) am Stück ausgeführt.
+>
+> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block B Steps B1..B3 (S. 365-466) + §1 P8 (Schema-Floor statt In-Daemon-Migration) + §1 P7/P9 (Wochenend-Filter + Demotion) + §4 Cross-Phase-Tabelle (P8 + P9 freigegeben) + §11 Operator-Aktionen.
+>
+> Ausführungs-Scope: **4 Atomic Commits** (`SESSION-ROT` `36d1553` · B1 `ac3d1c2` · B3 `d82922e` · `ff84dac` Σ-Sweep-Verifikation) **+ 1 B2-Confirmed-Commit** `6ee2620` dieser Session-Finalisierung. Push-Freigabe (P18) erteilt; Nikinger hat in dieser Session eigenständig `git push origin main` ausgeführt (9 Commits gepusht, `82e5f8d..ff84dac`).
+
+### B2-Operator-Apply (P13) — Nikinger-verifiziert 2026-09-05 (gleicher Tag)
+
+**Runbook verbatim ausgeführt (Plan §6 B2 + §11):**
+
+```bash
+git push origin main
+# remote: ... 82e5f8d..ff84dac  main -> main  (65 Objekte, 9 Commits)
+# → 9 Commits lokal ahead → 0 ahead (origin/main = ff84dac nach push)
+
+bash scripts/restart-services.sh stop
+# 4 Dienste terminiert:
+#   PID 124611 WebUI      — graceful TERM (5 s Timeout reichte)
+#   PID 124569 Scheduler  — TERM → KILL (5 s reichte nicht; bekanntes Phase-8-POST_WINDOW-Cap-Pattern)
+#   PID 124512 Discovery  — TERM → KILL
+#   PID 124485 Recorder   — TERM → KILL
+#   ps aux nach stop: LEER ✓
+
+cp data/trading_bot.sqlite data/trading_bot.sqlite.bak-20260905-pre-mig009
+
+phase1_broker_wrapper/.venv/bin/python phase2_persistence/scripts/init_db.py --db-path data/trading_bot.sqlite
+# INFO Database ready at data/trading_bot.sqlite (schema version 9)
+# INFO Seeded config keys: bot_score, daily_pnl_today, force_trigger_locked, risk_level, session_date
+# INFO State directory ready at /home/trading-bot/trading-bot/data/state
+
+sqlite3 "file:data/trading_bot.sqlite?mode=ro" "SELECT MAX(version) FROM _schema_version; PRAGMA table_info(trade_outcomes);"
+# 9
+# [Spalten 0–23 ...]
+# 23|last_resolve_attempt_utc|TEXT|0||0   ← Migration 008 angewendet ✓
+
+sqlite3 data/bars.sqlite "SELECT COUNT(*), SUM(points) FROM source_spend WHERE kind='rescue';"
+# 5|250   ← Ledger-Befund vor Restore (Plan §2.5: 5 Zeilen / 250 Pkt, ts 2026-09-04T07:12Z) ✓
+
+sqlite3 data/bars.sqlite "DELETE FROM source_spend WHERE kind='rescue';"
+# → 5 Rescue-Zeilen gelöscht, IG-Quota-Bilanz bereinigt
+```
+
+**Verifikations-Bilanz:** ✅ Schema-Floor 9 erreicht (Migrationen 008+009 angewendet). ✅ `last_resolve_attempt_utc`-Spalte vorhanden → A6 (P7-Reconcile-Backoff) wird beim nächsten OPEN-Trade live-verifizierbar. ✅ Ledger-Restore sauber (250 fälschlich gebuchte Rescue-Punkte aus dem 2026-09-04-Pfad-A-Scharfschaltungs-Bug entfernt). ✅ Backup `data/trading_bot.sqlite.bak-20260905-pre-mig009` ist die Pre-Migration-008-Rückfall-Option. ✅ Bot bleibt aus (Plan §6 B2-Fußnote: „Restart erst nach Block D").
+
+**🟢 Phase 16 L3 vollständig geschlossen:** Schema-Stale war der eine 🔴-Befund, der den Reconcile-Backoff (Phase-7-P12-Reconcile-Timing-Fix) still lahmgelegt hat. Die `wiring.py:1066-1077`-Preflight-Sequenz enthält jetzt **drei** fail-closed Checks (keyring + `account`-Spalte + Schema-Floor), nicht mehr zwei.
+
+### Completed
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #3, 2026-09-05):**
+- `git log origin/main..HEAD --oneline` → 5 Commits (alle Block A: `901c15b`, `7f5b516`, `19d0ad3`, `eedd266`, `557761c`).
+- `git status` → working tree clean.
+- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0.
+- Source-Pin gegen `wiring.py:1066-1077` + `discovery.py:131` + `promotion.py:251-262` + `models.py` — alle verbatim bestätigt.
+
+**1. Block-B-Steps B1 + B3 in 2 atomaren Commits (B2 = Operator-Aktion, separat):**
+
+| Step | Commit | Scope | Σ-Delta | Akzeptanz |
+|---|---|---|---|---|
+| **B1** Schema-Floor | `ac3d1c2` phase16+phase8: code | `wiring.py` `REQUIRED_SCHEMA_VERSION = 9` + `assert_schema_floor(conn)` Modul-Funktion + `preflight_fn`-Aufruf danach + `phase8_scheduler/tests/test_wiring_schema_floor.py` (5 Tests) | +5 (P8: 248→253) | AK4 ✅ |
+| **B3** Wochenend-Filter | `d82922e` phase16+phase9: code | `models.py` `WEEKEND_NAME_MARKERS` + `is_weekend_market(epic, name)` + `discovery.py` Filter + `promotion.py` Skip + Demotion + `phase9_universe/tests/test_weekend_market.py` (8 Tests) | +8 (P9: 87→95) | AK9 ✅ |
+| **Session-Rotation** | `36d1553` phase16: docs | Phasenkopf Exec-#2 → SESSIONS_ARCHIVE.md + Exec-#3 → Phasenkopf | 0 | Doc-Rotation ✅ |
+| **Σ-Sweep-Verifikation** | `ff84dac` phase16: docs | Phasenkopf-Update mit konkreten Commit-Hashes + Σ 1856 | 0 | Doc-Rotation ✅ |
+
+**2. Σ-Sweep nach Block B (verifiziert 2026-09-05):** **1856 grün (= 1843 + 13 neue Tests).** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/root = 95+78+104+155+185+76+166+253+95+165+145+82+61+91+105 = 1856 ✅ AK2 erfüllt.
+
+**3. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach jedem Commit.
+
+**4. Git-Stand vor A-5:** HEAD = `ff84dac`, 9 Commits lokal ahead of `origin/main`.
+
+**5. B2 + A-5 Nikinger-Operator-Apply:** ✅ push (9 Commits) · ✅ stop (4 Dienste) · ✅ Backup · ✅ init_db.py v9 · ✅ SQL-Verify · ✅ Ledger-Restore.
+
+**6. Git-Stand nach A-5:** `origin/main = ff84dac`, 0 Commits lokal ahead.
+
+### Findings
+
+🟢 **Block B vollständig abgeschlossen** (B1 + B3 Code + B2 Operator-Apply + A-5 Push): alle drei fail-closed-Sequenzen scharf, Wochenend-Märkte strukturell aus dem Universe gefiltert, Live-DB auf v9.
+
+🟢 **Cross-Phase-Touch-Disziplin eingehalten:** Block B berührt: **P8** + **P9**. Keine P1/P2/P3/P4/P5/P7/P15-Touches.
+
+🟢 **Source-of-truth precedence gewahrt:** B1 = gleicher Mechanismus wie `account`-Check; B3 = additive Edits auf bestehende Schnittstellen.
+
+🟢 **Drei TERM→KILL-Übergänge sind erwartet** (POST_WINDOW-Sleep-Cap-Pattern).
+
+🟢 **`is_weekend_market` Fail-Open Richtung „entdeckt":** beide Filter triggern unabhängig.
+
+🟢 **AK4 live-verifiziert:** drei fail-closed Checks jetzt scharf; v9 erreicht.
+
+🟡 **A-6 (Reconcile-Backoff Live-Verify) wartet auf nächsten OPEN-Trade.**
+
+🟡 **Bot bleibt aus** (Plan §6 B2-Fußnote).
+
+### Open questions / blockers
+
+- Keine. Block B ✅ vollständig.
+
+### Next (für Exec-Session #4)
+
+- **Block C — Research-Loop** (Plan §6 C1..C5): startet in Exec-Session #4.
+- **E1 (Vorregistrierung) — VOR dem Restart nach Block D committen**.
+
+**Block-Status nach dieser Session:**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ A-0..A-4 endgültig in code (Session #1+#2); A-5 = Operator-Push |
+| B (Substrat) | ✅ B1+B3 code + B2 Operator-Apply + A-5 Push (Session #3) |
+| C (Research-Loop) | ⏳ startet in Exec-Session #4 |
+| D (Freischaltung) | ⏳ nach C |
+| E (2-Wochen-Test) | ⏳ nach D + Operator-Restart |
+
+**Push-Status dieser Session:** **9 Commits gepusht von Nikinger** (`ff84dac` = `origin/main`), 0 Commits pending.
+
+---
 
 ---
 
