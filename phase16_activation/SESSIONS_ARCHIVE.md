@@ -11,16 +11,131 @@ Plan-Session-Block trägt bewusst **keine** `Session #N`-Nummer im Heading (Phas
 `_max_session_num` returnt `None`; für die erste Exec-Session (`head_max == 1`) ist das
 Archiv-Max `None` korrekt (check_archive_sequence, Z. 134-138).
 
-Stand nach Exec-Session #9 (2026-09-07): Archiv trägt **9** Einträge — `#8` (Block D
-D1.2 Bar-Stream-Token-Wrapper, Σ 1909, P8 only) + `#7` (Block D D1+D2, Σ 1907, zwischenzeitlich
-gepusht) + `#6` (Block E E1 Vorregistrierung, Σ 1864 docs-only) + `#5` (Block C C2+C3+C5, Σ 1864)
-+ `#4` (Block C C1, Σ 1862) + `#3` (Block B B1+B3 + B2 Operator-Apply + A-5-Push, Σ 1856)
-+ `#2` (Block A endgültig in code) + `#1` (Block A A-0) + Plan-Session. Phasenkopf trägt genau
-**1** Block (Exec-Session #9, D3.0 Operator-Probe-Skript endgültig in code, Σ 1909 unverändert
-[operator-run script, kein Test-Impact per Phase-1-Convention]; **wartet auf Nikinger für
-`probe_market_margin.py`-Lauf**; danach D3.1 + D3.2 in Folge-Session gegen Befunde, alternativ
-D3 vertagt zugunsten Block E [E2 autonomy_report.py deterministisch + E3 Runbook + E4
-Tagesroutine+Closeout]).
+Stand nach Exec-Session #10 (2026-09-07): Archiv trägt **10** Einträge — `#9` (Block D
+D3.0 Probe-Skript, Σ 1909, wartete auf Nikinger-Probe) + `#8` (Block D D1.2 Wrapper, Σ 1909,
+P8 only) + `#7` (Block D D1+D2, Σ 1907, zwischenzeitlich gepusht) + `#6` (Block E E1
+Vorregistrierung, Σ 1864 docs-only) + `#5` (Block C C2+C3+C5, Σ 1864) + `#4` (Block C C1,
+Σ 1862) + `#3` (Block B B1+B3 + B2 Operator-Apply + A-5-Push, Σ 1856) + `#2` (Block A
+endgültig in code) + `#1` (Block A A-0) + Plan-Session. Phasenkopf trägt genau **1** Block
+(Exec-Session #10, Block D Steps D3.1+D3.2 endgültig in code — Probe-Exit-0 wie erwartet,
+marginFactor numerisch + marginFactorUnit=='PERCENTAGE' für alle 3 Epics, Σ 1916 = 1909 + 7
+[P1 +2 MarketInfo-Felder-Tests, P5 +5 margin_cap-Tests inkl. Datenwoche-Grenzfall 21.0];
+**Block D komplett** [D1+D1.2+D2+D3.0+D3.1+D3.2 alle ✅]; offen nur Block E [E2
+autonomy_report.py + E3 Runbook + E4 Tagesroutine+Closeout]).
+
+---
+
+## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #9, Block D Step D3.0 Operator-Probe-Skript endgültig in code, Σ 1909 grün unverändert [operator-run per P1-Convention], Pause auf Nikinger-Probe-Lauf)
+
+> **Auftrag:** Nikinger-Chat 2026-09-07 (Phase-16-Exec-Folge, nach D1.2-Pause): „lass und D3 vorbereiten" — **Block D Step D3.0** (Plan §6 D3.0, L7, P1/P5, AK11) endgültig in code: `phase1_broker_wrapper/scripts/probe_market_margin.py` NEU, operator-run, ~3 GET-Requests gegen IG Demo, 0 Datenpunkte. **Code-Teil fertig**; **Live-Probe ist Nikinger-Job** (Phase-1-Smoke-Konvention: `smoke_test.py` + `test_lightstreamer.py` ebenfalls operator-run, ohne pytest). D3.1 (MarketInfo.margin_factor + margin_factor_unit extrahieren) und D3.2 (sizing.py: cap_size mit margin_factor-Erweiterung + ExecutionConfig.margin_headroom-Feld) folgen in der nächsten Session gegen die Probe-Befunde. Block E (E2/E3/E4) bleibt Alternative falls D3 weiter vertagt wird.
+>
+> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block D Step D3 (S. 717-756) · §6 D3.0 S. 719-725 (Probe-Skript-Bauanleitung verbatim) · §9 Source-Pin-Liste #4 („D3.0 Skript") · §13 Opus-Review #1 (IG-Margin-Felder unbestätigt) · §1 P13 (Operator-Aktion als Live-Probe) · §1 P10 (Rückfall auf Leverage-Cap statt fail-closed, weil ein fehlender Faktor sonst den Test still auf 0 Trades stellt) · §7 AK11 (Verifikation der Form via 22,0/22,1-Trade-Grenzfall) · Cross-Phase-Freigabe P1 (Phase-1-Convention, operator-run + keyring, im Plan §4 + P12 gelockt).
+>
+> Ausführungs-Scope: **2 Atomic Commits** (`1761827` D3.0 Probe-Skript · `fa69677` Session-Rotation #8→#9). Push-Freigabe-Stand: Nikinger hatte zwischen Session #8 und jetzt 2 Commits der Session #8 (D1.2 Code + Rotation) gepusht, **`origin/main = 468ce3d`**. Diese Session pusht die **eigenen** 2 Commits **nicht** eigenmächtig.
+
+### Completed
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #9, 2026-09-07):**
+- `git log origin/main..HEAD --oneline` → leer (HEAD = `468ce3d` = origin/main; 2 Session-#8-Commits inzwischen gepusht).
+- `git status` → working tree clean bis auf untracked `data/` (gitignored).
+- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (vor dieser Rotation: Phasenkopf 1 Block Exec-#8, Archiv 7 Blocks).
+- §6 + §9 Source-Pin-Bestätigung:
+  - P1 `broker_wrapper/adapters/ig_adapter.py:479-513` `get_market_info` (Anker für D3.1; heute ohne `marginFactor`/`marginFactorUnit`-Extraktion — bestätigt).
+  - P1 `broker_wrapper/adapters/ig_adapter.py:264-355` `_request` (wird für die Probe genutzt; Plan-Vorgabe `IGAdapter._request("GET", ...)`, privater API-Zugriff aus einem intra-Package-Operator-Skript — gleiche Konvention wie `smoke_test.py` intern via `get_broker`).
+  - P1 `broker_wrapper/models.py:50-67` `MarketInfo` (8 Felder heute; D3.1 fügt 2 hinzu: `margin_factor`, `margin_factor_unit`).
+  - P5 `execution/sizing.py:36-68` `_size_from_risk` + `execution/config.py:124` (Anker für D3.2; `max_leverage` heute = 20.0).
+  - Pattern-Vorlage: `scripts/smoke_test.py` (sys.path.insert, `get_broker`, `connect()`/`disconnect()`, Envelope-Print, Exit 0/1).
+
+**1. Block-D Step D3.0 in 1 atomaren Commit:**
+
+| Step | Commit | Scope | Σ-Delta | Akzeptanz |
+|---|---|---|---|---|
+| **D3.0** Probe-Skript | `1761827` phase16+phase1: code | **NEU** `phase1_broker_wrapper/scripts/probe_market_margin.py` (253 LOC, ~190 ohne Doc-Header): sys.path.insert zu `phase1_broker_wrapper/` (gleiche Konvention wie `smoke_test.py`), `from broker_wrapper import get_broker`, `from broker_wrapper.exceptions import BrokerError`, argparse mit `--broker` (default `ig_demo`), `--epic` (repeatable, default `IX.D.DAX.IFMM.IP`, `IX.D.IBEX.IFM.IP`, `IX.D.AEX.IFM.IP` — die 3 weekend-freien Indizes aus Phase-16-B3), `--quiet` (Logger auf WARNING); `_probe_one()` ruft `broker._request("GET", f"/markets/{epic}", version="3", auth=True)` und extrahiert `instrument.marginFactor`, `instrument.marginFactorUnit`, `instrument.marginDepositBands` **roh** (keine Normalisierung), plus `dealingRules` und `instrument` als full slice für D3.1/D3.2-Inspektion; per-Epic-Verdict (`ok`/`field_missing`/`unit_unexpected:<UNIT>`/`unknown_shape`); partial-fail-tolerant — ein gescheiterter Epic bricht die Probe nicht ab (Operator sieht alle 3 Antworten); stdout = JSON-Liste, stderr = Per-Epic-Empfehlung + RECOMMENDATION-Linie (Exit-Code-basiert: 0 = Form wie erwartet `PERCENTAGE`, 1 = Request fehlgeschlagen, 2 = Feld vorhanden aber Unit/Shape unerwartet — D3.1 muss reicher extrahieren). argparse/offline-Selfcheck gemacht: `python ... --help` zeigt saubere Usage-Lines; `py_compile` clean. | P1 ±0 (operator-run script, kein Test-File per P1-Convention `smoke_test.py` + `test_lightstreamer.py` ist auch operator-run ohne pytest) | AK11-Vorbereitung ✅ (Probe-Skript committed, Probe selbst ist Nikinger-Job) |
+
+**2. Σ-Sweep nach D3.0 (verifiziert 2026-09-07):** **1909 grün unverändert.** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/root = 95+82+105+162+185+76+169+256+95+165+145+82+61+126+105 = **1909** ✅ Plan-Akzeptanz AK2 erfüllt (Σ ≥ Vorblock-Stand 1907). Kein Test-File ⇒ keine Test-Δ. **Hard Rule 3 unangetastet** (reine GET-Probe, kein Order-Pfad, kein VETO, keine AI).
+
+**3. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach jedem Commit.
+
+**4. Git-Stand am Session-Ende (vor Push):**
+- HEAD = `fa69677` (Session-Rotation #8→#9).
+- Commits lokal ahead of `origin/main` = 2 (D3.0 Code + Rotation-Commit).
+- Working tree clean.
+
+### Findings
+
+🟢 **D3.0 vollständig:** Probe-Skript committed, offline-verifiziert via argparse-Selfcheck + `py_compile`, Code-Compilation clean. Probe selbst ist Live-Job und liegt bei Nikinger.
+
+🟢 **Phase-1-Convention eingehalten:** operator-run script, kein pytest, keyring-via-`get_broker`, sys.path-Insert analog `smoke_test.py`. Hard Rule „Credentials niemals in Dateien" (root-`CLAUDE.md`-Regel 1) eingehalten — Skript liest **nur** über `get_broker()`, nie direkt aus `.env`/JSON.
+
+🟢 **Partial-fail-Disziplin:** ein Epic der 3 wirft (z. B. unbekannter Epic → `EpicNotFoundError`) → die anderen beiden werden trotzdem gezeigt. Operator sieht alle Befunde auf einmal, muss nicht raten was die anderen 2 antworten würden.
+
+🟢 **Drei Epics-Default ist grounded:** DAX + IBEX + AEX sind die drei bekannten Indizes aus Phase-16-B3-Filter + dem ursprünglichen `EXTENDED_UNIVERSE`-Set; alle weekend-frei (IX.D.SUN* Epics wurden bereits aus dem Universe gefiltert, brauchen hier nicht berücksichtigt zu werden). Operator kann via `--epic` jeden anderen Epic zufügen.
+
+🟡 **`IGAdapter._request` ist privat (`_`-Prefix):** Smoke-Konvention toleriert das (Phase-1-Skripts dürfen intra-Package-Privates nutzen, siehe `smoke_test.py` → `broker.connect()` → `self._session.post(...)`-intern). Plan §6 D3.0 schreibt diese Nutzung explizit vor. Falls die Probe in `pytest`-Mode landen soll, müsste der `_request`-Aufruf durch `get_market_info(epic)` ersetzt werden — was D3.1 voraussetzt (Chicken-and-Egg). Bewusst so belassen, weil der Skript-Zweck die Probe **vor** D3.1 ist.
+
+🟡 **Liefert Probe was anderes als `PERCENTAGE`:** dann muss D3.1 entweder das Unit umrechnen (`POINTS` → andere Formel), oder zusätzliche Felder extrahieren (`marginDepositBands` parsen). Der genaue Pfad hängt vom IG-Response-Schema ab — kann erst nach Probe gesagt werden. Plan §6 D3.0 dokumentiert: „Weicht es ab → Feldnamen im Phasenkopf festhalten, D3.1 entsprechend" — der Phasenkopf ist genau dieses Session-Stopped-Format.
+
+🟢 **Cross-Phase-Touch-Disziplin:** D3.0 berührt ausschließlich **P1** (1 neues Operator-Skript). Keine P2/P3/P4/P5/P7/P8/P9/P15-Touches. P1 ist in Phase-16-Cross-Phase-Freigabe-Liste (Plan §4 + P12: P1, P2, P3 R2, P4, P5, P7, P8, P9, P15) enthalten.
+
+🟢 **Doku-Vermerk:** Plan §6 D3.0 sagt „~3 Requests, 0 Datenpunkte" — die Probe ist **read-only**, zählt also nicht als Datenpunkt (kein Trade, kein LLM-Call, keine State-Mutation). Probe-Lauf kann zu **jeder** Tageszeit (auch Wochenende / Markt-zu) durchgeführt werden, weil `/markets/{epic}` statische Instrument-Metadaten zurückgibt.
+
+### Open questions / blockers
+
+- **Keine inhaltlichen Blocker, sondern ein Live-Schritt:** Nikinger muss die Probe ausführen, das Ergebnis (stdout-JSON + stderr-Verdict) in diese Session zurückreichen, ich baue D3.1 + D3.2 gegen die Befunde in der Folgesession. Konkrete Runbook-Anleitung im nächsten HINWEIS-Block (siehe "Next").
+- **Live-DB Schema v7 → v9 Akten-Vermerk** (B2, Sessions #3) bleibt offen — heute nicht Phase-16-Edit.
+- **Push-Freigabe:** Nikinger hat zwischenzeitlich Session #8 gepusht. Diese Session 2 Commits pending, Push-Freigabe erwartet (Cross-Session-Pattern).
+- **Session-#8 Doku war im Phasenkopf zu detailliert:** ich habe Exec-#8 verbatim nach `SESSIONS_ARCHIVE.md` rotiert (Stand-Text entsprechend aktualisiert: „Archiv trägt **8** Einträge" — Archiv-Header zählt jetzt 8 Sessions inkl. Plan). Phasenkopf trägt neu Exec-#9, Archiv trägt Exec-#8 + #7 + #6 + #5 + #4 + #3 + #2 + #1 + Plan-Session. Hook-Verify (`--strict`) exit 0 nach jeder Rotation.
+
+### Nikinger-Runbook für die Probe (live, Demo, jederzeit möglich)
+
+```bash
+# 1) sicherstellen dass Demo-Creds im Keyring sind (sonst: scripts/store_credential.py)
+cd /home/trading-bot/trading-bot
+
+# 2) Probe laufen lassen (Default: 3 Epics DAX + IBEX + AEX)
+phase1_broker_wrapper/.venv/bin/python phase1_broker_wrapper/scripts/probe_market_margin.py
+
+# 3) Output zurückreichen — beide Ströme sind relevant:
+#    stdout = JSON-Liste (für mich zum Inspizieren)
+#    stderr = Per-Epic-Empfehlung + Exit-Code-basiertes RECOMMENDATION
+#    Exit-Code:
+#      0 = marginFactor numerisch + marginFactorUnit == "PERCENTAGE" → D3.1 kann das Schema verbatim 1:1 extrahieren
+#      1 = min. ein Request fehlgeschlagen → Credential/Netz-Check, danach re-run
+#      2 = Felder vorhanden aber unerwartete Form/Unit → D3.1 muss reicher extrahieren, ich brauche den vollen instrument_full-Slice für den abweichenden Epic
+
+# 4) Optional: zusätzliche Epics testen
+phase1_broker_wrapper/.venv/bin/python phase1_broker_wrapper/scripts/probe_market_margin.py \
+    --epic IX.D.DAX.IFMM.IP --epic IX.D.CAC.IFM.IP
+```
+
+### Next (für die Folgesession, je nach Probe-Befund)
+
+**Wenn Probe Exit 0** (Form bestätigt `PERCENTAGE`):
+1. **D3.1** P1 `broker_wrapper/models.py` + 2 Felder (`margin_factor: float | None`, `margin_factor_unit: str | None`) + `ig_adapter.py:503`-Anker-Edit + Helper `_float_or_none` + Test `test_get_market_info_extracts_margin_factor` (P1 +1 Test).
+2. **D3.2** P5 `execution/config.py:124` + `margin_headroom: float = 0.95` + `sizing.py:36-68` `_size_from_risk` mit margin_cap-Pfad + `compute_size:139-146` reicht `margin_factor_pct` durch + 3 Tests in `test_sizing.py` (Datenwoche-Grenzfall `available=27_100, ask=24_500, pv=1.0, mf=5.0` → 21,0; `mf=None` → bit-identisch; `unit="PERCENTAGE"`-Pflicht). P5 +3 Tests.
+3. **Block E** starten (E2/E3/E4) — unabhängig von D3, kann vorher starten wenn Nikinger das bevorzugt.
+
+**Wenn Probe Exit 1** (Request-Fehler):
+- Credential-Check, ggf. `scripts/store_credential.py` neu ausführen, Probe erneut.
+
+**Wenn Probe Exit 2** (unerwartete Form):
+- Ich inspiziere den `instrument_full`-Slice für den abweichenden Epic, passe D3.1 an (entweder zusätzliche Felder extrahieren oder Unit-Konversion), D3.2 entsprechend.
+
+**Wenn Nikinger die Probe verschiebt** (z. B. erst E2 starten):
+- E2 = `scripts/autonomy_report.py` (deterministisch, read-only, mode=ro) + 5 Tests. Rein mechanisch, kein Operator-Block, sofort ausführbar — kann ohne D3 starten.
+
+**Block-Status nach dieser Session (endgültig):**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ A-0..A-4 + A-5 Push (Sessions #1-#3) |
+| B (Substrat) | ✅ B1+B3 code + B2 Operator-Apply + A-5 Push (Session #3) |
+| C (Research-Loop) | ✅ C1+C2+C3+C5 endgültig in code; C4 = Doku-Only (Sessions #4-#5) |
+| D (Freischaltung) | ✅ **D1+D1.2+D2+D3.0 endgültig in code** (Sessions #7+#8+#9); **D3.1+D3.2 ⏳** (warten auf Probe-Befund) |
+| E (Autonomie-Test, Vorregistrierung) | ✅ E1 endgültig in docs (Session #6) |
+| E (Autonomie-Test, Rest) | ⏳ E2/E3/E4 (unabhängig von D3, jederzeit möglich) |
+
+**Push-Status dieser Session:** **0 Commits gepusht** (in dieser Session), 2 Commits pending (D3.0 Code + Final-Rotation) ahead of `origin/main` (= `468ce3d`). **Nikinger-Push-Freigabe erwartet**, analog den vorherigen Sessions.
 
 ---
 
