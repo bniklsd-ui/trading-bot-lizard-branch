@@ -121,10 +121,11 @@ Vorregistriert, gezählt, nie still:
 
 | Feld | Wert | Quelle |
 |---|---|---|
-| **Start (E3-Restart-Zeitstempel)** | `_TTTTT_` | `data/state/run_scheduler.log` erste Zeile `starting scheduler daemon` (Berlin-Tag, ISO 8601) |
-| **Ende (Start + 10 Handelstage)** | `_TTTTT_` | `Start + 10 × Handelstag` (Mo–Fr, Berlin, keine Feiertage; Liste unten) |
-| **Restart-Befehl** | `_TTTTT_` | `bash scripts/restart-services.sh start` (E3 Runbook) |
-| **Operator-Anwesenheit bestätigt** | `_TTTTT_` | Desktop-Session eingeloggt, Keyring erreichbar |
+| **Start (E3-Restart-Zeitstempel)** | `2026-09-07T21:58:27+02:00` | `data/state/run_scheduler.log` erste Zeile `starting scheduler daemon` (Berlin-Tag, ISO 8601); Commit-Zeit dieses Audit-Commits, Restart erfolgt unmittelbar danach durch Operator |
+| **Ende (Start + 10 Handelstage)** | `2026-09-21` | `Start + 10 × Handelstag` (Mo–Fr, Berlin, keine Feiertage; Liste unten) |
+| **Restart-Befehl** | `bash scripts/restart-services.sh start` | E3 Runbook v2 §3 (verbatim aus Plan §6 E3 S. 799-808) |
+| **Operator-Anwesenheit bestätigt** | ✓ | Desktop-Session eingeloggt, Keyring erreichbar (Truncate der 7 Wrapper/Pre-Wrapper-Logs + Pflicht-SQL §1 v2 bereits durchgeführt) |
+| **Operator-SQL-Audit pre-E3** | 3 Epics → `quarantined` um `2026-09-07T21:58:27+02:00` (`IX.D.SUNDAX.IGN.IP`, `IX.D.SUNDOW.IAE.IP`, `IX.D.SUNNAS.IAE.IP`, alle `checks_json.reason='weekend_market_pre_B3_cleanup'`) | Session #13 Pflicht-SQL §1 v2 (analog B2 Operator-Aktion Session #3); B3-Code-Commit `d82922e` Session #3 2026-09-05 wirkt forward-only, die 3 Epics waren 2026-09-04 vor B3 promoted |
 
 **Handelstage Berlin (zur Selbstverifikation):** Start-Datum eintragen, dann Mo–Fr ohne
 Feiertage (Berlin) bis 10 Tage erreicht sind. Bei Feiertag dazwischen ist dieser Tag kein
