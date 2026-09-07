@@ -149,6 +149,10 @@ data/state/discovery_state.json
 # so a wildcard catches them all. Added 2026-08-22 (Session 9 — hygiene ticket
 # first raised in Session 4, picked up while the D4 Doku-Updates are in flight).
 *.sqlite.bak-*
+# Phase 16 (E2 — Freischaltung) runtime reports: `autonomy_report.py` writes a
+# JSON report per day under `data/reports/` for the 2-week autonomy test (Plan
+# §6 E2 + §7 AK14). Operational artifact, not source.
+data/reports/
 
 # --- Logs ---
 *.log
