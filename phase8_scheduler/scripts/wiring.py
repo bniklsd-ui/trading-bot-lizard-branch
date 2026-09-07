@@ -328,14 +328,21 @@ def _make_debate_runner(broker: Any) -> Callable[[dict[str, Any]], Any]:
     return debate_runner
 
 
-def _build_reward_sink(broker: Any, db: Any) -> Any:
-    """Build the Phase-7 :class:`RewardSink` over the shared broker (read-only) + db.
+def _build_reward_sink(broker: Any, db: Any) -> tuple[Any, Any]:
+    """Build the Phase-7 :class:`RewardSink` + the Phase-16 Promotion-Bridge.
 
-    Replica of Phase-7 ``scripts.wiring.build_reward_sink`` built from the ``reward`` package: the
-    reused Phase-4 ``LLMClient`` (Haiku, from ``RewardConfig.lesson_*``) + :class:`Scorer` +
-    :class:`Brain` (the only AI). The broker is read **only** for ``get_trade_history`` (P&L /
-    reconcile), never order/close (Decision J). The Anthropic key is read here; the SDK is lazy.
+    Phase 16 D2.6 (Plan §6 D2.6): the wiring returns a ``tuple[RewardSink,
+    InstinctBridge]``. The bridge hooks the RewardSink's new ``instinct_hook``
+    (D2.5) to drive extract → validate → promote → compile. The single Haiku
+    client serves both ``Brain`` (Phase 7 lessons) and
+    ``SingleShotInstinctExtractor`` (Phase 15 instincts) — same model, same
+    token-meter, same credentials flow.
+
+    The broker is read **only** for ``get_trade_history`` (P&L / reconcile),
+    never order/close (Decision J). The Anthropic key is read here; the SDK
+    is lazy.
     """
+    from instinct import InstinctBridge, InstinctConfig, InstinctValidator, SingleShotInstinctExtractor
     from research.llm_client import LLMClient
     from research.models import ResearchConfig
     from reward import Brain, RewardConfig, RewardSink, Scorer
@@ -351,7 +358,24 @@ def _build_reward_sink(broker: Any, db: Any) -> Any:
         token_meter_path=str(_USAGE_LOG),
         config=ResearchConfig(),
     )
-    return RewardSink(db=db, broker=broker, scorer=Scorer(cfg), brain=Brain(llm, cfg), cfg=cfg)
+    instinct_cfg = InstinctConfig()
+    instinct_extractor = SingleShotInstinctExtractor(llm=llm, cfg=intinct_cfg)
+    instinct_validator = InstinctValidator()
+    bridge = InstinctBridge(
+        db=db,
+        extractor=intinct_extractor,
+        validator=intinct_validator,
+        cfg=intinct_cfg,
+    )
+    sink = RewardSink(
+        db=db,
+        broker=broker,
+        scorer=Scorer(cfg),
+        brain=Brain(llm, cfg),
+        cfg=cfg,
+        instinct_hook=bridge.after_trade_closed,
+    )
+    return sink, bridge
 
 
 class _AbstainLLMAdapter:
@@ -857,7 +881,16 @@ def build_scheduler(
         broker, db, state, bar_service, enable_bar_service=config.enable_bar_service
     )
     debate_runner = _make_debate_runner(broker)
-    reward_sink = _build_reward_sink(broker, db)
+    reward_sink, instinct_bridge = _build_reward_sink(broker, db)
+    # Phase 16 D2.6: load any already-promoted instincts into ``longterm_rules``
+    # BEFORE the executor runs (Plan §6 D2.6). Empty tuple today — AK9-Erbe
+    # (``longterm_rules == ()`` ⇒ ``test_pre_trade_check_veto5_empty_rules_is_identity``
+    # stays green). On every close the bridge re-runs ``promote()`` + ``load_rules()``,
+    # but a promotion only takes effect after the next ``restart-services.sh restart``
+    # (the executor reads ``exec_cfg`` once at construction).
+    instinct_bridge.promote()
+    initial_longterm_rules = instinct_bridge.load_rules()
+    exec_cfg = dataclasses.replace(exec_cfg, longterm_rules=initial_longterm_rules)
     paper_engine = None
     paper_tracker = None
     if config.enable_paper_trades:

@@ -326,6 +326,32 @@ class Database:
         )
         return self._rows(cur)
 
+    def get_recent_rewards(self, n: int = 20) -> list[dict[str, Any]]:
+        """Phase 16 D2: newest ``reward_pts`` rows for the instinct extractor.
+
+        Mirrors :meth:`get_recent_lessons` exactly. The instinct extractor
+        (Phase 15 C2) takes the most recent reward history alongside the
+        most recent lessons to produce instincts; ``n`` defaults to 20
+        (Plan §6 D2.1).
+        """
+        cur = self.conn.execute(
+            "SELECT * FROM reward_pts ORDER BY id DESC LIMIT ?", (n,)
+        )
+        return self._rows(cur)
+
+    def count_closed_trades(self) -> int:
+        """Phase 16 D2: ``n_closed`` for ``promote_eligible`` (P10/P12 gate).
+
+        Counts every row in ``trade_outcomes`` with ``status='CLOSED'`` —
+        used by :func:`instinct.promotion.promote_eligible` to decide
+        whether the ``n_closed >= cfg.instinct_n_min`` gate opens. Read-only,
+        no side effects.
+        """
+        cur = self.conn.execute(
+            "SELECT COUNT(*) FROM trade_outcomes WHERE status = 'CLOSED'"
+        )
+        return int(cur.fetchone()[0])
+
     def get_recent_lessons_for_prompt(
         self,
         n: int = 5,

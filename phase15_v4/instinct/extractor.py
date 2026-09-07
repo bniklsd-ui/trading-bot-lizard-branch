@@ -171,7 +171,13 @@ def _build_instinct_prompt(
         "mit dem Feld \"instincts\" (Liste, max. 5 Einträge). Jeder Eintrag hat die "
         f"Felder trigger (string), domain (eines von: {domain_list}), "
         "confidence (0.0–1.0 oder null), evidence_trade_ids (Liste int), "
-        "contradictions_trade_ids (Liste int). KEINE weiteren Felder."
+        "contradictions_trade_ids (Liste int). "
+        "**``trigger`` MUSS die Form ``avoid BUY`` / ``avoid SELL`` / "
+        "``avoid BUY on <EPIC>`` / ``avoid SELL on <EPIC>`` haben "
+        "(EPIC = uppercase letters + digits + dots, z.B. ``IX.D.DAX.IFMM.IP``). "
+        "Alles, was nicht in dieses Mini-Grammatik-Schema passt, wird vom Compiler "
+        "verworfen (WARNING, kein Veto).** "
+        "KEINE weiteren Felder."
     )
 
     user_lines = [
@@ -196,7 +202,15 @@ def _build_instinct_prompt(
                 "items": {
                     "type": "object",
                     "properties": {
-                        "trigger": {"type": "string"},
+                        # Phase 16 D2.3: enforce the Mini-Grammatik at schema level
+                        # (Plan §1 P9). The pattern is the **same** regex the
+                        # compiler (compile.py:TRIGGER_RE) uses, so a trigger that
+                        # passes the schema is guaranteed to compile to a predicate;
+                        # a trigger that fails is structurally invalid for VETO 5.
+                        "trigger": {
+                            "type": "string",
+                            "pattern": r"^\s*avoid\s+(BUY|SELL)(?:\s+on\s+[A-Z0-9.]+)?\s*$",
+                        },
                         "domain": {
                             "type": "string",
                             "enum": list(DOMAINS),

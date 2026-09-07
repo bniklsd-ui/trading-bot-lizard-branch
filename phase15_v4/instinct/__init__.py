@@ -21,9 +21,17 @@ duck-typed ``_LLMClientLike`` Protocol — **never** imports ``research.LLMClien
 The wiring in Phase 15 (later step) builds the real client; tests use a fake.
 """
 
+from instinct.bridge import InstinctBridge
+from instinct.compile import (
+    TRIGGER_RE,
+    compile_rule,
+    compile_rules,
+    instinct_from_row,
+)
 from instinct.extractor import (
     InstinctExtractor,
     InstinctExtractionResult,
+    SingleShotInstinctExtractor,
 )
 from instinct.models import (
     DOMAINS,
@@ -43,11 +51,18 @@ __all__ = [
     "DOMAINS",
     "INSTINCT_STATUSES",
     "Instinct",
+    "InstinctBridge",
     "InstinctConfig",
     "InstinctExtractionResult",
     "InstinctExtractor",
+    "InstinctExtractionResult",
     "InstinctValidation",
     "InstinctValidator",
+    "SingleShotInstinctExtractor",
+    "TRIGGER_RE",
+    "compile_rule",
+    "compile_rules",
+    "instinct_from_row",
     "is_valid_domain",
     "is_valid_status",
     "promote_eligible",

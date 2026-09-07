@@ -167,6 +167,7 @@ class RewardSink:
         brain: Any,
         cfg: RewardConfig,
         confidence_provider: Callable[[], Any] | None = None,
+        instinct_hook: Callable[[int], None] | None = None,
     ) -> None:
         """Bind the collaborators.
 
@@ -178,6 +179,12 @@ class RewardSink:
             cfg: the reward config.
             confidence_provider: optional observe-only hook invoked best-effort after a
                 close; its result is logged, never written, never gates (Decision C).
+            instinct_hook: Phase 16 D2: optional callable invoked best-effort after a
+                close with the persisted ``trade_outcomes.id`` (int). Wires the
+                Promotion-Bridge (Phase 15 C2): extract → validate → promote. Never
+                raises — failures log CRITICAL and are swallowed (mirrors
+                ``confidence_provider`` discipline, Decision C). Default ``None`` =
+                P5 bit-identical + Phase 7 bit-identical + Phase 15 bit-identical.
         """
         self.db = db
         self.broker = broker
@@ -185,6 +192,7 @@ class RewardSink:
         self.brain = brain
         self.cfg = cfg
         self.confidence_provider = confidence_provider
+        self.instinct_hook = instinct_hook
         self._opened: dict[str, OpenedTrade] = {}
         # Retain the exact ClosedTrade per deal so a later reconcile (after IG history
         # lag clears) retries the *same* close — with its true exit status — not a
@@ -427,6 +435,18 @@ class RewardSink:
 
         # observe-only confidence (forward-compat; never gates — Decision C).
         self._observe_confidence(deal_id)
+
+        # Phase 16 D2: best-effort instinct extraction (Phase-15 Promotion-Bridge).
+        # Never raises — the close path stays safe (mirrors ``confidence_provider``).
+        # Trade stays CLOSED; instinct bookkeeping is a learning signal, not safety.
+        if self.instinct_hook is not None and trade_id is not None:
+            try:
+                self.instinct_hook(int(trade_id))
+            except Exception as exc:  # noqa: BLE001
+                logger.critical(
+                    "reward: instinct_hook raised for deal_id=%s: %s",
+                    deal_id, exc,
+                )
 
     @staticmethod
     def _reward_record(

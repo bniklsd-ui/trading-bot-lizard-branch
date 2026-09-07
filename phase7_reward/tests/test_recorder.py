@@ -28,7 +28,7 @@ def _now_iso() -> str:
 CFG = RewardConfig()
 
 
-def _sink(db, *, broker=None, brain=None, confidence_provider=None):
+def _sink(db, *, broker=None, brain=None, confidence_provider=None, instinct_hook=None):
     """Wire a RewardSink with the real Scorer and the given fakes."""
     return RewardSink(
         db=db,
@@ -37,6 +37,7 @@ def _sink(db, *, broker=None, brain=None, confidence_provider=None):
         brain=brain if brain is not None else FakeBrain(),
         cfg=CFG,
         confidence_provider=confidence_provider,
+        instinct_hook=instinct_hook,
     )
 
 
@@ -314,6 +315,48 @@ def test_raising_confidence_provider_does_not_break_close(make_opened, make_clos
     sink.on_trade_opened(make_opened())
     sink.on_trade_closed(make_closed())  # must not raise
     assert len(db.rewards) == 1  # the reward still got written
+
+
+# --- instinct_hook (Phase 16 D2.5) ----------------------------------------
+
+
+def test_instinct_hook_called_after_close_with_trade_id(make_opened, make_closed):
+    """Phase 16 D2.5: ``instinct_hook(trade_id)`` fires after a successful close,
+    with the persisted ``trade_outcomes.id`` int.
+    """
+    db = FakeDB()
+    seen: list[int] = []
+    sink = _sink(db, instinct_hook=seen.append)
+    sink.on_trade_opened(make_opened())
+    sink.on_trade_closed(make_closed())
+    assert len(seen) == 1
+    assert isinstance(seen[0], int)
+    assert seen[0] > 0
+
+
+def test_raising_instinct_hook_does_not_break_close(make_opened, make_closed):
+    """Phase 16 D2.5: a raising instinct_hook must not propagate (best-effort).
+
+    Mirrors the ``confidence_provider`` discipline (Decision C). Trade stays
+    CLOSED, reward remains written, no exception escapes.
+    """
+    def boom(_trade_id: int) -> None:
+        raise RuntimeError("bridge blew up")
+
+    db = FakeDB()
+    sink = _sink(db, instinct_hook=boom)
+    sink.on_trade_opened(make_opened())
+    sink.on_trade_closed(make_closed())  # must not raise
+    assert len(db.rewards) == 1  # the reward still got written
+
+
+def test_default_instinct_hook_is_none_and_safe(make_opened, make_closed):
+    """Phase 16 D2.5: no instinct_hook wired ⇒ bit-identical to pre-D2.5 behaviour."""
+    db = FakeDB()
+    sink = _sink(db)  # no instinct_hook passed
+    sink.on_trade_opened(make_opened())
+    sink.on_trade_closed(make_closed())  # must not raise
+    assert len(db.rewards) == 1
 
 
 # --- close-confirm P&L (lag-free; preferred over transaction history) ----------

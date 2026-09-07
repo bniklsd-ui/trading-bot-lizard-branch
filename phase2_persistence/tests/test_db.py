@@ -371,3 +371,44 @@ def test_trades_for_prompt_combined_returns_newest_n_survivors(db, base_trade):
     )
     # survivors are KEEP1/KEEP2/KEEP3; LIMIT 2 returns the newest two, id DESC.
     assert [t["deal_id"] for t in got] == ["KEEP3", "KEEP2"]
+
+
+# -- D2.1: get_recent_rewards + count_closed_trades --------------------------
+# Phase 16 D2: read methods for the Instinct-Extractor + the
+# promote_eligible gate (Plan §6 D2.1).
+
+
+def test_get_recent_rewards_returns_newest_first(db, base_trade):
+    """Phase 16 D2.1: ``get_recent_rewards(n)`` returns the ``n`` newest
+    ``reward_pts`` rows, id DESC. Mirrors ``get_recent_lessons``."""
+    tid = db.insert_trade(base_trade)
+    for score in (40.0, 50.0, 60.0):
+        db.insert_reward(tid, {"score_after": score, "win_loss": "BREAKEVEN"})
+    got = db.get_recent_rewards(n=2)
+    assert len(got) == 2
+    # newest first
+    assert got[0]["score_after"] == 60.0
+    assert got[1]["score_after"] == 50.0
+
+
+def test_get_recent_rewards_empty_db_returns_empty_list(db):
+    """Phase 16 D2.1: no rewards yet ⇒ ``[]``, not None, not a default."""
+    assert db.get_recent_rewards(n=20) == []
+
+
+def test_count_closed_trades_only_counts_status_closed(db, base_trade):
+    """Phase 16 D2.1: ``count_closed_trades()`` only counts ``status='CLOSED'``.
+    OPEN / CANCELLED don't qualify — only CLOSED trades
+    contribute to ``n_closed`` for the ``promote_eligible`` gate."""
+    open_trade = {**base_trade, "deal_id": "OPEN1", "status": "OPEN"}
+    cancelled = {**base_trade, "deal_id": "CAN1", "status": "CANCELLED"}
+    closed = {**base_trade, "deal_id": "C1", "status": "CLOSED"}
+    closed2 = {**base_trade, "deal_id": "C2", "status": "CLOSED"}
+    for t in (open_trade, cancelled, closed, closed2):
+        db.insert_trade(t)
+    assert db.count_closed_trades() == 2
+
+
+def test_count_closed_trades_empty_db_returns_zero(db):
+    """Phase 16 D2.1: no trades ⇒ ``0``."""
+    assert db.count_closed_trades() == 0
