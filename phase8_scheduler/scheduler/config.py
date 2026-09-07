@@ -181,18 +181,19 @@ class SchedulerConfig:
     # this session, plan §10.3/§14 drop-order #1.
     enable_context_persistence: bool = True
     enable_paper_trades: bool = True
-    enable_paper_debate: bool = False
+    # Phase 16 D1: ON by default; `--no-paper-debate` disables (Plan §6 D1).
+    enable_paper_debate: bool = True
     paper_debate_daily_cap: int = 3
 
     # --- Phase 11 (H1, 2026-08-01+): time-scheduled shadow pairs -----------------
     # Decouples paper-trade measurement from the collapsed research funnel
     # (phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md §5 H1 — two data-weeks died on the same
     # "everything hangs off REASON_DEBATE_ABSTAIN" coupling: 1 debate-abstain in 366
-    # cycles). Default OFF: real IG-allowance cost (~130-136 extra quote-calls/day at the
-    # 8-epic/30-min default), the Nikinger arms it consciously (mirrors
-    # enable_paper_debate's "default off" discipline). Requires enable_paper_trades — the
+    # cycles). Real IG-allowance cost (~130-136 extra quote-calls/day at the
+    # 8-epic/30-min default). Requires enable_paper_trades — the
     # wiring only builds the scheduler closure when both are True.
-    enable_shadow_schedule: bool = False
+    # Phase 16 D1: ON by default; `--no-shadow-schedule` disables (Plan §6 D1).
+    enable_shadow_schedule: bool = True
     shadow_schedule_interval_min: int = 30
 
     # --- Phase 12 (Datenfundament) Step 6: measurement heartbeat + divergence sampler ---
@@ -208,17 +209,15 @@ class SchedulerConfig:
     # (D12) into the existing `universe_refresher` closure — no new runner seam, it rides
     # the same pass. Unlike the heartbeat, this DOES spend real IG budget (3 points/epic/day,
     # ~120/week for ~8 'ok' epics — inside the plan's <1500/week target, but still new spend).
-    # Default OFF, same discipline as `enable_shadow_schedule`/`enable_paper_debate` — the
-    # Nikinger arms it consciously rather than it turning on silently under a Step-6 commit.
-    enable_divergence_sampler: bool = False
+    # Phase 16 D1: ON by default; `--no-divergence-sampler` disables (Plan §6 D1).
+    enable_divergence_sampler: bool = True
 
     # Phase 13 §6 B3: `enable_bar_stream` arms the LSBarRecorder-adjacent
-    # Lightstreamer candle subscription. Same discipline as
-    # `enable_shadow_schedule`: default OFF, the operator arms it consciously
-    # rather than it turning on silently. The recorder is a **measurement**
+    # Lightstreamer candle subscription. The recorder is a **measurement**
     # arm (writes candles to ``data/bars.sqlite``); the daemon is fully usable
     # without it.
-    enable_bar_stream: bool = False
+    # Phase 16 D1: ON by default; `--no-bar-stream` disables (Plan §6 D1).
+    enable_bar_stream: bool = True
 
     # --- paths (gitignored data/ tree) ---
     live_db_path: str = "data/trading_bot.sqlite"          # the real P2 DB

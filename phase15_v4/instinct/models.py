@@ -160,15 +160,17 @@ class InstinctConfig:
       ``RewardConfig.n_min = 10`` which is the Wilson confidence floor —
       §9.6 der Plan-Session bestätigt: ``RewardConfig.n_min`` wird NUR in
       ``confidence.py`` + Tests gelesen, ein Conf laten ist ausgeschlossen).
-    - ``enable_instinct_promotion`` (P10): master switch. Default ``False``.
-      Even with ``n_closed >= instinct_n_min``, no promotion happens while
-      this is False. The only way to flip it is a Nikinger-authorized config
-      change — same discipline as ``enable_shadow_schedule``,
-      ``enable_divergence_sampler``, ``enable_paper_debate``.
+    - ``enable_instinct_promotion``: master switch. The real gates are
+      ``instinct_n_min`` (today 50) and the deterministic validator — this
+      switch only suppresses the **Promotion-Bridge** path. Phase 16 D1:
+      default ``True`` (Plan §1 P5 supersedes Phase-15-P10). The validator
+      is code, not AI — Hard Rule 3 stays satisfied (no AI→VETO path).
     """
 
     instinct_n_min: int = 50
-    enable_instinct_promotion: bool = False
+    # Phase 16 D1: ON by default; the Promotion-Bridge wires the close-seam
+    # of ``RewardSink`` through to ``promote_eligible`` (Plan §6 D2).
+    enable_instinct_promotion: bool = True
 
     def __post_init__(self) -> None:
         """Reject negative or zero ``instinct_n_min`` — would make the gate trivial."""
@@ -186,7 +188,8 @@ class InstinctConfig:
         """
         return InstinctConfig(
             instinct_n_min=int(record.get("instinct_n_min", 50)),
+            # Phase 16 D1: default True; ``from_dict`` mirrors the dataclass default.
             enable_instinct_promotion=bool(
-                record.get("enable_instinct_promotion", False)
+                record.get("enable_instinct_promotion", True)
             ),
         )

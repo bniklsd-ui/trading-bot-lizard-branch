@@ -95,39 +95,38 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "ON (archive-first, yFinance-first/IG-fallback chain).",
     )
     parser.add_argument(
-        "--enable-paper-debate",
+        "--no-paper-debate",
         action="store_true",
-        help="enable the Council-Paper-Call (Phase 10 / V3 §10.3): up to "
+        help="disable the Council-Paper-Call (Phase 10 / V3 §10.3): up to "
         "paper_debate_daily_cap forced BUY/SELL paper picks per day on debate-abstain "
-        "cycles — output lands only in paper_trades, never an order. Default OFF.",
+        "cycles. Phase 16 D1: arm is ON by default (Plan §6 D1, P4); "
+        "--no-paper-debate disables it (e.g. for `--budget-isolation` runs).",
     )
     parser.add_argument(
-        "--enable-shadow-schedule",
+        "--no-shadow-schedule",
         action="store_true",
-        help="enable Phase 11 (H1) time-scheduled Both-Sides-Shadow pairs: a paper pair "
-        "per active epic every shadow_schedule_interval_min (default 30), fully decoupled "
-        "from REASON_DEBATE_ABSTAIN — output lands only in paper_trades, never an order. "
-        "Requires paper trades to be enabled (on by default). Real IG-allowance cost "
-        "(~130-136 extra quote-calls/day at the default interval/universe size). "
-        "Default OFF.",
+        help="disable Phase 11 (H1) time-scheduled Both-Sides-Shadow pairs: a paper pair "
+        "per active epic every shadow_schedule_interval_min (default 30). Real IG-allowance "
+        "cost (~130-136 extra quote-calls/day at the default interval/universe size). "
+        "Requires paper trades to be enabled (on by default). Phase 16 D1: ON by default; "
+        "--no-shadow-schedule disables.",
     )
     parser.add_argument(
-        "--enable-divergence-sampler",
+        "--no-divergence-sampler",
         action="store_true",
-        help="enable the Phase 12 (Datenfundament, Step 6 / D12) once-per-epic-per-day "
-        "IG-vs-yFinance divergence check: a persistently drifting instrument is demoted "
-        "to data_source_status='mismatch' and drops out of measurable_universe(). Real "
-        "IG-allowance cost (~3 points/epic/day, ~120/week at the default universe size). "
-        "Default OFF (der Nikinger scharfschaltet bewusst).",
+        help="disable the Phase 12 (Datenfundament, Step 6 / D12) once-per-epic-per-day "
+        "IG-vs-yFinance divergence check. Real IG-allowance cost (~3 points/epic/day, "
+        "~120/week at the default universe size). Phase 16 D1: ON by default; "
+        "--no-divergence-sampler disables.",
     )
     parser.add_argument(
-        "--enable-bar-stream",
+        "--no-bar-stream",
         action="store_true",
-        help="enable Phase 13 §6 B3 LSBarRecorder — the Lightstreamer candle "
+        help="disable Phase 13 §6 B3 LSBarRecorder — the Lightstreamer candle "
         "subscription (CHART:{epic}:1MINUTE) that writes S1 candles to "
         "``data/bars.sqlite`` with source='ls' + tick_count. Costs **0** IG "
         "points (Lightstreamer-Kontingent, not the historical-data-allowance). "
-        "Default OFF (der Nikinger scharfschaltet bewusst).",
+        "Phase 16 D1: ON by default; --no-bar-stream disables.",
     )
     parser.add_argument(
         "--no-measurement-heartbeat",
@@ -161,10 +160,11 @@ def config_from_args(args: argparse.Namespace) -> SchedulerConfig:
         max_trades_per_day=args.max_trades,
         cycle_interval_min=args.cycle_interval_min,
         max_consecutive_failures=args.max_consecutive_failures,
-        enable_paper_debate=args.enable_paper_debate,
-        enable_shadow_schedule=args.enable_shadow_schedule,
-        enable_divergence_sampler=args.enable_divergence_sampler,
-        enable_bar_stream=args.enable_bar_stream,
+        # Phase 16 D1: arms default ON, --no-* flips OFF.
+        enable_paper_debate=not args.no_paper_debate,
+        enable_shadow_schedule=not args.no_shadow_schedule,
+        enable_divergence_sampler=not args.no_divergence_sampler,
+        enable_bar_stream=not args.no_bar_stream,
         enable_measurement_heartbeat=not args.no_measurement_heartbeat,
     )
 

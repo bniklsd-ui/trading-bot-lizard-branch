@@ -189,9 +189,11 @@ def test_promotion_today_state_is_closed() -> None:
     returns ``[]`` — the gating the Instinct-ECC harness was built to do.
 
     This test is redundant with ``test_promotion_refuses_below_n_min`` above
-    but it makes the today-state property readable in isolation."""
-    cfg = InstinctConfig()  # defaults: n_min=50, flag=False
+    but it makes the today-state property readable in isolation.
+    Phase 16 D1: ``enable_instinct_promotion`` default is now True (Plan §1 P5);
+    n_min=50 still gates at n_closed=8 ⇒ no promotion."""
+    cfg = InstinctConfig()  # defaults: n_min=50, flag=True (Phase 16 D1)
     assert cfg.instinct_n_min == 50
-    assert cfg.enable_instinct_promotion is False
+    assert cfg.enable_instinct_promotion is True
     rows = [_instinct("validated") for _ in range(5)]
     assert promote_eligible(rows, n_closed=8, cfg=cfg) == []

@@ -172,10 +172,11 @@ def test_instinct_evidence_is_tuple_not_list() -> None:
 
 
 def test_instinct_config_defaults() -> None:
-    """Defaults: ``instinct_n_min=50``, ``enable_instinct_promotion=False`` (P10/P12)."""
+    """Defaults: ``instinct_n_min=50``, ``enable_instinct_promotion=True``
+    (Phase 16 D1: ON by default, Plan §1 P5 supersedes Phase-15-P10)."""
     cfg = InstinctConfig()
     assert cfg.instinct_n_min == 50
-    assert cfg.enable_instinct_promotion is False
+    assert cfg.enable_instinct_promotion is True
 
 
 def test_instinct_config_rejects_non_positive_n_min() -> None:
@@ -193,10 +194,11 @@ def test_instinct_config_is_frozen() -> None:
 
 
 def test_instinct_config_from_dict_uses_defaults_when_keys_missing() -> None:
-    """``from_dict`` is defensive: missing keys fall back to the dataclass defaults."""
+    """``from_dict`` is defensive: missing keys fall back to the dataclass defaults.
+    Phase 16 D1: default for ``enable_instinct_promotion`` is now ``True``."""
     cfg = InstinctConfig.from_dict({})
     assert cfg.instinct_n_min == 50
-    assert cfg.enable_instinct_promotion is False
+    assert cfg.enable_instinct_promotion is True
 
 
 def test_instinct_config_from_dict_reads_provided_keys() -> None:

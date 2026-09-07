@@ -55,21 +55,25 @@ def test_defaults_match_locked_concept_values() -> None:
     assert cfg.reflect_daily_cap == 10
 
     # Phase 10 (V3) market_context + paper-trades (Block B) — context persistence + Both-
-    # Sides-Shadow paper trades on by default; Council-Paper-Call (debate) off (deferred)
+    # Sides-Shadow paper trades on by default. Phase 16 D1 flips Council-Paper-Call ON
+    # by default (--no-paper-debate disables, Plan §1 P4 + §6 D1).
     assert cfg.enable_context_persistence is True
     assert cfg.enable_paper_trades is True
-    assert cfg.enable_paper_debate is False
+    assert cfg.enable_paper_debate is True
     assert cfg.paper_debate_daily_cap == 3
 
-    # Phase 11 (H1) time-scheduled shadow pairs — off by default (real IG-allowance cost)
-    assert cfg.enable_shadow_schedule is False
+    # Phase 11 (H1) time-scheduled shadow pairs — Phase 16 D1 ON by default
+    # (--no-shadow-schedule disables; real IG-allowance cost).
+    assert cfg.enable_shadow_schedule is True
     assert cfg.shadow_schedule_interval_min == 30
 
     # Phase 12 (Datenfundament) Step 6 — measurement heartbeat + divergence sampler on
-    # by default (no new IG spend of its own beyond the budgeted sampler probe)
+    # by default (no new IG spend of its own beyond the budgeted sampler probe).
+    # Phase 16 D1: divergence sampler now ON by default too (--no-divergence-sampler
+    # disables).
     assert cfg.enable_measurement_heartbeat is True
     assert cfg.health_check_interval_min == 1200
-    assert cfg.enable_divergence_sampler is False  # spends real IG budget — Nikinger arms it
+    assert cfg.enable_divergence_sampler is True
 
     # paths (gitignored data/ tree)
     assert cfg.live_db_path == "data/trading_bot.sqlite"
