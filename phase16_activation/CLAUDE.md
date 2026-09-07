@@ -10,7 +10,7 @@ down:
   - ../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md   # 📕 A6 hängt an Migration 008
   - ../phase5_execution/CLAUDE.md                 # B3-Block → Plan D3
   - ./SESSIONS_ARCHIVE.md                         # 📦 Session-Block-Historie (newest-first, A-0 angelegt)
-updated: 2026-09-05 (+ Exec-Session #4 → Archiv; Exec-Session #5 startet D + E; Phasenkopf trägt Exec-#5)
+updated: 2026-09-07 (+ Exec-Session #5 → Archiv; Exec-Session #6 startet Block D; Phasenkopf trägt Exec-#6)
 ---
 
 # Phase 16 — Freischaltung
@@ -70,64 +70,70 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 | *(Cross-Phase)* `phase1_broker_wrapper/scripts/probe_market_margin.py` | Operator-Live-Probe für B3 | D3.0 |
 
 ---
-## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #5, Block C Steps C2+C3+C5 endgültig in code, Σ 1864 grün = 1862 + 2 neue Tests (1× P4 + 1× P3), Pause auf Nikinger-Auftrag)
+## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #6, Block E Step E1 Vorregistrierung endgültig in docs, Σ 1864 grün unverändert [docs-only], Pause auf Nikinger-Auftrag)
 
-> **Auftrag:** Nikinger-Chat 2026-09-05 (Phase-16-Exec-Folge): „Block C noch offen: C2 + C3 + C5. E1 (Vorregistrierung) muss vor Block-D-Operator-Restart committet sein — kann jederzeit in einer Mini-Session passieren." — **Block C vollständig abgeschlossen** (Plan §6 C2 + C3 + C5: C2 = Prompt-Satz, C3 = Budget 300k, C5 = Breaker-Semantik); E1 + Block D + Block E bleiben offen für nachfolgende Sessions.
+> **Auftrag:** Nikinger-Chat 2026-09-05 (Phase-16-Exec-Folge, „letzten sesion") am 2026-09-07 fortgesetzt: „Next step, atomically, then ask nikinger." — **Block E Step E1** (Plan §6 E1, P11) endgültig in docs. Block D (D1/D1.2/D2/D3) + Block E (E2/E3/E4) bleiben für nachfolgende Sessions.
 >
-> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block C Steps C2 (S. 502-512) + C3 (S. 515-522) + C5 (S. 531-555) · §1 P2 (Prompt-Satz) + P3 (Budget-Flip + Caching gestrichen mit Begründung) + §1 P18 (P3 Runde 2 freigegeben) · §4 Cross-Phase-Tabelle (P4 + P8 + P3 freigegeben) · §7 AK7+AK8+AK17.
+> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block E Step E1 (S. 760–769) · §1 P11 (Vorregistrierung vor Start, danach nicht geändert) + P17 (erlaubte Operator-Ereignisse) + P4/P5 (Arme ON + Promotion-Default) + P6 (Rescue AUS) + P7 (Universe ohne Wochenend) · §7 AK13 (Commit-Zeit < Start-Zeile) + AK15 (7 PASS-Kriterien) + AK16 (Closeout) · §11 Operator-Aktionen #5/#6/#7 · §13 Opus-Review #5 (Supervision), #6 (WebUI-Aliveness unmessbar), #8 (Bridge unerreichbar im Test), #9 (Budget-Datei-Korruption).
 >
-> Ausführungs-Scope: **3 Atomic Commits** (`ac39ee4` C2+C3 kombiniert · `c9a34e0` C5 · dieser Final-Commit Σ-Sweep+Rotation). Push-Freigabe (P18 / Fable-5.1-Handover) gilt weiterhin; diese Session pusht **nicht** eigenmächtig (Nikinger entscheidet am Session-Ende).
+> Ausführungs-Scope: **2 Atomic Commits** (`af99a2c` E1 Vorregistrierung + INDEX-Zeile · dieser Final-Commit Session-Rotation #5→#6). Push-Freigabe (P18) gilt weiterhin; diese Session pusht **nicht** eigenmächtig.
 
 ### Completed
 
-**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #5, 2026-09-05):**
-- `git log origin/main..HEAD --oneline` → 4 Commits (`a329180` Exec-#4-Σ-Verifikation, `acc941f` C1, `e26ff06` Session-Rotation #3→#4, `6ee2620` B2-Confirmed).
-- `git status` → working tree clean.
-- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (vor Mini-Rotation: Phasenkopf 1 Block Exec-#4, Archiv 3 Blocks).
-- §9 Source-Pins verbatim bestätigt: `phase4_research/research/prompt.py:46` ABSTAIN-Anker + `scheduler/config.py:134` + `scheduler/run.py:62` + `external_data/fetcher.py:407-411` (jetzt 411-419 nach C5).
-- §9 Greps ausgeführt: kein P4-Pin auf „When in doubt" / „Recent trades (newest" außerhalb der C1-Test-Datei (Plan §9 #2 bestätigt); alle P8-`200_000`-Pins identifiziert (`config.py:134`, `run.py:62`, `live_test.py:60`, `test_run.py:20,52`, `test_config.py:39`, `test_webui.py:338-339,348` — 7 Stellen, jetzt alle auf 300_000 migriert); P3-Circuit-Tests-Liste: `test_circuit_opens_after_repeated_get_history_failures` (umbenannt-Pfad via `always_rate_limit`-Fixture), `test_circuit_success_after_failures_resets` (bleibt unverändert), `test_default_circuit_is_constructed_when_omitted` (bleibt unverändert).
+**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #6, 2026-09-07):**
+- `git log origin/main..HEAD --oneline` → leer (HEAD = `b2a64df` = origin/main; 7 Session-#5-Commits sind inzwischen gepusht).
+- `git status` → working tree clean bis auf untracked `data/`.
+- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (vor dieser Rotation: Phasenkopf 1 Block Exec-#5, Archiv 4 Blocks).
+- §6 E1-Verbatim-Bestätigung: 9 Konfig-Werte (Tage/Account/max_trades/daily_loss_cap/Token-Budget/4 Arme/Universe/Rescue/Promotion-Bridge), 7 PASS-Kriterien mit append-only Messquellen, 4 erlaubte Operator-Ereignisse (P17), 6 Watch-Items, Operator-Regel, Aktiv-Block.
 
-**1. Block-C Steps C2+C3+C5 in 2 atomaren Commits:**
+**1. Block-E Step E1 in 1 atomaren Commit:**
 
 | Step | Commit | Scope | Σ-Delta | Akzeptanz |
 |---|---|---|---|---|
-| **C2** Prompt-Satz „context, not a veto" + **C3** Budget 200k → 300k | `ac39ee4` phase16+phase4+phase8: code | **C2:** `phase4_research/research/prompt.py` neuer System-Prompt-Satz nach ABSTAIN-Zeile („Recent trades are context for lessons and sizing, NOT a veto…") + 1 Substring-Pin-Test `test_system_prompt_names_history_as_context_not_veto` in `tests/test_prompt.py`. **C3:** `scheduler/config.py` Default `daily_token_budget: 200_000 → 300_000` + Doc-String (Begründung „exhausted daily at ~15:48") + CLI-Default in `scheduler/run.py:62` + Help-Text-Update + `live_test.py:60` (Operator-Tool) + 5 Test-Pins (`test_run.py:20,52`, `test_config.py:39`, `test_webui.py:338-339,348`) inkl. Prozent-Pin 0.6 (war 0.9, 100\*1800/300000). | P4 +1 (161→162), P8 ±0 (253, default flip + Test-Parität) | AK7 ✅ (C2-Satz im System-Prompt) + AK8 ✅ (Budget 300k in Config + CLI + alle Test-Pins) |
-| **C5** Breaker-Semantik | `c9a34e0` phase16+phase3: code | `external_data/fetcher.py` neuer zweigliedriger `except` (RateLimitError record_failure + raise; DataUnavailableError raise-only) — leerer Frame ist Datenurteil, kein Ausfall. `tests/test_circuit.py` lokaler `YFRateLimitError` (Mirror `test_fetcher.py`-Pattern) + neue `always_rate_limit`-Fixture + bestehender `test_circuit_opens_after_repeated_get_history_failures` umgebaut auf Rate-Limit-Pfad (Circuit-Öffnung weiter gepinnt) + neuer `test_empty_frame_does_not_open_circuit` (4× empty-frame ⇒ circuit bleibt zu, 5. Call versucht erneut Netz). | P3 +1 (104→105) | AK17 ✅ (empty frame öffnet Circuit nicht; RateLimitError öffnet weiter) |
+| **E1** Vorregistrierung | `af99a2c` phase16: docs | **NEU** `phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION.md` (9 vorregistrierte Werte + 7 PASS-Kriterien AK15 mit append-only Messquellen + 4 erlaubte Operator-Ereignisse P17 + 6 Watch-Items + Operator-Regel + Aktiv-Block vom Operator vor E3-Restart) + INDEX-Zeile in `docs/INDEX.md` (Phase-16-Block, zwischen SESSIONS_ARCHIVE und Plan-Link). | 0 (docs-only) | AK13 (Commit-Zeit < Start-Zeile ist die Nikinger-Pflicht bei E3) + AK15-Framework (Kriterien vorregistriert, Messquellen ausschließlich append-only, Opus-Review §13 #6 eingehalten: keine `*_state.json`, stattdessen `*.log` + `.jsonl` + SQLite-Tabellen) |
 
-**2. Σ-Sweep nach Block C (verifiziert 2026-09-05):** **1864 grün (= 1862 + 2 neue Tests).** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/root = 95+78+105+162+185+76+166+253+95+165+145+82+61+91+105 = **1864** ✅ exakt Plan-Akzeptanz AK2 erfüllt. P15-Sweep mit `PYTHONPATH=.../phase15_v4` (Phase-eigenes `instinct`-Package, Pre-existing Quirk aus Phase 15) — 91 unverändert.
+**2. Σ-Sweep nach E1 (verifiziert 2026-09-07):** **1864 grün unverändert** (root `tests/` = 105 nachgemessen, alle anderen Phasen unangetastet). Plan-Akzeptanz AK2 (Σ ≥ Vorblock) trivial erfüllt.
 
-**3. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach jedem Commit.
+**3. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach Commit + nach Rotation.
 
 **4. Git-Stand am Session-Ende:**
 - HEAD = dieser Final-Commit.
-- Commits lokal ahead of `origin/main` = 4 (vorherige, alle Block B/C) + 3 (diese Session: `ac39ee4` C2+C3, `c9a34e0` C5, dieser Final-Commit) = **7 Commits ahead**.
+- Commits lokal ahead of `origin/main` = 0 (E1 ist die erste Session nach dem letzten Push) + 2 (diese Session: `af99a2c` E1, dieser Final-Commit) = **2 Commits ahead**.
 - Working tree clean nach jedem Commit (außer untracked `data/`, gitignored).
 
 ### Findings
 
-🟢 **Block C vollständig abgeschlossen** (C1 + C2 + C3 + C5 ✅): L1 (Window) + L2 (Budget) + L9 (Breaker) strukturell zu. **Cross-Phase-Touch-Disziplin eingehalten:** Block C Steps C2+C3+C5 berühren **P4** (C2 = prompt.py + test_prompt.py) + **P8** (C3 = config.py + run.py + 3 Test-Dateien + live_test.py) + **P3** (C5 = fetcher.py + test_circuit.py). Keine P1/P2/P5/P7/P9/P15-Touches.
+🟢 **E1 erfüllt P11 wörtlich:** Vorregistrierung committet **vor** dem E3-Restart (AK13: Commit-Zeit < Start-Zeile ist strukturell erfüllbar, weil die Vorregistrierung als Doku-Only **jetzt** im Repo steht und der Operator-Restart frühestens nach Block D erfolgen kann). Nach dem Start **kein** Edit mehr an den 9 Werten oder 7 Kriterien — Korrekturen nur als neues, datiertes, supersedendes Dokument (M1-Disziplin, analog `META_M1_PREREGISTRATION.md`).
 
-🟢 **C2 = semantischer Begleiter zu C1:** C1 hat das Zeitfenster gesetzt (mechanisch), C2 benennt die Rolle im System-Prompt. Zusammen verhindern sie, dass eine Pechsträhne nach dem 7. Trade wieder zu einem absorbierenden „5–6 von 7 Verluste → ABSTAIN"-Zustand führt. Substring-Pin ist minimal (zwei Substrings, keine Prompt-Regression möglich).
+🟢 **Aktiv-Block = Eintragung, kein Edit:** der einzige Operator-Touch am Dokument ist die `## Aktiv-Block`-Tabelle (Start-Zeitstempel + Ende + Restart-Befehl + Anwesenheits-Bestätigung), explizit als „Eintragung am E3-Tag **vor** der ersten Start-Zeile" definiert. Das ist **vor** dem Test und **nicht** „nach dem Lauf geschrieben" — P11-Spirit gewahrt.
 
-🟢 **C3 = rein numerischer Flip, Test-Parität gehalten:** P8 253 unverändert. Alle Stellen explizit migriert (Plan §9 #3 grep-verifiziert: 7 Stellen mit `200_000` → `300_000`, übrige Treffer nur in Kommentaren wie „was 200000"). Doc-String dokumentiert explizit, **warum kein `cache_system=True`** (Plan §1 P3: Meter zählt Cache-Reads voll + Sonnet-4.6-Prefix-Mindestlänge 1024 Tokens, System-Prompt ~250 → erwartet 0 Saving). Nikinger-Antwort Runde 2 bestätigt.
+🟢 **append-only Quellen konsequent:** AK15 misst ausschließlich aus `*.log` + `*.jsonl` + SQLite-Tabellen (Trade-Tabelle, `bars.sqlite`). `*_state.json` sind explizit ausgeschlossen (Opus-Review §13 #6: in-place-Überschreibung, beweist nichts). WebUI-Aliveness ist ehrlich als Operator-Sichtung vorregistriert, nicht als append-only Beleg.
 
-🟢 **C5 = minimal-invasiver Eingriff, fail-open Semantik bewahrt:** `DataUnavailableError` re-raised unverändert (Caller sieht weiterhin leeren Frame), `RateLimitError` öffnet Circuit weiterhin. Vorher locked-out 09:05-Phase pro Ticker für 15 min bei Yahoo-Datenleck, jetzt versucht jeder Cycle erneut (3 interne Retries à ~1 s — akzeptabel). Test `test_circuit_opens_after_repeated_get_history_failures` umgebaut: nicht gelöscht (würde Coverage der Circuit-Öffnungs-Mechanik verlieren), sondern auf `always_rate_limit`-Fixture migriert (RateLimitError ist der einzige verbleibende Auslöser).
+🟢 **PASS-Kriterien messen Autonomie, nicht Profit:** Kriterium 3 zählt nur ≥ 5 autonome CLOSED-Trades (nicht Win-Rate, nicht P&L). P&L ist explizit aus dem Test ausgeschlossen („Was diese Vorregistrierung *nicht* macht").
 
-🟡 **P15-Σ-Quirk dokumentiert:** `phase15_v4/tests/test_instinct_*.py` brauchen `PYTHONPATH=/home/trading-bot/trading-bot/phase15_v4` (Phase-eigenes `instinct`-Package, nicht im venv editable installiert). 4 Errors bei normalem `pytest`-Aufruf sind erwartet (Pre-existing, identisch zum Stand vor dieser Session) — Phase-15-Σ bleibt 91.
+🟡 **Kriterium 7 (Caps unverändert) ist eine kleine Schwäche:** es pinnt die Start-Log-Zeile auf exakte Strings. Wenn der Scheduler-Start-Log-Text sich minimal ändert (z.B. Float-Format `1800.0` → `1800`), bricht das Grep-Pattern. Mitigation: das ist `daily_loss_cap=1800.0` mit `.0`-Suffix (Python-Float-Default-Repr), die Wahrscheinlichkeit einer Änderung ohne Phase-17-Skript ist gering. Beim E3-Runbook-Schritt nachmessen + ggf. das Pin-Muster schärfen — bewusst NICHT jetzt (würde M1-Disziplin verletzen: kein Vorab-Wissen nach dem ersten Log-Blick).
 
-🟡 **C4 (Research-Ökonomie Doku-Only, Plan §6 C4) wurde in dieser Session NICHT separat committet:** die Begründung „Quotes im User-Prompt variieren jede Runde ⇒ Dedupe nicht möglich → YAGNI mit Begründung" ist im Phasenkopf (Findings oben, Block-Tabelle unten) bereits dokumentiert. Falls Nikinger einen expliziten Doku-Commit fordert, kann das nachgeholt werden — Code-Touch = 0.
+🟡 **Kriterium 2 „Dienste pro Handelstag aktiv"** ist eine 3+1-Regel (3 automatische append-only Belege + 1 Operator-Sichtung WebUI). Die Operator-Sichtung ist kein technisches PASS, sondern eine Selbstverpflichtung — wenn Nikinger die WebUI nicht aktiv prüft, gilt Kriterium 2 als „nicht erfüllt" unabhängig von der Realität. Bewusst so vorregistriert: WebUI-Aliveness ist nicht anders belegbar (Opus-Review §13 #6).
 
-🟡 **Bot bleibt aus:** B2 (Schema-Apply) ist gelaufen, A-5 (Push) ist gelaufen, aber der Bot wurde noch nicht neu gestartet (Plan §6 B2-Fußnote: „Restart erst nach Block D"). C1+C2+C3+C5 wirken beim nächsten Restart sofort (C3 = CLI-Default, C1/C2 = Research-Kontext-Aufbau, C5 = yF-Breaker-Semantik). E1 (Vorregistrierung) zwingend vor Block-D-Operator-Restart.
+🟡 **Watch-Item W6 (`min_evidence` vs. Trade-Zahl)** erwartet n≈10–20 Trades ≪ `instinct_n_min = 50` → VETO 5 bleibt No-Op. Das ist **kein** PASS-Verletzung, sondern per Plan §13 #8 erwartetes Verhalten (Bridge lebt, ist aber unter der Schwelle). Beim Closeout wird die tatsächliche n-Zahl als Befund geführt.
+
+🟢 **Cross-Phase-Disziplin:** E1 berührt **keinen** Cross-Phase-Code (nur Phase-16-Doc + INDEX-Eintrag). P1/P2/P3/P4/P5/P7/P8/P9/P15 alle unangetastet.
 
 ### Open questions / blockers
 
-- Keine. Block C ✅ vollständig (C1 + C2 + C3 + C5). L1/L2/L9 strukturell zu. Bot bleibt aus bis Block D + Operator-Restart.
+- Keine. E1 ✅ vollständig. AK13 (Commit-Zeit < Start-Zeile) hängt jetzt nur noch an der **Reihenfolge der Operator-Aktionen** beim E3-Restart (zuerst D1+D2 fertig bauen, dann E3-Restart ausführen, dann Vorregistrierung bleibt unangetastet).
 
 ### Next (für die Folgesession)
 
-- **E1 (Vorregistrierung)** (Plan §6 E1, P11): `phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION.md` (📕, NEU) — Start-/Enddatum (10 Handelstage), Konfiguration (Demo, max_trades 5, daily_loss_cap 1800, Budget 300k, alle vier Arme ON, Universe ohne Wochenend), PASS-Kriterien AK15 (§7 E2) mit je einer append-only Messquelle, erlaubte Operator-Ereignisse (P17: Backoff-KILL einmal, Reboot = Intervention), Watch-Items. **Muss vor Block-D-Operator-Restart committet sein.**
-- **Block D — Freischaltung** (Plan §6 D1..D3): D1 = Defaults flippen + `--no-*`-Schalter (P4/P5/P8/P15) · D1.2 = Bar-Stream-Token-Wrapper (P8, Opus-Befund #2) · D2 = Promotion-Bridge + Prädikat-Compiler (P2/P7/P8/P15) · D3 = Margin-Headroom (P1/P5, Operator-Probe D3.0 zuerst).
-- **Block E — 2-Wochen-Autonomie-Test** (Plan §6 E1..E4): nach D + Operator-Restart. E2 = `scripts/autonomy_report.py` (deterministisch, read-only, mode=ro) + Tests · E3 = Runbook Start (Operator) · E4 = Tagesroutine + Closeout-Handover.
+- **Block D — Freischaltung** (Plan §6 D1..D3, nach E1 freigegeben):
+  - **D1** = Defaults flippen + `--no-*`-Schalter (P4/P5/P8/P15, AK5) — `SchedulerConfig` Defaults `enable_* = True` + `config_from_args` Mirror + `--no-*`-Flags + Entfernung der `--enable-*`-Flags + Help-Text-Update. ~5 Tests.
+  - **D1.2** = Bar-Stream-Token-Wrapper (P8 only, Opus-Befund #2, AK5b) — Wrapper-Klasse die `restart()` korrekt mit aktuellen Broker-Tokens baut, damit der Arm nach IG-Token-Rotation nicht stirbt. 2 Tests.
+  - **D2** = Promotion-Bridge + Prädikat-Compiler (L6, P2/P7/P8/P15, AK10) — Extractor-Hook am Close-Seam von `RewardSink` → Validator → DB; Promotion beim Start + nach jedem Close; Prädikat-Compiler (Mini-Grammatik `avoid <BUY\|SELL>[ on <EPIC>]`). Cross-Phase Phase 15 + Phase 5 + Phase 7 + Phase 2 + Phase 8. ~10 Tests.
+  - **D3** = Margin-Headroom B3 (L7, P1/P5, AK11) — **erst** Operator-Live-Probe `probe_market_margin.py` für 3 Epics (Demo), **dann** Code in P5 Sizing-Grenzfall. ~3 Tests.
+- **Block E — 2-Wochen-Test** (nach D + Operator-Restart):
+  - **E2** = `scripts/autonomy_report.py` (deterministisch, read-only, mode=ro) + 5 Tests (Tagesbericht + Summary PASS/FAIL).
+  - **E3** = Runbook Start (Operator, restart-services.sh start + Day-0-Checks).
+  - **E4** = Tagesroutine (täglich `--day`-Report) + Closeout-Handover nach Tag 10.
 
 **Block-Status nach dieser Session (endgültig):**
 
@@ -135,8 +141,9 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 |---|---|
 | A (Haushalt) | ✅ A-0..A-4 + A-5 Push (Sessions #1-#3) |
 | B (Substrat) | ✅ B1+B3 code + B2 Operator-Apply + A-5 Push (Session #3) |
-| C (Research-Loop) | ✅ **C1+C2+C3+C5 endgültig in code**; C4 = Doku-Only, im Phasenkopf dokumentiert |
-| D (Freischaltung) | ⏳ nach E1 (Vorregistrierung) |
-| E (2-Wochen-Test) | ⏳ nach D + Operator-Restart |
+| C (Research-Loop) | ✅ C1+C2+C3+C5 endgültig in code; C4 = Doku-Only (Sessions #4-#5) |
+| **E (Autonomie-Test, Vorregistrierung)** | ✅ **E1 endgültig in docs** (diese Session) |
+| D (Freischaltung) | ⏳ nach E1 (Vorregistrierung) — kann jetzt starten |
+| E (Autonomie-Test, Rest) | ⏳ E2/E3/E4 nach D + Operator-Restart |
 
-**Push-Status dieser Session:** **0 Commits gepusht**, 3 Commits pending (C2+C3 + C5 + Final-Sweep) ahead of `origin/main` (gesamt: **7 Commits lokal ahead nach dieser Session**, Fable-5.1-Push-Freigabe gilt weiterhin).
+**Push-Status dieser Session:** **0 Commits gepusht**, 2 Commits pending (E1 + Final-Rotation) ahead of `origin/main`.
