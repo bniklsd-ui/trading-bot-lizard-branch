@@ -11,17 +11,73 @@ Plan-Session-Block trägt bewusst **keine** `Session #N`-Nummer im Heading (Phas
 `_max_session_num` returnt `None`; für die erste Exec-Session (`head_max == 1`) ist das
 Archiv-Max `None` korrekt (check_archive_sequence, Z. 134-138).
 
-Stand nach Exec-Session #10 (2026-09-07): Archiv trägt **10** Einträge — `#9` (Block D
-D3.0 Probe-Skript, Σ 1909, wartete auf Nikinger-Probe) + `#8` (Block D D1.2 Wrapper, Σ 1909,
-P8 only) + `#7` (Block D D1+D2, Σ 1907, zwischenzeitlich gepusht) + `#6` (Block E E1
-Vorregistrierung, Σ 1864 docs-only) + `#5` (Block C C2+C3+C5, Σ 1864) + `#4` (Block C C1,
-Σ 1862) + `#3` (Block B B1+B3 + B2 Operator-Apply + A-5-Push, Σ 1856) + `#2` (Block A
-endgültig in code) + `#1` (Block A A-0) + Plan-Session. Phasenkopf trägt genau **1** Block
-(Exec-Session #10, Block D Steps D3.1+D3.2 endgültig in code — Probe-Exit-0 wie erwartet,
-marginFactor numerisch + marginFactorUnit=='PERCENTAGE' für alle 3 Epics, Σ 1916 = 1909 + 7
-[P1 +2 MarketInfo-Felder-Tests, P5 +5 margin_cap-Tests inkl. Datenwoche-Grenzfall 21.0];
-**Block D komplett** [D1+D1.2+D2+D3.0+D3.1+D3.2 alle ✅]; offen nur Block E [E2
-autonomy_report.py + E3 Runbook + E4 Tagesroutine+Closeout]).
+Stand nach Exec-Session #11 (2026-09-07): Archiv trägt **11** Einträge — `#10` (Block D
+D3.1+D3.2 endgültig in code, Σ 1916, Block D komplett) + `#9` (Block D D3.0 Probe-Skript,
+Σ 1909, wartete auf Nikinger-Probe) + `#8` (Block D D1.2 Wrapper, Σ 1909, P8 only) + `#7`
+(Block D D1+D2, Σ 1907, zwischenzeitlich gepusht) + `#6` (Block E E1 Vorregistrierung,
+Σ 1864 docs-only) + `#5` (Block C C2+C3+C5, Σ 1864) + `#4` (Block C C1, Σ 1862) + `#3`
+(Block B B1+B3 + B2 Operator-Apply + A-5-Push, Σ 1856) + `#2` (Block A endgültig in code)
++ `#1` (Block A A-0) + Plan-Session. Phasenkopf trägt genau **1** Block (Exec-Session
+#11, Block E Step E2 endgültig in code — `autonomy_report.py` + 5 Tests [5/5 grün, Σ
+1921 = 1916 + 5]; **Block E** [E1 docs ✅, E2 code ✅] **vorletzter Schritt**; offen
+nur E3 Runbook-Start [Nikinger-Job] + E4 Tagesroutine+Closeout-Handover+SVG).
+
+---
+
+## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #10, Block D Steps D3.1+D3.2 endgültig in code, Σ 1916 grün = 1909 + 7 neue Tests [P1 +2 MarketInfo-Felder, P5 +5 margin_cap inkl. Datenwoche-Grenzfall 21,0], Block D komplett, Pause auf Nikinger-Auftrag)
+
+> **Auftrag:** Nikinger-Chat 2026-09-07 (Phase-16-Exec-Folge): Probe-Lauf-Ergebnis aus #9 zurückgereicht — Exit-Code **0** für alle 3 Epics, `marginFactor` numerisch (DAX 5, IBEX 10, AEX 10), `marginFactorUnit == "PERCENTAGE"` für alle 3. **Block D Steps D3.1 (MarketInfo-Felder) + D3.2 (ExecutionConfig.margin_headroom + sizing.py margin_cap-Pfad)** endgültig in code, Plan §6 S. 719-756 + §7 AK11 verbatim umgesetzt. **Block D damit komplett** (D1+D1.2+D2+D3.0+D3.1+D3.2 ✅); Block E (E2/E3/E4) bleibt offen.
+
+> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block D Step D3.1 S. 727-732 (MarketInfo + `margin_factor`/`margin_factor_unit`, `ig_adapter.py:503`-Anker, Helper `_float_or_none` — bei uns `_safe_float` wiederverwendet, schon vorhanden aus Phase-1-Hardening Z.946) · §6 D3.2 S. 734-753 (`config.py:124` `margin_headroom`, `sizing.py:36-68` `_size_from_risk` mit margin_cap, `compute_size:139-146` reicht `margin_factor_pct` durch — kein Caller-Touch, einziger Produktions-Aufrufer `executor.py:321-324` übergibt Envelope schon heute) · §9 Source-Pin-Liste #4 + #5 (D3.0/D3.1/D3.2 verbatim) · §1 P10 (Rückfall auf Leverage-Cap bei fehlendem Faktor) · §7 AK11 (Datenwoche-Grenzfall 27 100/24 500/mf=5 ⇒ 21,0; `mf=None` ⇒ bit-identisch; `unit="PERCENTAGE"`-Pflicht).
+
+> Ausführungs-Scope: **2 Atomic Commits** (`0625836` D3.1+D3.2 kombiniert [Plan §6: „D3.1+D3.2 in einem Commit", wie D2.x] · dieser Final-Commit Session-Rotation #9→#10). Push-Freigabe-Stand: Nikinger hat zwischen #9 und jetzt 2 Commits der Session #9 (D3.0 Code + Rotation) eigenmächtig gepusht, **`origin/main = fa69677`**. Diese Session pusht die **eigenen** 2 Commits **nicht** eigenmächtig.
+
+### Completed
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #10, 2026-09-07):**
+- `git log origin/main..HEAD --oneline` → leer (HEAD = `fa69677` = origin/main; 2 Session-#9-Commits inzwischen gepusht, Cross-Session-Pattern bestätigt).
+- `git status` → working tree clean bis auf untracked `data/` (gitignored).
+- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (vor dieser Rotation: Phasenkopf 1 Block Exec-#9, Archiv 9 Blocks).
+- Probe-Befund verifiziert (Nikinger-Post #9–#10): 3 von 3 Epics `verdict: "ok"` (`margin_factor` numerisch + `margin_factor_unit == "PERCENTAGE"`); empirische Werte DAX=5, IBEX=10, AEX=10; Staffelung via `marginDepositBands` ignoriert per Plan-Vereinfachung (Watch-Item unten).
+- §6 + §9 Source-Pin-Bestätigung verbatim an aktuellen Code-Stand angepasst:
+  - P1 `broker_wrapper/models.py:50-72` (MarketInfo heute 10 Felder, D3.1 fügt 2 hinzu).
+  - P1 `broker_wrapper/adapters/ig_adapter.py:485-503` (`get_market_info` heute 8 Felder, D3.1 fügt 2 hinzu; Anker `instr.get("contractSize")` Z.501).
+  - P1 `_safe_float` Helper bestehend Z.946 (DRY: wiederverwendet statt `_float_or_none` NEU).
+  - P5 `execution/config.py:124-141` (`max_leverage` Z.124, D3.2 fügt `margin_headroom` danach ein).
+  - P5 `execution/sizing.py:36-68` `_size_from_risk` (Anker für margin_cap) + Z.139-146 (Anker für compute_size-Durchreichung).
+  - P5 `executor.py:321-324` = einziger Caller, reicht market_info_env schon heute durch ⇒ kein Caller-Touch.
+
+**1. Block-D Steps D3.1+D3.2 in 1 atomaren Commit:**
+
+| Step | Commit | Scope | Σ-Delta | Akzeptanz |
+|---|---|---|---|---|
+| **D3.1** MarketInfo-Felder | `0625836` phase16+phase1+phase5: code | P1 `broker_wrapper/models.py`: `MarketInfo` +2 Felder nach `contract_size`: `margin_factor: float \| None = None` + `margin_factor_unit: str \| None = None` (defaults None = bit-identisch zu heute wenn IG nichts liefert). P1 `broker_wrapper/adapters/ig_adapter.py:get_market_info` (Z.501): `margin_factor=_safe_float(instr.get("marginFactor"))` (existierender Phase-1-Hardening-Helper Z.946 wiederverwendet, DRY) + `margin_factor_unit=instr.get("marginFactorUnit")` (raw string). P1 `tests/test_ig_adapter.py`: 2 neue Tests — `test_get_market_info_extracts_margin_factor` (5.0/PERCENTAGE-Extraktion) + `test_get_market_info_missing_margin_factor_fields_are_none_not_crash` (None-Rückfall). `test_get_market_info_to_dict_roundtrip_keys` (existierend) um die 2 neuen Keys erweitert (sonst würde der Assertion-Coverage brechen). | P1 +2 (95→97) | AK11-Vertrag ✅ |
+| **D3.2** Margin-Cap | `0625836` phase16+phase1+phase5: code (gleicher Commit) | P5 `execution/config.py:124-141`: `margin_headroom: float = 0.95` direkt nach `max_leverage` mit ausführlichem Doc-String (5%-Puffer-Begründung gegen IG-Staffelung empirisch aus dem 2026-09-07 Probe-Lauf). P5 `execution/sizing.py`: `logger = logging.getLogger(__name__)` NEU + `_size_from_risk` mit 2 neuen keyword-only kwargs `margin_factor_pct: float \| None = None`, `margin_headroom: float = 1.0`. Plan §6 D3.2-Formel verbatim: `margin_cap = (available_balance * margin_headroom) / (price * point_value * margin_factor_pct / 100.0)`, angewendet als min() auf den bestehenden leverage_cap (P10-Fallback: margin_factor_pct is None or <= 0 ⇒ kein margin_cap ⇒ bit-identisch zu heute). `compute_size:139-146` liest market_info.margin_factor/margin_factor_unit, akzeptiert nur wenn `unit == "PERCENTAGE"`, sonst WARNING + Fallback auf leverage_cap. 5 neue Tests in `test_sizing.py`: (a) Datenwoche-Grenzfall `available=27_100 ask=24_500 risk_pct=3% mf=5% ⇒ size=21.0` (margin_cap binds, leverage_cap wäre 22.12, IG würde 22.1 ablehnen — exakt die Datenwoche-Beobachtung 2026-07-20), (b) `margin_factor is None` ⇒ bit-identisch (Plan-AK11-Forderung), (c) `margin_factor=0.0` ⇒ margin_cap-Skip (Leverage-Cap gewinnt; `>0`-Guard), (d) `unit="POINTS"` ⇒ WARNING + 22.1 (Leverage-Fallback), (e) End-to-End mit `margin_factor=10.0` ⇒ 10.5 (IGEX-style 10%). | P5 +5 (185→190) | AK11 ✅ |
+
+**2. Σ-Sweep nach Block D-Komplettierung (verifiziert 2026-09-07):** **1916 grün = 1909 + 7 neue Tests.** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/root = 97+82+105+162+190+76+169+256+95+165+145+82+61+126+105 = **1916** ✅ Plan-Akzeptanz AK2 erfüllt.
+
+**3. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach jedem Commit (nach Code-Commit `0625836` + nach dieser Rotation).
+
+**4. Git-Stand am Session-Ende (vor Push):** HEAD = dieser Final-Commit · 2 Commits lokal ahead of `origin/main = fa69677` · working tree clean.
+
+### Findings
+- 🟢 **Probe-Befund passt 1:1 zum Plan:** DAX=5, IBEX=10, AEX=10 — alle 3 Indizes liefern `marginFactor` numerisch + `marginFactorUnit == "PERCENTAGE"`. Genau die Form, die Plan §7 AK11 verlangt.
+- 🟢 **Datenwoche-Grenzfall trifft empirische Beobachtung 2026-07-20:** `size = 21.0` exakt (margin_cap binds, leverage_cap wäre 22.12 gerundet 22.1, was IG ablehnte).
+- 🟢 **P10-Rückfall korrekt:** `margin_factor is None` ⇒ ein 2%-1000-Balance-Trade rundet auf 0.6 wie heute.
+- 🟡 **Watch-Item Staffelung via `marginDepositBands`** dokumentiert (Plan-Vereinfachung ignoriert die Bands, `margin_headroom = 0.95` faengt die meisten Spruenge ab, empirisch niedriges Risiko auf 30K-Demo-Konto).
+- 🟢 **Hard Rule 3 unangetastet**: keine AI-Pfade berührt, kein VETO-Pfad, keine Order-Trigger.
+- 🟢 **`_safe_float` wiederverwendet** statt neuen Helper (DRY).
+- 🟢 **Cross-Phase-Touch-Disziplin:** D3.1+D3.2 berührt nur P1 + P5 (in Freigabe-Liste P12 enthalten).
+- 🟢 **Block-D-Commits-Bilanz** (Plan §6 angekündigt 6): tatsächlich 6 Commits D1 · D1.2 · D2.1+D2.2+D2.3+D2.4+D2.5+D2.6 (3 Commits) · D3.0 · D3.1+D3.2 — **6** ✅.
+
+### Open questions / blockers
+- **Block D komplett** — keine inhaltlichen Phase-16-Blocker mehr in Block A-D.
+- **E3 (Operator-Restart)** — wartet auf Nikinger-Aktion (Restart des Schedulers). Mit D10 abgeschlossen sind **alle Restart-Voraussetzungen erfüllt**.
+- **Push-Freigabe-Stand:** Nikinger hat zwischenzeitlich Session #9 (D3.0 Code + Rotation) gepusht, **`origin/main = fa69677`**. Diese Session 2 Commits pending.
+
+### Next (für die Folgesession)
+- **E2** = `scripts/autonomy_report.py` (deterministisch, read-only) + 5 Tests. Block E ist **unabhängig von Block D**.
+- **E3** = Runbook Start (Nikinger-Job). **E4** = Tagesroutine + Closeout-Handover.
 
 ---
 
