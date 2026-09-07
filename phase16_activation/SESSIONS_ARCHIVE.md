@@ -11,11 +11,92 @@ Plan-Session-Block trägt bewusst **keine** `Session #N`-Nummer im Heading (Phas
 `_max_session_num` returnt `None`; für die erste Exec-Session (`head_max == 1`) ist das
 Archiv-Max `None` korrekt (check_archive_sequence, Z. 134-138).
 
-Stand nach Exec-Session #5 (2026-09-05): Archiv trägt **5** Einträge — `#4` (Block C
-C1 endgültig in code, Σ 1862) + `#3` (Block B B1+B3 + B2 Operator-Apply + A-5-Push, Σ 1856)
-+ `#2` (Block A endgültig in code) + `#1` (Block A A-0) + Plan-Session. Phasenkopf trägt
-genau **1** Block (Exec-Session #5, C2+C3+C5 endgültig in code, Σ 1864; startet E1 in
-Exec-Session #6 nach Mini-Rotation).
+Stand nach Exec-Session #7 (2026-09-07): Archiv trägt **6** Einträge — `#5` (Block C
+C2+C3+C5 endgültig in code, Σ 1864) + `#4` (Block C C1 endgültig in code, Σ 1862) + `#3`
+(Block B B1+B3 + B2 Operator-Apply + A-5-Push, Σ 1856) + `#2` (Block A endgültig in
+code) + `#1` (Block A A-0) + Plan-Session. Phasenkopf trägt genau **1** Block
+(Exec-Session #7, D1+D2 endgültig in code, Σ 1907; startet D1.2+D3+E2-E4 in
+Folge-Sessions nach Nikinger-Push-Freigabe 2026-09-07).
+
+---
+
+## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #6, Block E Step E1 Vorregistrierung endgültig in docs, Σ 1864 grün unverändert [docs-only], Pause auf Nikinger-Auftrag)
+
+> **Auftrag:** Nikinger-Chat 2026-09-05 (Phase-16-Exec-Folge, „letzten sesion") am 2026-09-07 fortgesetzt: „Next step, atomically, then ask nikinger." — **Block E Step E1** (Plan §6 E1, P11) endgültig in docs. Block D (D1/D1.2/D2/D3) + Block E (E2/E3/E4) bleiben für nachfolgende Sessions.
+>
+> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block E Step E1 (S. 760–769) · §1 P11 + P17 + P4/P5 + P6 + P7 · §7 AK13 + AK15 + AK16 · §11 Operator-Aktionen #5/#6/#7 · §13 Opus-Review #5/#6/#8/#9.
+>
+> Ausführungs-Scope: **2 Atomic Commits** (`af99a2c` E1 Vorregistrierung + INDEX-Zeile · `dc505b2` Session-Rotation #5→#6). Push-Freigabe (P18) gilt weiterhin; diese Session pusht **nicht** eigenmächtig.
+
+### Completed
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #6, 2026-09-07):**
+- `git log origin/main..HEAD --oneline` → leer (HEAD = `b2a64df` = origin/main; 7 Session-#5-Commits sind inzwischen gepusht).
+- `git status` → working tree clean bis auf untracked `data/`.
+- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (vor dieser Rotation: Phasenkopf 1 Block Exec-#5, Archiv 4 Blocks).
+- §6 E1-Verbatim-Bestätigung: 9 Konfig-Werte, 7 PASS-Kriterien mit append-only Messquellen, 4 erlaubte Operator-Ereignisse (P17), 6 Watch-Items, Operator-Regel, Aktiv-Block.
+
+**1. Block-E Step E1 in 1 atomaren Commit:**
+
+| Step | Commit | Scope | Σ-Delta | Akzeptanz |
+|---|---|---|---|---|
+| **E1** Vorregistrierung | `af99a2c` phase16: docs | **NEU** `phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION.md` (9 vorregistrierte Werte + 7 PASS-Kriterien AK15 mit append-only Messquellen + 4 erlaubte Operator-Ereignisse P17 + 6 Watch-Items + Operator-Regel + Aktiv-Block vom Operator vor E3-Restart) + INDEX-Zeile in `docs/INDEX.md`. | 0 (docs-only) | AK13 (Commit-Zeit < Start-Zeile ist die Nikinger-Pflicht bei E3) + AK15-Framework (Kriterien vorregistriert, Messquellen ausschließlich append-only, Opus-Review §13 #6 eingehalten: keine `*_state.json`, stattdessen `*.log` + `.jsonl` + SQLite-Tabellen) |
+
+**2. Σ-Sweep nach E1 (verifiziert 2026-09-07):** **1864 grün unverändert**. AK2 (Σ ≥ Vorblock) trivial erfüllt.
+
+**3. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach Commit + nach Rotation.
+
+**4. Git-Stand am Session-Ende:**
+- HEAD = `dc505b2`.
+- Commits lokal ahead of `origin/main` = 0 (E1 ist die erste Session nach dem letzten Push) + 2 (diese Session) = **2 Commits ahead**.
+- Working tree clean nach jedem Commit (außer untracked `data/`, gitignored).
+
+### Findings
+
+🟢 **E1 erfüllt P11 wörtlich:** Vorregistrierung committet **vor** dem E3-Restart (AK13: Commit-Zeit < Start-Zeile strukturell erfüllbar). Nach dem Start **kein** Edit mehr an den 9 Werten oder 7 Kriterien — Korrekturen nur als neues, datiertes, supersedendes Dokument (M1-Disziplin).
+
+🟢 **Aktiv-Block = Eintragung, kein Edit:** explizit als „Eintragung am E3-Tag **vor** der ersten Start-Zeile" definiert. **Vor** dem Test, **nicht** „nach dem Lauf geschrieben" — P11-Spirit gewahrt.
+
+🟢 **append-only Quellen konsequent:** AK15 misst ausschließlich aus `*.log` + `*.jsonl` + SQLite-Tabellen. `*_state.json` ausgeschlossen (Opus-Review §13 #6). WebUI-Aliveness ehrlich als Operator-Sichtung vorregistriert.
+
+🟢 **PASS-Kriterien messen Autonomie, nicht Profit:** Kriterium 3 zählt nur ≥ 5 autonome CLOSED-Trades (nicht Win-Rate, nicht P&L). P&L explizit ausgeschlossen.
+
+🟡 **Kriterium 7 (Caps unverändert):** pinnt Start-Log-Zeile auf exakte Strings. Mitigation: `daily_loss_cap=1800.0` mit `.0`-Suffix (Python-Float-Default-Repr); beim E3-Runbook-Schritt nachmessen + ggf. Pin-Muster schärfen — bewusst NICHT jetzt (würde M1-Disziplin verletzen).
+
+🟡 **Kriterium 2 (3+1-Regel):** WebUI-Operator-Sichtung ist Selbstverpflichtung, kein technisches PASS. Bewusst so vorregistriert: WebUI-Aliveness ist nicht anders belegbar (Opus-Review §13 #6).
+
+🟡 **Watch-Item W6:** n≈10–20 ≪ `instinct_n_min = 50` → VETO 5 No-Op, per Plan §13 #8 erwartet (Bridge lebt, unter Schwelle). Beim Closeout wird die tatsächliche n-Zahl als Befund geführt.
+
+🟢 **Cross-Phase-Disziplin:** E1 berührt **keinen** Cross-Phase-Code (nur Phase-16-Doc + INDEX-Eintrag). P1/P2/P3/P4/P5/P7/P8/P9/P15 alle unangetastet.
+
+### Open questions / blockers
+
+- Keine. E1 ✅ vollständig. AK13 hängt jetzt nur noch an der **Reihenfolge der Operator-Aktionen** beim E3-Restart (zuerst D1+D2 fertig bauen, dann E3-Restart, dann Vorregistrierung bleibt unangetastet).
+
+### Next (für die Folgesession)
+
+- **Block D — Freischaltung** (Plan §6 D1..D3, nach E1 freigegeben):
+  - **D1** = Defaults flippen + `--no-*`-Schalter (P4/P5/P8/P15, AK5) · ~5 Tests
+  - **D1.2** = Bar-Stream-Token-Wrapper (P8, Opus-Befund #2, AK5b) · 2 Tests
+  - **D2** = Promotion-Bridge + Prädikat-Compiler (P2/P7/P8/P15, AK10) · ~10 Tests
+  - **D3** = Margin-Headroom (P1/P5, AK11) · erst Operator-Live-Probe, dann Code · ~3 Tests
+- **Block E — 2-Wochen-Test** (nach D + Operator-Restart):
+  - **E2** = `scripts/autonomy_report.py` (deterministisch, read-only, mode=ro) + 5 Tests
+  - **E3** = Runbook Start (Operator, restart-services.sh start + Day-0-Checks)
+  - **E4** = Tagesroutine + Closeout-Handover
+
+**Block-Status nach dieser Session (endgültig):**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ A-0..A-4 + A-5 Push (Sessions #1-#3) |
+| B (Substrat) | ✅ B1+B3 code + B2 Operator-Apply + A-5 Push (Session #3) |
+| C (Research-Loop) | ✅ C1+C2+C3+C5 endgültig in code; C4 = Doku-Only (Sessions #4-#5) |
+| **E (Autonomie-Test, Vorregistrierung)** | ✅ **E1 endgültig in docs** (diese Session) |
+| D (Freischaltung) | ⏳ nach E1 (Vorregistrierung) — kann jetzt starten |
+| E (Autonomie-Test, Rest) | ⏳ E2/E3/E4 nach D + Operator-Restart |
+
+**Push-Status dieser Session:** **0 Commits gepusht**, 2 Commits pending (E1 + Final-Rotation) ahead of `origin/main`.
 
 ---
 
