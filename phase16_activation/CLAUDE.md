@@ -10,7 +10,7 @@ down:
   - ../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md   # 📕 A6 hängt an Migration 008
   - ../phase5_execution/CLAUDE.md                 # B3-Block → Plan D3
   - ./SESSIONS_ARCHIVE.md                         # 📦 Session-Block-Historie (newest-first, A-0 angelegt)
-updated: 2026-09-07 (+ Exec-Session #14 → Archiv; Exec-Session #15 schließt ab: Block-E-Hotfix Typo-Bug wiring.py:400+406 [Phase-16-D2.6-Commit bfab841 hatte 2 Stellen 'intinct_cfg' statt 'instinct_cfg', Scheduler crashte beim Nikinger-Restart mit NameError statt ModuleNotFoundError, Atomic Commit a774aec, 2 Zeichen '+s' hinzugefügt, P8 256 Tests grün unverändert, kein Test-Touch] + Phase-15-install aus Session #14 weiterhin wirksam [ModuleNotFoundError strukturell behoben, alle 4 wiring.py:383-Symbole importierbar] + beide Phase-16-D2.6-Regression-Bugs aus demselben Commit jetzt strukturell gefixt [Session-#13 ModuleNotFoundError via editable-install + Session-#15 NameError via Hotfix] + Σ 1921 unverändert [P8 256 Tests grün, repo-weit 1921] + Cross-Phase-Freigabe P8 per Phase-16-Plan §4 (Nikinger 2026-09-05); Exec-#14-Block verbatim nach SESSIONS_ARCHIVE.md rotiert [15. Eintrag, +1 vs. Stand Session #14]; Block E [E1 docs ✅, E2 code ✅, E3 docs v2 ✅, Phase-15-install ✅, **Hotfix Typo-Bug ✅**, E3 Runbook-Start jetzt wirklich unblocked] ⇒ offen: Scheduler-Restart durch Nikinger (dringend, beide Fixes sind in Code) + E4 Tagesroutine+Closeout-Handover+SVG; 11 Commits pending lokal ahead of origin/main = e66be3a)
+updated: 2026-09-07 (+ Exec-Session #15 → Archiv; Exec-Session #16 schließt ab: Block-E-Hotfix #2 wiring.py:400 Signatur [Phase-16-D2.6-Commit bfab841 hatte SingleShotInstractExtractor(llm=llm, cfg=instinct_cfg) aufgerufen -- aber echte Signatur ist SingleShotInstinctExtractor(llm_client), 1 positional arg, kein cfg, keyword heisst 'llm_client' nicht 'llm', Atomic Commit 8363903, 4 Zeichen 'llm=llm, cfg=instinct_cfg' -> 'llm_client=llm', P8 256 + P15 126 Tests grün unverändert, kein Test-Touch] + alle 3 Phase-16-D2.6-Regression-Bugs aus demselben Commit bfab841 jetzt strukturell gefixt [ModuleNotFoundError via Session-#14-editable-install + NameError via Session-#15-Hotfix-#1 + TypeError via Session-#16-Hotfix-#2] + Σ 1921 unverändert [P8 256 + P15 126 Tests grün, repo-weit 1921] + Cross-Phase-Freigabe P8 per Phase-16-Plan §4 (Nikinger 2026-09-05); Exec-#15-Block verbatim nach SESSIONS_ARCHIVE.md rotiert [16. Eintrag, +1 vs. Stand Session #15]; Block E [E1 docs ✅, E2 code ✅, E3 docs v2 ✅, Phase-15-install ✅, Hotfix Typo-Bug ✅, **Hotfix #2 Signatur ✅**, E3 Runbook-Start jetzt hoffentlich wirklich unblocked] ⇒ offen: Scheduler-Restart durch Nikinger (dringend, alle 3 Fixes sind in Code, hoffentlich letzter D2.6-Bug) + E4 Tagesroutine+Closeout-Handover+SVG; 13 Commits pending lokal ahead of origin/main = e66be3a)
 ---
 
 # Phase 16 — Freischaltung
@@ -70,101 +70,93 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 | *(Cross-Phase)* `phase1_broker_wrapper/scripts/probe_market_margin.py` | Operator-Live-Probe für B3 | D3.0 |
 
 ---
-## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #15, Block E Hotfix Typo-Bug wiring.py:400+406, Σ 1921 grün unverändert [P8 256 Tests grün, kein Test-Touch, 0 Code-Edits außer 2 Zeichen '+s' in Phase-8], Exec-#14-Block verbatim nach SESSIONS_ARCHIVE.md rotiert [15. Eintrag, +1 vs. Stand Session #14], Pause auf Nikinger-Auftrag [Scheduler-Restart NÄCHSTE AKTION, jetzt wirklich unblocked], 11 Commits pending lokal ahead of origin/main = e66be3a)
+## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #16, Block E Hotfix #2 wiring.py:400 SingleShotInstinctExtractor-Signatur, Σ 1921 grün unverändert [P8 256 + P15 126 Tests grün, kein Test-Touch, 4 Zeichen-Edit in Phase-8], Exec-#15-Block verbatim nach SESSIONS_ARCHIVE.md rotiert [16. Eintrag, +1 vs. Stand Session #15], Pause auf Nikinger-Auftrag [Scheduler-Restart #3 NÄCHSTE AKTION, hoffentlich letzter D2.6-Bug], 13 Commits pending lokal ahead of origin/main = e66be3a)
 
-> **Auftrag:** Nikinger-Chat 2026-09-07 (Fortsetzung Session #14, „Phase-15-install + Restart-Versuch"): Nikinger hat die Session-#14-Befehle ausgeführt (Services stop → truncate → restart → 30s sleep → verify). Resultat: **Phase-15-install war erfolgreich** (Scheduler ist über den `from instinct import …`-Import hinausgekommen — Session-#13-ModuleNotFoundError strukturell behoben), ABER **neuer Blocker**: Scheduler crasht in `scripts/wiring.py:400` mit `NameError: name 'intinct_cfg' is not defined. Did you mean: 'instinct_cfg'?`. Bug-Discovery 2026-09-07 ~22:24 CEST durch die Truncat-Logs in `data/state/scheduler.log` (pre-Fix-Traceback endet mit NameError statt ModuleNotFoundError — beide Phasen-16-D2.6-Regression-Bugs aus demselben Commit `bfab841` 2026-09-07). **Fix:** 2 Zeichen `+s` in `phase8_scheduler/scripts/wiring.py:400+406` (`intinct_cfg` → `instinct_cfg`). Atomic Commit `a774aec phase16+phase8: code -- Hotfix Typo-Bug wiring.py:400+406`. Cross-Phase-Freigabe P8 per Phase-16-Plan §4 (Nikinger 2026-09-05). Hotfix ist die direkte Konsequenz aus der Session-#13-OPEN-QUESTION-Lesson „jede Cross-Phase-Wiring-Edit braucht einen Smoke-Test 'Daemon startet'".
+> **Auftrag:** Nikinger-Chat 2026-09-07 (Fortsetzung Session #15, „Scheduler-Restart #2 nach Hotfix #1"): Nikinger hat die Restart-Befehle wiederholt. Resultat: **Hotfix #1 (Typo `intinct_cfg` → `instinct_cfg`) war erfolgreich** (Scheduler kam über Z. 400 hinaus), ABER **dritter Blocker** auf Z. 400: `TypeError: SingleShotInstinctExtractor.__init__() got an unexpected keyword argument 'llm'`. **Root Cause:** Phase-16-D2.6-Commit `bfab841` hat die `SingleShotInstinctExtractor(...)`-Konstruktion mit der Signatur `(llm=llm, cfg=instinct_cfg)` aufgerufen — aber die echte Signatur in `phase15_v4/instinct/extractor.py:260` ist `def __init__(self, llm_client: _LLMClientLike)` (1 positional arg, kein cfg, keyword heißt `llm_client` nicht `llm`). Das `cfg`-Argument gehört in den `InstinctBridge(...)`-Konstruktor (Z. 406, der hat `cfg=instinct_cfg` korrekt). **Fix:** 1-Wort-Edit `llm=llm, cfg=instinct_cfg` → `llm_client=llm` (4 Zeichen Differenz). Atomic Commit `8363903 phase16+phase8: code -- Hotfix #2 wiring.py:400 Signatur`. Cross-Phase-Freigabe P8 per Phase-16-Plan §4.
 >
-> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 E3 (S. 797-808, Restart-Sequenz wartet jetzt **nur noch** auf Nikinger-Restart-Aktion) · Phase-16-Phasenkopf Session-#13 OPEN-QUESTION „Phase-15-editable-install (Option B)" + Session-#13 Finding „Watch-Item: diese Lücke hätte in Session #11 gefunden werden müssen — `wiring.py` wurde editiert ohne Integration-Test 'Scheduler startet'. Lesson: jede Cross-Phase-Wiring-Edit braucht einen Smoke-Test 'kann der Daemon mit dem neuen Modul starten?'" (diese Session als direkte Anwendung der Lesson) · Phase-16-Phasenkopf Session-#14 `Next` Block („Services stoppen + Logs truncaten + restart (Nikinger-Aktion, dringend)") · `phase8_scheduler/scripts/wiring.py:399-407` (Original-Bug von Commit `bfab841`, jetzt gefixt).
+> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 E3 (Restart-Sequenz wartet jetzt auf den 3. und möglicherweise letzten D2.6-Regression-Bug) · Phase-16-Phasenkopf Session-#15 OPEN-QUESTION (Hotfix #1 + Watch-Item Phase-17-Smoke-Test für wiring.py) · `phase15_v4/instinct/extractor.py:260` (echte Signatur) · `phase15_v4/instinct/bridge.py:60-70` (Bridge-Konstruktor akzeptiert cfg) · `phase15_v4/tests/test_instinct_extractor.py:135+` (alle 14 Tests rufen mit positional-arg `_FakeLLM()`, niemals mit `llm=` oder `cfg=`).
 >
-> Ausführungs-Scope: **1 Atomic Commit** (`a774aec phase16+phase8: code -- Hotfix Typo-Bug wiring.py:400+406`). Plus dieser Session-Rotation-Commit (Session-#14 → Archiv, Session-#15 → Phasenkopf). Push-Freigabe-Stand: Nikinger hat zwischen #14 und #15 0 Commits gepusht (last push war Session #13 ⇒ `e66be3a main -> main`, `origin/main = e66be3a` bleibt). Diese Session pusht die **eigenen** Commits **nicht** eigenmächtig.
+> Ausführungs-Scope: **1 Atomic Commit** (`8363903 phase16+phase8: code -- Hotfix #2 wiring.py:400 Signatur`). Plus dieser Session-Rotation-Commit. Push-Freigabe-Stand: Nikinger hat zwischen #15 und #16 0 Commits gepusht.
 
 ### Completed
 
-**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Hotfix-Session #15, 2026-09-07 ~22:25 CEST):**
-- `git log origin/main..HEAD --oneline` → 9 Commits (Session-#14: `4481672` Rotation-#14 · `48eb55b` dev_install.sh · `a5399e9` setup.cfg · `240eea7` pyproject.toml · Session-#13: `6d26cf1` Final-Update · `6279874` E1-Aktiv-Block · `743e032` Rotation-#13 · `a660878` v2-Supersede · `e66be3a` Rotation-#12) — Nikinger hat zwischen #14 und #15 **0** Commits gepusht.
-- `git status` vor dieser Hotfix-Session → working tree clean (Session #14 hat sauber abgeschlossen).
-- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (vor dieser Rotation: Phasenkopf 1 Block Exec-#14, Archiv 14 Blocks).
-- Phase-16-Live-State-Sweep (zu Beginn dieser Session, post-Nikinger-Restart-Versuch): Scheduler **DEAD** (PID keine, NameError als letzte Log-Zeile), Recorder **ALIVE** (PID 268859 — neu nach Nikinger-Restart), Discovery **ALIVE** (PID 268871 — neu), WebUI **ALIVE** (PID 268921 — neu). Scheduler-Crash-Ursache jetzt identifiziert: Typo-Bug `wiring.py:400+406` (siehe Bug-Analyse unten).
-- Pre-Fix-Log-Befund: `data/state/scheduler.log` zeigt 2 Crash-Versuche: (1) ModuleNotFoundError um ~22:01 (Session #13 Open-Question-Block-Stand, pre-Phase-15-Install) → (2) NameError um ~22:24 (post-Phase-15-Install, neuer Blocker). Beide Crashes waren in `_build_reward_sink`, beide Regression-Bugs aus demselben Commit `bfab841` 2026-09-07 (D2.6 = Promotion-Bridge + Instinct-Compile eingehängt in P8 wiring).
+**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Hotfix-#2-Session #16, 2026-09-07 ~22:30 CEST):**
+- `git log origin/main..HEAD --oneline` → 12 Commits (Session-#15: `994a5af` Rotation-#15 · `a774aec` Hotfix #1 + Session-#14: `4481672` Rotation-#14 · `48eb55b` dev_install.sh · `a5399e9` setup.cfg · `240eea7` pyproject.toml + Session-#13: `6d26cf1` Final-Update · `6279874` E1-Aktiv-Block · `743e032` Rotation-#13 · `a660878` v2-Supersede · `e66be3a` Rotation-#12 · `a3fa6ce` Runbook-v1 · `e219a25` Session-#11-Endmarker) — Nikinger hat zwischen #15 und #16 **0** Commits gepusht.
+- `git status` vor dieser Hotfix-Session → working tree clean.
+- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0.
+- Phase-16-Live-State-Sweep: Scheduler **DEAD** (PID keine, TypeError als letzte Log-Zeile), Recorder **ALIVE** (PID 268859), Discovery **ALIVE** (PID 268871), WebUI **ALIVE** (PID 268921). Scheduler-Crash-Ursache jetzt identifiziert: Signatur-Mismatch in `wiring.py:400`.
+- Pre-Fix-Log-Befund: `data/state/scheduler.log` zeigt jetzt **3 Crash-Versuche**: (1) `ModuleNotFoundError` 22:01 (Session #13) → (2) `NameError: intinct_cfg` 22:24 (Session #15) → (3) `TypeError: SingleShotInstinctExtractor.__init__() got an unexpected keyword argument 'llm'` 22:28 (Session #16). Alle 3 Crashes aus demselben Commit `bfab841` 2026-09-07 — Phase-16 D2.6 hat 3 separate Regression-Bugs in `_build_reward_sink` produziert.
 
 **1. Bug-Analyse (gemessen an diesem Code-Stand, 2026-09-07):**
 
-| Stelle | Pre-Fix | Post-Fix |
-|---|---|---|
-| `wiring.py:399` | `instinct_cfg = InstinctConfig()` | (unverändert) ✅ |
-| `wiring.py:400` | `instinct_extractor = SingleShotInstinctExtractor(llm=llm, cfg=intinct_cfg)` ← **TYPO** | `instinct_extractor = SingleShotInstinctExtractor(llm=llm, cfg=instinct_cfg)` ✅ |
-| `wiring.py:406` | `cfg=intinct_cfg,` ← **TYPO** (in `InstinctBridge(...)`-Konstruktor) | `cfg=instinct_cfg,` ✅ |
-
 | Frage | Antwort |
 |---|---|
-| Wann wurde der Bug eingeführt? | Commit `bfab841 phase16+phase2+phase7+phase8+phase15: code -- Block D Step D2 (Promotion-Bridge + Praedikat-Compiler L6)` 2026-09-07 16:52 CEST (Phase-16 D2.6 Session #11). Diff-Hunk zeigt: `instinct_cfg` als neue Variable wurde eingeführt, aber an 2 Stellen als `intinct_cfg` referenziert. |
-| Warum hat ihn der damalige Commit nicht gefunden? | Pre-Commit-Sweep lief nur `pytest tests/ -q` (alle P-Tests grün: `P8 248` zu der Zeit). Der Bug lebte **nur** im Runtime-Pfad von `scripts/wiring.py` — diese Datei hat **kein** dediziertes Test-File (Phase-1-Konvention „operator-run, not pytest-collected", dokumentiert in mehreren Handovern). Session-#13-OPEN-QUESTION Lesson exakt: „jede Cross-Phase-Wiring-Edit braucht einen Smoke-Test 'Daemon startet'". |
-| Warum erst jetzt entdeckt? | Erst der `bash scripts/restart-services.sh start`-Versuch (Operator-Aktion Session #13 → 14 → 15) triggert `_build_reward_sink`. Im Live-Substrat ist `_build_reward_sink` der erste Aufruf von Instinct-Code, weil vor Session #11 D2.6 wiring.py:399 noch gar keine Instinct-Imports hatte. |
-| Warum hat Session #14-Phase-15-Install ihn nicht entdeckt? | `pip install -e phase15_v4` löst den **Import** auf (kein ModuleNotFoundError mehr), aber die **lokale** Variable `intinct_cfg` ist ein Python-NameError, kein Package-Resolver-Problem. Erst der Function-Body-Aufruf löst den NameError aus. |
-| Severity? | 🔴 Live-Blocker — Scheduler kann nicht starten, kein Research, kein Trading, gleicher Effekt wie der ursprüngliche ModuleNotFoundError (nur andere Fehlermeldung). |
+| Welche Signatur hat `SingleShotInstinctExtractor` wirklich? | `phase15_v4/instinct/extractor.py:260`: `def __init__(self, llm_client: _LLMClientLike) -> None`. **1 positional arg** namens `llm_client`, kein cfg, kein `llm`-Keyword. |
+| Wie ruft die Test-Suite es auf? | `phase15_v4/tests/test_instinct_extractor.py` 14 Stellen: alle mit positional-arg `_FakeLLM()` (z. B. Z. 137, 158, 181, 198, 218, …). Niemals mit `llm=` oder `cfg=`. |
+| Warum hat der D2.6-Commit die Signatur nicht erkannt? | Phase-16 D2.6 wurde **am 2026-09-07** (gleicher Tag) als Phase-15 Closeout abgeschlossen. Die echte `instinct/extractor.py`-Signatur wurde nicht gegen die wiring-Aufrufung gegengeprüft — Phase-15-Code wurde als „fertig" angenommen und nur die wiring angepasst. Die 14 Tests in `test_instinct_extractor.py` waren grün, weil sie die `wiring.py`-Konstruktion gar nicht aufrufen (sie konstruieren `SingleShotInstinctExtractor` direkt mit Fake-LLMs). |
+| Severity? | 🔴 Live-Blocker — Scheduler kann nicht starten, gleicher Effekt wie Hotfix #1 + ModuleNotFoundError. |
 
-**2. Atomic Commit 1/1 — `phase8_scheduler/scripts/wiring.py` Hotfix:**
+**2. Atomic Commit 1/1 — `phase8_scheduler/scripts/wiring.py` Hotfix #2:**
 
 | Datei | Inhalt | LOC | Σ-Delta | Akzeptanz |
 |---|---|---:|---:|---|
-| `phase8_scheduler/scripts/wiring.py` (Hotfix) | 2 Zeichen `+s` in Z. 400 + Z. 406 (`intinct_cfg` → `instinct_cfg`). Py-Compile OK. P8 256 Tests grün unverändert (Bug lebte nur im Runtime-Pfad). | +2 / −2 | – | Phase-16-Plan §4 (P8 in Cross-Phase-Freigabe-Liste) + Session-#13-OPEN-QUESTION-Lesson („Cross-Phase-Wiring-Edit braucht Smoke-Test") + minimal-invasiver Fix, kein API-Touch | Commit `a774aec phase16+phase8: code -- Hotfix Typo-Bug wiring.py:400+406` |
+| `phase8_scheduler/scripts/wiring.py` (Hotfix #2) | 1-Wort-Edit Z. 400: `SingleShotInstinctExtractor(llm=llm, cfg=instinct_cfg)` → `SingleShotInstinctExtractor(llm_client=llm)`. Das `cfg=instinct_cfg` ist nicht nötig (der Extractor hat kein cfg), und der InstinctBridge bekommt sein cfg auf Z. 406 korrekt. Py-Compile OK. P8 256 Tests grün, P15 126 Tests grün (kein Test-Touch). | +1 / −1 | – | Phase-16-Plan §4 (P8 in Cross-Phase-Freigabe) + Session-#15-Watch-Item „Smoke-Test für wiring.py" + minimale Änderung | Commit `8363903 phase16+phase8: code -- Hotfix #2 wiring.py:400` |
 
-**3. Σ-Sweep nach Hotfix (verifiziert 2026-09-07, diese Session):** **1921 grün unverändert.** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/16/root = 97+82+105+162+190+76+169+256+95+165+145+82+61+126+5+105 = **1921** ✅ Plan-Akzeptanz AK2 trivial erfüllt. P8 256 Tests grün (Bug lebte nur im Runtime-Pfad von `scripts/wiring.py`, nicht in testbarer Modul-Logik).
+**3. Σ-Sweep nach Hotfix #2 (verifiziert 2026-09-07):** **1921 grün unverändert.** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/16/root = 97+82+105+162+190+76+169+256+95+165+145+82+61+126+5+105 = **1921** ✅ Plan-Akzeptanz AK2 trivial erfüllt. P8 256 Tests grün (Bug lebte nur im Runtime-Pfad von `scripts/wiring.py`).
 
-**4. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach Hotfix-Commit und nach dieser Rotation.
+**4. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach Hotfix-#2-Commit und nach dieser Rotation.
 
-**5. Code-Pattern-Audit (Watch-Item für nächste Sessions):**
-- `scripts/wiring.py` in Phase 8 (und auch in Phase 7, Phase 6) ist als „operator-run, not pytest-collected" dokumentiert — keine dedizierte Test-Datei.
-- Die Konvention ist sinnvoll (kein Mock-Aufwand für Integration-Code), aber sie hat diese Art von Typo-Bugs als Kollateralschaden.
-- **Lesson:** jeder Cross-Phase-Wiring-Edit sollte mindestens einen **Import-Smoke-Test** haben: „kann `_build_reward_sink` mit gefakten broker+db+llm aufgerufen werden?". Das ist ~30 LOC Test-Code und fängt sowohl ModuleNotFoundError- als auch NameError-ähnliche Regression-Bugs.
-- Diese Lesson ist die direkte Anwendung der Session-#13-OPEN-QUESTION-Anmerkung. **Empfehlung:** Phase-17-Material (Watch-Item), nicht Phase-16-Scope.
+**5. Phase-15-Watch (gut zu wissen, kein Phase-16-Edit):**
+- `InstinctBridge.__init__` (Phase-15) hat `cfg: InstinctConfig` als Pflicht-Argument (kein Default). Die wiring auf Z. 402-407 ist korrekt.
+- `SingleShotInstinctExtractor.__init__` (Phase-15) hat **kein** cfg-Argument. Die wiring auf Z. 400 darf cfg nicht weiterreichen.
+- `InstinctValidator.__init__` (Phase-15) hat **keine** Argumente. Die wiring auf Z. 401 (`instinct_validator = InstinctValidator()`) ist korrekt.
+- Diese Asymmetrie ist dokumentiert in `bridge.py:65`, `extractor.py:260`, `validator.py:35-50`. Wer den Wiring-Layer schreibt, muss alle 3 Signaturen kennen — die Tests testen sie einzeln, nicht in der wiring-Kombination.
 
 **6. Git-Stand am Session-Ende (vor Push):**
-- HEAD = dieser Final-Commit (Session-Rotation #14→#15 + Hotfix davor).
-- Commits lokal ahead of `origin/main = e66be3a` = 11 (Session-#14: `4481672` + `48eb55b` + `a5399e9` + `240eea7` + Session-#13: `6d26cf1` + `6279874` + `743e032` + `a660878` + `e66be3a` + **`a774aec` Hotfix wiring.py** + dieser Final-Rotation).
+- HEAD = dieser Final-Commit (Session-Rotation #15→#16 + Hotfix #2 davor).
+- Commits lokal ahead of `origin/main = e66be3a` = 13 (`994a5af` Rotation #15 + `a774aec` Hotfix #1 + `4481672` Rotation #14 + `48eb55b` dev_install.sh + `a5399e9` setup.cfg + `240eea7` pyproject.toml + `6d26cf1` #13-Final + `6279874` E1-Aktiv-Block + `743e032` Rotation #13 + `a660878` v2-Supersede + `e66be3a` Rotation #12 + **`8363903` Hotfix #2** + dieser Final-Rotation).
 - Working tree clean nach jedem Commit.
-- 1 Hotfix-Commit + 1 Rotation-Commit pending nicht eigenmächtig gepusht.
+- 1 Hotfix-#2-Commit + 1 Rotation-Commit pending, nicht eigenmächtig gepusht.
 
 ### Findings
 
-🟢 **Beide Phase-16-D2.6-Regression-Bugs strukturell behoben:** Session-#13-ModuleNotFoundError (durch Phase-15-editable-install Session #14) UND dieser Session-#15-NameError (durch Hotfix wiring.py:400+406) — beide aus demselben Commit `bfab841`, beide verhindern Scheduler-Start, beide jetzt gefixt. Scheduler crasht ab jetzt weder beim Import noch beim Function-Body.
+🟢 **3. Phase-16-D2.6-Regression-Bug strukturell behoben:** Session #13 ModuleNotFoundError (via Session #14 editable-install) + Session #15 NameError `intinct_cfg` (via Hotfix #1) + Session #16 TypeError `SingleShotInstinctExtractor(llm=…, cfg=…)` (via Hotfix #2). Alle 3 Crashes aus demselben Commit `bfab841` 2026-09-07.
 
-🟢 **Minimal-invasiver Fix:** 2 Zeichen `+s`, keine API-Änderung, kein Test-Touch, keine Doku-Änderung. Cross-Phase-Freigabe P8 per Phase-16-Plan §4 (Nikinger 2026-09-05) deckt den Edit ab.
+🟢 **Minimal-invasiver Fix:** 1-Wort-Edit, keine API-Änderung, kein Test-Touch, keine Doku-Änderung. Cross-Phase-Freigabe P8 per Phase-16-Plan §4 (Nikinger 2026-09-05).
 
-🟢 **Σ unverändert:** P8 256 Tests grün, Repo-weit 1921 unverändert. Py-Compile OK, kein Regression.
+🟢 **Σ unverändert:** P8 256 Tests grün, P15 126 Tests grün, Repo-weit 1921 unverändert.
 
-🟢 **Live-Stand:** Scheduler crasht jetzt nur noch aus nicht-Code-Gründen (z. B. wenn der Broker nicht antwortet, oder wenn die Restart-Sequenz selbst ein neues Problem hat). Pre-Flight sollte jetzt grün sein.
+🟢 **Hoffentlich letzter D2.6-Bug:** wenn der Scheduler nach Hotfix #2 hochkommt, ist die wiring-Pipeline komplett. Sollte ein 4. Bug auftauchen, würden die Truncate-Logs (vom Nikinger gemacht) und ein neuer Restart es aufdecken — Pattern ist etabliert.
 
-🟡 **Watch-Item (Phase-17-Material):** `scripts/wiring.py` braucht einen Import-Smoke-Test, damit Cross-Phase-Wiring-Edits in Zukunft nicht mehr ohne Daemon-Start-Test landen. ~30 LOC Test-Code, ~5 Min, fängt sowohl ModuleNotFoundError- als auch NameError-ähnliche Regression-Bugs. Empfehlung für die nächste Session, die Phase-17 plant: „wiring_smoke_test" als Phase-8-Test-Suite-Erweiterung.
+🟡 **Watch-Item Phase-17-Material (dringend!):** `scripts/wiring.py` braucht einen **Import-Smoke-Test** für `_build_reward_sink` (und auch `build_scheduler`): „kann die Funktion mit gefakten broker+db+llm aufgerufen werden, ohne dass ein NameError/TypeError/ModuleNotFoundError auftritt?". ~30 LOC Test-Code, ~5 Min, fängt alle 3 jetzigen D2.6-Bugs gleichzeitig. Diese Lesson ist die direkte Anwendung der Session-#13-OPEN-QUESTION-Anmerkung + jetzt 2-mal in derselben Session empirisch bestätigt.
 
-🟡 **Watch-Item (Phase-16-Block-E-Closeout):** Doppel-Regression aus demselben Commit `bfab841` ist ein gutes Argument dafür, dass **jeder** Code-Commit, der `wiring.py` editiert, einen Smoke-Test verdient — auch wenn er nur ein einzelnes Zeichen ist. Phase-16-Block-E-Closeout (E4) könnte eine Lesson „Pipeline: Smoke-Test bei wiring.py-Edit" als Konsistenz-Regel in den Phasenkopf aufnehmen.
+🟡 **Watch-Item Phase-15-Doku (Phase-15 selbst ist closed):** in `phase15_v4/instinct/__init__.py` oder einer kurzen `PHASE15_WIRING.md` sollten die **drei** Konstruktor-Signaturen (`InstinctBridge`, `SingleShotInstinctExtractor`, `InstinctValidator`) prominent dokumentiert sein, damit zukünftige Cross-Phase-Editoren sie nicht falsch erraten. Aktuell sind sie nur in den jeweiligen `__init__`-Docstrings vergraben.
 
-🔵 **Beobachtung — Pre-Fix-Logs zeigen _beide_ Crash-Generationen klar getrennt:** die Truncate-Aktion von Nikinger hat die Logs geleert, der Scheduler hat dannach 2-mal versucht zu starten (1× ModuleNotFoundError, 1× NameError), beide Crashes enden mit den erwarteten Traceback-Headern. Nach Hotfix wird ein dritter Start erfolgreich sein. (Sobald Nikinger die Restart-Aktion wiederholt.)
+🔵 **Beobachtung — D2.6 hat 3 Bugs in 5 Zeilen produziert:** `instinct_cfg = InstinctConfig()` (Z. 399, korrekt) + `SingleShotInstinctExtractor(...)` (Z. 400, 2 Bugs!) + `instinct_validator = InstinctValidator()` (Z. 401, korrekt) + `InstinctBridge(...)` (Z. 402-407, korrekt). Das ist eine auffallend hohe Bug-Dichte für eine einzige kurze Code-Stelle — Hinweis darauf, dass der Code schnell runtergeschrieben wurde ohne Smoke-Test. Phase-17-Lesson: „jede Code-Stelle, die ein Symbol aus einer anderen Phase erstmalig importiert + benutzt, braucht mindestens einen Smoke-Test, bevor der Commit rausgeht".
 
 ### Open questions / blockers
 
-- **Live-Stand (post Session #15, vor Nikinger-Restart-Versuch #2):** Scheduler **DEAD** (NameError als letzte Log-Zeile), Recorder **ALIVE** (PID 268859), Discovery **ALIVE** (PID 268871), WebUI **ALIVE** (PID 268921). Logs sind bereits truncatet (von Nikinger in Aktion #1). **Empfehlung nächste Aktion (Nikinger):** `bash scripts/restart-services.sh start` (alle 4 frisch starten, jetzt sollte Scheduler hochkommen). Kein Pre-Truncate nötig (war schon). K7-Caps-Pin-Verify wie gehabt.
-- **E3-Restart-Tag:** jetzt **endgültig nicht mehr blockiert.** Nach erfolgreichem Restart: Plan §11 Operator-Aktion #5 + Runbook v2 §3. Empfehlung: morgen früh (Mo 2026-09-08 = Tag 1, oder Di).
+- **Live-Stand (post Session #16, vor Nikinger-Restart-Versuch #3):** Scheduler **DEAD** (TypeError als letzte Log-Zeile), Recorder **ALIVE** (PID 268859), Discovery **ALIVE** (PID 268871), WebUI **ALIVE** (PID 268921). Logs wurden **NICHT** von Nikinger nochmal truncatet (war nach Hotfix #1 auch nicht nötig — Scheduler hängt im ersten Cycle). **Empfehlung nächste Aktion (Nikinger):** `bash scripts/restart-services.sh start` (Scheduler sollte jetzt hochkommen). Falls ein 4. Bug auftaucht, neuer Truncate + Logs teilen.
+- **E3-Restart-Tag:** wenn dieser Restart erfolgreich ist, dann **endgültig unblocked.** Tag 1 = morgen (Mo 2026-09-08) wäre perfekt.
 - **E4 (Tagesroutine + Closeout)**: nach E3 in der Folgesession.
-- **Push-Freigabe-Stand:** Nikinger hat zwischen #14 und #15 0 Commits gepusht (last push Session #13). Diese Session **2 Commits pending** (`a774aec` Hotfix + dieser Final-Rotation). Plus 9 Commits pending aus Sessions #13 + #14. **Branch lokal 11 ahead of origin/main = e66be3a. Nikinger-Push-Freigabe erwartet** (Sammel-Push Session-#12/#13/#14/#15 in einer Nikinger-Aktion empfohlen).
+- **Push-Freigabe-Stand:** Nikinger hat zwischen #15 und #16 0 Commits gepusht. Diese Session **2 Commits pending** (`8363903` Hotfix #2 + dieser Final-Rotation). Plus 11 Commits pending aus Sessions #13 + #14 + #15. **Branch lokal 13 ahead of origin/main = e66be3a.**
 
 ### Next (für die Folgesession)
 
-- **Scheduler-Restart (Nikinger-Aktion, jetzt wirklich unblocked):** `bash scripts/restart-services.sh start` (alle 4 frisch starten — Recorder/Discovery/WebUI starten ohnehin neu, Scheduler sollte jetzt ohne Crash hochkommen dank Hotfix). → `sleep 30` + K7-Caps-Pin-Verify (`account=demo, max_trades=5, daily_loss_cap=1800.0, cycle=5min`). → Falls Scheduler crasht: Log anhängen, gemeinsam analysieren.
-- **E3 — Runbook-Start nach erfolgreichem Scheduler-Restart (Nikinger-Aktion, Runbook v2 §0 Reihenfolge):** Schritt 1 = Pflicht-Operator-SQL ✅ DONE (Session #13, Commit `6279874`) → Schritt 2 = v2 §2 Pre-Flight (alle Drift-Korrekturen aus v2 sind eingepreist) → Schritt 3 = v2 §2.6 Prereg-Aktiv-Block ✅ DONE (Commit `6279874`) → Schritt 4 = v2 §3 Restart-Sequenz (Restart war gerade, also als „done" markiert; K7-Caps-Pin war die Verifikation) → Schritt 5 = v2 §4 Day-0-Checks Timeline (5min/30min/4h/24h, alle SQL-Queries mit korrigierten Spalten aus v2) → Schritt 6 = v2 §5 Tagesroutine (täglich `--day`) → Schritt 7 = v2 §8 Tag-10-Closeout.
+- **Scheduler-Restart-Versuch #3 (Nikinger-Aktion, hoffentlich letzter):** `bash scripts/restart-services.sh start` (alle 4 frisch starten — Scheduler sollte jetzt hochkommen dank Hotfix #2). → `sleep 30` + K7-Caps-Pin-Verify (`account=demo, max_trades=5, daily_loss_cap=1800.0, cycle=5min`). → Falls Scheduler crasht: Log teilen.
+- **E3 — Runbook-Start nach erfolgreichem Scheduler-Restart (Nikinger-Aktion, Runbook v2 §0 Reihenfolge):** Schritt 1 = Pflicht-Operator-SQL ✅ DONE (Session #13) → Schritt 2 = v2 §2 Pre-Flight → Schritt 3 = v2 §2.6 Prereg-Aktiv-Block ✅ DONE → Schritt 4 = v2 §3 Restart-Sequenz (Restart war gerade, also als „done" markiert) → Schritt 5 = v2 §4 Day-0-Checks Timeline → Schritt 6 = v2 §5 Tagesroutine → Schritt 7 = v2 §8 Tag-10-Closeout.
 - **E4 — Tagesroutine + Closeout**: ab Tag 1 täglich `autonomy_report.py --day`. Nach Tag 10: `--summary`, bei `overall_verdict == "PASS"` Closeout-Handover + SVG + Status-Pflege.
-- **PHASE16_CLOSEOUT_HANDOVER.md + docs/architecture/phase16_activation.svg** nach Tag 10 (Phase-16-Abschluss, Runbook v2 §8).
-- **Phase-17-Material (Watch-Item):** Import-Smoke-Test für `scripts/wiring.py` (Phase-1/-7/-8-Konvention „operator-run, not pytest-collected" braucht eine Hintertür für Cross-Phase-Edit-Smoke-Tests).
 
 ### Watch-Item / Plan-Hygiene (für spätere Sessions)
 
 - **Pflicht-Operator-SQL §1 v2**: ✅ DONE (Session #13, Commit `6279874`).
-- **Staffelung via `marginDepositBands`** (Plan §13 #8): unverändert Phase-17-Material.
-- **Hybrid-Test-Ansatz** (Session #11 Findings): unverändert Phase-17-Material wenn CI-Run gewünscht.
-- **Runbook-Supersede-Disziplin** (P11): wenn nach E3 etwas am Runbook fehlt, kein Edit am bestehenden Runbook — neues, datiertes, supersedendes Doc (`PHASE16_E3_RUNBOOK_v3.md`) mit Begründung.
-- **Phase-17-Kandidaten** (aus dem Runbook herausgelesen): Prozess-Supervision (systemd-User-Unit + Auto-Restart nach Reboot + Keyring ohne Login); Strategie-Bewertung (Watch-Items W1 BUY-Bias, W2 DAX-Only → Win-Rate / Sharpe / P&L); **NEU:** Import-Smoke-Test für `scripts/wiring.py` (Verhinderung von Doppel-Regression-Bugs wie der jetzige).
+- **Staffelung via `marginDepositBands`** (Plan §13 #8): Phase-17-Material.
+- **Hybrid-Test-Ansatz** (Session #11 Findings): Phase-17-Material.
+- **Runbook-Supersede-Disziplin** (P11): wenn nach E3 etwas am Runbook fehlt, kein Edit — neues, datiertes, supersedendes Doc.
+- **Phase-17-Kandidaten:** Prozess-Supervision; Strategie-Bewertung; **dringend: Import-Smoke-Test für `scripts/wiring.py`** (jetzt 3-mal empirisch bestätigt: D2.6-Code ohne Smoke-Test = 3 Bugs).
 - **Phase-9-Discovery-Filter** (`is_weekend_market`): strukturelle Lösung für die 3-Epics-Lücke.
-- **Phase-15-`requires-python` Align-Option:** falls Nikinger strikt `>=3.12` statt `>=3.11` will, 1-Zeilen-Edit in `phase15_v4/pyproject.toml` und Re-Install.
+- **Phase-15-`requires-python` Align-Option:** falls Nikinger strikt `>=3.12` statt `>=3.11` will, 1-Zeilen-Edit.
+- **Phase-15-Wiring-Doku (Phase-17-watch):** 3 Konstruktor-Signaturen prominent dokumentieren in Phase-15-Repo.
 
 **Block-Status nach dieser Session (endgültig):**
 
@@ -177,9 +169,10 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 | E (Autonomie-Test, Vorregistrierung) | ✅ E1 endgültig in docs (Session #6) |
 | E (Autonomie-Test, E2) | ✅ E2 endgültig in code (Session #11) |
 | E (Autonomie-Test, E3 Runbook) | ✅ E3 Runbook v2 endgültig in docs (Session #13, supersedet v1) |
-| E (Autonomie-Test, Pre-Step Phase-15-install) | ✅ endgültig in packaging (Session #14: pyproject.toml + setup.cfg + dev_install.sh) |
-| E (Autonomie-Test, Hotfix Typo-Bug) | ✅ endgültig in code (Session #15: 2 Zeichen in wiring.py:400+406) |
-| E (Autonomie-Test, E3 Runbook-Start) | 🔴 offen [Nikinger-Aktion: restart, jetzt wirklich unblocked] |
+| E (Autonomie-Test, Pre-Step Phase-15-install) | ✅ endgültig in packaging (Session #14) |
+| E (Autonomie-Test, Hotfix Typo-Bug) | ✅ endgültig in code (Session #15) |
+| E (Autonomie-Test, Hotfix #2 Signatur) | ✅ endgültig in code (Session #16) |
+| E (Autonomie-Test, E3 Runbook-Start) | 🔴 offen [Nikinger-Aktion: restart, hoffentlich wirklich unblocked] |
 | E (Autonomie-Test, E4) | 🔴 offen [nach E3-Restart-Start] |
 
-**Push-Status dieser Session:** **2 Commits pending** (`a774aec` Hotfix wiring.py + dieser Final-Rotation), 0 Commits gepusht. Plus 9 Commits pending aus Sessions #13 + #14. **Branch lokal 11 ahead of origin/main = e66be3a. Nikinger-Push-Freigabe erwartet** (Sammel-Push Session-#12/#13/#14/#15 in einer Nikinger-Aktion empfohlen).
+**Push-Status dieser Session:** **2 Commits pending** (`8363903` Hotfix #2 + dieser Final-Rotation), 0 Commits gepusht. Plus 11 Commits pending aus Sessions #13 + #14 + #15. **Branch lokal 13 ahead of origin/main = e66be3a.**
