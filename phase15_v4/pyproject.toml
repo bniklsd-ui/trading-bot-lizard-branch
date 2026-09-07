@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phase15_v4"
+version = "0.1.0"
+description = "Phase 15 (V4) — Instinct-ECC package (Plan §6 Block C): aggregates closed-trade lessons + reward outcomes into structured Instincts, validates them deterministically, gates promotion to VETO 5 behind n_closed>=n_min AND enable_instinct_promotion. Schema (instincts table) is wörtlich nach phase7_reward_concept.md §7b + Migration 009 (lifecycle status). Five sub-modules: models / extractor (LLM, best-effort, never raises) / validator (deterministic, code-only) / promotion / bridge. Reactivated for Phase-16 runtime (Phase 15 was closed 2026-09-05 without runtime integration; Phase-16 D2.6 imports it from scripts/wiring.py:383)."
+requires-python = ">=3.11"
+# Packaging metadata only, enabling an editable install (`pip install -e`) so
+# `import instinct` resolves at runtime without sys.path hacks — same pattern
+# as `phase9_universe` (`universe`), `phase10_v3` (`abstain_lessons`),
+# `phase12_data_foundation` (`data_foundation`), `phase13_live_data`
+# (`live_data`) and `phase14_discovery` (`source_registry`). The sibling
+# `tests`/`scripts`/`CLAUDE.md`/`PHASE15_*.md` dirs are deliberately excluded
+# from the installed package. `phase1_broker_wrapper/.venv` is the target
+# venv — see `scripts/dev_install.sh` for the editable-install sequence.
+
+[tool.setuptools.packages.find]
+include = ["instinct*"]
