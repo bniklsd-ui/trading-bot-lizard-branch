@@ -397,7 +397,7 @@ def _build_reward_sink(broker: Any, db: Any) -> tuple[Any, Any]:
         config=ResearchConfig(),
     )
     instinct_cfg = InstinctConfig()
-    instinct_extractor = SingleShotInstinctExtractor(llm=llm, cfg=instinct_cfg)
+    instinct_extractor = SingleShotInstinctExtractor(llm_client=llm)
     instinct_validator = InstinctValidator()
     bridge = InstinctBridge(
         db=db,
