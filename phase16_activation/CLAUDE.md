@@ -164,4 +164,4 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 | E (Autonomie-Test, Vorregistrierung) | ✅ E1 endgültig in docs (Session #6) |
 | **E (Autonomie-Test, E2)** | ✅ **E2 endgültig in code** (Session #11); E3 Runbook-Start [Nikinger] + E4 Tagesroutine+Closeout offen |
 
-**Push-Status dieser Session:** **0 Commits gepusht** (in dieser Session), 2 Commits pending (`c55dcd4` + Final-Rotation) ahead of `origin/main` (= `fa69677`). **Nikinger-Push-Freigabe erwartet**, analog Session #10.
+**Push-Status dieser Session:** **2 Commits gepusht** (`e9c8aa7..11f315b main -> main`, 2026-09-07 nach Nikinger-Push-Freigabe im Session-Ende-Block) — Branch wieder synchron mit `origin/main = 11f315b`. Die zwischen `#10` und `#11` offen gebliebenen 2 Commits (`c55dcd4` E2-Code + diese Rotation) sind live.
