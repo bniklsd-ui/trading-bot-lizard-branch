@@ -401,8 +401,8 @@ def _build_reward_sink(broker: Any, db: Any) -> tuple[Any, Any]:
     instinct_validator = InstinctValidator()
     bridge = InstinctBridge(
         db=db,
-        extractor=intinct_extractor,
-        validator=intinct_validator,
+        extractor=instinct_extractor,
+        validator=instinct_validator,
         cfg=instinct_cfg,
     )
     sink = RewardSink(
