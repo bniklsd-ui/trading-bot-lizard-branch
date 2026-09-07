@@ -116,6 +116,44 @@ def assert_schema_floor(conn: Any, required: int = REQUIRED_SCHEMA_VERSION) -> i
             "`python phase2_persistence/scripts/init_db.py --db-path data/trading_bot.sqlite`."
         )
     return version
+
+
+class _RebuildingBarStream:
+    """Phase 16 D1.2: rebuild the bar-stream inner object on every (re)start.
+
+    ``IGLightstreamerClient`` snapshots CST/XST/endpoint/account_id at construction
+    (``ig_lightstreamer.py:232-233,256``). After IG rotates the session tokens during the
+    broker's ``_warm_session`` reconnect path, the runner's ``_restart_bar_stream``
+    (``runner.py:493-512``) must rebuild the inner object against the CURRENT broker
+    state — keeping the old handle would keep the old CST, get auth-rejected on the
+    next keepalive, and emit one CRITICAL per rotation directly into the A6 bucket.
+
+    The wrapper fulfils the runner's ``start`` / ``stop`` / ``restart`` duck-type
+    contract by calling a zero-argument ``build_fn`` that closes over the live
+    broker/observability path so each call reads the current values. ``stop()`` is a
+    no-op if no inner object was ever built (so a shutdown before the first start — or
+    a never-started arm — is safe).
+    """
+
+    def __init__(self, build_fn: Callable[[], Any]) -> None:
+        self._build = build_fn
+        self._inner: Any | None = None
+
+    def start(self) -> None:
+        self._inner = self._build()
+        self._inner.start()
+
+    def stop(self) -> None:
+        if self._inner is None:
+            return
+        try:
+            self._inner.stop()
+        finally:
+            self._inner = None
+
+    def restart(self) -> None:
+        self.stop()
+        self.start()
 _STATE_DIR = _DATA_DIR / "state"
 _CACHE_DIR = _DATA_DIR / "cache"
 _USAGE_LOG = _STATE_DIR / "llm_usage.json"            # shared 8-field token meter
@@ -1153,13 +1191,37 @@ def build_scheduler(
     # (the CHART path) remains built and importable — if a future account
     # tier / IG change re-enables CHART, only this build site needs to
     # swap back.
+    #
+    # Phase 16 D1.2: the recorder is **not** held directly any more — we wrap
+    # it in ``_RebuildingBarStream`` (defined above) so the LS client is
+    # rebuilt against the broker's CURRENT tokens on every ``start()`` /
+    # ``restart()``. After the first IG session-token rotation the bare
+    # recorder would still hold the boot-time CST/XST and get auth-rejected
+    # on the next keepalive (one CRITICAL per rotation into the A6 bucket).
     bar_stream = None
     if config.enable_bar_stream:
-        try:
+        from universe import UniverseStore
+
+        def _epics_in_measurable() -> list[str]:
+            """Own connection: UniverseStore reads from the shared DB on
+            every call. Cheap (single short transaction), and avoids
+            holding a long-lived store open in a closure that runs
+            for days.
+            """
+            store = UniverseStore(_DB_PATH)
+            try:
+                return [r.epic for r in store.measurable_universe()]
+            finally:
+                store.close()
+
+        def _build_recorder() -> Any:
+            """Phase 16 D1.2: build the bar recorder fresh — reads
+            ``broker``'s CURRENT tokens at call time. Cross-phase imports are
+            kept lazy so a build failure inside the wrapper (e.g. account
+            tier change disabled CHART) never raises during the daemon boot.
+            """
             from broker_wrapper.streaming.ig_lightstreamer import IGLightstreamerClient
             from live_data.stream import TickAggregatorRecorder
-            from universe import UniverseStore
-
             # The LS client shares the broker's CST/XST/endpoint/account_id
             # (the broker ``connect()`` ran in preflight — the same token
             # is reused; IG's ``account_id`` is part of the LS user field,
@@ -1170,20 +1232,7 @@ def build_scheduler(
                 account_id=broker._account_id,
                 lightstreamer_endpoint=broker._lightstreamer_endpoint,
             )
-
-            def _epics_in_measurable() -> list[str]:
-                """Own connection: UniverseStore reads from the shared DB on
-                every call. Cheap (single short transaction), and avoids
-                holding a long-lived store open in a closure that runs
-                for days.
-                """
-                store = UniverseStore(_DB_PATH)
-                try:
-                    return [r.epic for r in store.measurable_universe()]
-                finally:
-                    store.close()
-
-            recorder = TickAggregatorRecorder(
+            return TickAggregatorRecorder(
                 stream=ls_client,
                 archive=bar_archive,
                 epics_fn=_epics_in_measurable,
@@ -1192,9 +1241,12 @@ def build_scheduler(
                     config.observability_path, ev,
                 ),
             )
-            # The runner expects an object with ``start`` / ``stop`` (and
-            # optionally ``restart``); the recorder is exactly that.
-            bar_stream = recorder
+
+        try:
+            # The runner expects ``start`` / ``stop`` / (optionally)
+            # ``restart`` — the rebuilding wrapper is exactly that, and on
+            # every call it reads the broker's CURRENT tokens.
+            bar_stream = _RebuildingBarStream(_build_recorder)
         except Exception as exc:  # noqa: BLE001 — best-effort, log and continue
             logger.critical("bar stream build failed (daemon continues without it): %s", exc)
 
