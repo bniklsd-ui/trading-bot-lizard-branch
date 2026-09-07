@@ -232,3 +232,130 @@ def test_not_ok_market_info_env_is_no_trade(config: ExecutionConfig) -> None:
         _account(100_000), _price(1000), _FakeEnv(ok=False), 1.0, config
     )
     assert (size, reason) == (0.0, "market_info_snapshot_unavailable")
+
+
+# --- compute_size: Phase 16 D3.2 margin-based cap (L7 / AK11) ---------------
+
+
+def _market_info_with_margin(
+    *,
+    min_deal_size: float = 0.1,
+    margin_factor: float | None = None,
+    margin_factor_unit: str | None = None,
+) -> _FakeEnv:
+    """Build a market_info envelope that optionally carries the margin fields.
+
+    Field names mirror the Phase-1 ``MarketInfo.to_dict()`` shape (snake_case)
+    — see ``ig_adapter.py:get_market_info`` (Phase 16 D3.1).
+    """
+    data: dict[str, Any] = {"min_deal_size": min_deal_size, "currency": "EUR"}
+    if margin_factor is not None:
+        data["margin_factor"] = margin_factor
+    if margin_factor_unit is not None:
+        data["margin_factor_unit"] = margin_factor_unit
+    return _FakeEnv(ok=True, data=data)
+
+
+def test_size_from_risk_margin_factor_uses_margin_cap(config: ExecutionConfig) -> None:
+    """Phase 16 D3.2 (Plan §7 AK11): the Datenwoche-Grenzfall ``available=27_100, ask=24_500,
+    pv=1.0, mf=5.0`` ⇒ ``leverage_cap ≈ 22.12`` and ``margin_cap ≈ 21.0`` ⇒ **size = 21.0**.
+
+    Reproduces the empirical 2026-07-20 finding: 22.1 was REJECTED by IG, 22.0 accepted.
+    With the 5 % margin-headroom (``config.margin_headroom = 0.95``, D3.2 default),
+    the margin cap takes over the leverage cap and yields exactly the IG-friendly size.
+    Risk-budget 3 % (aggressive) chosen so the margin cap actually binds — with the
+    conservative 2 % the risk-budget (raw ≈ 18.07) undercuts both caps and the margin
+    cap is never exercised (which is fine, but doesn't *demonstrate* D3.2).
+    """
+    info = _market_info_with_margin(
+        margin_factor=5.0, margin_factor_unit="PERCENTAGE",
+    )
+    size, reason = compute_size(
+        _account(27_100), _price(24_500), info,
+        config.risk_pct_aggressive, config,
+    )
+    assert reason is None
+    # raw = 3% of 27_100 / 30 = 27.10
+    # leverage_cap = 27_100 × 20 / (24_500 × 1) = 22.12
+    # margin_cap  = 27_100 × 0.95 / (24_500 × 1 × 5/100) = 25_745 / 1_225 = 21.02
+    # min(27.10, 22.12, 21.02) = 21.02 -> rounded down to 0.1 = 21.0
+    assert size == 21.0
+
+
+def test_size_from_risk_without_margin_factor_is_bit_identical(config: ExecutionConfig) -> None:
+    """``margin_factor is None`` (the legacy / pre-D3.2 path) ⇒ the leverage cap is the only cap.
+
+    The plan verification: ``mf=None`` ⇒ **bit-identisch zu heute** (Plan §7 AK11 +
+    §6 D3.2).
+    """
+    # Same account / price / risk inputs as the margin-factor test, but WITHOUT
+    # the margin_factor fields in the market_info envelope.
+    size, reason = compute_size(
+        _account(27_100), _price(24_500), _market_info(0.1),
+        config.risk_pct_aggressive, config,
+    )
+    assert reason is None
+    # raw = 27.10, leverage_cap = 22.12 — same arithmetic as with a margin cap, minus
+    # the margin constraint. Rounded down = 22.1.
+    assert size == 22.1
+
+
+def test_size_from_risk_margin_factor_zero_does_not_apply_cap(config: ExecutionConfig) -> None:
+    """A 0-valued ``margin_factor`` falls back to the leverage cap (the ``> 0`` guard)."""
+    info = _market_info_with_margin(
+        margin_factor=0.0, margin_factor_unit="PERCENTAGE",
+    )
+    size, reason = compute_size(
+        _account(27_100), _price(24_500), info,
+        config.risk_pct_aggressive, config,
+    )
+    assert reason is None
+    assert size == 22.1  # same as the no-margin path
+
+
+def test_compute_size_logs_warning_on_unexpected_margin_factor_unit(
+    config: ExecutionConfig, caplog
+) -> None:
+    """A non-PERCENTAGE unit (legacy ``POINTS``, hypothetical ``BANDS`` …) is ignored with a
+    WARNING — the size falls back to the leverage cap, not fail-closed.
+
+    Plan §6 D3.2: "nur wenn margin_factor_unit == 'PERCENTAGE', sonst None + einmaliges
+    WARNING". A missing factor must not silently deny trades (P10 fallback behaviour).
+    """
+    info = _market_info_with_margin(
+        margin_factor=5.0, margin_factor_unit="POINTS",
+    )
+    with caplog.at_level("WARNING", logger="execution.sizing"):
+        size, reason = compute_size(
+            _account(27_100), _price(24_500), info,
+            config.risk_pct_aggressive, config,
+        )
+    assert reason is None
+    # Same as the no-margin path: 27_100 × 20 / 24_500 = 22.12 -> 22.1.
+    assert size == 22.1
+    # WARNING surfaced, mentioning the unexpected unit so an operator grepping for it
+    # can correlate it with the IG response (and decide whether to extend D3.2).
+    assert any(
+        "POINTS" in rec.getMessage() and "leverage cap" in rec.getMessage()
+        for rec in caplog.records
+    ), [rec.getMessage() for rec in caplog.records]
+
+
+def test_compute_size_reads_margin_factor_from_market_info_unit_percentage(
+    config: ExecutionConfig,
+) -> None:
+    """The Phase-3.1 → Phase-3.2 wiring works end-to-end: the market_info envelope's
+    margin fields reach ``compute_size`` and the resulting size matches the
+    helper-level ``_size_from_risk(margin_factor_pct=...)`` path.
+    """
+    info = _market_info_with_margin(
+        margin_factor=10.0, margin_factor_unit="PERCENTAGE",
+    )
+    # IBEX-style 10 % margin: margin_cap = 27_100 × 0.95 / (24_500 × 1 × 0.10)
+    #                        = 25_745 / 2_450 = 10.51 -> 10.5 (rounded down to 0.1)
+    size, reason = compute_size(
+        _account(27_100), _price(24_500), info,
+        config.risk_pct_aggressive, config,
+    )
+    assert reason is None
+    assert size == 10.5

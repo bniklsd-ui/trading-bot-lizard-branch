@@ -122,6 +122,16 @@ class ExecutionConfig:
     risk_pct_conservative: float = 2.0     # percent; sizing.py divides by 100
     risk_pct_aggressive: float = 3.0       # percent; sizing.py divides by 100
     max_leverage: float = 20.0             # notional cap = balance × this (ESMA ceiling)
+    # Phase 16 D3.2 (L7 / AK11): fraction of available balance the margin cap may use.
+    # ``sizing.compute_size`` reads ``market_info.margin_factor`` (when ``margin_factor_unit
+    # == "PERCENTAGE"``) and computes ``margin_cap = (available_balance * margin_headroom)
+    # / (price * point_value * margin_factor / 100)``; the leverage cap above is the
+    # fallback when IG has no per-instrument margin factor. The 0.95 below (vs. a full
+    # 1.0) is the deliberate **5 % buffer** against IG's per-band staggering — empirical
+    # observation from the 2026-09-07 ``probe_market_margin.py`` run shows IG steps the
+    # factor up at named notional bands (e.g. DAX 5 % until 2800 EUR trade notional, then
+    # 15 %). 0.95 absorbs most of those band jumps at the cost of a tiny size reduction.
+    margin_headroom: float = 0.95
     # v1.5 (Issue C — multi-instrument sizing): per-epic account-currency value of ONE
     # index point, used by Gate-4 sizing (``risk / (stop_pts × point_value)``) and the
     # reconstructed ``initial_risk``. Default ``{}`` → every epic falls back to 1.0

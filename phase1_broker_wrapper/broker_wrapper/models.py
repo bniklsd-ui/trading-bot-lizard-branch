@@ -62,6 +62,17 @@ class MarketInfo:
     value_of_one_pip: str | None = None
     one_pip_means: str | None = None
     contract_size: str | None = None
+    # Additive (2026-09-05, Phase 16 D3.1, L7 / AK11): IG's per-instrument margin
+    # requirement (``instrument.marginFactor`` / ``marginFactorUnit``), used by
+    # Phase-5 sizing as a margin-based notional cap. ``margin_factor`` is a float
+    # (e.g. ``5.0`` for 5 % on DAX); ``margin_factor_unit`` is the IG-reported unit
+    # string ("PERCENTAGE" is the one the sizing code can consume, anything else
+    # triggers a one-shot WARNING + fall back to the leverage cap). ``None`` if IG
+    # omits either field — consumer MUST handle the absence (legacy behaviour,
+    # no margin cap). See `probe_market_margin.py` for the empirical confirmation
+    # across DAX/IBEX/AEX (2026-09-07).
+    margin_factor: float | None = None
+    margin_factor_unit: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

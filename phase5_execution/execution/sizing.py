@@ -31,9 +31,13 @@ hold. Round **down** to the 0.1 IG CFD step; ``0.0`` on any non-positive input.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from execution.config import ExecutionConfig
+
+logger = logging.getLogger(__name__)
+
 
 def _size_from_risk(
     *,
@@ -43,19 +47,29 @@ def _size_from_risk(
     price: float,
     max_leverage: float,
     point_value: float = 1.0,
+    margin_factor_pct: float | None = None,
+    margin_headroom: float = 1.0,
 ) -> float:
-    """Risk-per-trade size, leverage-capped, rounded **down** to the 0.1 IG step.
+    """Risk-per-trade size, leverage-capped (and margin-capped when available), rounded **down** to the 0.1 IG step.
 
     ``risk_pct`` is a **fraction** here (``compute_size`` passes ``config %`` ÷ 100).
     The size is the position whose loss at the stop ≈ ``available_balance × risk_pct``::
 
         raw_size = (available_balance × risk_pct) / (stop_distance_points × point_value)
 
-    A notional ceiling ``cap_size = (available_balance × max_leverage) / (price ×
-    point_value)`` guards against the risk model requesting more margin than the
-    account can hold (it only bites pathological cases — e.g. a tiny stop distance on
-    a large balance — never normal ~€1K sizing). Returns ``0.0`` on any non-positive
-    balance, stop distance or price (fail-safe), never a negative size.
+    Two notional ceilings, applied as ``min()``:
+      - ``leverage_cap = (available_balance × max_leverage) / (price × point_value)``
+        — the existing ESMA-style fallback cap.
+      - ``margin_cap = (available_balance × margin_headroom) / (price × point_value ×
+        margin_factor_pct / 100)`` — the **margin-based** cap. Only applied when
+        ``margin_factor_pct is not None and > 0``; otherwise the leverage cap wins
+        (the historical, pre-Phase-16 behaviour — D3.2's primary fail-closed path is
+        still in the leverage cap).
+    ``margin_factor_pct`` here is the IG ``marginFactor`` value as a **percent**, not a
+    fraction (e.g. DAX = 5.0, IBEX = 10.0). Phase-10-Fallback (Plan §1 P10): missing
+    factor ⇒ leverage cap = today, **not** fail-closed — a missing factor must not
+    silently deny trades. Returns ``0.0`` on any non-positive balance, stop distance
+    or price (fail-safe), never a negative size.
     """
     if available_balance <= 0 or stop_distance_points <= 0 or price <= 0:
         return 0.0
@@ -63,6 +77,10 @@ def _size_from_risk(
     raw_size = risk_amount / (stop_distance_points * point_value)
     # Notional/leverage safety cap — never request more margin than the account holds.
     cap_size = (available_balance * max_leverage) / (price * point_value)
+    # Phase 16 D3.2 margin cap (Phase-IG-per-instrument); only active when IG supplies it.
+    if margin_factor_pct is not None and margin_factor_pct > 0:
+        margin_cap = (available_balance * margin_headroom) / (price * point_value * margin_factor_pct / 100.0)
+        cap_size = min(cap_size, margin_cap)
     sized = min(raw_size, cap_size)
     # Round DOWN to the 0.1 IG CFD step so we never exceed the risk budget.
     return max(0.0, int(sized * 10) / 10.0)
@@ -136,6 +154,27 @@ def compute_size(
 
     point_value = config.point_value_for(epic_for_pv)
 
+    # Phase 16 D3.2 (L7 / AK11): margin-based notional cap. Only consumed when
+    # ``margin_factor_unit == "PERCENTAGE"`` (the format IG uses for the indices
+    # we trade — see ``probe_market_margin.py`` 2026-09-07 for the empirical
+    # confirmation across DAX/IBEX/AEX). Any other unit (e.g. legacy ``POINTS``)
+    # logs a one-shot-style WARNING and falls back to the leverage cap — a missing
+    # / unrecognised factor must not silently deny trades (Plan §1 P10). Missing
+    # factor (``margin_factor is None``) silently falls back to the leverage cap,
+    # today's behaviour.
+    raw_margin_factor = (market_info_env.data or {}).get("margin_factor")
+    raw_margin_factor_unit = (market_info_env.data or {}).get("margin_factor_unit")
+    if raw_margin_factor is not None and raw_margin_factor_unit == "PERCENTAGE":
+        margin_factor_pct: float | None = float(raw_margin_factor)
+    elif raw_margin_factor is not None and raw_margin_factor_unit is not None:
+        logger.warning(
+            "margin factor unit %r is not 'PERCENTAGE' (epic=%s); falling back to the leverage cap",
+            raw_margin_factor_unit, epic_for_pv,
+        )
+        margin_factor_pct = None
+    else:
+        margin_factor_pct = None
+
     # Config risk_pct is a PERCENT (2.0 → 2.0%); the helper takes a fraction.
     size = _size_from_risk(
         available_balance=available,
@@ -144,6 +183,8 @@ def compute_size(
         price=ask,
         max_leverage=config.max_leverage,
         point_value=point_value,
+        margin_factor_pct=margin_factor_pct,
+        margin_headroom=config.margin_headroom,
     )
 
     if size < min_deal_size:

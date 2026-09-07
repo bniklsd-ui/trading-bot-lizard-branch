@@ -437,7 +437,43 @@ def test_get_market_info_to_dict_roundtrip_keys():
         "epic", "name", "instrument_type", "currency", "expiry",
         "min_deal_size", "lot_size", "market_status",
         "value_of_one_pip", "one_pip_means", "contract_size",
+        "margin_factor", "margin_factor_unit",
     }
+
+
+def test_get_market_info_extracts_margin_factor():
+    """Phase 16 D3.1 (L7 / AK11): ``marginFactor`` is parsed to float, ``marginFactorUnit`` is the raw IG unit string.
+
+    Confirms the value-side path (the notional-cap math in sizing lives in Phase 5):
+    a 5 %/POINTS body yields ``margin_factor == 5.0`` and ``margin_factor_unit == "PERCENTAGE"``
+    in the envelope ``data``; a body with the fields absent yields ``None`` (no crash,
+    no fallback to 0.0 — Phase-5 sizing treats ``None`` as "no margin cap, use the
+    leverage cap"). Mirrors the probe (2026-09-07, DAX marginFactor=5 PERCENTAGE).
+    """
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body=_market_info_body(
+            marginFactor=5, marginFactorUnit="PERCENTAGE",
+        ))
+        env = a.get_market_info("IX.D.DAX.IFMM.IP")
+
+    assert env.ok is True
+    assert env.data["margin_factor"] == 5.0
+    assert env.data["margin_factor_unit"] == "PERCENTAGE"
+
+
+def test_get_market_info_missing_margin_factor_fields_are_none_not_crash():
+    """A body without ``marginFactor`` / ``marginFactorUnit`` (e.g. a future non-CFD instrument)
+    yields ``None`` for both — sizing's "fall back to the leverage cap" path is the consumer.
+    """
+    a = _authed_adapter()
+    with patch.object(a._session, "request") as req:
+        req.return_value = _mock_response(json_body=_market_info_body())
+        env = a.get_market_info("IX.D.FTSE.IFD.IP")
+
+    assert env.ok is True
+    assert env.data["margin_factor"] is None
+    assert env.data["margin_factor_unit"] is None
 
 
 # --- Step 3 test backfill (Phase 1 hardening plan §5) ------------------------

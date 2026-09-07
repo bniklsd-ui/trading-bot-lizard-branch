@@ -500,6 +500,14 @@ class IGAdapter(BrokerAdapter):
                     value_of_one_pip=instr.get("valueOfOnePip"),
                     one_pip_means=instr.get("onePipMeans"),
                     contract_size=instr.get("contractSize"),
+                    # Phase 16 D3.1 (L7 / AK11): IG's per-instrument margin requirement
+                    # (raw). `_safe_float` is the existing Phase-1 hardening helper
+                    # (ig_adapter.py:946) — used identically here so a non-numeric or
+                    # missing field resolves to None without a Hard-Rule-1 / Hard-Rule-3
+                    # touch. ``margin_factor_unit`` is the raw IG string; Phase-5 sizing
+                    # narrows it to "PERCENTAGE" itself.
+                    margin_factor=_safe_float(instr.get("marginFactor")),
+                    margin_factor_unit=instr.get("marginFactorUnit"),
                 )
                 return ok_envelope(
                     broker=self.name, method="get_market_info",
