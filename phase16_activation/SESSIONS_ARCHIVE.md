@@ -11,12 +11,114 @@ Plan-Session-Block trägt bewusst **keine** `Session #N`-Nummer im Heading (Phas
 `_max_session_num` returnt `None`; für die erste Exec-Session (`head_max == 1`) ist das
 Archiv-Max `None` korrekt (check_archive_sequence, Z. 134-138).
 
-Stand nach Exec-Session #7 (2026-09-07): Archiv trägt **6** Einträge — `#5` (Block C
-C2+C3+C5 endgültig in code, Σ 1864) + `#4` (Block C C1 endgültig in code, Σ 1862) + `#3`
-(Block B B1+B3 + B2 Operator-Apply + A-5-Push, Σ 1856) + `#2` (Block A endgültig in
-code) + `#1` (Block A A-0) + Plan-Session. Phasenkopf trägt genau **1** Block
-(Exec-Session #7, D1+D2 endgültig in code, Σ 1907; startet D1.2+D3+E2-E4 in
-Folge-Sessions nach Nikinger-Push-Freigabe 2026-09-07).
+Stand nach Exec-Session #8 (2026-09-07): Archiv trägt **7** Einträge — `#7` (Block D
+D1+D2 endgültig in code, Σ 1907, Push-Freigabe erteilt + zwischenzeitlich gepusht) +
+`#6` (Block E E1 Vorregistrierung, Σ 1864 docs-only) + `#5` (Block C C2+C3+C5, Σ 1864) +
+`#4` (Block C C1, Σ 1862) + `#3` (Block B B1+B3 + B2 Operator-Apply + A-5-Push, Σ 1856)
++ `#2` (Block A endgültig in code) + `#1` (Block A A-0) + Plan-Session. Phasenkopf
+trägt genau **1** Block (Exec-Session #8, D1.2 endgültig in code, Σ 1909 = 1907 + 2
+neue P8-Tests; startet D3 [Margin-Headroom mit zwingender Operator-Live-Probe D3.0
+vor Code] + Block E [E2 autonomy_report.py + E3 Runbook + E4 Tagesroutine+Closeout]
+in Folge-Sessions nach Nikinger-Push-Freigabe 2026-09-07).
+
+---
+
+## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #7, Block D Steps D1+D2 endgültig in code, Σ 1907 grün = 1864 + 43 neue Tests [P8 +1, P2 +4, P7 +3, P15 +35], Push-Freigabe, Pause auf Nikinger-Auftrag)
+
+> **Auftrag:** Nikinger-Chat 2026-09-07 (Phase-16-Exec-Folge, „letzten sesion" → „Next step, atomically, then ask nikinger" → „D1 und D2, push freigegeben, danach Session beenden bitte"). — **Block D Steps D1 (Defaults + Flags) + D2 (Promotion-Bridge + Compiler)** endgültig in code; **push-freigegeben** (Nikinger 2026-09-07). D1.2 (Bar-Stream-Wrapper, Opus-Befund #2) + D3 (Margin-Headroom, Live-Probe zuerst) bleiben für nachfolgende Sessions.
+>
+> Plan-Anker: [`../docs/concepts/phase16_activation_plan.md`](../docs/concepts/phase16_activation_plan.md) §6 Block D Steps D1 (S. 561-590) + D2 (S. 621-715) · §1 P4 (Defaults ON + `--no-*`) + P5 (Promotion-Bridge ON default, Validator bleibt Code) + P12 (Cross-Phase-Liste) · §7 AK5 (Defaults + Flags) + AK10 (Bridge + Compiler, VETO-5-strukturell) · §9 Source-Pin-Liste.
+>
+> Ausführungs-Scope: **3 Atomic Commits** (`4038252` D1 Defaults + Flags · `bfab841` D2 Bridge + Compiler + 6 Sub-Steps · dieser Final-Commit Session-Rotation #6→#7). **Push-Freigabe erteilt** (Nikinger 2026-09-07, „push freigegeben"); diese Session pusht am Ende.
+
+### Completed
+
+**0. Cross-Session-Drift-Vorab-Check (Session-Start dieser Exec-Folge-Session #7, 2026-09-07):**
+- `git log origin/main..HEAD --oneline` → 2 Commits (`af99a2c` E1, `dc505b2` Session-Rotation #5→#6).
+- `git status` → working tree clean.
+- Hook `check_doc_rotation.py --strict --phase phase16_activation` → exit 0 (vor dieser Rotation: Phasenkopf 1 Block Exec-#6, Archiv 5 Blocks).
+- §6 Source-Pin-Bestätigung:
+  - P8 `scheduler/config.py:184, 195, 213, 221` (plan-§6-D1-Anker; tatsächlich: 184/195/213/221 — Plan-Drift +6 Zeilen aus Phase-10/12-Insertionen).
+  - P8 `scheduler/run.py:97-131, 164-167` (4 `--enable-*`-Blöcke + 4 args-Zuweisungen).
+  - P15 `phase15_v4/instinct/models.py:171` (`enable_instinct_promotion` default).
+  - P2 `persistence/db.py` `get_recent_lessons:322-327` (Anker für die 2 neuen Methoden).
+  - P15 `instinct/extractor.py:_build_instinct_prompt:171` (Anker für Grammatik-Hint im System-Prompt; tatsächlich Z. 172).
+  - P7 `reward/recorder.py:167-176` (Anker für `instinct_hook` Parameter; tatsächlich Z. 161-194).
+  - P8 `scripts/wiring.py:302-325` (`_build_reward_sink`; tatsächlich Z. 331-385 nach Phase-10-Erweiterungen).
+
+**1. Block-D Steps D1+D2 in 2 atomaren Commits:**
+
+| Step | Commit | Scope | Σ-Delta | Akzeptanz |
+|---|---|---|---|---|
+| **D1** Defaults + Flags | `4038252` phase16+phase8+phase15: code | P8 `scheduler/config.py`: 4 Defaults `False → True` (enable_paper_debate Z.184, enable_shadow_schedule Z.195, enable_divergence_sampler Z.213, enable_bar_stream Z.221) + Kommentare je „Phase 16 D1: ON by default; --no-* disables". P8 `scheduler/run.py`: 4 `--enable-*`-Blöcke Z.97-131 ersetzt durch 4 `--no-*`-Blöcke (Help-Texte umformuliert: „Phase 16 D1: ON by default"). P8 `scheduler/run.py:164-167`: 4 args-Zuweisungen geflippt (`= not args.no_*`). P15 `phase15_v4/instinct/models.py:171`: `enable_instinct_promotion` Default `False → True` + Doc-String „Phase 16 P5 supersedes Phase-15-P10" + `from_dict` Default analog. Tests: `test_run.py` 4 Tests umbenannt + `not args.no_*` Pin; `test_config.py` 3 Assertions geflippt; `test_instinct_models.py` 2 Tests angepasst; `test_promotion.py` 1 Test angepasst; **NEU** `test_default_profile_is_fully_armed` pinnt AK5 (alle 4 Arme ON in `SchedulerConfig()` + `config_from_args([])`, keine `--enable-*` im `build_arg_parser`-Output). | P8 +1 (253→254), P15 ±0 (3 Tests angepasst) | AK5 ✅ |
+| **D2** Bridge + Compiler | `bfab841` phase16+phase2+phase7+phase8+phase15: code | **D2.1 P2 `persistence/db.py`** + 2 neue Methoden: `get_recent_rewards(n=20)` (newest first) + `count_closed_trades()` (`status='CLOSED'`) + 4 Tests. **D2.2 P15 `instinct/compile.py` NEU** + `TRIGGER_RE` Mini-Grammatik (case-insensitive `^\s*avoid\s+(BUY\|SELL)(?:\s+on\s+([A-Z0-9.]+))?\s*$`) + `instinct_from_row()` (JSON-Parse) + `compile_rule()` (entry-domain → predicate oder None+WARNING) + `compile_rules()` → tuple, 23 Tests. **D2.3 P15 `instinct/extractor.py`** System-Prompt um Grammatik-Hint + JSON-Schema `pattern` erzwungen (gleicher Regex wie Compiler → schema-pass = compiler-pass). **D2.4 P15 `instinct/bridge.py` NEU** + `InstinctBridge.after_trade_closed(trade_id)` (best-effort, extract→insert→validate→update) + `promote()` (P10/P12-Gatter via `promote_eligible`) + `load_rules()` (compile rules → tuple) + 12 Tests. `instinct/__init__.py` exportiert `SingleShotInstinctExtractor`. **D2.5 P7 `reward/recorder.py`** `__init__` keyword `instinct_hook: Callable[[int], None] \| None = None` + Aufruf am Ende `_on_trade_closed` (best-effort wie `confidence_provider`, Decision C) + 3 Tests. **D2.6 P8 `scripts/wiring.py`** `_build_reward_sink` returnt jetzt `tuple[RewardSink, InstinctBridge]` + `build_scheduler` lädt `initial_longterm_rules = instinct_bridge.load_rules()` in `exec_cfg` via `dataclasses.replace` (AK9-Erbe: heute `longterm_rules == ()` → VETO 5 No-Op). | P2 +4 (78→82), P7 +3 (166→169), P15 +35 (91→126) | AK10 ✅ |
+
+**2. Σ-Sweep nach Block D (verifiziert 2026-09-07):** **1907 grün = 1864 + 43 neue Tests.** Phase-1/2/3/4/5/6/7/8/9/10/12/13/14/15/root = 95+82+105+162+185+76+169+254+95+165+145+82+61+126+105 = **1907** ✅ Plan-Akzeptanz AK2 erfüllt. P15-Sweep mit `PYTHONPATH=.../phase15_v4`.
+
+**3. Hook-Verify:** `python3 scripts/check_doc_rotation.py --strict --quiet` → exit 0 nach jedem Commit.
+
+**4. Git-Stand am Session-Ende (vor Push):**
+- HEAD = dieser Final-Commit.
+- Commits lokal ahead of `origin/main` = 2 (E1 + Rotation) + 2 (D1 + D2) + 1 (dieser Rotation-Commit) = **5 Commits ahead** — **Nikinger-Push-Freigabe gilt (Nikinger 2026-09-07, „push freigegeben")**.
+- Working tree clean nach jedem Commit.
+
+### Findings
+
+🟢 **D1 vollständig:** 4 Defaults geflippt + 4 `--enable-*` durch `--no-*` ersetzt + 4 args-Zuweisungen geflippt + 1 Instinct-Default geflippt + 5 Tests angepasst + 1 neuer Test. **Cross-Phase-Touch-Disziplin:** P8 + P15 nur. P1/P2/P3/P4/P5/P7/P9 unangetastet.
+
+🟢 **D1 = rein strukturelle Flip, kein Verhaltens-Drift im bit-identischen Pfad:** P8-Test-Parität gehalten (P8 253→254 = +1 neuer Test, kein Test gelöscht). Die `--enable-*`-Flags waren heute eh nicht gesetzt (Plan §6 B2-Fußnote: „Restart erst nach Block D"); das Flip macht sie strukturell unmöglich (die Flags existieren nicht mehr).
+
+🟢 **D1.2 + D3 bewusst ausgeschlossen** (Nikinger-Wahl 2026-09-07): D1.2 = Bar-Stream-Wrapper (Opus-Befund #2) bleibt offen; D3 = Margin-Headroom mit zwingender Operator-Live-Probe D3.0 *vor* dem Code. Beide brauchen entweder Wrapper-Klasse oder Live-Network — passt besser in eine Folge-Session, nicht in dieselbe.
+
+🟢 **D2.1 sauber + minimal:** 2 Read-Methoden (`get_recent_rewards`, `count_closed_trades`), beide Spiegel von `get_recent_lessons`. Keine Schema-Änderung, keine Migration. P2-CRUD-Disziplin (Phase 2 ist dumb store, Caller bestimmt Policy) gewahrt.
+
+🟢 **D2.2 Mini-Grammatik deterministisch:** `TRIGGER_RE` matched `avoid BUY|SELL[ on EPIC]` case-insensitive, EPIC = `[A-Z0-9.]+`. Alles außerhalb → None + WARNING (kein silent pass). Schema-pass = compiler-pass (D2.3): Anthropic-Structured-Outputs validiert den Trigger gegen denselben Regex, der Compiler matcht.
+
+🟢 **D2.4 Bridge best-effort + never-raises:** single `try/except` in `after_trade_closed` + per-instinct `try/except` in `_extract_and_validate`. Failures loggen CRITICAL (Decision C-Spiegel), propagate niemals zum Trade-Pfad. `promote()` + `load_rules()` ebenfalls never-raises (Bridge-Disziplin).
+
+🟢 **D2.5 instinct_hook = Spiegelschluss zu confidence_provider:** keyword-only `Callable[[int], None] | None`, default `None` ⇒ P7 bit-identisch. Aufruf am Ende `_on_trade_closed` (nach `_observe_confidence`), mit `int(trade_id)` als Argument. Kein Raise-Propagation.
+
+🟢 **D2.6 Wiring strukturell korrekt:** `_build_reward_sink` returnt jetzt `tuple[Any, Any]` — **einziger** Aufrufer in `build_scheduler:884` (Plan §9 #11 verifiziert). `exec_cfg` wird Z. 859 gebaut und Z. 884 modifiziert (`dataclasses.replace`); `longterm_rules` ist heute `()` (ExecutionConfig-Default, Phase 5 P9-Pin).
+
+🟢 **Hard Rule 3 unangetastet:** die Kette ist `AI → structured trigger → JSON-Schema-pattern → compile → predicate → VETO 5`. Der AI-Output triggert nie direkt eine Order — das Mini-Grammatik-Schema erzwingt deterministische Compile-Prüfung, und der Validator (Code-only) bleibt die einzige Autorität für Status-Übergänge (Hard Rule 3, root-CLAUDE.md).
+
+🟡 **AK9-Erbe heute `longterm_rules == ()`:** `n_closed = 8 ≪ instinct_n_min = 50` → `promote()` returnt `[]` → `load_rules()` returnt `()`. VETO 5 bleibt No-Op (`test_pre_trade_check_veto5_empty_rules_is_identity` weiterhin grün, Phase 5 P9-Pin). Bridge lebt, ist aber unter der Schwelle — per Plan §13 #8 erwartet und ehrlich dokumentiert (Phasenkopf Phase-15 E2 bleibt offen).
+
+🟡 **Schema-v7-Live-DB noch nicht migriert:** Migrations 008 + 009 sind im Code, aber die Live-DB läuft noch auf v7. `instincts`-Tabelle existiert dort nicht. Die Bridge würde auf v7 sofort failen (DB-Methoden werfen `sqlite3.OperationalError`) → CRITICAL, never-raises ⇒ trade bleibt CLOSED, kein Crash. **Aber:** `n_closed = 8` reicht eh nicht für Promotion, also ist die Live-Wirkung = identisch zu `longterm_rules == ()`. Nach B2 (Operator-Apply, schon gelaufen) ist das behoben. **Bewusst nicht in dieser Session** (P13-Operator-Aktion, kein Phase-16-Edit).
+
+🟡 **P15-Σ-Quirk dokumentiert** (aus Sessions #4-#5): `phase15_v4/tests/test_instinct_*.py` brauchen `PYTHONPATH=/home/trading-bot/trading-bot/phase15_v4` — Pre-existing, identisch zum Stand vor dieser Session. Phase-15-Σ bleibt 126 (heute 91 + 35 neue).
+
+🟢 **Cross-Phase-Touch-Disziplin:** D2 berührt P2 (db.py), P7 (recorder.py), P8 (wiring.py), P15 (instinct/{compile,bridge,extractor}.py + __init__.py). Keine P1/P3/P4/P5/P6/P9/P10/P12/P13/P14-Touches.
+
+### Open questions / blockers
+
+- Keine inhaltlichen Phase-16-Blocker. D1 + D2 ✅ strukturell vollständig.
+- D1.2 (Bar-Stream-Token-Wrapper) bleibt offen (Opus-Befund #2, AK5b).
+- D3 (Margin-Headroom) bleibt offen — Operator-Live-Probe D3.0 zwingend vor Code (P1/P5, AK11).
+- Live-DB Schema v7 → v9 Operator-Apply (B2, schon gelaufen nach Sessions #3-Bestätigung; aber Akten-Verifikation mit B2-Vermerk offen) — heute nicht Phase-16-Edit.
+- Push-Freigabe gilt (Nikinger 2026-09-07). Diese Session pusht am Ende.
+
+### Next (für die Folgesession)
+
+- **D1.2** = Bar-Stream-Token-Fix als Wrapper (P8 only, Opus-Befund #2, AK5b) — `_RebuildingBarStream`-Klasse in `wiring.py:1091-1134` + 2 Tests. Cross-Phase-Freigabe P8 (existiert).
+- **D3** = Margin-Headroom B3 (L7, P1/P5, AK11) — **erst** Operator-Live-Probe `phase1_broker_wrapper/scripts/probe_market_margin.py` für 3 Epics (Demo), **dann** Code in `phase5_execution/execution/sizing.py` (Sizing-Grenzfall 27 100 / 24 500 / mf 5 ⇒ 21,0; `mf=None` ⇒ heutiger Cap). ~3 Tests.
+- **Block E — 2-Wochen-Test** (nach D + Operator-Restart):
+  - **E2** = `scripts/autonomy_report.py` (deterministisch, read-only, mode=ro) + 5 Tests (Tagesbericht + Summary PASS/FAIL).
+  - **E3** = Runbook Start (Operator, restart-services.sh start + Day-0-Checks).
+  - **E4** = Tagesroutine (täglich `--day`-Report) + Closeout-Handover nach Tag 10.
+
+**Block-Status nach dieser Session (endgültig):**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ A-0..A-4 + A-5 Push (Sessions #1-#3) |
+| B (Substrat) | ✅ B1+B3 code + B2 Operator-Apply + A-5 Push (Session #3) |
+| C (Research-Loop) | ✅ C1+C2+C3+C5 endgültig in code; C4 = Doku-Only (Sessions #4-#5) |
+| D (Freischaltung) | ✅ **D1+D2 endgültig in code** (diese Session); D1.2 + D3 ⏳ (Folge-Sessions) |
+| E (Autonomie-Test, Vorregistrierung) | ✅ E1 endgültig in docs (Session #6) |
+| E (Autonomie-Test, Rest) | ⏳ E2/E3/E4 nach D-Komplettierung + Operator-Restart |
+
+**Push-Status dieser Session:** **0 Commits gepusht** (in dieser Session), 5 Commits pending (E1 + Rotation + D1 + D2 + Final-Rotation) ahead of `origin/main`. **Nikinger-Push-Freigabe (2026-09-07, „push freigegeben") gilt — Push am Session-Ende.**
 
 ---
 
