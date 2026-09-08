@@ -15,6 +15,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger("data_foundation.heartbeat")
 
@@ -38,6 +39,51 @@ def _day_bounds_iso(day_utc: str) -> tuple[str, str]:
     end_date = datetime.strptime(day_utc, "%Y-%m-%d") + timedelta(days=1)
     end = end_date.strftime("%Y-%m-%dT00:00:00.000Z")
     return start, end
+
+
+# Recorder lag tolerance: how many minutes we shrink the right edge of the coverage
+# window. Measured 18 min on 2026-09-08 08:48 UTC (last yF bar 18 min behind wall-clock).
+# ``assess_window`` counts the gap between the last bar and ``end_dt`` as part of the
+# window, so without this trim a perfectly healthy session with a lagging recorder
+# reads as "5-min gap exceeded" right at the edge. 30 min is a deliberate safety
+# margin (18 min measured + 12 min slack) — the only knob to turn if the Recorder's
+# fetch cadence ever widens is **this constant**, NOT the 5-min ``largest_gap_min``
+# threshold (Phase 13 F3's "kein Loch mitten im Fenster" — still the right contract).
+RECORDER_LAG_TOLERANCE_MIN = 30
+
+# Coverage window — the Berlin trading session. Mirrors ``SchedulerConfig.window_open``
+# (``"09:00"``) and ``window_close`` (``"17:30"``) in ``phase8_scheduler/scheduler/config.py``.
+# Held as constants here rather than imported because Phase 12 does not import from
+# Phase 8; if these ever diverge, the heartbeat's coverage window must move with the
+# scheduler's trade window — that's an intentional single-knob check, not a bug.
+_SESSION_OPEN_BERLIN = (9, 0)
+_SESSION_CLOSE_BERLIN = (17, 30)
+_SESSION_TZ = ZoneInfo("Europe/Berlin")
+
+
+def _session_bounds_iso(day_utc: str) -> tuple[str, str]:
+    """Berlin trading-session bounds for ``day_utc`` as UTC ISO strings.
+
+    Phase 16 §3 J3 + J5: replaces the 00:00–24:00 UTC window for the **coverage**
+    check (the bars-today and paper-trade counters still use ``_day_bounds_iso`` —
+    those are wall-clock-aligned daily aggregates, not in-session coverage).
+
+    ``end_dt`` is shifted **earlier** by :data:`RECORDER_LAG_TOLERANCE_MIN` so the
+    trailing gap a lagging Recorder always produces doesn't get counted as a real
+    gap. The shift happens in UTC after the Berlin-to-UTC conversion so DST is
+    handled correctly (``zoneinfo`` carries it).
+    """
+    day = datetime.strptime(day_utc, "%Y-%m-%d").date()
+    start_local = datetime(day.year, day.month, day.day, _SESSION_OPEN_BERLIN[0],
+                            _SESSION_OPEN_BERLIN[1], tzinfo=_SESSION_TZ)
+    end_local = datetime(day.year, day.month, day.day, _SESSION_CLOSE_BERLIN[0],
+                          _SESSION_CLOSE_BERLIN[1], tzinfo=_SESSION_TZ)
+    start_utc = start_local.astimezone(timezone.utc)
+    end_utc = (end_local - timedelta(minutes=RECORDER_LAG_TOLERANCE_MIN)).astimezone(timezone.utc)
+    return (
+        start_utc.strftime("%Y-%m-%dT%H:%M:%S.") + f"{start_utc.microsecond // 1000:03d}Z",
+        end_utc.strftime("%Y-%m-%dT%H:%M:%S.") + f"{end_utc.microsecond // 1000:03d}Z",
+    )
 
 
 def assess_day(
@@ -71,6 +117,13 @@ def assess_day(
     from universe.store import UniverseStore
 
     start, end = _day_bounds_iso(day_utc)
+    # Phase 16 §3 J3: coverage on the trading session (Berlin 09:00–17:30 minus the
+    # Recorder's lag tolerance), not 00:00–24:00. The overnight gap otherwise reißt
+    # the 5-min ``largest_gap_min`` threshold on every single trading day, making
+    # K4 structurally unreachable since 2026-08-24 (10 consecutive ``ok=False``
+    # measurements). The bars-today + paper-trade counters stay wall-clock-aligned
+    # because they're daily aggregates, not coverage measures.
+    cov_start, cov_end = _session_bounds_iso(day_utc)
     bars_today = archive.bars_written_since(start, end)
 
     conn = sqlite3.connect(paper_db_path)
@@ -104,6 +157,10 @@ def assess_day(
     # unbrauchbar machen, ohne dass die Zählung das anzeigt. assess_window über das
     # Tages-Fenster ist die einzige preiswerte Operation, die beides misst (Dichte
     # und größte zusammenhängende Lücke).
+    #
+    # Phase 16 §3 J3: window = ``_session_bounds_iso`` (Berlin 09:00–17:30 minus
+    # Recorder lag), not ``_day_bounds_iso`` (00:00–24:00). The overnight gap
+    # otherwise reißt the 5-min ``largest_gap_min`` threshold on every trading day.
     from data_foundation.coverage import MIN_WINDOW_RATIO, assess_window
 
     worst_coverage = 1.0
@@ -115,10 +172,10 @@ def assess_day(
                 continue
             timestamps = [
                 b.ts_utc for b in archive.window(
-                    epic, "1m", start, end, sources=("yf",),
+                    epic, "1m", cov_start, cov_end, sources=("yf",),
                 )
             ]
-            verdict = assess_window(timestamps, start, end, 1)
+            verdict = assess_window(timestamps, cov_start, cov_end, 1)
             if verdict.ratio < worst_coverage:
                 worst_coverage = verdict.ratio
             if verdict.largest_gap_min > 5:  # MAX_WINDOW_GAP_MIN — same threshold as A1

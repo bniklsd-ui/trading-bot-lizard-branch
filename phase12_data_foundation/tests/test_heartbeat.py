@@ -406,3 +406,135 @@ def test_sampler_budget_veto_is_a_noop(archive):
     sampler = DivergenceSampler(_RefusingIG(), archive, health_sink=events.append)
     sampler.sample_epic(EPIC, lambda e: None, lambda e: None)
     assert events == []
+
+
+# -- Phase 16 §3 J3: coverage on the Berlin trading session ----------------------------
+
+
+def _insert_session_yf_bars(archive, epic: str, day: str) -> int:
+    """Insert one yF bar per minute from Berlin 09:00 to Berlin 17:30 of ``day``
+    (= UTC 07:00 to 15:30, CEST summer-time). Mirrors the production Recorder
+    output: dense during the session, nothing overnight. Used by the J3 session-
+    window tests below."""
+    from datetime import datetime, timedelta, timezone
+    from zoneinfo import ZoneInfo
+    tz_berlin = ZoneInfo("Europe/Berlin")
+    start_local = datetime.strptime(day, "%Y-%m-%d").replace(hour=9, minute=0, tzinfo=tz_berlin)
+    end_local = start_local + timedelta(hours=8, minutes=30)  # 09:00 → 17:30 Berlin
+    start_utc = start_local.astimezone(timezone.utc)
+    end_utc = end_local.astimezone(timezone.utc)
+    bars: list = []
+    cur = start_utc
+    while cur < end_utc:
+        ts = cur.strftime("%Y-%m-%dT%H:%M:00.000Z")
+        bars.append(Bar(epic=epic, resolution="1m", ts_utc=ts,
+                        open=1, high=1, low=1, close=1, volume=1, source="yf",
+                        fetched_at=ts))
+        cur += timedelta(minutes=1)
+    archive.insert_bars(bars)
+    return len(bars)
+
+
+def test_assess_day_ok_with_session_only_bars(archive, db_path):
+    """Phase 16 §3 J3 regression pin: bars *only* during the trading session (no
+    overnight bars, no gap inside) ⇒ coverage window = session window ⇒
+    ``worst_coverage ≈ 1.0`` ⇒ no ``epics_below_threshold`` ⇒ K4 can be PASS.
+
+    Pre-J3 the coverage window was 00:00–24:00, so a session-only fixture
+    (510 of 1440 minutes present) read ``worst_coverage = 0.35`` and tripped
+    the gap threshold via the overnight hole — K4 unreachable every day.
+    """
+    _insert_universe_row(db_path, EPIC)
+    _insert_session_yf_bars(archive, EPIC, DAY)
+    _insert_paper_trade(db_path, created_utc=f"{DAY}T09:00:00.000Z", status="RESOLVED",
+                         resolved_utc=f"{DAY}T10:00:00.000Z", exit_reason="TP")
+
+    verdict = assess_day(archive, db_path, db_path, DAY, shadow_enabled=True)
+    assert verdict.ok is True, f"problems={verdict.problems}"
+    assert verdict.epics_below_threshold == []
+    # 8.5h session window minus 30min lag tolerance = 8h exactly = 480 minutes,
+    # all present (510 minutes inserted - some past the lag-trimmed end).
+    assert verdict.worst_coverage == pytest.approx(1.0, abs=0.01), (
+        f"session-only bars must read as full coverage; got worst_coverage={verdict.worst_coverage}"
+    )
+
+
+def test_assess_day_flags_gap_inside_session(archive, db_path):
+    """Phase 16 §3 J3 Gegenprobe: a real 20-min gap **inside** the session must
+    still read as ``epics_below_threshold`` — the window moved from 00–24h to
+    09–17:30, but the "no 5-min gap inside the window" contract (Phase-13 F3) is
+    unchanged. A gap at 10:00–10:20 Berlin (= 08:00–08:20 UTC) is 20 min > 5 min.
+    """
+    _insert_universe_row(db_path, EPIC)
+    # Insert session bars except skip 08:00–08:19 UTC (= 10:00–10:19 Berlin).
+    from datetime import datetime, timedelta, timezone
+    from zoneinfo import ZoneInfo
+    tz_berlin = ZoneInfo("Europe/Berlin")
+    start_local = datetime.strptime(DAY, "%Y-%m-%d").replace(hour=9, minute=0, tzinfo=tz_berlin)
+    start_utc = start_local.astimezone(timezone.utc)
+    bars: list = []
+    cur = start_utc
+    skipped_start = datetime.strptime(DAY, "%Y-%m-%d").replace(hour=8, minute=0, tzinfo=timezone.utc)
+    skipped_end = skipped_start + timedelta(minutes=20)
+    while cur < start_utc + timedelta(hours=8, minutes=30):
+        if skipped_start <= cur < skipped_end:
+            cur += timedelta(minutes=1)
+            continue
+        ts = cur.strftime("%Y-%m-%dT%H:%M:00.000Z")
+        bars.append(Bar(epic=EPIC, resolution="1m", ts_utc=ts,
+                        open=1, high=1, low=1, close=1, volume=1, source="yf",
+                        fetched_at=ts))
+        cur += timedelta(minutes=1)
+    archive.insert_bars(bars)
+    _insert_paper_trade(db_path, created_utc=f"{DAY}T09:00:00.000Z", status="RESOLVED",
+                         resolved_utc=f"{DAY}T10:00:00.000Z", exit_reason="TP")
+
+    verdict = assess_day(archive, db_path, db_path, DAY, shadow_enabled=True)
+    assert verdict.ok is False, (
+        "a 20-min gap inside the session must trip epics_below_threshold; "
+        f"verdict={verdict}"
+    )
+    assert EPIC in verdict.epics_below_threshold
+    assert any("below the coverage threshold" in p for p in verdict.problems)
+
+
+def test_assess_day_tolerates_lagging_recorder_tail(archive, db_path):
+    """Phase 16 §3 J5 regression pin: a Recorder that lags the session by < 30 min
+    must NOT read as a coverage gap. The Recorder measured ~18 min behind wall-
+    clock on 2026-09-08 08:48 UTC (last yF bar 08:30 UTC, wall clock 08:48 UTC)
+    — without the lag trim the trailing 18-min hole would falsely trip
+    ``largest_gap_min > 5`` exactly at session close.
+
+    The trim is :data:`RECORDER_LAG_TOLERANCE_MIN` = 30 min, so we deliberately
+    cut the last 20 minutes of bars (well inside the 30-min slack) and assert
+    PASS. Without the trim the verdict would still be FAIL — that's the
+    regression we're guarding.
+    """
+    _insert_universe_row(db_path, EPIC)
+    # Session bars from Berlin 09:00 to Berlin 17:10 (= UTC 07:00 to 15:10)
+    # — 20 minutes short of session close 17:30 (= UTC 15:30), still well
+    # inside the 30-min lag tolerance.
+    from datetime import datetime, timedelta, timezone
+    from zoneinfo import ZoneInfo
+    tz_berlin = ZoneInfo("Europe/Berlin")
+    start_local = datetime.strptime(DAY, "%Y-%m-%d").replace(hour=9, minute=0, tzinfo=tz_berlin)
+    end_local = start_local + timedelta(hours=8, minutes=10)  # 09:00 → 17:10 Berlin
+    start_utc = start_local.astimezone(timezone.utc)
+    end_utc = end_local.astimezone(timezone.utc)
+    bars: list = []
+    cur = start_utc
+    while cur < end_utc:
+        ts = cur.strftime("%Y-%m-%dT%H:%M:00.000Z")
+        bars.append(Bar(epic=EPIC, resolution="1m", ts_utc=ts,
+                        open=1, high=1, low=1, close=1, volume=1, source="yf",
+                        fetched_at=ts))
+        cur += timedelta(minutes=1)
+    archive.insert_bars(bars)
+    _insert_paper_trade(db_path, created_utc=f"{DAY}T09:00:00.000Z", status="RESOLVED",
+                         resolved_utc=f"{DAY}T10:00:00.000Z", exit_reason="TP")
+
+    verdict = assess_day(archive, db_path, db_path, DAY, shadow_enabled=True)
+    assert verdict.ok is True, (
+        f"lagging Recorder tail within tolerance must not fail K4; problems={verdict.problems}"
+    )
+    assert verdict.epics_below_threshold == []
