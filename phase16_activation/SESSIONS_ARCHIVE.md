@@ -11,7 +11,12 @@ Plan-Session-Block trägt bewusst **keine** `Session #N`-Nummer im Heading (Phas
 `_max_session_num` returnt `None`; für die erste Exec-Session (`head_max == 1`) ist das
 Archiv-Max `None` korrekt (check_archive_sequence, Z. 134-138).
 
-Stand nach Plan-Session #21 (2026-09-08): Archiv trägt **21** Einträge — `#19`
+Stand nach Exec-Session #22 (2026-09-08): Archiv trägt **22** Einträge — Plan-Session #21
+(2026-09-08, Opus 5, F-Exec-Plan J/H/G/I, drei selbst gemessene Struktur-Defekte des
+laufenden 2-Wochen-Tests, Nikinger-Entscheidung Variante A, Σ-Regression-Baseline 1934
+vor dem ersten Fix, Lock F3 revidiert, Cross-Phase P12 erteilt; verbatim aus Phasenkopf
+rotiert nach dieser J-Exec-Session #22 — der Block steht jetzt hier im Archiv, neu im
+Phasenkopf ist der #22-J-Exec-Block) + `#19`
 (MiniMax-M3-Exec-Session #19 vom 2026-09-08, Doc-Drift-Audit repo-weit nach Nikinger-Push;
 6 Audit-Checks: #1 Push-Baseline ✅, #2 Σ-Konsistenz ✅ (Σ 1934), #3 Archiv-Integrität 🟢
 (2 echte F8-B-Befunde repariert: Phase-14-Sessions #9 + #10 verbatim aus Git,
@@ -90,6 +95,69 @@ Hotfix Typo-Bug ✅, **Hotfix #2 Signatur ✅**, E3 Runbook-Start jetzt hoffentl
 wirklich unblocked, E4 Tagesroutine+Closeout offen]; offen: Scheduler-Restart
 durch Nikinger [dringend, alle 3 Fixes sind in Code] + E4
 Tagesroutine+Closeout-Handover+SVG).
+
+## Session stopped — 2026-09-08 (Opus-5-Plan-Session #21, Phase-16-F-Exec-Plan — `PHASE16_F_EXEC_PLAN.md` NEU [611 LOC, Blöcke J/H/G/I]; **drei Struktur-Defekte des laufenden 2-Wochen-Tests selbst gemessen**, Nikinger-Entscheidung „Lauf abbrechen, fixen, neu vorregistrieren"; Lock F3 revidiert [Hook-Step 4 statt neuem Skript]; Cross-Phase-Freigabe **P12** erteilt; Σ-Regression-Baseline **1934** vor dem ersten Fix)
+
+> **Auftrag:** Nikinger-Chat 2026-09-08 — Plan für die noch offenen und neu offenen Items der
+> Phase-16-F-Subphase, ausführungsreif für Sonnet 5. Kein Phase 17 (Lock F1 unverändert).
+
+### Completed
+
+- **`PHASE16_F_EXEC_PLAN.md` NEU** (611 LOC): Blöcke **J** (Live-Reparatur) · **H** (Audit-Restbefunde,
+  revidierte Mechanik) · **G** (Tagesroutine) · **I** (Tag-10-Closeout). 13 Locks (J1–J8, H1–H4, F1)
+  mit Begründung je Zeile, Schritt-Sequenz mit verbatim-Ankern + heutigen Zeilennummern, Testliste
+  (+11 → Σ 1945), 10 Akzeptanzkriterien, vollständige Verify-Liste V-1..V-10, Fehlgriff-Tabelle.
+- **`docs/INDEX.md`** +1 Zeile (Phase-16-Cluster, im selben Commit).
+- **`phase16_activation/CLAUDE.md`** Modul-Tabelle +2 Zeilen (`PHASE16_F_EXEC_PLAN.md`,
+  `PHASE16_AUTONOMY_PREREGISTRATION_v2.md`).
+- **Σ-Regression-Baseline genommen (vor dem ersten Fix): 1934 grün**, 16 Suites einzeln gemessen
+  2026-09-08. Deckt sich Zeile für Zeile mit `PHASE16_PARTIAL_CLOSEOUT.md` §1.2 — bestätigt, nicht übernommen.
+- **Step-0-Legacy-Ritual gelaufen: No-Op.** `grep -rn -i "turbo\|CALL/PUT\|pre_trade_option_check"` →
+  4 Treffer, alle bewusst eingefroren und dokumentiert (`ARCHITECTURE.md:76,134,212`, `README.md:28`),
+  kein Python-Treffer.
+
+### Findings (alle 2026-09-08 selbst gemessen, Details im Plan §1.3)
+
+- **J-D1** — LS-Bar-Stream schreibt nichts. `data_foundation/archive.py:77` öffnet SQLite mit dem
+  `check_same_thread=True`-Default; `live_data/stream.py:498` schreibt aus dem Lightstreamer-Thread.
+  **63 942** `sqlite3.ProgrammingError` allein heute, erster um 09:35:25. `bars.source='ls'` = **0**,
+  seit es die Tabelle gibt. Log wächst dadurch ≈25 MB/h.
+- **J-D2** — K1 misst ohne Fenster. `evaluate_k1` (`autonomy_report.py:542`) hat `from_ts`/`to_ts`;
+  **beide** Aufrufer (Z. 870 + 919) übergeben nichts → 7 Alt-Starts seit 2026-08-31 statt der einen
+  von heute. Dazu zählt `_START_PATTERNS["webui"]` (Z. 143) einen Start doppelt.
+- **J-D3** — K4 unerreichbar. `heartbeat.py:73` prüft die Bar-Dichte gegen 00:00–24:00 UTC; die
+  Overnight-Lücke (≈930 min) reißt die 5-Minuten-Gap-Schwelle (Z. 124) an **jedem** Handelstag →
+  `ok=False` durchgehend seit 2026-08-24 (10 Tage in Folge). `worst_coverage` ist reine Telemetrie
+  und gattert nichts — wer `MIN_WINDOW_RATIO` anfasst, ändert gar nichts.
+- **7 Aussagen aus `PHASE16_PARTIAL_CLOSEOUT.md` gegen Code/Live-DB korrigiert** (Plan §1.4) —
+  u. a. „endet ohne Traceback" (falsch), das G2-Caps-Pin-Kommando (`/proc/<pid>/cmdline` enthält die
+  Caps nicht) und der Pattern-B-`sed` (erzeugt das nicht existierende `docs/CLAUDE.md`).
+- **Zwei Offenposten erledigt:** Ledger-Restore (0 Zeilen `kind='rescue'`) und Live-DB-Migration
+  008+009 (`_schema_version` = 9).
+- Runbook-v2-Pflicht-SQL für die SUN*-Epics war ein **No-Op** (`WHERE status='active'`, alle 5 stehen
+  auf `verified`). Prereg formal erfüllt — zufällig; 3 SUN*-Epics zogen heute trotzdem 15 IG-Punkte.
+
+### Nikinger-Entscheidungen (2026-09-08)
+
+1. **Variante A** — Lauf abbrechen, fixen, `PHASE16_AUTONOMY_PREREGISTRATION_v2.md` als datiertes
+   Supersede-Doc, Uhr auf Tag 1. (v1 bleibt Byte-identisch, so schreibt v1 es sich selbst vor.)
+2. **Cross-Phase P12 freigegeben** für `data_foundation/archive.py` + `heartbeat.py`.
+3. **Lock F3 revidiert** — Header-Card-Link-Check wird Step 4 in `scripts/check_doc_rotation.py`,
+   kein zweites Skript.
+4. **Pattern C** — Referenz auf `PHASE15_A1_A6_STEP_RECORDS.md` entfernen, Datei nicht erfinden.
+
+### Next
+
+- **Exec-Session startet mit Plan §3 Step 0**, dann **Block J** (J0 Bot-Stopp ist Operator-Aktion).
+- Block J vor Block H — der Test kann erst neu starten, wenn die drei Defekte weg sind.
+
+### Open questions / blockers
+
+- **V-4 (Plan §6):** ob der zweite `ok=False`-Zweig (`heartbeat.py:142`, `pairs_resolved == 0`)
+  zusätzlich feuert, entscheidet sich erst im ersten POST_WINDOW nach dem Restart. Wenn K4 nach J3
+  nicht grün wird, ist **das** der erste Verdächtige, nicht der Fenster-Fix.
+- Tag-1/Tag-10-Daten stehen erst nach J6 fest; Block I trägt deshalb kein festes Datum.
+- Push-Freigabe für diesen Commit steht aus.
 
 ## Session stopped — 2026-09-08 (MiniMax-M3-Exec-Session #20, Phase-16-F-Subphase-Eröffnung — `PHASE16_PARTIAL_CLOSEOUT.md` NEU [310 LOC, Mini-Plan für die 2-Wochen-Test-Periode in 3 Blöcken G/H/I: G = E4-Tagesroutine-Begleitung 9 Tage, H = Audit-Restbefunde-Reparatur 29+1+1 am Wochenende 13.–14. Sept., I = Tag-10-Closeout Mo 2026-09-21 nach 17:30], 8 Locks F1–F8 [F1: Phase-16-F als Subphase, kein Phase-17; F2: F9-Mechanik zentral; F3: H-1-Hook analog F9 vor H-3-Reparatur; F4: Sammel-Commit für 29+1+1; F5: Block-G-Vorrang, Code-Edits außerhalb Trade-Fenster; F6: read-only für aktive Phasen; F7: Tag-10-Closeout Mo-Abend; F8: Phase-15 `requires-python`-Align offen für Phase-17], 8 Akzeptanzkriterien AK-F1–AK-F7, 8 Operator-Aktionen Nikinger, 7 Out-of-Scope-Items für Phase-17, 8 Drift-Items, Cross-Phase-Touch 6 Phasen + root, Σ 1934 unverändert, Exec-#19-Block verbatim nach SESSIONS_ARCHIVE.md rotiert [20. Eintrag, +1 vs. Stand Session #19], Push-Freigabe-Stand: 0 Commits pending nach Nikinger-Push `560d038`)
 
