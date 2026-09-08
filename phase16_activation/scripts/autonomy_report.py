@@ -140,7 +140,11 @@ _START_PATTERNS = {
     "scheduler": re.compile(r"starting scheduler daemon"),
     "recorder":  re.compile(r"\[run_recorder\] starting recorder"),
     "discovery": re.compile(r"\[run_discovery\] starting daemon"),
-    "webui":     re.compile(r"\[run_webui\] dashboard on|Started server process"),
+    # J8 (Phase 16 §3): the ``Started server process`` alternative is uvicorn's own
+    # line and fires on every worker spawn — counting it made one WebUI start read
+    # as two, exhausting the budget on a single restart. Only the wrapper line is
+    # the operator-observable "WebUI came up" event; the uvicorn line is dropped.
+    "webui":     re.compile(r"\[run_webui\] dashboard on"),
 }
 
 
@@ -235,6 +239,34 @@ def _berlin_day(dt: datetime) -> date:
         return dt.astimezone(ZoneInfo("Europe/Berlin")).date()
     # Fallback: fixed UTC+1 (no DST). Coarse but correct at midnight.
     return dt.astimezone(timezone(timedelta(hours=1))).date()
+
+
+def _berlin_day_bounds(day: date) -> tuple[datetime, datetime]:
+    """Inverse of :func:`_berlin_day` — the ``[start, end)`` tz-aware UTC range
+    that maps to the Berlin local date ``day``.
+
+    Used by K1 to filter ``run_scheduler.log`` start-lines by the preregistered
+    "in window" clause (Phase 16 §3 J2): without this, every start-line in the
+    log counted, so 7 pre-registration starts already broke K1 on day 1. End is
+    exclusive so a start exactly at Berlin-midnight is attributed to the day
+    that just started (matching the bucket ``_berlin_day`` assigns).
+    """
+    if ZoneInfo is not None:
+        tz = ZoneInfo("Europe/Berlin")
+        start_local = datetime.combine(day, datetime.min.time(), tzinfo=tz)
+        end_local = datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=tz)
+        return (
+            start_local.astimezone(timezone.utc),
+            end_local.astimezone(timezone.utc),
+        )
+    # Fallback (DST-naive, but mirrors _berlin_day's coarse correctness guarantee):
+    tz_fallback = timezone(timedelta(hours=1))
+    start_local = datetime.combine(day, datetime.min.time(), tzinfo=tz_fallback)
+    end_local = datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=tz_fallback)
+    return (
+        start_local.astimezone(timezone.utc),
+        end_local.astimezone(timezone.utc),
+    )
 
 
 def trades_per_day(trading_db: Path) -> dict[date, int]:
@@ -867,7 +899,8 @@ def _build_day_report(
             "bars_per_day": bars_per_day(bars_db, day),
         }
     }
-    report.criteria["1"] = evaluate_k1(state_dir)
+    from_ts, to_ts = _berlin_day_bounds(day)
+    report.criteria["1"] = evaluate_k1(state_dir, from_ts=from_ts, to_ts=to_ts)
     report.criteria["2"] = evaluate_k2(state_dir, bars_db, trading_db, day, health_evidence_per_service=k2_evidence)
     report.criteria["3"] = evaluate_k3(
         trading_db,
@@ -916,7 +949,11 @@ def _build_summary_report(
 ) -> SummaryReport:
     report = SummaryReport(from_day=from_day, to_day=to_day)
     report.n_trading_days = sum(1 for _ in _iter_trading_days(from_day, to_day))
-    report.criteria["1"] = evaluate_k1(state_dir)
+    # Summary covers the full Berlin range [from_day 00:00, to_day 24:00).
+    # _berlin_day_bounds(to_day)[1] is Berlin-00:00 of the next day (end-exclusive).
+    from_ts, _ = _berlin_day_bounds(from_day)
+    _, to_ts = _berlin_day_bounds(to_day)
+    report.criteria["1"] = evaluate_k1(state_dir, from_ts=from_ts, to_ts=to_ts)
     report.criteria["2"] = evaluate_k2(state_dir, bars_db, trading_db, from_day)
     counts = trades_per_day(trading_db)
     report.criteria["3"] = evaluate_k3(

@@ -508,3 +508,69 @@ def test_summary_fails_when_six_criticals_after_open(tmp_path: Path) -> None:
     assert payload["criteria"]["5"]["measured"]["max_critical_24h"] == 6
     assert payload["criteria"]["5"]["verdict"] == "FAIL"
     assert payload["overall_verdict"] == "FAIL"
+
+
+# -- Phase 16 §3 J2 + J8: K1 misst im Fenster + WebUI-Start zählt einmal ------------------
+
+
+def test_k1_ignores_starts_before_window(tmp_path: Path) -> None:
+    """Phase 16 §3 J2 regression pin: K1 must filter by Berlin-day window, not by the
+    whole log file. Before the fix, ``evaluate_k1`` was called with ``from_ts=None`` /
+    ``to_ts=None`` from both report builders, so ``count_starts_in_window`` counted every
+    start-line in the log — 7 historic Scheduler starts since 2026-08-31 made K1 FAIL on
+    day 1 of every fresh run. Here: 3 scheduler starts pre-window + 1 in-window ⇒ max
+    starts (in window) = 1 ⇒ PASS.
+    """
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # Three starts on 2026-09-07 (the day before the window) and one on 2026-09-08
+    # (the report day) — Berlin local times.
+    lines = [
+        "2026-09-07 09:00:00,000 INFO scheduler.run: starting scheduler daemon (account=demo, max_trades=5, daily_loss_cap=1800.0, cycle=5min).",
+        "2026-09-07 11:00:00,000 INFO scheduler.run: starting scheduler daemon (account=demo, max_trades=5, daily_loss_cap=1800.0, cycle=5min).",
+        "2026-09-07 15:00:00,000 INFO scheduler.run: starting scheduler daemon (account=demo, max_trades=5, daily_loss_cap=1800.0, cycle=5min).",
+        "2026-09-08 09:30:00,000 INFO scheduler.run: starting scheduler daemon (account=demo, max_trades=5, daily_loss_cap=1800.0, cycle=5min).",
+    ]
+    (state_dir / "run_scheduler.log").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    for svc in ("recorder", "discovery", "webui"):
+        (state_dir / f"run_{svc}.log").write_text("", encoding="utf-8")
+
+    day = date(2026, 9, 8)
+    from_ts, to_ts = autonomy_report._berlin_day_bounds(day)
+    result = autonomy_report.evaluate_k1(state_dir, from_ts=from_ts, to_ts=to_ts)
+    assert result.measured["scheduler"]["starts"] == 1, (
+        f"K1 must count only in-window starts; got {result.measured['scheduler']['starts']}"
+    )
+    assert result.verdict == "PASS", (
+        f"1 start inside the Berlin day = PASS expected, got {result.verdict}; "
+        f"measured={result.measured}"
+    )
+
+
+def test_k1_webui_single_start_counts_once(tmp_path: Path) -> None:
+    """Phase 16 §3 J8 regression pin: one WebUI restart must read as **one** start,
+    not two. Before the fix, ``_START_PATTERNS["webui"]`` matched both the wrapper
+    line (``[run_webui] dashboard on``) **and** uvicorn's own ``Started server
+    process`` line — a single WebUI restart therefore exhausted the 2-restart budget
+    on its own, failing K1 on the first non-trivial restart. After the fix only the
+    wrapper line matches.
+    """
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # Single start: wrapper line + uvicorn's own "Started server process" line.
+    # Pre-fix this would count as 2; post-fix the second line doesn't match.
+    lines = [
+        "[run_webui] dashboard on http://127.0.0.1:8000 (read-only DB, localhost-only)...",
+        "INFO:     Started server process [12345]",
+    ]
+    (state_dir / "run_webui.log").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    for svc in ("scheduler", "recorder", "discovery"):
+        (state_dir / f"run_{svc}.log").write_text("", encoding="utf-8")
+
+    day = date(2026, 9, 8)
+    from_ts, to_ts = autonomy_report._berlin_day_bounds(day)
+    result = autonomy_report.evaluate_k1(state_dir, from_ts=from_ts, to_ts=to_ts)
+    assert result.measured["webui"]["starts"] == 1, (
+        f"WebUI counts one start per restart; got {result.measured['webui']['starts']}"
+    )
+    assert result.verdict == "PASS"
