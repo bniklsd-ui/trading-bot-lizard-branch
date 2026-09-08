@@ -419,3 +419,73 @@ zur sofortigen Klärung.
 > widersprochen hat (Working-style-Regel: *„Tested code > concept doc >
 > README/status prose"*). Datierter Vermerk im Sinne der
 > Phase-12/13/14-Closeout-Konvention.
+
+---
+
+> 🟡 **Korrekturhinweis 2026-09-08 (Phase 16 #23, MiniMax-M3 Exec-Session
+> „Doc-Drift-Repair"):** drei weitere Stellen in diesem Handover (und in
+> Folge-Dokumenten), an denen die Doku der Code-/Live-Wahrheit widersprochen
+> hat, sind jetzt mit datierten 🟡-Vermerken markiert. **Alle drei positiven
+> Drifts** (Code/Repo ist weiter als die Phase-15-Closeout-Prosa behauptet),
+> alle am 2026-09-08 selbst nachgemessen. Quelle der Wahrheit: Phase-16-F-Exec-Plan
+> §1.2 (Plan-Session #21, Opus 5, 2026-09-08) hatte die Fakten bereits korrekt
+> dokumentiert — die Drift existierte nur in der Status-Prosa.
+>
+> **D1 — Live-DB Schema v7 → v9.** Mehrere Stellen in diesem Handover (§0 BLUF,
+> §3 E1, §4 „Live-Substrate" Zeile „Live-DB `data/trading_bot.sqlite`
+> `_schema_version` max = 7", §7 E1, §9.13, §10 Punkt 4, §11 Was-diese-Session-
+> Block #4, §11 Verifikations-Tabellen-Zeile „`_schema_version` max | 9 (mit
+> Migration 009 angewendet)" mit ❌-Vermerk „7 — Live-DB noch auf v7") sagten
+> Stand 2026-09-05: Schema v7, Migration 009 noch nicht angewendet, apply
+> erfolge beim nächsten Service-Restart automatisch (was die Phase-16-A-3-
+> Korrekturhinweis oben bereits als **falsch** markiert hatte). **Stand
+> 2026-09-08:** `SELECT MAX(version) FROM _schema_version` = **9**;
+> `data/trading_bot.sqlite.instincts`-Tabelle existiert (0 Rows, weil
+> `n_closed=8 < instinct_n_min=50`); Backup
+> `data/trading_bot.sqlite.bak-20260905-pre-mig009` (3,3 MB, 2026-09-05 20:28)
+> ist die Pre-Migration-008-Rückfall-Option. Operator-Apply lief in
+> **Phase-16-Session #3 (2026-09-05, Block B2 + Aktion #7)**, dokumentiert
+> im Phase-16-SESSIONS_ARCHIVE (Block #3 Z. 1803 „Live-DB Schema v9 erreicht").
+> **Audit-Stand:** die Phase-15-Behauptungen in §0/§3/§4/§7/§9/§10/§11 waren
+> zum Schreibzeitpunkt korrekt (Phase 15 war zu dem Zeitpunkt noch im Closeout),
+> sind aber heute durch die Phase-16-Operator-Aktion überholt. Doc-Repair:
+> siehe root-`CLAUDE.md`-Korrekturhinweis 2026-09-08 (gleicher Tag).
+>
+> **D2 — Ledger-Restore 250 Punkte erledigt.** Mehrere Stellen (§0 BLUF,
+> §4 Live-Substrate-Zeile „`source_spend WHERE kind='rescue'` | 5 Zeilen, 250
+> Punkte | … noch nicht restored", §5 Live-Zeile „5 Zeilen / 250 Punkte
+> (Ledger-Restore ausstehend)", §7 E3, §9.12, §10 Punkt „Don't …", §11 NEXT-Item
+> #2, Session-#11-Block im Archiv „3. Ledger-Restore" etc.) sagten Stand
+> 2026-09-05: Ledger-Restore offen, Nikinger-Aktion. **Stand 2026-09-08:**
+> `SELECT COUNT(*), SUM(points) FROM source_spend WHERE kind='rescue'` =
+> **0|0** (war 5|250 zur Phase-15-Closeout-Zeit). Restore wurde zwischen
+> Phase-16-Session #22 (Doc stand noch auf „pending") und heute ausgeführt.
+> Phase-16-Session-#3-Block im Archiv hatte den Restore bereits als
+> Aktion #7 dokumentiert; Phase-16-F-Exec-Plan §1.2 Z. 77 hatte ihn ebenfalls
+> bereits als erledigt geführt. Doc-Repair: Korrekturhinweise in
+> `phase15_v4/CLAUDE.md` (Header-Card purpose aktualisiert), root-`CLAUDE.md`
+> (Status-Block), Phase-16-Phasenkopf (Header-Card).
+>
+> **D3 — Push-Freigabe 6 Commits erteilt.** Session-#22-Block im Phase-16-
+> Phasenkopf Z. 76 + Z. 176–177, dieser Handover §11 Push-Status-Tabelle
+> („0 Commits gepusht, 1 Commit pending ahead of origin/main, gesamt 7 Commits
+> lokal ahead"), Session-#13-Block in diesem Phasenkopf „6 Commits lokal ahead
+> (Sessions #10-#13, Push-Freigabe steht aus)" sagten Stand 2026-09-05:
+> Push-Freigabe ausstehend. **Stand 2026-09-08:** `git rev-list --left-right
+> --count origin/main...HEAD` = **0 0**, `origin/main = 20a10c1` = HEAD, working
+> tree clean (nur `data/` untracked, das ist `.gitignore`-d). Alle 6 Commits
+> der Phase-16-Session #22 wurden vom Nikinger gepusht; die Session-#22-Prosa
+> im Phasenkopf war zum Schreibzeitpunkt korrekt, ist aber seit dem Push
+> zwischen #22 und #23 überholt. Doc-Repair: Session-#22-Block wurde verbatim
+> nach `phase16_activation/SESSIONS_ARCHIVE.md` rotiert (mit dem historischen
+> „pending Push"-Stand, der zum Schreibzeitpunkt korrekt war), Session-#23-
+> Block im Phasenkopf dokumentiert den Push-Status-Wechsel.
+>
+> **Bilanz:** Phase 15 bleibt ✅ abgeschlossen — die Korrekturhinweise ändern
+> die Bilanz nicht, sie aktualisieren nur Stellen, an denen die Doku der
+> Code-/Live-Wahrheit widersprochen hat. Working-style-Regel:
+> *„Tested code > concept doc > README/status prose. On conflict, trust the
+> code, fix the doc immediately, and leave a dated note in the doc that it was
+> corrected against code"* — exakt das wurde in dieser Mini-Session umgesetzt.
+> Datierte-Vermerk-Konvention analog der Phase-12/13/14/15-Closeout-Handover
+> und der 2026-09-05-Korrekturhinweis oben.

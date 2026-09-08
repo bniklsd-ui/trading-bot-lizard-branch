@@ -121,6 +121,36 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 > den Aufruf **nicht** im Daemon, sondern als **Schema-Floor** im Preflight (B1) +
 > einmaligen Operator-Apply mit Backup (B2). Schema heute v7.
 
+> 🟡 **Korrekturhinweis 2026-09-08 (Phase 16 Exec-Session #23, Doc-Drift-Repair):** drei
+> Aussagen in den Phase-15-Offen-Items (Ledger-Restore 250 Punkte, Schema v7, 6 Commits
+> pending Push) sind heute **positiv überholt** — Code/Repo/Git sind weiter als diese
+> Status-Prosa. Belegt am 2026-09-08, in einer Mini-Session speziell zur Drift-Reparatur
+> zusammengeführt (Working-style-Regel: *„Tested code > concept doc > README/status
+> prose"*). Details siehe Phase-15-Closeout-Handover-Korrekturhinweis 2026-09-08
+> (gleicher Tag, mit Quellen) + Phase-16-Session-#23-Block im aktiven Phasenkopf.
+>
+> - **D1 — Schema heute v9, nicht v7.** `SELECT MAX(version) FROM _schema_version` = 9.
+>   `data/trading_bot.sqlite.instincts`-Tabelle existiert (0 Rows, `n_closed=8 <
+>   instinct_n_min=50`). Backup `data/trading_bot.sqlite.bak-20260905-pre-mig009` (3,3 MB,
+>   2026-09-05 20:28) ist die Pre-Migration-Rückfall-Option. Operator-Apply lief in
+>   Phase-16-Session #3 (2026-09-05, Block B2). Die Phase-16-A-3-Korrektur (eine Zeile
+>   höher) bleibt korrekt — es gibt **keinen** automatischen Apply im Daemon, der Apply
+>   lief als Operator-Aktion.
+> - **D2 — Ledger-Restore 250 Punkte erledigt.** `SELECT COUNT(*), SUM(points) FROM
+>   source_spend WHERE kind='rescue'` = `0|0` (war `5|250`). Operator-Aktion ausgeführt
+>   zwischen Phase-15-Closeout und 2026-09-08.
+> - **D3 — Push-Freigabe 6 Commits erteilt.** `git rev-list --left-right --count
+>   origin/main...HEAD` = `0 0`, `origin/main = 20a10c1` = HEAD, working tree clean.
+>   Alle 6 Commits der Phase-16-Session #22 wurden vom Nikinger gepusht.
+>
+> **Bilanz:** Phase 15 bleibt ✅ abgeschlossen. Promotion-Bridge (Phase 16 D2 in Commit
+> `bfab841` + Hotfixes #1–#3 in Sessions #14–#16) und Gate P7/A6 (Phase-12-Reconcile-
+> Timing, wartet auf nächsten OPEN-Trade) sind die einzigen verbleibenden Phase-15-Folge-
+> Punkte. Working-Style-Regel: *„On conflict, trust the code, fix the doc immediately,
+> and leave a dated note in the doc that it was corrected against code"* — exakt das
+> wurde hier umgesetzt; Phase-15-Handover + Phase-15-Phasenkopf + Phase-16-Phasenkopf
+> tragen jetzt analoge datierte 🟡-Vermerke.
+
 > 📦 **Doku-Hygiene (2026-07-03):** die volle Phase-1–8-Chronik, die vorher hier stand, ist
 > **wortgleich, unverändert** ausgelagert nach
 > [`docs/sessions/root_claude_md_phase_status_archive.md`](./docs/sessions/root_claude_md_phase_status_archive.md)

@@ -1,6 +1,6 @@
 ---
 status: live
-purpose: PHASE-HEAD, Phase 15 (V4) — ✅ **abgeschlossen 2026-09-05 (Session #13)**. Mission = den Lern-Signal-Pfad ehrlich machen, dann darauf aufbauen. Kern-Befund: der Reward-Loop belohnt Verluste (live −1 972,87 EUR P&L bei +28,72 Score). 4 Blöcke A/B/C/D alle ✅; Block B live-validiert; Block C heute bit-identical (AK9). Promotion-Bridge + Ledger-Restore + Gate P7/A6 + Live-DB-Migration-009 bleiben offen.
+purpose: PHASE-HEAD, Phase 15 (V4) — ✅ **abgeschlossen 2026-09-05 (Session #13)**. Mission = den Lern-Signal-Pfad ehrlich machen, dann darauf aufbauen. Kern-Befund: der Reward-Loop belohnt Verluste (live −1 972,87 EUR P&L bei +28,72 Score). 4 Blöcke A/B/C/D alle ✅; Block B live-validiert; Block C heute bit-identical (AK9). **Promotion-Bridge in Phase 16 D2 gebaut** (Commit `bfab841` + Hotfixes #1-#3 in Sessions #14–#16); **Ledger-Restore + Live-DB-Migration 008+009 zwischenzeitlich erledigt** (gemessen 2026-09-08); nur **Gate P7/A6** wartet noch auf nächsten OPEN-Trade + 24 h Beobachtung.
 read-when: jede Folge-Session, die einen der offenen Phase-15-Folge-Punkte aufgreift; zuerst den neuesten `## Session stopped`-Block
 detail: L1
 up: ../CLAUDE.md

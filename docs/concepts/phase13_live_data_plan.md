@@ -1111,6 +1111,19 @@ Hauptpfad:
    Rettungsstufe geht am Chain-Provider vorbei direkt an den Adapter.
    ⚠ `get_historical_ohlcv` bucht **keinen** Spend — `GapRescue` muss ihn selbst gegen
    `SourceBudget` buchen und vorher `can_spend` fragen.
+
+   > 🟡 **Korrekturhinweis 2026-09-08 (Phase 16 Exec-Session #23, Doc-Drift-Repair):**
+   > der Plan-Wortlaut unterstellt implizit, dass der Spend bei **jedem** Call-Versuch
+   > gebucht wird. Phase-15 Block-D-Folgefix Variante C (Session #9, 2026-09-03, Commit
+   > der `rescue.py`-Signatur-Korrektur) hat die Spend-Logik um einen **Exception-Pfad**
+   > ergänzt: bucht nur bei `env.ok` (also wenn IG den Call tatsächlich gesehen hat), nicht
+   > bei Exception (`TypeError` o.ä., bei dem IG den Call nie erreicht hat und keine
+   > Punkte abrechnen würde). Der Plan-Wortlaut bleibt für den „Normalpfad" korrekt
+   > (GapRescue bucht selbst, gegen `SourceBudget`, mit `can_spend`); die
+   > Exception-Pfad-Ergänzung ist im Code dokumentiert (`phase13_live_data/live_data/
+   > rescue.py:217-225` + der Session-#9-Block im Phase-15-Phasenkopf-Archiv). Bilanz:
+   > **Plan bleibt richtig, Implementation ist vollständiger als der Plan** — kein
+   > Code-Konflikt, nur Doku-Lücken-Schließung.
 3. **Drossel** `max_calls_per_epic_per_day` nach dem Muster von `DivergenceSampler`s
    `_last_sample_date` (`heartbeat.py:156`).
 
