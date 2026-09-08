@@ -2334,7 +2334,7 @@ Nikingers Job, nicht der der Session).
 
 ---
 
-## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session, Block A: A-1..A-4 + Session-End-Rotation)
+## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session #1, Block A: A-1..A-4 + Session-End-Rotation)
 
 > **Auftrag:** Nikinger-Chat 2026-08-31 nach Plan-Commit (`f98df68` + Folge-Commits +
 > Nikinger-Freigabe-Commit `aad1d00`): „Plan ist fertig. Die Exec-Session (MiniMax M3)

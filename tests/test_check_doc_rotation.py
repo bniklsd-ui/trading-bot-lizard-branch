@@ -434,30 +434,30 @@ def test_archive_sequence_ignores_plan_session_without_number(tmp_path: Path) ->
 
 
 def test_strict_check_passes_for_phase15_v4_against_real_repo() -> None:
-    """P15-F A6 + P16-F9: Echtes Phase-15-Repo zeigt die F9-Lücke.
+    """P15-F A6 + P16-F9: Echtes Phase-15-Repo ist nach F8-B-Reparatur Step-3-konform.
 
-    Stand 2026-09-08 (P16-F9-Befund): ``phase15_v4/SESSIONS_ARCHIVE.md``
-    hat **lückenlose Headings #2..#12 + Plan-Session-Block, aber das
-    Heading für Session #1 fehlt** (MiniMax-M3-Exec-Session ohne Nummer
-    in der Heading-Zeile). Pre-F9-Step-2 hat das nicht gemeldet
-    (Anschluss passte: head=#12 → expected=#11 = OK). F9 meldet jetzt
-    korrekt exit 1 für Phase 15 unter ``--strict``.
+    Reparatur-Historie (Phase 16 Session #19 = Doc-Drift-Audit):
+    - 2026-09-08 F9-Audit-Fund: ``phase15_v4/SESSIONS_ARCHIVE.md`` hatte
+      Headings #2..#12 + Plan-Session-Block, aber das Heading für Session #1
+      fehlte (MiniMax-M3-Exec-Session ohne Nummer — Pre-#1 hatte nie eine
+      `#1`-Nummer, war von Anfang an ein F8-A-Versäumnis bei der ersten
+      Erstellung des Archivs)
+    - Reparatur: `#1` zur Heading-Zeile hinzugefügt (1-Zeichen-Edit, kein
+      Inhalt geändert, kein Plan-Session-Block berührt). Jetzt exit 0.
 
-    Folgesession (Doc-Drift-Audit) repariert den Heading und stellt den
-    Test zurück auf grünen Pfad. Bis dahin: dieser Test dokumentiert den
-    Befund und bestätigt, dass der Hook **greift** (das ist die eigentliche
-    F9-Akzeptanz — der Hook ist jetzt *laut* statt still).
+    Der Test dokumentiert den Erfolg der Reparatur — der Hook bleibt
+    *laut* bei zukünftigen Lücken (gleiche Mechanik wie Phase 16 / Phase 14).
     """
     result = subprocess.run(
         [sys.executable, str(_SCRIPT_PATH), "--strict", "--phase", "phase15_v4"],
         capture_output=True, text=True, cwd=str(REPO_ROOT),
     )
-    assert result.returncode == 1, (
-        f"erwartet exit 1 (Phase 15 fehlt Session #1 in Archive-Headings), "
+    assert result.returncode == 0, (
+        f"erwartet exit 0 (Phase 15 F8-B-repariert post Audit), "
         f"got {result.returncode}: stdout={result.stdout!r}"
     )
-    assert "not contiguous" in result.stdout.lower()
-    assert "missing session(s) [1]" in result.stdout
+    assert "phase15_v4" in result.stdout
+    assert "not contiguous" not in result.stdout.lower()
 
 
 # ---------------------------------------------------------------------------
