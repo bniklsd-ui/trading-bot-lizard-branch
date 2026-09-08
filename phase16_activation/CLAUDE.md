@@ -10,7 +10,7 @@ down:
   - ../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md   # 📕 A6 hängt an Migration 008
   - ../phase5_execution/CLAUDE.md                 # B3-Block → Plan D3
   - ./SESSIONS_ARCHIVE.md                         # 📦 Session-Block-Historie (newest-first, A-0 angelegt)
-updated: 2026-09-08 (+ Exec-Session #19 → Archiv; Exec-Session #18 schließt ab: F9 Lücken-Check in `scripts/check_doc_rotation.py` [P14-F Step-2 Verschärfung, `_first_session_num_per_heading` + `check_archive_gaps` als Step 3 im `--strict`-Pfad, +10 neue Tests root 105 → 115, Σ 1924 → 1934; install_hooks.sh Header Two→Three Steps; 2 bestehende Tests umgeschrieben weil sie Step-2-Konformität für Phasen mit F8-B-Befunden behaupteten — Phase 14 missing [9, 10] + Phase 15 missing [1] jetzt **laut** als F9, Reparatur in Folgesession via Git-Verbatim-Rückholung analog F8; Commit `--no-verify` weil Pre-Commit-Hook die noch-nicht-reparierten Lücken ablehnt, Begründung im Commit-Body; Cross-Phase-Freigabe P14 per Phase-16-Plan §4 + Nikinger-Freigabe 2026-09-08]; Exec-Session #19 schließt ab: **Doc-Drift-Audit repo-weit (Nikinger-Auftrag 2026-09-08)** — 2 F8-B-Reparaturen `ce74ee1` Phase 14 [9, 10] verbatim aus Git (REPLACE-statt-PREPEND-Bug in Commits `19dc8c7` + `3f5fdd1`) + `23bbd14` Phase 15 [1] `#1`-Heading hinzugefügt + Audit-Bericht mit allen 6 Checks [Check #1 Push-Baseline PASS · Check #2 Σ-Konsistenz PASS (1934 grün, Konvention meta_m1 zählt nicht) · Check #3 Archiv-Integrität 🟢 (2 Befunde repariert, 0 verbleibend in F9-Scope) · Check #4 ein Block/Phasenkopf PASS · Check #5 INDEX-Vollständigkeit 🟡 (224 Skill-Internals fehlen — Scope-Drift, Phase-17) · Check #6 Header-Card-Links 🟡 (29 echte fehlende Links, Phase-17-Material)]; Σ 1924 → 1934 unverändert (Archiv-Reparaturen = Markdown-Only, kein Test-Touch, kein Code-Touch); `git rev-parse --short origin/main` = `73f30d9`, 0 Commits pending (vor dieser Session 2 Commits lokal ahead, Commits `ce74ee1` + `23bbd14` + dieser Rotation-Commit erwarten Nikinger-Push; Cross-Phase-Freigabe: P14 für Phase-14 + Phase-15-Archive-Touch (`ce74ee1` + `23bbd14`), P16 für diese Rotation)
+updated: 2026-09-08 (+ Exec-Session #20 → Archiv; Exec-Session #19 schließt ab: Doc-Drift-Audit repo-weit nach Nikinger-Push — 6 Audit-Checks: #1 Push-Baseline ✅, #2 Σ-Konsistenz ✅ (Σ 1934), #3 Archiv-Integrität 🟢 (2 F8-B-Reparaturen `ce74ee1` Phase-14 + `23bbd14` Phase-15), #4 ein Block/Phasenkopf ✅, #5 INDEX-Vollständigkeit 🟡 (224 Skill-Internals fehlen — Scope-Drift), #6 Header-Card-Links 🟡 (29 echte fehlende Links aufgedeckt, read-only dokumentiert, Reparatur in Phase-16-F-Subphase Block H); Σ 1924 → 1934 unverändert (Archiv-Reparaturen = Markdown-Only); origin/main = 560d038, 0 Commits pending (Nikinger hat Session-#19-Commits gepusht); Cross-Phase-Freigabe: P14 für Phase-14 + Phase-15-Archive-Touch (`ce74ee1` + `23bbd14`), P16 für diese Rotation]; Exec-Session #20 schließt ab: **Phase-16-F-Subphase-Eröffnung mit `PHASE16_PARTIAL_CLOSEOUT.md` NEU** (310 LOC, Mini-Plan für die 2-Wochen-Test-Periode in 3 Blöcken G/H/I: G = E4-Tagesroutine-Begleitung 9 Tage, H = Audit-Restbefunde-Reparatur 29+1+1 am Wochenende 13.–14. Sept., I = Tag-10-Closeout Mo 2026-09-21 nach 17:30) + 8 Locks F1–F8 + 8 Akzeptanz AK-F1–AK-F7 + 8 Operator-Aktionen Nikinger + 7 Out-of-Scope-Items Phase-17 + 8 Drift-Items; kein Phase-17 (Nikinger-Auftrag „Keine Phase 17, weitere Phase 16 Subphase"); Modul-Tabelle um `PHASE16_PARTIAL_CLOSEOUT.md` ergänzt; Σ 1934 unverändert (docs-only, kein Test-Touch, kein Code-Touch außer der F-Subphase-Eröffnung selbst); 0 Commits pending (Nikinger pusht 560d038 nach dieser Session-#19-Eröffnung); Push-Freigabe-Stand: dieser Commit + 1 = 1 Commits pending nach Commit
 ---
 
 # Phase 16 — Freischaltung
@@ -65,112 +65,73 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 | `scripts/autonomy_report.py` | deterministischer Tages-/Summary-Report aus append-only Quellen, `mode=ro`, kein LLM | E2 |
 | `tests/test_autonomy_report.py` | Fixture-DB + synthetische 10 Tage | E2 |
 | `PHASE16_AUTONOMY_PREREGISTRATION.md` | 📕 PASS-Kriterien + erlaubte Operator-Ereignisse, **vor** dem Start committet | E1 |
-| `PHASE16_CLOSEOUT_HANDOVER.md` + `docs/architecture/phase16_activation.svg` | Closeout nach Tag 10 | E4 |
+| `PHASE16_PARTIAL_CLOSEOUT.md` | 📕 Partial Closeout zur 2-Wochen-Test-Halbzeit (Phase-16-F-Subphase: Blöcke G/H/I — E4-Begleitung + Audit-Restbefunde-Reparatur + Tag-10-Closeout) | F |
+| `PHASE16_CLOSEOUT_HANDOVER.md` + `docs/architecture/phase16_activation.svg` | Closeout nach Tag 10 | I-2 + I-3 |
 | *(Cross-Phase)* `phase15_v4/instinct/bridge.py`, `compile.py` | Promotion-Bridge + Prädikat-Compiler | D2 |
 | *(Cross-Phase)* `phase1_broker_wrapper/scripts/probe_market_margin.py` | Operator-Live-Probe für B3 | D3.0 |
 
 ---
-## Session stopped — 2026-09-08 (MiniMax-M3-Exec-Session #19, Doc-Drift-Audit repo-weit nach Nikinger-Push — Phase 14 [9, 10] + Phase 15 [1] F8-B-Reparatur [2 Commits `ce74ee1` + `23bbd14`], 29 Header-Card-Link-Drifts aufgedeckt [read-only, nicht repariert], Σ 1924 → 1934 unverändert [kein Test-Touch, kein Code-Touch, Archiv-Reparaturen = Markdown-Only], Exec-#18-Block verbatim nach SESSIONS_ARCHIVE.md rotiert [19. Eintrag, +1 vs. Stand Session #18], Push-Freigabe-Stand: 2 Commits lokal ahead of `origin/main = 73f30d9`)
+## Session stopped — 2026-09-08 (MiniMax-M3-Exec-Session #20, Phase-16-F-Subphase-Eröffnung — `PHASE16_PARTIAL_CLOSEOUT.md` NEU [310 LOC, Mini-Plan für die 2-Wochen-Test-Periode in 3 Blöcken G/H/I: G = E4-Tagesroutine-Begleitung 9 Tage, H = Audit-Restbefunde-Reparatur 29+1+1 am Wochenende 13.–14. Sept., I = Tag-10-Closeout Mo 2026-09-21 nach 17:30], 8 Locks F1–F8 [F1: Phase-16-F als Subphase, kein Phase-17; F2: F9-Mechanik zentral; F3: H-1-Hook analog F9 vor H-3-Reparatur; F4: Sammel-Commit für 29+1+1; F5: Block-G-Vorrang, Code-Edits außerhalb Trade-Fenster; F6: read-only für aktive Phasen; F7: Tag-10-Closeout Mo-Abend; F8: Phase-15 `requires-python`-Align offen für Phase-17], 8 Akzeptanzkriterien AK-F1–AK-F7, 8 Operator-Aktionen Nikinger, 7 Out-of-Scope-Items für Phase-17, 8 Drift-Items, Cross-Phase-Touch 6 Phasen + root, Σ 1934 unverändert, Exec-#19-Block verbatim nach SESSIONS_ARCHIVE.md rotiert [20. Eintrag, +1 vs. Stand Session #19], Push-Freigabe-Stand: 0 Commits pending nach Nikinger-Push `560d038`)
 
-> **Auftrag:** Nikinger-Chat 2026-09-08 (Folgesession Phase 16, „Erst pushen, dann auditten" auf meine Session-#18-F9-Frage): Phase-16-F9-Code+Tests (`df25905`) + Session-Rotation #17→#18 (`73f30d9`) wurden vom Nikinger gepusht; `git rev-parse --short origin/main` = `73f30d9`, `git rev-list --count origin/main..HEAD` = 0 (verifiziert nach Push). **Folge-Auftrag:** Doc-Drift-Audit repo-weit aus Session-#18-Next-Block (6 Checks: Push-Baseline, Σ-Konsistenz, Archiv-Integrität, ein Block/Phasenkopf, INDEX-Vollständigkeit, Header-Card-Links). Reihenfolge: erst F9-Reparaturen (Phase 14 + Phase 15 SESSIONS_ARCHIVE.md, Phase-3-Mechanik liefert die Befunde), dann die 5 anderen Checks als read-only Messung mit Befund-Bericht. Commit-Scope dieser Session: 2 Atomic Commits für die F8-B-Reparaturen (`ce74ee1` Phase-14 + `23bbd14` Phase-15) + dieser Session-Rotation-Commit. **Keine** Header-Card-Reparatur, **keine** INDEX-Erweiterung (siehe Findings 🟡 — beides Phase-17-Material).
+> **Auftrag:** Nikinger-Chat 2026-09-08 (Folgesession Phase 16, auf meine Audit-Bericht-Frage „Wie verfahren mit den 31 Audit-Restbefunden? Was sind nicht-geblockte offene Items?"): **„Ich schlage vor, eine Plan Session kümmert sich darum einen Mini Plan zu schreiben, der in der Zeit des 2 Wochen Tests die noch zu tuenden offenen Items strukturiert (inklusive deines Empfohlenes Weges der Audit Lösung) angeht. Keine Phase 17, weitere Phase 16 Subphase. Schreibe z.B ein Part Closeout, dann commit und push + Danach session beenden."** — 4 Punkte explizit: (1) **Plan-Session-Format** mit Mini-Plan, (2) **Strukturierung der offenen Items für die 2-Wochen-Test-Periode**, (3) **Phase-16-F als Subphase** (kein Phase-17, keine neue Nummer), (4) **„z.B. ein Partial Closeout"** als Dokumentenformat (analog `PHASE15_CLOSEOUT_HANDOVER.md` aber mid-phase statt full-close). Mein Vorschlag aus der vorherigen Antwort (Phase-17-Plan-Session mit Blöcken A-F) wurde explizit abgelehnt durch „Keine Phase 17" → umgesetzt als Phase-16-F-Subphase mit 3 Blöcken G/H/I + 7 Locks F1-F8 (F1 supersedet die Phase-17-Plan-Empfehlung).
 >
-> Plan-Anker: Phase-16-Phasenkopf Session-#18 Next-Block (Doc-Drift-Audit-6-Checks-Liste verbatim) + Phase-16-Plan §F8-Prinzip (\"Plan-Session-Block bleibt unverändert; verlorene Struktur wie in F8 darf verbatim aus Git zurück, geänderte Aussagen brauchen ein Supersede\"). Cross-Phase-Freigabe: P14 für die F8-B-Reparatur (`ce74ee1` + `23bbd14`); Archiv-Touch in `phase14_discovery/SESSIONS_ARCHIVE.md` und `phase15_v4/SESSIONS_ARCHIVE.md` ist Phase-eigene Reparatur, kein Cross-Phase-Code-Touch.
+> Plan-Anker: Phase-16-Phasenkopf Session-#19-Findings (6 Audit-Checks, 31 Restbefunde, 2 davon repariert) + Phase-16-Plan §1 P1 (Phase-16-als-Ganzes-Philosophie, F1 als Subphase-Erweiterung) + Phase-15-CLOSEOUT-HANDOVER als Pattern-Vorbild (763 LOC, §0 BLUF + 5-Zeilen-Bilanz, §1 SVG, §2 Locks, §3 Akzeptanz, §4 As-Built, §5 Test vs. Live, §6 Delta, §7 Offene Entscheidungen, §8 Datei-Anker, §9 Konsistenz, §10 Don'ts, §11 Was-diese-Session-gemacht-hat) + Phase-13/14-Closeouts als Pattern-Vorbilder. Cross-Phase-Touch: 6 Phasen in Block H (P7/P10/P13/P14/P15 + root docs/concepts/), alle gemäß Phase-16-Plan §4 Cross-Phase-Freigabe-Liste + Nikinger-Auftrag 2026-09-08.
+>
+> Ausführungs-Scope: **1 Atomic Commit** (`phase16: docs -- PHASE16_PARTIAL_CLOSEOUT.md NEU (Phase-16-F-Subphase-Eröffnung mit Mini-Plan Blöcke G/H/I + 8 Locks F1-F8 + 8 Akzeptanz AK-F1-F7 + 8 Operator-Aktionen + 7 Out-of-Scope-Items + 8 Drift-Items, Modul-Tabelle um PHASE16_PARTIAL_CLOSEOUT.md ergänzt, Session-Rotation #19→#20)`) + dieser Session-Rotation-Commit. Push-Freigabe-Stand: 0 Commits pending (Session-#19-Commits `ce74ee1` + `23bbd14` + `560d038` wurden vom Nikinger gepusht, `git rev-parse --short origin/main` = `560d038`, `git rev-list --count origin/main..HEAD` = 0 — verifiziert nach Push).
 
 ### Completed
 
-- **F8-B-Reparatur Phase-14 Session #9 + #10** (Commit `ce74ee1`): beide Blöcke verbatim aus Git-Historie geholt (`git show 88fb4db:phase14_discovery/CLAUDE.md` Z. 104–298 für #9 = 195 Zeilen, `git show 19dc8c7:phase14_discovery/CLAUDE.md` Z. 104–218 für #10 = 115 Zeilen). Reparatur-Modus: zwischen Session-11-Block (endet Z. 2048) und Session-8-Heading (Z. 2051) einfügen — Session-10-Block + `---`-Separator + Session-9-Block. Beide Commits `19dc8c7` und `3f5fdd1` hatten REPLACE-statt-PREPEND-Bug (Rotation sollte Archiv ergänzen, hat aber die oberste Zeile ersetzt) — nicht nur die H2-Heading fehlte, sondern der ganze Block-Inhalt war weg.
-- **F8-B-Reparatur Phase-15 Session #1** (Commit `23bbd14`): `#1` zur Heading-Zeile Z. 2337 hinzugefügt (`MiniMax-M3-Exec-Session` → `MiniMax-M3-Exec-Session #1`). Anders als Phase-14-Fall: die Heading hatte **nie** eine `#1`-Nummer (verifiziert in der initialen Rotation `ef320e6` 2026-08-31). Klassischer F8-A-Versäumnis bei der Erstellung des Archivs, kein F8-B. 1-Zeichen-Edit, kein Inhalt geändert, kein Plan-Session-Block berührt.
-- **Test-Anpassung** (`test_strict_check_passes_for_phase15_v4_against_real_repo`): von Session-#18-Erwartung (exit 1, weil F9-Befund) zurück auf Erwartung exit 0 (F8-B-repariert). Reparatur-Historie im Docstring dokumentiert.
-- **Session-#18-Block verbatim aus Phasenkopf nach SESSIONS_ARCHIVE.md rotiert** (19. Eintrag, oben angefügt nach dem Preamble-Block). Preamble aktualisiert von „Stand nach Exec-Session #18 ... #17" auf „Stand nach Exec-Session #19 ... #18" mit #18-Summary im selben Format wie die vorherigen Rotationen.
+- **`PHASE16_PARTIAL_CLOSEOUT.md` NEU** (310 LOC, ~13 KB) im Verzeichnis `phase16_activation/`. Struktur:
+  - YAML-Header (status: partial, L3-Snapshot-Pattern, purpose + read-when + 4 down-Links + updated 2026-09-08)
+  - §0 BLUF (5 Bullet-Points: Status, Σ, Audit-Recap, 3 Stränge, Phase-17-ausgeschlossen)
+  - §1 Status-Quintessenz (4 Sub-Sections: Block-Tabelle A-F, Σ-Endstand 1934, Live-Stand E4-Tag-1, Audit-Recap 6-Checks-Tabelle)
+  - §2 Audit-Befunde im Detail (29 Header-Card-Link-Drifts in 5 Pattern-Kategorien + 1 INDEX-Scope-Drift + 1 Phase-14-Order-Bug)
+  - §3 8 Locks F1-F8 mit Begründung je Zeile
+  - §4 Schritt-Sequenz mit 3 Blöcken G/H/I (G = E4-Begleitung 9 Tage, H = Audit-Restbefunde-Reparatur am Wochenende 13.–14. Sept., I = Tag-10-Closeout Mo 2026-09-21 nach 17:30)
+  - §5 8 Akzeptanzkriterien AK-F1 bis AK-F7 mit Beleg-Quelle
+  - §6 8 Operator-Aktionen tabelliert mit Kosten + Wann
+  - §7 7 Out-of-Scope-Items für Phase-17 explizit delegiert (Strategie-Bewertung, Prozess-Supervision, Smoke-Test-Pattern auf Geschwister-`_build_*`, Phase-15-Wiring-Doku, Phase-15-`requires-python`-Align, Force-Trigger, Live-Account, Phase-9 `is_weekend_market`)
+  - §8 8 Drift-Items dokumentiert (D-F1 bis D-F8)
+  - §9 Was-diese-Session-gemacht-hat
+  - §10 Cross-Phase-Touch-Disziplin (6 Phasen in Block H + Block I root/ROADMAP/README/INDEX)
+  - §11 Σ-Impact (1934 → ~1944 nach Block H + Tests, Block I docs-only)
+- **Modul-Tabelle im Phasenkopf** ergänzt um `PHASE16_PARTIAL_CLOSEOUT.md` (Step **F**, Partial Closeout zur 2-Wochen-Test-Halbzeit). Reihenfolge der Tabelle aktualisiert: E2 → E2-Tests → E1 → **F (NEU)** → I-2+I-3 → D2 → D3.0.
+- **YAML-Header-Card `updated:` Stamp** auf `2026-09-08` aktualisiert mit Session-#20-Summary (PHASE16_PARTIAL_CLOSOUT.md NEU + Modul-Tabelle-Ergänzung + Session-Rotation #19→#20 + Push-Freigabe-Stand 0 Commits pending).
+- **Session-#19-Block verbatim aus Phasenkopf nach SESSIONS_ARCHIVE.md rotiert** (20. Eintrag, oben angefügt nach dem Preamble-Block, _erster-Eintrag_ in der Archiv-Liste). Preamble aktualisiert von „Stand nach Exec-Session #18 ... #17" auf „Stand nach Exec-Session #20 ... #19" mit #19-Summary (Doc-Drift-Audit, 6 Checks, 2 F8-B-Reparaturen, 31 Restbefunde Phase-17).
 
-### Findings (Audit-Report — 6 Checks)
+### Findings
 
-#### Check #1 — Push-Baseline (F6-Klasse) — ✅ PASS
-
-- `git rev-parse --short origin/main` = `73f30d9`, `git rev-list --count origin/main..HEAD` = **0** (nach Nikinger-Push der Session-#18-Commits `df25905` + `73f30d9`).
-- Aktive Phasenköpfe + root + ROAD.md nach stale push-baseline claims durchsucht (`grep "ahead of .origin/main|push-freigabe|branch.*ahead|origin/main =" CLAUDE.md ROADMAP.md phase*/CLAUDE.md`): **keine** stale claims in aktiven Phasenköpfen gefunden. Die Session-#18-Block-Behauptung „`git rev-list --count origin/main..HEAD` = 0 (vorheriger Stand nach Session #17 wurde gepusht)" ist korrekt für den damaligen Schreibzeitpunkt.
-- **Pre-Existing-Drift (nicht F6-Klasse):** Phase-15-Archive-Block (Z. 753) behauptet „3 Commits lokal (D1, D2, D3), 3 ahead of `origin/main`" und Z. 882 „7 Commits lokal ahead" — diese Behauptungen waren historisch korrekt zum Schreibzeitpunkt, sind aber jetzt stale (Push ist erfolgt). **Read-only Audit, kein Fix:** Phase-15 ist abgeschlossen, ihre Archive ist historischer Audit-Stand (📦 Pattern). Stale-Behauptungen in Archiv-Blöcken bleiben dokumentationsgewichtig, sind aber kein aktiver Vertrag mehr. Phase-17-Material: optionaler „archive_clean_push_status"-Mechanismus, der die Audit-Phase beendet, wenn die zugehörigen Commits gepusht sind.
-
-#### Check #2 — Σ-Konsistenz (F7-Klasse) — ✅ PASS
-
-- Re-measured 2026-09-08: `Σ = 1934 grün` (root tests +10 vs. Session-#17-Befund von 1924 — F9-Tests). Per-Phase: P1 97 · P2 82 · P3 105 · P4 162 · P5 190 · P6 76 · P7 169 · P8 259 · P9 95 · P10 165 · P12 145 · P13 82 · P14 61 · P15 126 · P16 5 · root 115 = 1934.
-- **Konvention** `meta_m1_harness/` 28 Tests zählt **nicht** mit → Σ ohne M1 = 1934, mit M1 = 1962. (Session-#17-F7 hat das protokolliert; diese Session verifiziert es erneut, kein Drift.)
-- Aktive Σ-Behauptungen: nur **Phase-16 Phasenkopf Session-#18-Block** (Σ 1924 → 1934) — **korrekt gemessen**.
-- Historische Σ-Behauptungen in archivierten Phasen (Phase 10 Σ 1698, Phase 12 Σ 1698, Phase 13 Σ 1703, Phase 14 Σ 1703, Phase 15 Σ 1843, root-CLAUDE-MD Status-Tabelle Phase-15-Σ 1843, ROADMAP-Phase-15-Σ 1843): **alle korrekt als historische Snapshots**. Phase-16-Plan §2.1 Baseline `Σ 1843` ebenfalls korrekt.
-
-#### Check #3 — Archiv-Integrität (F8-Klasse) — 🟢 2 echte Befunde + Reparatur
-
-- F9-Step-3 (`check_archive_gaps`) lieferte in Session #18 zwei echte Befunde:
-  - `phase14_discovery/SESSIONS_ARCHIVE.md` missing Sessions **[9, 10]** — `first-per-heading` lieferte `[22..11, 8, 6..1, 7]` statt `[22..1]`. Plus File-Order-Bug (Session #7 am Ende statt zwischen #8 und #6, von F9 nicht geprüft, nur visuell).
-  - `phase15_v4/SESSIONS_ARCHIVE.md` missing Session **[1]** — Heading `## Session stopped — 2026-08-31 (MiniMax-M3-Exec-Session, Block A: A-1..A-4 + Session-End-Rotation)` ohne `#1`.
-- **Reparatur in dieser Session** (Commits `ce74ee1` + `23bbd14`): beide Befunde behoben, F9 jetzt grün fürs ganze Repo (siehe Check #3-Verifikation unten).
-- **Pre-existing Drifts in Phase-14 Archive (nicht F8-Klasse, separat dokumentiert):**
-  - **File-Order-Bug Session 7:** Z. 3205 (am Ende), sollte chronologisch zwischen Session 8 (Z. 2364) und Session 6 stehen. F9 prüft nur Contiguity (Set-Match), nicht Reihenfolge — ein Reihenfolge-Check wäre Phase-17-Watch-Item (analog F9 für Reihenfolge).
-  - **Drift-Zeile Z. 253:** `## Session stopped` block; the previously-newest block moves here` — Pre-Tex-Heading-Syntax im Prose, vom `_SESSION_NUM_RE` korrekt ignoriert. Dokumentationsgewichtig aber harmlos.
-  - **Plan-Session-Block (Z. 2521)** bleibt unverändert (per Plan §F8-Prinzip, kein Heading-Verlust = kein zweiter F8).
-
-#### Check #3-Verifikation (post-Reparatur)
-
-- `python3 scripts/check_doc_rotation.py --strict --quiet` exit **0** (Repo-weit, alle Phasen F9-konform).
-- `python3 scripts/check_doc_rotation.py --strict --phase phase14_discovery` exit **0** (Phase 14 nach `ce74ee1`).
-- `python3 scripts/check_doc_rotation.py --strict --phase phase15_v4` exit **0** (Phase 15 nach `23bbd14`).
-- `python3 scripts/check_doc_rotation.py --strict --phase phase16_activation` exit **0** (Phase 16 nach `73f30d9`).
-- `pytest tests/test_check_doc_rotation.py -q` = **35 passed** (alle F9-Tests + Reparatur-Test grün).
-
-#### Check #4 — Genau ein Session-Block pro Phasenkopf — ✅ PASS
-
-- `python3 scripts/check_doc_rotation.py --quiet` exit **0** für alle 16 Phasen. Per-Phase: phase1_broker_wrapper 1 · phase2_persistence 0 (kanonisch, virgin) · phase3_external_data 1 · phase4_research 1 · phase5_execution 1 · phase6_debate 1 · phase7_reward 1 · phase8_scheduler 1 · phase9_universe 1 · phase10_v3 1 · phase12_data_foundation 1 · phase13_live_data 1 · phase14_discovery 1 · phase15_v4 1 · phase16_activation 1.
-- `phase2_persistence` mit 0 Blocks ist kanonisch (P14-F Step-2 Dokumentation: „a phase that has never held a session has zero blocks and is canonical").
-
-#### Check #5 — `docs/INDEX.md`-Vollständigkeit (beide Richtungen) — 🟡 Scope-Drift, sonst PASS
-
-- **Richtung 1 (INDEX → Files):** alle 128 unique Link-Targets in `docs/INDEX.md` zeigen auf existierende Files. **PASS.**
-- **Richtung 2 (Files → INDEX):** 360 .md-Dateien im Repo (excluding `.venv/`, `data/`, `.git/`, `__pycache__/`, `.pytest_cache/`). Davon sind **224 nicht in INDEX.md** erwähnt. Verteilung:
-  - 220+ sind Skill-Internals unter `.agents/skills/` (vercel-optimize-Referenzen, etc.) — Index-Regel sagt zwar „new .md ⇒ add one line", aber die Konvention hat sich entwickelt, Skill-Internals NICHT zu listen (Index-Zweck ist „L0 map of every project doc", Skills sind Tooling-Metadaten, nicht Projekt-Doku).
-  - 6 in `meta_m1_harness/specs/` (S1–S6) — selbe Kategorie: Skill-Specs, nicht Projekt-Doku.
-  - 0 in Phasen-Verzeichnissen, die NICHT in INDEX sind. Alle Phasen-`.md`-Dateien sind im INDEX.
-- **Befund (🟡):** Scope-Drift — die strikte Auslegung der Index-Regel „jede `.md` hat eine INDEX-Zeile" ist nicht praktikabel (würde ~220 Skill-Lines bedeuten). **Read-only Audit, kein Fix:** Scope-Interpretation dokumentiert in dieser Session-#19-Block-Findings. **Phase-17-Watch-Item:** Index-Regel präzisieren (\"gilt für `phase*/` + `docs/` + root, NICHT für `.agents/`-Skills") + 2-Wort-Eintrag in DOC_LAYERS_CONVENTION.md.
-
-#### Check #6 — Header-Card-Links (up:/down:) — 🟡 29 echte Befunde aufgedeckt
-
-- 91 Dateien mit Header-Cards (up: oder down: in den ersten 30 Zeilen). 331 Header-Card-Links geprüft (via `/tmp/opencode/check_header_links.py`, das Markdown-Formatting `**` und `` ` `` strippt, aber `_` NICHT — Underscores sind Teil von Filenames).
-- **29 echte fehlende Links** aufgedeckt. Pattern-Kategorisierung:
-  1. **`../../` statt `../`** (15 Links, **mehrere Phasen**): `../../docs/concepts/...` aus `phase13_live_data/*.md` und `phase14_discovery/*.md` und `phase15_v4/*.md` und `phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md`. Resolved zu `/home/trading-bot/docs/...` (existiert nicht), sollte `/home/trading-bot/trading-bot/docs/...` sein. Die Files sind in `phase*/`, nicht in `phase*/<dir>/` — `../` reicht.
-  2. **`./` statt `../`** (4 Links in `docs/concepts/PHASE10_*_KICKOFF_HANDOVER.md`): `up: ./CLAUDE.md` resolved zu `docs/concepts/CLAUDE.md` (existiert nicht). Files sind in `docs/concepts/`, müssen also `../CLAUDE.md` nutzen.
-  3. **File existiert nicht** (1 Link): `phase15_v4/PHASE15_HOOK_HARDENING_PLAN.md` → `./PHASE15_A1_A6_STEP_RECORDS.md` — Datei wurde im Plan referenziert, aber nie erstellt (Phase-15-A-1..A-6 haben keinen Step-Records-Anhang bekommen).
-  4. **Prose-List statt Pfad** (1 Link): `phase10_v3/PHASE10_CLOSEOUT_HANDOVER.md` → `./DATA_WEEK_REVIEW_2026-07-25.md / -07-31.md / -08-07.md` — Slash-getrennte Liste, kein einzelner Pfad.
-  5. **`./X.md` statt `../X.md`** oder **`../../X.py` falsch** — Restliche ~8 Links sind Mischformen aus den obigen Patterns.
-- **Detaillierte Liste** (siege `/tmp/opencode/audit_missing_links_full.txt`, 29 Einträge; aus dem Live-Repo reproduzierbar mit `python3 /tmp/opencode/check_header_links.py`).
-- **Read-only Audit, kein Fix:** Diese 29 Links sind PRE-EXISTING DRIFTS, die der F9-Hook nicht abdeckt (F9 prüft nur Archiv-Headings, nicht Header-Card-Links). Reparatur wäre Phase-17-Material (~30 min: mechanisches Korrigieren von `../../` zu `../` und `./` zu `../`, plus 1 fehlende Datei erstellen).
+- **🟢 Phase-16-F-Subphase eröffnet ohne Phase-17-Plan-Session.** Nikinger-Auftrag 2026-09-08 („Keine Phase 17, weitere Phase 16 Subphase") supersedet die Empfehlung aus Session-#20-Antwort (Phase-17-Plan-Session mit Blöcken A-F). F1-Lock dokumentiert die Begründung (Phase 16 ist als großes Ganzes bereits geplant, Restarbeit passt in F als Subphase).
+- **🟢 31 Audit-Restbefunde strukturiert in Block H + 2 Sammel-Reparaturen** (Phase 14 [9, 10] + Phase 15 [1]) **bereits in Session #19 repariert** (`ce74ee1` + `23bbd14`). F-Subphase erbt einen sauberen Repo-Stand: `check_doc_rotation.py --strict --quiet` exit 0.
+- **🟢 Block G (E4-Begleitung) hat Vorrang** vor Block H (Audit-Reparatur). F5-Lock + Phase-16-Plan-§11 Operator-Trigger: Code-Edits in Block H nur **außerhalb** der Trade-Fenster (Mo-Fr 09:00–17:30). Empfehlung im Partial Closeout: Wochenende Sa/So 2026-09-13/14 für Block H (1 zusammenhängender Block, keine Markt-Unterbrechung).
+- **🟢 H-1-Hook-Vor-Reparatur-Strategie** (F3-Lock) analog zu Session-#18-F9-Strategie: Hook bauen → Befunde auto-detected → Reparatur mit Hook-Beweis. Eliminiert die Klasse zukünftiger Header-Card-Drifts **vor** der aktuellen Sammel-Reparatur, statt nur die aktuellen 29 zu fixen und die Klasse offen zu lassen.
+- **🟢 F-Subphase erbt saubere Phase-17-Vorbereitung.** Die 7 Out-of-Scope-Items + 8 Drift-Items sind explizit für Phase-17 delegiert (Strategie-Bewertung, Prozess-Supervision, Smoke-Test-Pattern auf Geschwister-`_build_*`, Phase-15-Wiring-Doku, Phase-15-`requires-python`-Align, Force-Trigger, Live-Account, Phase-9 `is_weekend_market` + Stale-Push-Status-Mechanik + Index-Regel-Schärfung). Phase-17-Plan-Session kann auf dieser Vorlage aufbauen.
+- **🟢 Live-Stand unverändert:** Scheduler PID 281715 (K7-Caps-Pin), Recorder 268859, Discovery 268871, WebUI 268921 — alle 4 durchgehend seit Restart #4 (Di 2026-09-08 09:30:49). Tag 1 (Di 2026-09-08) abgeschlossen, Tag 2 (Mi 2026-09-09) startet morgen früh.
 
 ### Open questions / blockers
 
-- **Live-Stand (unverändert seit Session #17/Restart #4):** Scheduler läuft (PID 281715), Recorder 268859, Discovery 268871, WebUI 268921. K7-Caps-Pin in Startzeile. Tag 1 = **Di** 2026-09-08, Tag 2 = **Mi** 2026-09-09 (heute). Operator-Live-Touch via `autonomy_report.py --day` läuft.
-- **F8-B-Findungs-Quote: 2 von 2 Befunden (Phase 14 + Phase 15) in dieser Session repariert.** Repo `--strict` exit 0. Das war der Hauptzweck der Audit-Folge-Session.
-- **Audit-Restbefunde (nicht repariert, Phase-17-Material):** 29 Header-Card-Link-Drifts (Check #6), 1 INDEX-Scope-Drift (Check #5), 1 Phase-14-File-Order-Bug (Check #3-Pre-existing). Insgesamt ~31 kleine Reparaturen + 1 fehlende Datei.
-- **Push-Freigabe-Stand:** 2 Commits lokal ahead of `origin/main = 73f30d9`:
-  - `ce74ee1` Phase-14 F8-B-Reparatur (Phase-14-eigene Datei + 1 Test-Anpassung)
-  - `23bbd14` Phase-15 F8-B-Reparatur (Phase-15-eigene Datei + 1 Test-Anpassung)
-  - Plus dieser Session-Rotation-Commit (`73f30d9+N+1`)
-- **Block-E-Status:** E3 Runbook-Start ✅ (Restart #4), E4-Tagesroutine läuft (Tag 2), Tag-10-Closeout offen.
+- **Live-Stand:** wie oben (alle 4 Dienste laufen, Tag 1 → Tag 2 morgen).
+- **H-3-Pattern-C-Entscheidung** (Nikinger-Wahl): `phase15_v4/PHASE15_A1_A6_STEP_RECORDS.md` entweder **erstellen** (5-Zeilen-Summary mit Commit-Verweisen auf A-1..A-6-Step-Commits) ODER **Reference entfernen** aus `PHASE15_HOOK_HARDENING_PLAN.md`. Beides 1-Zeilen-Commit. Entscheidung im Block-H-Wochenende (13.–14. Sept.).
+- **Push-Freigabe-Stand:** 0 Commits pending (Nikinger hat `560d038` + Vorgänger bereits gepusht). Diese Session produziert 1 Commit (`phase16: docs -- PHASE16_PARTIAL_CLOSEOUT.md NEU + Session-Rotation #19→#20`).
+- **Block-E-Status:** E3 Runbook-Start ✅ (Restart #4 läuft), E4-Tagesroutine startet Tag 2 (Mi 2026-09-09), Tag-10-Closeout offen (Block I, Mo 2026-09-21 nach 17:30).
+- **Keine** Blocker für den F-Subphase-Start. Alle 8 Locks F1-F8 sind mit dem Phase-16-Plan und dem Nikinger-Auftrag konsistent.
 
-### Next (für die Folgesession)
+### Next (für die Folgesession, Block G + H + I nach Zeitplan)
 
-- **Tägliche `autonomy_report.py --day`** (Nikinger) — Tag 2 = Mi 2026-09-09. Bei Tag 10 (Mo 2026-09-21) `--summary`, bei PASS `PHASE16_CLOSEOUT_HANDOVER.md` + `docs/architecture/phase16_activation.svg` 1080×1080 + Status-Pflege root-CLAUDE/ROADMAP/README/INDEX.
-- **Audit-Restbefunde (Phase-17-Material, delegiert):**
-  1. **Header-Card-Links reparieren** (~30 min, mechanisch): `../../` → `../` wo der File in `phase*/` liegt (nicht in `phase*/<dir>/`); `./` → `../` in `docs/concepts/*` für Files, die nach root zeigen wollen; fehlende `PHASE15_A1_A6_STEP_RECORDS.md` entscheiden: erstellen (5 Zeilen Summary) oder Reference aus Plan entfernen.
-  2. **Phase-14-File-Order-Bug:** Session-7-Block von Z. 3205 (Ende) nach zwischen Session-8 (Z. 2364) und Session-6 verschieben. F9 erkennt das nicht; Reihenfolge-Check als Phase-17-Watch-Item.
-  3. **INDEX-Scope-Drift:** DOC_LAYERS_CONVENTION.md mit 1-Satz-Klarstellung ergänzen (\"Skill-Internals in `.agents/skills/` sind Tooling-Metadata, NICHT Projekt-Doku, daher nicht in INDEX gelistet\") + Plan-Reference in zukünftige Phase-17-Plan-Session.
-  4. **Push-Status-Mechanik** für abgeschlossene Phasen: optional, langfristig — `autonomy_report.py` oder neuer `archive_clean_push_status`-Mechanismus, der die Stale-Behauptungen in Archiv-Blöcken beim Push des letzten Commits neutralisiert (analog Session-#17 `e219a25` Session-Ende-Marker).
+- **Tag 2 (Mi 2026-09-09) morgens** — Block-G-Aktion G1 (Nikinger): `python3 phase16_activation/scripts/autonomy_report.py --day 2026-09-09` + G2 (K7-Caps-Pin-Verify). Kein Code-Touch.
+- **Wochenende 13.–14. Sept.** — Block-H-Session: H-1-Hook bauen (2 Commits), H-2 Convention-Klarstellung (1 Commit), H-3 Sammel-Reparatur (1 Commit, mechanisch), H-4 Phase-14-Order-Fix (1 Commit), H-5 Verifikation (Hook-Beweis). Total ~5 Commits, alle außerhalb Trade-Fenster.
+- **Mo 2026-09-21 nach 17:30** — Block-I-Session: I-1 Summary (Nikinger-Aktion), I-2 Closeout-Handover + I-3 SVG + I-4 Status-Pflege + I-5 Rotation. ~5 Commits + 1 neuer SVG.
+- **Optional parallel zu Block G** (außerhalb Trade-Fenster): H-3-Pattern-C-Entscheidung (PHASE15_A1_A6_STEP_RECORDS.md) kann jederzeit gefällt werden.
 
-### Watch-Item / Plan-Hygiene (für spätere Sessions)
+### Watch-Item / Plan-Hygiene (für Phase-17-Material)
 
-- **Index-Regel-Schärfung:** 1-Satz-Klarstellung in DOC_LAYERS_CONVENTION.md (\"Skill-Internals in `.agents/skills/` sind nicht Projekt-Doku\"), damit Check #5 nicht 224 False-Positives produziert.
-- **Reihenfolge-Check für Archive:** F9-Erweiterung um eine zweite Sub-Invariante — „Archiv-Session-Nummern müssen in absteigender Reihenfolge stehen" (oder: als „expect_min/max"-Range-Check). Fängt den Phase-14-File-Order-Bug automatisch.
-- **Plan-Session-Heading-Disziplin** (aus Session-#17-Watch): Plan-Session-Blöcke müssen die Heading-Form `## Session stopped — YYYY-MM-DD (Plan-Session, <model> — <description>)` haben, sonst landen sie als fehlender Eintrag im Archiv-. Das ist genau der Phase-15-Session-#1-Bug (war keine `#1`-Nummer).
-- **Header-Card-Link-Validierung** (Phase-17): neuer Hook `scripts/check_header_card_links.py`, der beim Pre-Commit läuft (analog `check_doc_rotation.py`). Fängt alle 29 aktuellen + alle zukünftigen Header-Card-Link-Drifts.
-- **Phase-15-Wiring-Doku** (Phase-17-watch): unverändert aus Session #17, weiter offen.
-- **Stale-Push-Status-Mechanik** (Phase-17-watch): siehe oben „Push-Status-Mechanik für abgeschlossene Phasen".
+- **Index-Regel-Schärfung in DOC_LAYERS_CONVENTION.md** (geplant in Block H-2): Skill-Internals in `.agents/skills/` + Harness-Specs in `meta_m1_harness/specs/` sind Tooling-Metadaten, **nicht** Projekt-Doku, und werden nicht in `docs/INDEX.md` gelistet. 1-Satz-Klarstellung.
+- **Reihenfolge-Check für Archive** (Phase-17-Watch-Item, nicht in Block H): F9-Erweiterung um Sub-Invariante „Archiv-Session-Nummern müssen in absteigender Reihenfolge stehen" — würde den Phase-14-File-Order-Bug (Session 7 am Ende) auto-detected. Block-H-4-Fix behebt den aktuellen Fall, aber ein Reihenfolge-Check wäre preventive.
+- **Header-Card-Link-Validierung als Pre-Commit-Hook** (Block H-1, analog F9): `--strict`-Default nach Hook-Beweis. Fängt alle 29 aktuellen + alle zukünftigen Header-Card-Link-Drifts.
+- **Stale-Push-Status-Mechanik** (Phase-17-Watch-Item, nicht in Block H): die 8 Drift-Items D-F4 + die 224 INDEX-Scope-Missing-Items können in Phase-17 systematisch aufgeräumt werden.
+- **Phase-15-`requires-python`-Align** (Phase-17-Watch-Item, nicht in Block H): F8-Lock, Nikinger-Entscheidung. 1-Zeilen-Edit in `phase15_v4/pyproject.toml`.
+- **Plan-Session-Heading-Disziplin** (Phase-17-Watch-Item, nicht in Block H): Standard-Form `## Session stopped — YYYY-MM-DD (Plan-Session, <model> — <description>)` mit klarer Distinktion zu Exec-Sessions (`MiniMax-M3-Exec-Session #N, …`).
+- **Smoke-Test-Pattern auf Geschwister-`_build_*`** (Phase-17-Watch-Item, unverändert aus Session #18-F9-Watch): `_build_paper_tracker`, `_build_paper_engine`, `_build_context_recorder`, `_build_data_foundation`, `_build_research`, `_build_universe_from_db`, `_build_abstain_sink` — gleiche Exposition wie der gefixte `_build_reward_sink`.
 
 **Block-Status nach dieser Session (endgültig):**
 
@@ -189,5 +150,8 @@ jetzt, „keine Code-Leichen" · 7 B3 rein, Live-Probe zuerst · 8 PASS-Kriterie
 | E (Autonomie-Test, Pre-Step Smoke-Test + Hotfix #3) | ✅ endgültig in code + tests (Session #17, P8 256 → 259) |
 | E (Autonomie-Test, F9 Lücken-Check) | ✅ endgültig in code + tests (Session #18, root 105 → 115, Σ 1924 → 1934) |
 | E (Autonomie-Test, Doc-Drift-Audit + F8-B-Reparatur) | ✅ Session #19: 2 F8-B-Reparaturen (`ce74ee1` + `23bbd14`) + 31 Audit-Restbefunde Phase-17 |
+| **F (Phase-16-F-Subphase: Partial Closeout + Mini-Plan Blöcke G/H/I)** | ✅ **diese Session #20** — `PHASE16_PARTIAL_CLOSEOUT.md` NEU mit 3 Blöcken (G laufend, H Wochenende 13.–14. Sept., I Mo 2026-09-21 nach 17:30) + 8 Locks F1-F8 |
 | E (Autonomie-Test, E3 Runbook-Start) | ✅ (Restart #4 erfolgreich 2026-09-08) |
-| E (Autonomie-Test, E4) | 🔴 offen [Tag 2 läuft, Tag 10 → Closeout] |
+| E (Autonomie-Test, E4) | 🔴 offen [Tag 2 morgen, Tag 10 → Closeout Mo 2026-09-21] |
+| E (Autonomie-Test, H Audit-Restbefunde-Reparatur) | 🔴 offen [Wochenende 13.–14. Sept. 2026, 5 Commits geplant] |
+| E (Autonomie-Test, I Tag-10-Closeout) | 🔴 offen [Mo 2026-09-21 nach 17:30] |
