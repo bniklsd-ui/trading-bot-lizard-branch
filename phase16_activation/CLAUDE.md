@@ -165,19 +165,45 @@ $ python3 scripts/check_doc_rotation.py --strict --phase phase16_activation
 
 ### NEXT (für die nächste Session / morgen)
 
-**Push-Freigabe-Stand:** **0 Commits pending** (alle Session-#22-Commits wurden vom Nikinger zwischen #22 und #23 gepusht; diese Session produziert 2 Atomic Commits — Phasenkopf-Rotation + Cross-File-Korrekturhinweise — die separat gepusht werden können, falls Nikinger das möchte).
+**Push-Status (post-push 2026-09-08 13:41):** Commit **`ee16540`** auf `origin/main`, `ahead/behind = 0 0`, working tree clean (nur `data/` untracked, das ist `.gitignore`-d). Session-#23-Doc-Drift-Repair ist damit vollständig auf `origin/main`.
 
-**Nikinger-Aktionen morgen früh** (aus Session-#22-Block unverändert):
+**Offene Items für die nächste Session (Exec-Session #24, on demand morgen nach J6):**
 
-1. **J4** (Log-Hygiene): 4 Wrapper-Logs truncaten mit Backup-Kopie daneben, Plan §3 J4 + Runbook-v2 §2.4.
-2. **J6** (Restart): vor 09:00 Berlin per `PHASE16_E3_RUNBOOK_v2.md` §3 verbatim. Danach Day-0-Verify (J7, Exec-Session on demand).
-3. **Aktiv-Block-Eintrag in Prereg v2** vor erster Start-Zeile im Log (Commit `phase16: docs -- E1-Aktiv-Block-Eintragung`, Commit-Zeit < Start-Zeile = AK13-Bedingung).
+1. **Nikinger-Aktionen morgen früh (in dieser Reihenfolge):**
+   - **J4** (Log-Hygiene): 4 Wrapper-Logs truncaten mit Backup-Kopie daneben — Plan §3 J4 + Runbook-v2 §2.4. **Vor J6.**
+   - **J6** (Restart): vor 09:00 Berlin per `PHASE16_E3_RUNBOOK_v2.md` §3 verbatim. **Vor** dem ersten Handelstag, damit Tag 1 ein voller Handelstag ist. **Danach** Day-0-Verify (J7) durch Exec-Session on demand.
+   - **Aktiv-Block-Eintrag in Prereg v2** (`PHASE16_AUTONOMY_PREREGISTRATION_v2.md`): Commit `phase16: docs -- E1-Aktiv-Block-Eintragung`, **Commit-Zeit < Start-Zeile im Log** (AK13-Bedingung).
+2. **Tag-1-Live-Verifikation (Exec-Session #24, J7):**
+   - **AK-J1** `bars.source='ls'` > 0 nach dem ersten Handelstag — Befehl: `sqlite3 "file:data/bars.sqlite?mode=ro" "select count(*) from bars where source='ls'"`. Sollte > 0 sein nach 10 min Markt-Öffnung.
+   - **AK-J2** 0 `ProgrammingError` im neuen `run_scheduler.log` — Befehl: `grep -c ProgrammingError data/state/run_scheduler.log`. Sollte 0 sein nach erstem POST_WINDOW.
+   - **AK-J3** K1 = 1 Start je Dienst im Tagesreport (Day-0 + Day-1). Test `test_k1_ignores_starts_before_window` ist bereits grün; Live-Verify ist Day-0-Verify.
+   - **AK-J4** `measurement_heartbeat.ok == true` am ersten POST_WINDOW (Berlin 17:30 minus 30-min-Recorder-Lag-Toleranz, also 17:00). Wenn K4 nach J3 nicht grün wird, **V-4-Verdächtige**: `heartbeat.py:142` zweiter `ok=False`-Zweig (`pairs_resolved == 0`).
+3. **Phase-16-F-Subphase-Plan weitertreiben (G + I):**
+   - **G1** ab Tag 1: `autonomy_report.py --day YYYY-MM-DD` (täglich).
+   - **G2** ab Tag 1: korrigiertes Caps-Pin-Kommando `grep "starting scheduler daemon" data/state/run_scheduler.log | tail -1` (nicht `/proc/<pid>/cmdline` — enthält die Caps nicht).
+   - **I-2 + I-3** Tag-10-Closeout Mo 2026-09-21 nach 17:30 (`PHASE16_CLOSEOUT_HANDOVER.md` + `docs/architecture/phase16_activation.svg`).
+4. **Phase-H-Block (Audit-Restbefunde-Reparatur 29+1+1) Wochenende 13.–14. Sept.:**
+   - H-1-Hook-Step-4 in `scripts/check_doc_rotation.py` (Lock F3 revidiert, kein zweites Skript).
+   - H-3-Reparatur-Tabelle aus F-Exec-Plan §4 + §1.4.
+   - H-4 Sammel-Commit für 29+1+1 Header-Card-Link-Reparaturen.
+   - **Lock F5:** Code-Edits außerhalb des Trade-Fensters (Wochenende).
+5. **Phase-15-Folge-Punkte (alle nicht-blockierend, seit Session #23 erledigt vs. wartend):**
+   - **Promotion-Bridge** — ✅ bereits gebaut in Phase 16 D2 (Commit `bfab841` + Hotfixes #1–#3 in Sessions #14–#16), live-validiert per AK9-Pin (n_closed=8 < n_min=50 ⇒ `promote_eligible` returnt `[]` ⇒ `longterm_pre_trade_check` Identity).
+   - **Ledger-Restore 250 Punkte** — ✅ bereits erledigt (gemessen 2026-09-08, Doku-Korrekturhinweis).
+   - **Live-DB Migration 008+009** — ✅ bereits angewendet (Schema v9, Backup vorhanden, Doku-Korrekturhinweis).
+   - **Gate P7/A6** (Phase-12-Reconcile-Timing Live-Verify) — ⏳ wartet auf nächsten OPEN-Trade + 24-h-Beobachtung; Backoff-Mechanik replay-verifiziert Mini-Session 26 (17→4 CRITICALs); Code unverändert seit Phase-15-Closeout, kein Action bis Markt-Event.
+6. **Push-Freigabe-Stand:** **0 Commits pending** nach diesem Session-#23-Folge-Commit; Nikinger pusht bei nächster Gelegenheit, kein eigenmächtiger Push.
 
-**Erwartete Exec-Session #24 (nach J6, on demand):**
+**Block-Status nach Session #23:**
 
-- Day-0-Verify (J7): AK-J1 (`bars.source='ls'` > 0), AK-J2 (0 `ProgrammingError` in `run_scheduler.log`), AK-J3 (K1 = 1 Start je Dienst), AK-J4 (`measurement_heartbeat.ok == true` am ersten POST_WINDOW).
-- G1/G2-Tagesroutine-Begleitung (G-Block aus F-Subphase-Plan).
-- Block H (Audit-Restbefunde) bleibt Wochenende 13.–14. Sept.
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ (Session #1–#4) |
+| B (Substrat) | ✅ (Session #3) |
+| C (Research-Loop) | ✅ (Sessions #3–#7) |
+| D (Freischaltung) | ✅ (Session #7–#17, inkl. Promotion-Bridge) |
+| E (2-Wochen-Autonomie-Test) | 🔄 — Block J (Defekte-Fixes) ✅ (Session #22), Block G (Tagesroutine) startet nach J6, Block H (Audit-Restbefunde) Wochenende 13.–14. Sept., Block I (Tag-10-Closeout) Mo 2026-09-21 |
+| F (Subphase) | 🔄 — Doc-Drift-Repair ✅ (diese Session #23), Block G/H/I oben |
 
 ### Phase-15 — Block C (Instinct-ECC) — Klarstellung (gegen Sondernotiz-Item #4)
 
