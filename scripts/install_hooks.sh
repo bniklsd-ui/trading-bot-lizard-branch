@@ -28,19 +28,27 @@ HOOK_PATH="${REPO_ROOT}/.git/hooks/pre-commit"
 CANONICAL_BODY="$(cat <<'HOOK_BODY'
 #!/bin/sh
 # Pre-commit hook: doc-rotation hygiene check.
-# Two steps (P14-F, 2026-08-31):
+# Three steps (P14-F + P16-F9, 2026-09-08):
 #   Step 1: no phase CLAUDE.md carries more than one "## Session stopped"
 #           block (Doc-Layers-Konvention, root CLAUDE.md "Rotation rule").
 #   Step 2: head-N == archive-max-(N-1) (archive-sequence integrity).
-# Step 2 became default in Mini-Session 24 (2026-08-31) after D5-Beweis
-# (Mini-Sessions 22+23 verifiziert: alle 14 Archive Step-2-konform).
+#           Step 2 became default in Mini-Session 24 (2026-08-31) after
+#           D5-Beweis (Mini-Sessions 22+23 verifiziert: alle 14 Archive
+#           Step-2-konform).
+#   Step 3: archive numbers are contiguous 1..head_max-1 (P16-F9, Nikinger
+#           2026-09-08). Diese Prüfung ist eine Verschärfung von Step 2: ein
+#           Archiv mit ``#16, #14, …, #1`` (Lücke bei #15) bestünde Step 2
+#           (head=17 → expected=16 = OK), aber Step 3 macht den Drift laut.
+#           Genau diese Lücke ist in Session #17 (F8) operativ aufgetreten
+#           und blieb drei Sessions lang unentdeckt.
+# Installed by scripts/install_hooks.sh (P14-F, 2026-08-31, +P16-F9 2026-09-08).
+# Tracked source: scripts/install_hooks.sh — re-run after every ``git clone`` /
+# fresh venv setup (or just re-run ``bash scripts/dev_install.sh`` which
+# calls this at the end).
 #
-# Installed by scripts/install_hooks.sh (P14-F, 2026-08-31). Tracked source:
-# scripts/install_hooks.sh — re-run after every ``git clone`` / fresh venv
-# setup (or just re-run ``bash scripts/dev_install.sh`` which calls this at
-# the end).
-#
-# Override per commit with `git commit --no-verify` when needed.
+# Override per commit with `git commit --no-verify` when needed (z. B. wenn
+# ein F9-Befund absichtlich noch nicht repariert ist, siehe Doc-Drift-Audit
+# Phase 16 Folgesession).
 
 if ! command -v python3 >/dev/null 2>&1; then
     echo "pre-commit: python3 not found, skipping doc-rotation check"
@@ -53,6 +61,7 @@ if [ ! -f scripts/check_doc_rotation.py ]; then
 fi
 
 # Step 2 became default after D5-Beweis (Mini-Session 24, 2026-08-31).
+# Step 3 became default with F9 (P16, 2026-09-08, Nikinger-Freigabe).
 python3 scripts/check_doc_rotation.py --strict --quiet
 result=$?
 

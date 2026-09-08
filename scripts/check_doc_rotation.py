@@ -29,9 +29,22 @@ below Session 13 → two ``## Session stopped`` blocks in one phasenkopf).
 Usage::
 
     python3 scripts/check_doc_rotation.py                       # Step-1 only (default)
-    python3 scripts/check_doc_rotation.py --strict             # Step-1 + Step-2 (P14-F)
+    python3 scripts/check_doc_rotation.py --strict             # Step-1 + Step-2 (P14-F) + Step-3 (P16-F9)
     python3 scripts/check_doc_rotation.py --phase phase14_discovery
     python3 scripts/check_doc_rotation.py --quiet              # suppress OK rows
+
+The ``--strict`` mode runs two additional checks beyond the default
+inline-duplicate count (Step 1):
+
+- Step 2 (P14-F): ``check_archive_sequence`` — head's max session number
+  must equal archive's max + 1 (Anschluss Phasenkopf→Archiv).
+- Step 3 (P16-F9, 2026-09-08): ``check_archive_gaps`` — archive's
+  per-heading session numbers must form a contiguous descending range
+  from 1 to head_max - 1 (Lückenlosigkeit der Archiv-Nummern). This
+  caught F8 (Session #17): two blocks had lost their ``## Session stopped``
+  headings in earlier rotations, leaving ``#16, #15, #12, #11, …, #1`` —
+  Step 2 still passed because the head's predecessor was correctly set,
+  but the gap at #13/#14 was silent. Step 3 makes that drift loud.
 """
 
 from __future__ import annotations
@@ -145,6 +158,111 @@ def check_archive_sequence(phase_dir: Path) -> tuple[str, str] | None:
     return None
 
 
+def _first_session_num_per_heading(md_text: str) -> list[int]:
+    """For each ``## Session stopped`` heading line in ``md_text``, return the
+    FIRST ``Session #N``-number found on that line.
+
+    Headings without a parseable session number (e.g. the Plan-Session block
+    in Phase 16's archive, or pre-numeric-session prose) are skipped — the
+    regex needs the literal substring ``Session`` followed by whitespace, then
+    an optional ``#`` and digits; ``Plan-Session, Fable 5.1`` does not match
+    because the char immediately after ``Session`` is a comma, not whitespace.
+
+    The returned list is in file order (newest-first for archive files
+    written by the rotation rule, oldest-first if a future convention
+    changes).
+
+    P16-F9 (2026-09-08): the archive-gap check needs each block's PRIMARY
+    session number, not the MAX across the line — heading bodies routinely
+    reference previous sessions (e.g. the ``#16`` heading also mentions
+    ``Session #15``). ``_max_session_num`` was unsuitable because it takes
+    the max; the gap check needs the per-block primary number.
+    """
+    nums: list[int] = []
+    for line in md_text.splitlines():
+        if not line.startswith(SESSION_HEADING):
+            continue
+        m = _SESSION_NUM_RE.search(line)
+        if m is not None:
+            nums.append(int(m.group(1)))
+    return nums
+
+
+def check_archive_gaps(phase_dir: Path) -> tuple[str, str] | None:
+    """P16-F9 (2026-09-08): prüfe, dass die Archiv-Nummern lückenlos sind.
+
+    Returns:
+        ``None`` wenn OK, sonst ``(phase_name, diagnostic)`` für die FAIL-Zeile.
+
+    Invariante: wenn der Phasenkopf genau einen ``Session N``-Block hat,
+    muss das Archiv für jedes ``k in 1..N-1`` genau einen Block mit
+    Session-Number ``k`` enthalten. Plan-Session-Blocks ohne Nummer sind
+    korrekt ausgenommen (siehe Preamble der Archive-Disziplin).
+
+    Diese Prüfung ist eine Verschärfung von ``check_archive_sequence``
+    (P14-F Step 2): jene prüft nur ``arch_max == head_max - 1``, also den
+    Anschluss Phasenkopf→Archiv. Ein Archiv mit ``#16, #14, #13, …, #1``
+    (Lücke bei #15) bestünde diese Prüfung, ist aber ein Doc-Rotation-Drift.
+
+    Genau das ist in Session #17 (F8) operativ aufgetreten: die Rotationen
+    der Sessions #14/#15 haben je die ``## Session stopped``-Überschrift der
+    Blöcke #13/#14 verloren — der damalige ``--strict``-Hook hat das nicht
+    gemeldet, weil die Prüfung nur den Anschluss, nicht die Lückenlosigkeit
+    prüfte.
+    """
+    head = phase_dir / "CLAUDE.md"
+    if not head.exists():
+        return None  # kein Phasenkopf → keine Prüfung
+    head_max = _max_session_num(head.read_text(encoding="utf-8"))
+    if head_max is None:
+        return None  # keine numerierten Sessions im Phasenkopf
+    if head_max <= 1:
+        return None  # head=#1 ⇒ Archiv darf leer sein / fehlen
+
+    archive = phase_dir / "SESSIONS_ARCHIVE.md"
+    if not archive.exists():
+        # check_archive_sequence behandelt diesen Fall bereits (head>1 ohne
+        # Archive = FAIL); hier doppeln wir die Diagnostik nicht.
+        return None
+
+    nums = _first_session_num_per_heading(archive.read_text(encoding="utf-8"))
+    if not nums:
+        # Archiv existiert, aber enthält keinen numerierten Block. head>1
+        # ohne numerierte Blöcke = Lücke über alle 1..head_max-1; konsistent
+        # mit check_archive_sequence, das den Fall auch behandelt.
+        return (phase_dir.name,
+                f"head has Session {head_max} but archive has no "
+                f"parseable session numbers (expected Sessions 1..{head_max - 1})")
+
+    found = set(nums)
+    expected = set(range(1, head_max))
+    missing = sorted(expected - found)
+    extra = sorted(found - expected)
+    # Duplikate: gleiche Nummer in zwei Headings (würde die Lücken-Logik
+    # verschleiern, weil set() sie wegdichtet).
+    seen: set[int] = set()
+    duplicates: list[int] = []
+    for n in nums:
+        if n in seen and n not in duplicates:
+            duplicates.append(n)
+        seen.add(n)
+
+    if not missing and not extra and not duplicates:
+        return None  # lückenlos
+
+    parts: list[str] = []
+    if missing:
+        parts.append(f"missing session(s) {missing}")
+    if extra:
+        parts.append(f"unexpected session(s) {extra}")
+    if duplicates:
+        parts.append(f"duplicate heading(s) for session(s) {duplicates}")
+    return (phase_dir.name,
+            f"archive session numbers are not contiguous ({'; '.join(parts)}, "
+            f"found first-per-heading: {nums}, expected contiguous range "
+            f"1..{head_max - 1})")
+
+
 def count_session_blocks(md_text: str) -> int:
     """Count ``## Session stopped`` H2 headings in a Markdown body.
 
@@ -225,6 +343,12 @@ def main() -> int:
     # --strict). D5: bewusste Trennung Tool-Bau vs. Tool-Verschärfung —
     # die Folgesession (oder --strict-Flag, falls Beweis-Skript grün)
     # aktiviert das im Pre-Commit-Hook.
+    #
+    # P16-F9 (2026-09-08): im selben --strict-Lauf zusätzlich prüfen, dass
+    # die Archiv-Nummern lückenlos sind. check_archive_sequence prüft nur
+    # den Anschluss Phasenkopf→Archiv, nicht die Lückenlosigkeit der
+    # Archiv-Nummern selbst (genau diese Lücke hat F8 drei Sessions lang
+    # unentdeckt bleiben lassen).
     if getattr(args, "strict", False):
         seq_bad: list[tuple[str, str]] = []
         for name in selected:
@@ -233,8 +357,14 @@ def main() -> int:
                 seq_bad.append(result)
                 label, diagnostic = result
                 print(f"[FAIL] {label}: {diagnostic}")
+            # P16-F9: Lücken-Check im selben Pass
+            gap_result = check_archive_gaps(REPO_ROOT / name)
+            if gap_result is not None:
+                seq_bad.append(gap_result)
+                label, diagnostic = gap_result
+                print(f"[FAIL] {label}: {diagnostic}")
         if seq_bad:
-            return 1  # keine Inline-Duplicates, aber Sequenz-Lücke → fail
+            return 1  # keine Inline-Duplicates, aber Sequenz- oder Lücken-FAIL → fail
 
     if not args.quiet:
         print("\nAll phase heads OK.")

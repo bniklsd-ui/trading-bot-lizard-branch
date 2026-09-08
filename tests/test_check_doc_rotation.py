@@ -332,23 +332,33 @@ def test_archive_sequence_handles_mini_session_naming(tmp_path: Path) -> None:
 def test_strict_flag_added_and_default_off() -> None:
     """A6: ``--strict``-Flag wird geparst; ohne Flag laeuft nur Step-1.
 
-    Subprozess-Aufruf (kein Mock) — verifiziert, dass das aktuelle Repo
-    bereits Step-2-konform ist (D5-Beweis-Skript).
+    Subprozess-Aufruf (kein Mock) — verifiziert die Mechanik ``--strict``
+    schaltet Step 2 + Step 3 ein. Scope auf ``phase16_activation``
+    (post-F8-Stand: alle 17 Headings lückenlos 1..16 + Plan-Session-Block),
+    NICHT auf das ganze Repo (Phase 14 hat fehlende Sessions [9, 10], Phase 15
+    fehlt Session #1 — diese Lücken werden in der Folgesession repariert;
+    siehe Session-#18-Doc-Drift-Audit-Auftrag aus Phase-16-Phasenkopf).
     """
-    # Ohne --strict: kein Step-2-Output fuer ein gut funktionierendes Repo
+    # Ohne --strict: nur Step-1 (Inline-Duplicate-Count), exit 0 erwartet.
     result = subprocess.run(
-        [sys.executable, str(_SCRIPT_PATH), "--quiet"],
+        [sys.executable, str(_SCRIPT_PATH), "--quiet", "--phase", "phase16_activation"],
         capture_output=True, text=True, cwd=str(REPO_ROOT),
     )
     assert result.returncode == 0  # Step-1 gruen, Step-2 nicht aktiv
 
-    # Mit --strict: Step-2 laeuft zusaetzlich, gleicher Exit fuer aktuelles Repo
+    # Mit --strict: Step-2 (Sequenz) + Step-3 (Lücken) aktiv. Phase 16 ist
+    # post-F8 lückenlos, also exit 0 erwartet.
     result_strict = subprocess.run(
-        [sys.executable, str(_SCRIPT_PATH), "--strict", "--quiet"],
+        [sys.executable, str(_SCRIPT_PATH), "--strict", "--quiet",
+         "--phase", "phase16_activation"],
         capture_output=True, text=True, cwd=str(REPO_ROOT),
     )
-    assert result_strict.returncode == 0  # aktuelles Repo ist auch Step-2-konform
-    assert "sequence gap" not in result_strict.stdout.lower()  # kein FAIL
+    assert result_strict.returncode == 0, (
+        f"check_doc_rotation.py --strict --phase phase16_activation failed:\n"
+        f"stdout={result_strict.stdout!r}\nstderr={result_strict.stderr!r}"
+    )
+    assert "sequence gap" not in result_strict.stdout.lower()
+    assert "not contiguous" not in result_strict.stdout.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -424,19 +434,317 @@ def test_archive_sequence_ignores_plan_session_without_number(tmp_path: Path) ->
 
 
 def test_strict_check_passes_for_phase15_v4_against_real_repo() -> None:
-    """P15-F A6: Echte Repo-Phase-15-Struktur ist Step-2-konform.
+    """P15-F A6 + P16-F9: Echtes Phase-15-Repo zeigt die F9-Lücke.
 
-    Subprozess-Aufruf gegen die echte Repo-Struktur (phase15_v4/CLAUDE.md +
-    phase15_v4/SESSIONS_ARCHIVE.md). Wenn dieser Test grün ist, deckt der
-    Pre-Commit-Hook Phase 15 ab und ist wirksam.
+    Stand 2026-09-08 (P16-F9-Befund): ``phase15_v4/SESSIONS_ARCHIVE.md``
+    hat **lückenlose Headings #2..#12 + Plan-Session-Block, aber das
+    Heading für Session #1 fehlt** (MiniMax-M3-Exec-Session ohne Nummer
+    in der Heading-Zeile). Pre-F9-Step-2 hat das nicht gemeldet
+    (Anschluss passte: head=#12 → expected=#11 = OK). F9 meldet jetzt
+    korrekt exit 1 für Phase 15 unter ``--strict``.
+
+    Folgesession (Doc-Drift-Audit) repariert den Heading und stellt den
+    Test zurück auf grünen Pfad. Bis dahin: dieser Test dokumentiert den
+    Befund und bestätigt, dass der Hook **greift** (das ist die eigentliche
+    F9-Akzeptanz — der Hook ist jetzt *laut* statt still).
     """
     result = subprocess.run(
         [sys.executable, str(_SCRIPT_PATH), "--strict", "--phase", "phase15_v4"],
         capture_output=True, text=True, cwd=str(REPO_ROOT),
     )
-    assert result.returncode == 0, (
-        f"check_doc_rotation.py --strict --phase phase15_v4 failed:\n"
-        f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
+    assert result.returncode == 1, (
+        f"erwartet exit 1 (Phase 15 fehlt Session #1 in Archive-Headings), "
+        f"got {result.returncode}: stdout={result.stdout!r}"
     )
-    assert "phase15_v4" in result.stdout
-    assert "sequence gap" not in result.stdout.lower()  # kein FAIL
+    assert "not contiguous" in result.stdout.lower()
+    assert "missing session(s) [1]" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# P16-F9 (2026-09-08) — archive-gap check (Lücken-Check).
+#
+# Session #17 (F8) hat zwei verlorene ``## Session stopped``-Überschriften in
+# den Archiv-Blöcken #13/#14 gefunden — der damalige ``--strict``-Hook
+# (P14-F Step 2) hat das nicht gemeldet, weil er nur den Anschluss
+# Phasenkopf→Archiv prüfte, nicht die Lückenlosigkeit der Archiv-Nummern
+# selbst. F9 fügt eine zweite Prüfung im selben ``--strict``-Pass hinzu.
+#
+# Akzeptanz (aus Phase-16-Phasenkopf Session-#17 Next-Block):
+# - Grün gegen das heutige, reparierte Phase-16-Archiv.
+# - Rot gegen den Stand vor der F8-Reparatur.
+# - Plan-Session-Blöcke ohne Nummer korrekt ausgenommen.
+# - Head = Session #1 → kein Check (Archiv darf leer sein).
+# ---------------------------------------------------------------------------
+
+
+def test_first_session_num_per_heading_picks_primary_not_max() -> None:
+    """Heading-Bodies erwähnen vorherige Sessions; die Funktion nimmt das ERSTE
+    Match pro Heading-Zeile (= primäre Session des Blocks), nicht das MAX.
+
+    Reproduziert die Phase-16-#16-Heading: ``MiniMax-M3-Exec-Session #16, …,
+    Session #15`` → muss 16 liefern, nicht 15. Ohne diese Disziplin würde der
+    Gap-Check fälschlich Lücken bei #16 (statt #13/#14) melden.
+    """
+    archive = (
+        "# SESSIONS_ARCHIVE\n\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #16, ..., "
+        "Session #15])\n\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #15, ..., "
+        "Session #14])\n\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #14, ..., "
+        "Session #13])\n\n"
+    )
+    nums = check_doc_rotation_mod._first_session_num_per_heading(archive)
+    assert nums == [16, 15, 14], (
+        f"expected primary session numbers [16, 15, 14] (first-per-heading), "
+        f"got {nums}"
+    )
+
+
+def test_first_session_num_per_heading_skips_plan_session_block() -> None:
+    """Plan-Session-Block (Heading ohne Nummer) wird korrekt ausgenommen.
+
+    ``Plan-Session, Fable 5.1`` matcht die Regex NICHT, weil nach
+    ``Session`` ein Komma statt Whitespace+``#``+Digits kommt.
+    """
+    archive = (
+        "## Session stopped — 2026-09-05 (Plan-Session, Fable 5.1 — Phase 16 eröffnet)\n"
+        "## Session stopped — 2026-09-05 (MiniMax-M3-Exec-Session #1, ...)\n"
+    )
+    nums = check_doc_rotation_mod._first_session_num_per_heading(archive)
+    assert nums == [1], (
+        f"expected [1] (Plan-Session block skipped), got {nums}"
+    )
+
+
+def test_archive_gaps_ok_for_complete_archive(tmp_path: Path) -> None:
+    """Head=#N, Archive mit lückenlosen Nummern 1..N-1 → OK.
+
+    Reproduziert das aktuelle Phase-16-Stand post-F8 (head=#17, archive mit
+    1..16 + Plan-Session-Block).
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-09-08 (MiniMax-M3-Exec-Session #17, ...)\n",
+        encoding="utf-8",
+    )
+    archive_lines = ["# SESSIONS_ARCHIVE\n\n"]
+    archive_lines.append(
+        "## Session stopped — 2026-09-05 (Plan-Session, Fable 5.1)\n\n"
+    )
+    for n in range(16, 0, -1):
+        archive_lines.append(
+            f"## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #{n}, "
+            f"..., Session #{n - 1}])\n\n"
+        )
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "".join(archive_lines), encoding="utf-8"
+    )
+    assert check_doc_rotation_mod.check_archive_gaps(tmp_path) is None
+
+
+def test_archive_gaps_fail_for_pre_f8_state(tmp_path: Path) -> None:
+    """Head=#17, Archive mit Lücke bei #13/#14 (pre-F8-Stand) → ❌ DRIFT.
+
+    Genau der Befund aus F8: die Rotationen der Sessions #14/#15 haben je die
+    ``## Session stopped``-Überschrift der Blöcke #13/#14 verloren — die
+    Archive-Datei trug weiterhin die BODYs, aber die H2-Headings fehlten,
+    sodass die Session-Nummern 13 und 14 nicht mehr zählbar waren. ``_max``
+    lieferte weiterhin 16 (Kopf #17 → Erwartung 16 = OK); die Lücke war
+    silent. Der neue Check muss sie laut machen.
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-09-08 (MiniMax-M3-Exec-Session #17, ...)\n",
+        encoding="utf-8",
+    )
+    # Archive mit Lücke: #16, #15, dann Body ohne Heading für #14 und #13,
+    # dann wieder #12, #11, …, #1.
+    archive_lines = ["# SESSIONS_ARCHIVE\n\n"]
+    archive_lines.append(
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #16, ...)\n\n"
+    )
+    archive_lines.append(
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #15, ...)\n\n"
+    )
+    # Hier fehlen die ## Session stopped-Headings für #14 und #13 (pre-F8).
+    archive_lines.append(
+        "> **Auftrag:** Nikinger-Chat 2026-09-07 (Session #14-Inhalt, "
+        "Überschrift ging bei der Rotation verloren)\n\n"
+    )
+    archive_lines.append(
+        "> **Auftrag:** Nikinger-Chat 2026-09-07 (Session #13-Inhalt, "
+        "Überschrift ging bei der Rotation verloren)\n\n"
+    )
+    for n in range(12, 0, -1):
+        archive_lines.append(
+            f"## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #{n}, ...)\n\n"
+        )
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "".join(archive_lines), encoding="utf-8"
+    )
+    result = check_doc_rotation_mod.check_archive_gaps(tmp_path)
+    assert result is not None, "expected FAIL for archive with gap at #13/#14"
+    label, diagnostic = result
+    assert "missing session(s) [13, 14]" in diagnostic, (
+        f"expected missing [13, 14] in diagnostic, got: {diagnostic!r}"
+    )
+
+
+def test_archive_gaps_fail_for_archive_with_extra_session(tmp_path: Path) -> None:
+    """Head=#5, Archive enthält zusätzlich #6 (out-of-range) → ❌ DRIFT.
+
+    Defensiv: nicht nur Lücken, auch unerwartete Nummern werden gemeldet
+    (z. B. wenn eine Rotation die falsche Datei erwischt hat).
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-09-08 (MiniMax-M3-Exec-Session #5, ...)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #6, ...)\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #4, ...)\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #3, ...)\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #2, ...)\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #1, ...)\n",
+        encoding="utf-8",
+    )
+    result = check_doc_rotation_mod.check_archive_gaps(tmp_path)
+    assert result is not None
+    _, diagnostic = result
+    assert "unexpected session(s) [6]" in diagnostic, (
+        f"expected unexpected [6] in diagnostic, got: {diagnostic!r}"
+    )
+
+
+def test_archive_gaps_fail_for_duplicate_heading(tmp_path: Path) -> None:
+    """Archive mit zwei Headings für dieselbe Session-Nummer → ❌ DRIFT.
+
+    Ohne Duplikat-Check würde ``set()`` den Bug wegdichten: zwei Headings
+    für #3 + Heading für #4 = ``{3, 4}``, contiguous → OK. Aber genau das
+    verschleiert den Drift (eine Session wäre doppelt rotiert).
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-09-08 (MiniMax-M3-Exec-Session #5, ...)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #4, ...)\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #3, ...)\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #3, ...)\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #2, ...)\n"
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #1, ...)\n",
+        encoding="utf-8",
+    )
+    result = check_doc_rotation_mod.check_archive_gaps(tmp_path)
+    assert result is not None
+    _, diagnostic = result
+    assert "duplicate heading(s) for session(s) [3]" in diagnostic
+
+
+def test_archive_gaps_skip_phases_with_first_ever_session(tmp_path: Path) -> None:
+    """Head=#1, Archive beliebig/leer → kein Check (erste Session der Phase)."""
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-09-08 (MiniMax-M3-Exec-Session #1, ...)\n",
+        encoding="utf-8",
+    )
+    # Kein Archiv
+    assert check_doc_rotation_mod.check_archive_gaps(tmp_path) is None
+    # Auch leeres Archiv
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "# Plan-Session-Block (kein Heading)\n", encoding="utf-8"
+    )
+    assert check_doc_rotation_mod.check_archive_gaps(tmp_path) is None
+
+
+def test_archive_gaps_fail_for_archive_with_no_numeric_headings(tmp_path: Path) -> None:
+    """Head=#5, Archive existiert, aber enthält keinen numerierten Block
+    (z. B. nur einen Plan-Session-Block ohne Nummer) → ❌ DRIFT.
+
+    Sonderfall, weil ``check_archive_sequence`` denselben Befund mit
+    anderer Diagnostik meldet; wir prüfen die Lücken-Check-Variante.
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-09-08 (MiniMax-M3-Exec-Session #5, ...)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "SESSIONS_ARCHIVE.md").write_text(
+        "## Session stopped — 2026-09-05 (Plan-Session, Fable 5.1)\n",
+        encoding="utf-8",
+    )
+    result = check_doc_rotation_mod.check_archive_gaps(tmp_path)
+    assert result is not None
+    _, diagnostic = result
+    assert "no parseable session numbers" in diagnostic
+
+
+def test_strict_check_passes_for_phase16_activation_against_real_repo() -> None:
+    """P16-F9: Echte Phase-16-Struktur post-F8 ist F9-konform.
+
+    Subprozess-Aufruf gegen ``phase16_activation/CLAUDE.md`` +
+    ``phase16_activation/SESSIONS_ARCHIVE.md`` (reparierter Stand).
+    Wenn dieser Test grün ist, deckt der Hook die F8-Klasse ab.
+    """
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPT_PATH), "--strict", "--phase", "phase16_activation"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT),
+    )
+    assert result.returncode == 0, (
+        f"check_doc_rotation.py --strict --phase phase16_activation failed:\n"
+        f"stdout={result.stdout!r}\nstderr={result.stderr!r}"
+    )
+    assert "not contiguous" not in result.stdout.lower(), (
+        f"unexpected Lücken-FAIL in repaired Phase-16 archive: {result.stdout!r}"
+    )
+
+
+def test_strict_check_fails_for_simulated_pre_f8_phase16_archive(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """P16-F9: Simulierter pre-F8-Phase-16-Stand erzeugt exit 1.
+
+    Verifiziert, dass der neue Check gegen den Stand VOR der F8-Reparatur
+    rot wäre — sonst prüft er nicht, was er prüfen soll (Selbsttest-Forderung
+    aus dem Phasenkopf Session-#17 Next-Block).
+    """
+    # Layout: phase16_activation/CLAUDE.md + SESSIONS_ARCHIVE.md
+    phase_dir = tmp_path / "phase16_activation"
+    phase_dir.mkdir()
+    (phase_dir / "CLAUDE.md").write_text(
+        "## Session stopped — 2026-09-08 (MiniMax-M3-Exec-Session #17, ...)\n",
+        encoding="utf-8",
+    )
+    # Pre-F8: Headings für #16, #15, #12..#1, Plan-Session ohne Nummer
+    archive_lines = ["# SESSIONS_ARCHIVE\n\n"]
+    archive_lines.append(
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #16, ...)\n\n"
+    )
+    archive_lines.append(
+        "## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #15, ...)\n\n"
+    )
+    # Hier fehlen die Headings für #14 und #13 (pre-F8-Drift)
+    archive_lines.append(
+        "> **Auftrag:** Body von Session #14 ohne Heading\n\n"
+        "> **Auftrag:** Body von Session #13 ohne Heading\n\n"
+    )
+    for n in range(12, 0, -1):
+        archive_lines.append(
+            f"## Session stopped — 2026-09-07 (MiniMax-M3-Exec-Session #{n}, ...)\n\n"
+        )
+    archive_lines.append(
+        "## Session stopped — 2026-09-05 (Plan-Session, Fable 5.1)\n"
+    )
+    (phase_dir / "SESSIONS_ARCHIVE.md").write_text(
+        "".join(archive_lines), encoding="utf-8"
+    )
+
+    # Hauptskript gegen das tmp-Layout laufen lassen
+    monkeypatch.setattr(check_doc_rotation_mod, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        check_doc_rotation_mod, "PHASE_DIRS", ("phase16_activation",)
+    )
+    monkeypatch.setattr(
+        sys, "argv", ["check_doc_rotation", "--strict", "--quiet"]
+    )
+    rc = check_doc_rotation_mod.main()
+    assert rc == 1, (
+        f"expected exit 1 for pre-F8 simulated archive (gap at #13/#14), got {rc}"
+    )
