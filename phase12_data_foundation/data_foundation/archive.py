@@ -14,6 +14,7 @@ Owns its own ``sqlite3`` connection rather than importing
 from __future__ import annotations
 
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
@@ -74,24 +75,40 @@ class BarArchive:
 
     def __init__(self, db_path: str | Path) -> None:
         self.db_path = str(db_path)
-        self.conn = sqlite3.connect(self.db_path)
+        # J1 (Phase 16 §3): the connection is shared by multiple threads
+        # (Recorder writes yF bars from the yF-thread, the Lightstreamer-Listener-
+        # Thread writes ``source='ls'`` bars from ``stream.py:498``). ``check_same_thread=False``
+        # permits the cross-thread use; the ``threading.Lock`` below serializes every
+        # DB-touching method so concurrent writers don't corrupt the cursor. See the
+        # ``commit``-message body and ``PHASE16_F_EXEC_PLAN.md`` §3 J1 for the live
+        # evidence (63 942 ``ProgrammingError`` on 2026-09-08 alone; ``bars.source='ls'`` = 0
+        # since the table existed).
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        self._lock = threading.Lock()
 
     def close(self) -> None:
-        self.conn.close()
+        # NOTE: ``close()`` invalidates ``self.conn`` for every other thread holding the lock.
+        # Today this is only called at shutdown (Recorder + Scheduler tear-down), so no other
+        # writer races the close. If a future caller adds an in-flight ``close()``, it must
+        # join all writer threads first — the lock alone doesn't protect against the
+        # post-close use-after-free on a different thread.
+        with self._lock:
+            self.conn.close()
 
     def ensure_schema(self) -> None:
         """Create all three ``bars.sqlite`` tables if they don't exist yet (idempotent)."""
-        self.conn.execute(_CREATE_BARS)
-        self.conn.execute(_CREATE_BARS_INDEX)
-        self.conn.execute(_CREATE_SOURCE_SPEND)
-        self.conn.execute(_CREATE_ALLOWANCE_OBSERVATIONS)
-        # Phase 13 §6 A5: idempotent column add for tick_count. A naked ALTER
-        # would raise on the second run; the PRAGMA check makes it a no-op.
-        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(bars)").fetchall()}
-        if "tick_count" not in cols:
-            self.conn.execute("ALTER TABLE bars ADD COLUMN tick_count INTEGER")
-        self.conn.commit()
+        with self._lock:
+            self.conn.execute(_CREATE_BARS)
+            self.conn.execute(_CREATE_BARS_INDEX)
+            self.conn.execute(_CREATE_SOURCE_SPEND)
+            self.conn.execute(_CREATE_ALLOWANCE_OBSERVATIONS)
+            # Phase 13 §6 A5: idempotent column add for tick_count. A naked ALTER
+            # would raise on the second run; the PRAGMA check makes it a no-op.
+            cols = {r[1] for r in self.conn.execute("PRAGMA table_info(bars)").fetchall()}
+            if "tick_count" not in cols:
+                self.conn.execute("ALTER TABLE bars ADD COLUMN tick_count INTEGER")
+            self.conn.commit()
 
     # -- writes -----------------------------------------------------------
 
@@ -117,19 +134,20 @@ class BarArchive:
                     f"unknown bar source {bar.source!r} (known: {sorted(KNOWN_SOURCES)})"
                 )
         new_count = 0
-        for bar in bars:
-            cur = self.conn.execute(
-                "INSERT OR IGNORE INTO bars "
-                "(epic, resolution, ts_utc, open, high, low, close, volume, source, fetched_at, tick_count) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    bar.epic, bar.resolution, bar.ts_utc,
-                    bar.open, bar.high, bar.low, bar.close, bar.volume,
-                    bar.source, bar.fetched_at, bar.tick_count,
-                ),
-            )
-            new_count += cur.rowcount
-        self.conn.commit()
+        with self._lock:
+            for bar in bars:
+                cur = self.conn.execute(
+                    "INSERT OR IGNORE INTO bars "
+                    "(epic, resolution, ts_utc, open, high, low, close, volume, source, fetched_at, tick_count) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        bar.epic, bar.resolution, bar.ts_utc,
+                        bar.open, bar.high, bar.low, bar.close, bar.volume,
+                        bar.source, bar.fetched_at, bar.tick_count,
+                    ),
+                )
+                new_count += cur.rowcount
+            self.conn.commit()
         return new_count
 
     # -- reads --------------------------------------------------------------
@@ -160,18 +178,20 @@ class BarArchive:
         """
         if sources is not None:
             placeholders = ",".join("?" for _ in sources)
-            rows = self.conn.execute(
-                f"SELECT * FROM bars WHERE epic = ? AND resolution = ? "
-                f"AND ts_utc >= ? AND ts_utc < ? AND source IN ({placeholders}) "
-                f"ORDER BY ts_utc ASC",
-                (epic, resolution, start_utc, end_utc, *sources),
-            ).fetchall()
+            with self._lock:
+                rows = self.conn.execute(
+                    f"SELECT * FROM bars WHERE epic = ? AND resolution = ? "
+                    f"AND ts_utc >= ? AND ts_utc < ? AND source IN ({placeholders}) "
+                    f"ORDER BY ts_utc ASC",
+                    (epic, resolution, start_utc, end_utc, *sources),
+                ).fetchall()
         else:
-            rows = self.conn.execute(
-                "SELECT * FROM bars WHERE epic = ? AND resolution = ? "
-                "AND ts_utc >= ? AND ts_utc < ? ORDER BY ts_utc ASC",
-                (epic, resolution, start_utc, end_utc),
-            ).fetchall()
+            with self._lock:
+                rows = self.conn.execute(
+                    "SELECT * FROM bars WHERE epic = ? AND resolution = ? "
+                    "AND ts_utc >= ? AND ts_utc < ? ORDER BY ts_utc ASC",
+                    (epic, resolution, start_utc, end_utc),
+                ).fetchall()
         by_ts: dict[str, sqlite3.Row] = {}
         rank = {src: i for i, src in enumerate(prefer)}
         default_rank = len(prefer)
@@ -198,6 +218,10 @@ class BarArchive:
         limitation, §6 Step 1) — a genuinely closed market reads as "missing
         coverage", which is fine for its only consumer (the Recorder heartbeat,
         Step 6) since a closed market also produces zero real bars either way.
+
+        No ``with self._lock`` here: ``self.window()`` already holds it, and
+        the math below is pure-Python on the returned list — no shared state
+        that another thread could race on.
         """
         present = len(self.window(epic, resolution, start_utc, end_utc))
         step = _RESOLUTION_SECONDS.get(resolution)
@@ -211,10 +235,11 @@ class BarArchive:
         return min(1.0, present / expected)
 
     def latest_ts(self, epic: str, resolution: str) -> str | None:
-        row = self.conn.execute(
-            "SELECT MAX(ts_utc) AS latest FROM bars WHERE epic = ? AND resolution = ?",
-            (epic, resolution),
-        ).fetchone()
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT MAX(ts_utc) AS latest FROM bars WHERE epic = ? AND resolution = ?",
+                (epic, resolution),
+            ).fetchone()
         return row["latest"] if row and row["latest"] is not None else None
 
     def bars_written_since(self, ts_utc: str, end_utc: str | None = None) -> int:
@@ -229,17 +254,19 @@ class BarArchive:
         until now, not just that day's — reporting a dead day as healthy.
         """
         if end_utc is None:
-            row = self.conn.execute(
-                "SELECT COUNT(DISTINCT epic || '|' || resolution || '|' || ts_utc) AS n "
-                "FROM bars WHERE fetched_at >= ?",
-                (ts_utc,),
-            ).fetchone()
+            with self._lock:
+                row = self.conn.execute(
+                    "SELECT COUNT(DISTINCT epic || '|' || resolution || '|' || ts_utc) AS n "
+                    "FROM bars WHERE fetched_at >= ?",
+                    (ts_utc,),
+                ).fetchone()
         else:
-            row = self.conn.execute(
-                "SELECT COUNT(DISTINCT epic || '|' || resolution || '|' || ts_utc) AS n "
-                "FROM bars WHERE fetched_at >= ? AND fetched_at < ?",
-                (ts_utc, end_utc),
-            ).fetchone()
+            with self._lock:
+                row = self.conn.execute(
+                    "SELECT COUNT(DISTINCT epic || '|' || resolution || '|' || ts_utc) AS n "
+                    "FROM bars WHERE fetched_at >= ? AND fetched_at < ?",
+                    (ts_utc, end_utc),
+                ).fetchone()
         return int(row["n"]) if row else 0
 
 

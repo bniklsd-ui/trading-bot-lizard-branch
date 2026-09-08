@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 import pytest
 
 from data_foundation.archive import BarArchive
@@ -256,3 +258,42 @@ class TestNormalizeBarTs:
     def test_rejects_empty(self):
         with pytest.raises(ArchiveError):
             normalize_bar_ts("")
+
+
+# -- Phase 16 §3 J1: thread safety (the 2026-09-08 ``ProgrammingError`` regression) ------
+
+
+def test_insert_bars_from_other_thread(tmp_path):
+    """Phase 16 §3 J1 regression pin: a write from a non-constructor thread must not
+    raise ``sqlite3.ProgrammingError(SQLite objects created in a thread can only be
+    used in that same thread)``. Before J1, the constructor opened the connection with
+    the ``check_same_thread=True`` default, and ``live_data/stream.py:498`` wrote LS
+    bars from the Lightstreamer listener thread → 63 942 ``ProgrammingError`` today
+    alone, ``bars.source='ls'`` = 0 since the table existed. The smallest check that
+    breaks if anyone reverts ``check_same_thread=False`` is to actually do the cross-
+    thread write the production path does: ``Thread().start()`` → ``insert_bars`` from
+    inside it, then read it back from the main thread via ``window()``. Without the
+    fix, ``insert_bars`` raises immediately and the test fails before the read.
+    """
+    a = BarArchive(tmp_path / "bars.sqlite")
+    a.ensure_schema()
+    try:
+        bar = _bar(ts="2026-09-08T09:01:00.000Z", source=SOURCE_IG)
+
+        def writer() -> None:
+            a.insert_bars([bar])
+
+        t = threading.Thread(target=writer)
+        t.start()
+        t.join(timeout=5.0)
+        assert not t.is_alive(), "writer thread is hung — lock likely deadlocked"
+
+        rows = a.window(
+            EPIC_DEFAULT := "IX.D.DAX.IFMM.IP", "1m",
+            "2026-09-08T00:00:00.000Z", "2026-09-09T00:00:00.000Z",
+        )
+        assert len(rows) == 1
+        assert rows[0].ts_utc == "2026-09-08T09:01:00.000Z"
+        assert rows[0].source == SOURCE_IG
+    finally:
+        a.close()
