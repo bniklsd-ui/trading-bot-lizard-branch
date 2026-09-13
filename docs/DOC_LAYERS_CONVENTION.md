@@ -50,7 +50,7 @@ updated: YYYY-MM-DD
 One line per doc, grouped by kind:
 `- [path](path) — <glyph> <~size> · <read-when hook>`
 Glyphs: 🔄 active · 📗 live (maintained) · 📕 snapshot (dated, never edit) · 📦 archive (verbatim history).
-Maintenance rule: **new .md file ⇒ its index line lands in the same commit.**
+Maintenance rule: **new .md file ⇒ its index line lands in the same commit** (Scope: die Regel gilt für `phase*/`, `docs/` und Root-`.md`; Skill-Internals `.agents/skills/` und Harness-Specs `meta_m1_harness/specs/` sind Tooling-Metadaten und werden **nicht** in `docs/INDEX.md` gelistet — Phase 16 H-2, 2026-09-13).
 Oversize check (every hit must be 📕/📦): `find . -name "*.md" -size +40k` (minus tooling dirs).
 
 ## Rotation rule (the anti-bloat mechanism)
