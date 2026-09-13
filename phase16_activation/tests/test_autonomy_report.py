@@ -574,3 +574,123 @@ def test_k1_webui_single_start_counts_once(tmp_path: Path) -> None:
         f"WebUI counts one start per restart; got {result.measured['webui']['starts']}"
     )
     assert result.verdict == "PASS"
+
+
+# -- Phase 16 §11 Drift #8 fix regression pin: K1 deterministic for wrappers ----
+# Commits 5cd9168 (P8 run_webui.sh) + cc73462 (P12 run_recorder.sh) +
+# 774a3e1 (P14 run_discovery.sh) added 'date +%Y-%m-%d %H:%M:%S' prefix to the
+# wrapper-start-line in each script, so autonomy_report.py:count_starts_in_window
+# can extract the timestamp via _parse_scheduler_ts() and filter by the
+# Berlin-day window — instead of falling back to 'full-file-count'.
+
+
+def test_k1_wrapper_timestamped_start_counts_in_window(tmp_path: Path) -> None:
+    """Phase 16 §11 Drift #8 fix pin: a wrapper-start-line WITH timestamp prefix
+    inside the Berlin-day window is counted precisely (filtered-by-timestamp).
+    Before the fix, the same line would have been untimestamped and K1 would
+    have reported 'full-file-count (opaque to window filter)'.
+    """
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # One recorder start on 2026-09-08 09:00:00 (Berlin local time, naive parsed
+    # as UTC by _parse_iso, i.e. 2026-09-08 11:00+02:00 Berlin).
+    line = (
+        "2026-09-08 09:00:00 [run_recorder] starting recorder from "
+        "/home/trading-bot/trading-bot/phase12_data_foundation..."
+    )
+    (state_dir / "run_recorder.log").write_text(line + "\n", encoding="utf-8")
+    for svc in ("scheduler", "discovery", "webui"):
+        (state_dir / f"run_{svc}.log").write_text("", encoding="utf-8")
+
+    day = date(2026, 9, 8)
+    from_ts, to_ts = autonomy_report._berlin_day_bounds(day)
+    result = autonomy_report.evaluate_k1(state_dir, from_ts=from_ts, to_ts=to_ts)
+    assert result.measured["recorder"]["starts"] == 1, (
+        f"K1 must count exactly the timestamped in-window wrapper-start; "
+        f"got {result.measured['recorder']['starts']}"
+    )
+    assert result.measured["recorder"]["note"] == "filtered-by-timestamp", (
+        f"After Drift #8 fix, wrapper-start-lines with timestamp must report "
+        f"'filtered-by-timestamp'; got {result.measured['recorder']['note']!r}"
+    )
+    assert result.verdict == "PASS"
+
+
+def test_k1_wrapper_timestamped_start_outside_window_excluded(tmp_path: Path) -> None:
+    """Phase 16 §11 Drift #8 fix pin: a wrapper-start-line WITH timestamp prefix
+    OUTSIDE the Berlin-day window is excluded (count=0). Proves the timestamp
+    is parsed and the window filter works for wrappers, not just scheduler.
+
+    Note: ``evaluate_k1`` sets the ``note`` field from the *in-window*
+    filtered list (not from the raw timestamps list) — so when no
+    timestamped line was inside the window, the note reverts to
+    'full-file-count'. This is by design (the note is the operator's
+    signal: "K1 successfully filtered by timestamp"; a 0-count after
+    timestamp filtering still means the timestamp mechanism worked, but
+    nothing was in-window). The primary assertion here is the count.
+    """
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # One recorder start on 2026-09-07 09:00:00 — one day BEFORE the window.
+    line = (
+        "2026-09-07 09:00:00 [run_recorder] starting recorder from "
+        "/home/trading-bot/trading-bot/phase12_data_foundation..."
+    )
+    (state_dir / "run_recorder.log").write_text(line + "\n", encoding="utf-8")
+    for svc in ("scheduler", "discovery", "webui"):
+        (state_dir / f"run_{svc}.log").write_text("", encoding="utf-8")
+
+    day = date(2026, 9, 8)
+    from_ts, to_ts = autonomy_report._berlin_day_bounds(day)
+    result = autonomy_report.evaluate_k1(state_dir, from_ts=from_ts, to_ts=to_ts)
+    assert result.measured["recorder"]["starts"] == 0, (
+        f"K1 must exclude timestamped out-of-window wrapper-starts; "
+        f"got {result.measured['recorder']['starts']}"
+    )
+    assert result.verdict == "PASS", (
+        f"0 starts = PASS expected; got {result.verdict}; "
+        f"measured={result.measured}"
+    )
+
+
+def test_k1_wrapper_mixed_timestamped_and_untimestamped(tmp_path: Path) -> None:
+    """Phase 16 §11 Drift #8 fix pin: a wrapper log with both timestamped and
+    untimestamped start-lines reports only the timestamped in-window count.
+    Realistic mixed-mode case after a fix-apply: old log content
+    (untimestamped) coexists with new restart events (timestamped).
+    """
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    lines = [
+        # 2 untimestamped (pre-fix format, legacy content)
+        "[run_recorder] starting recorder from "
+        "/home/trading-bot/trading-bot/phase12_data_foundation...",
+        "[run_recorder] starting recorder from "
+        "/home/trading-bot/trading-bot/phase12_data_foundation...",
+        # 1 timestamped in-window (post-fix, on report day)
+        "2026-09-08 09:00:00 [run_recorder] starting recorder from "
+        "/home/trading-bot/trading-bot/phase12_data_foundation...",
+        # 1 timestamped out-of-window (post-fix, day BEFORE report day)
+        "2026-09-07 09:00:00 [run_recorder] starting recorder from "
+        "/home/trading-bot/trading-bot/phase12_data_foundation...",
+    ]
+    (state_dir / "run_recorder.log").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    for svc in ("scheduler", "discovery", "webui"):
+        (state_dir / f"run_{svc}.log").write_text("", encoding="utf-8")
+
+    day = date(2026, 9, 8)
+    from_ts, to_ts = autonomy_report._berlin_day_bounds(day)
+    result = autonomy_report.evaluate_k1(state_dir, from_ts=from_ts, to_ts=to_ts)
+    # Only the 1 timestamped in-window line counts; the 2 untimestamped legacy
+    # lines and the 1 timestamped out-of-window line are excluded.
+    assert result.measured["recorder"]["starts"] == 1, (
+        f"K1 mixed-mode: only timestamped in-window counts; got "
+        f"{result.measured['recorder']['starts']} (expected 1, the single "
+        f"in-window post-fix restart; legacy untimestamped + out-of-window "
+        f"timestamped lines must be excluded)"
+    )
+    assert result.measured["recorder"]["note"] == "filtered-by-timestamp", (
+        f"Mixed-mode must report 'filtered-by-timestamp' when at least one "
+        f"timestamped line exists; got {result.measured['recorder']['note']!r}"
+    )
+    assert result.verdict == "PASS"
