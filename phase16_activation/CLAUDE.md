@@ -10,84 +10,105 @@ down:
   - ../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md   # 📕 A6 hängt an Migration 008
   - ../phase5_execution/CLAUDE.md                 # B3-Block → Plan D3
   - ./SESSIONS_ARCHIVE.md                         # 📦 Session-Block-Historie (newest-first, A-0 angelegt)
-updated: 2026-09-13 (+ Exec-Session #30: **Quick-Session: 3 nicht-zeit-blockierte Items abgehakt** [1 Doc-Commit `d1d8791` PHASE16_E3_RUNBOOK_v3.md §11 Drift-#8 + §7 W2-Definition-Update + 4 daily reports für 09-10/11/12/13 nachgeholt (`data/reports/autonomy_*.json`, gitignored, K1 PASS durchgängig, K2 Sa/So=FAIL erwartet, K3+K4 FAIL erwartungsgemäß, K5+K6+K7 stabil PASS); Σ-Drift-Auflösung 1940 → 1945 dokumentiert: Session-#27's 1940 war Session-#22-erbt und nicht frisch gemessen — wahre Session-#28-Baseline war 1939, +6 neue H-1-Tests in Session #29 → 1945 exakt am F-Exec-Plan §3 H-Akzeptanz-Wert; Σ unverändert 1945 [kein Test-Touch, kein Code-Touch, nur 1 Doc-Commit]; Session #29 verbatim nach SESSIONS_ARCHIVE.md rotiert [30. Eintrag]; 0 Drifts]). — Vorheriger Stand: Exec-Session #29: **Block H-Finish**; Exec-Session #28: **Block H-Start**; Exec-Session #26: **J6 Restart + J7 Day-0-Verify (AI-geführt)**
+updated: 2026-09-13 (+ Exec-Session #31: **Mini-Session „Wrapper-Skript-Fix Drift #8 Root Cause"** [4 Commits `5cd9168` + `cc73462` + `774a3e1` + `9c323e3`; 3 Wrapper-Skript-Edits (phase8_scheduler/scripts/run_webui.sh + phase12_data_foundation/scripts/run_recorder.sh + phase14_discovery/scripts/run_discovery.sh) mit `date '+%Y-%m-%d %H:%M:%S'`-Prefix; 3 neue Test-K1-Pin-Tests (in-window / out-of-window / mixed); Σ 1945 → **1948** exakt am F-Exec-Plan-Akzeptanz-Muster; v3-§11-Drift-#8-Fix-Marker **nicht** in v3 (Locked-Regel) — Drift-#8-Fix stattdessen im Phasenkopf dokumentiert; `bash -n` für jeden Wrapper exit 0; `pytest phase16_activation/tests/test_autonomy_report.py` 10/10 grün; `check_doc_rotation.py --strict --quiet` exit 0]). — Vorheriger Stand: Exec-Session #30: **Quick-Session: 3 nicht-zeit-blockierte Items abgehakt**
 
-## Session stopped — 2026-09-13 (MiniMax-M3-Exec-Session #30, Phase-16-F-Subphase **Quick-Session: 3 nicht-zeit-blockierte Items abgehakt** — 1 Doc-Commit `d1d8791` PHASE16_E3_RUNBOOK_v3.md §11 Drift-#8 (K1 full-file-count für untimestamped Wrapper-Start-Lines) + §7 W2-Definition-Update (DAX-dominant mit Sekundär-Slots, Live-Schwelle „DAX-Anteil < 50 %", heute 25 % FAIL by design nach B3+Phase-14) + 4 daily reports für 09-10/11/12/13 nachgeholt; Σ-Drift-Auflösung 1940 → 1945 dokumentiert: Session-#27's Σ=1940 war Session-#22-erbt ohne frische Messung — wahre Session-#28-Baseline war 1939, +6 neue H-1-Tests in #29 → 1945 exakt am F-Exec-Plan §3 H-Akzeptanz-Wert; `check_doc_rotation.py --strict --quiet` exit 0; Σ unverändert 1945 [kein Test-Touch, kein Code-Touch, nur 1 Doc-Commit]; Session #29 verbatim nach SESSIONS_ARCHIVE.md rotiert [30. Eintrag]; 0 Drifts)
+## Session stopped — 2026-09-13 (MiniMax-M3-Exec-Session #31, Phase-16-F-Subphase **Mini-Session „Wrapper-Skript-Fix Drift #8 Root Cause"** — 4 Commits `5cd9168` + `cc73462` + `774a3e1` + `9c323e3` (3 Code + 1 Test), 1 Session-Rotations-Commit; v3 §11 Drift-#8-Fix-Marker **nicht** in v3 eingetragen (Locked-Konvention verlangt v4-Erstellung, Mini-Session-Scope überschritten), stattdessen im Phasenkopf dokumentiert; K1 deterministisch für alle 4 Dienste; Σ 1945 → **1948** [+3 Tests, exakt am F-Exec-Plan-Akzeptanz-Muster]; `bash -n` für jeden Wrapper exit 0; `pytest phase16_activation/tests/test_autonomy_report.py` 10/10 grün; `check_doc_rotation.py --strict --quiet` exit 0)
 
-> **Auftrag:** Nikinger 2026-09-13 ~18:35 Berlin: „kurze Quick nächste Session, dann commit, push und session korrekt beenden". Drei nicht-zeit-blockierte Items aus Session-#29-NEXT-Block: (Item 3) Σ-Drift-Auflösung analytisch, (Item 2) Drift #8 v3 §11 + W2-Definition-Update als 1 Doc-Commit, (Item 1) Tagesroutine-Lücke 09-10/11/12/13 nachholen (4 daily reports). Block I Tag-10-Closeout bleibt zeit-blockiert (Di 2026-09-22 nach 17:30). **Auftrag-Ende:** Session-Stop-Block schreiben, Block-#29 verbatim nach SESSIONS_ARCHIVE.md rotieren, Commit, Nikinger pusht.
+> **Auftrag:** Nikinger-Chat 2026-09-13 ~19:30 Berlin: „Freigegeben, erstelle aber trotzdem eine extra Plan, damit wirklich nichts schief geht. Gerne sehr detailliert, mit langer nachdenkzeit. Danke dir!". Mini-Session aus Session #30 NEXT-Block Z. 81 (Nikinger-Vorschlag, nicht terminiert): 3 File-Edits + 1 Test-Erweiterung. Vorab: Cross-Phase-Freigabe-Status P12+P14 explizit abgefragt + erteilt (P8 schon freigegeben per Phase-16-Plan §4 Z. 260). Mini-Plan im Chat vorab detailliert besprochen + freigegeben („Plan OK, atomar ausführen"), 6 Commits geplant (3 Code + 1 Test + 1 v3-Annotation + 1 Rotation). **Plan-Anpassung während Ausführung:** v3 §11 Drift-#8-Annotation übersprungen weil v3 header „niemals ein Edit hier" → v4 wäre Pflicht, Mini-Session-Scope sprengen würde; stattdessen Drift-#8-Fix im Phasenkopf dokumentiert (lebender Ort, Locked-Konvention eingehalten). 5 Commits final.
 
 ### Completed
 
-**1. Item 3 — Σ-Drift-Auflösung 1940 → 1945 (analytisch):**
-- Suite-für-Suite-Messung heute (post-H-1): 97+82+105+161+190+76+169+259+95+165+149+82+61+126+7+121 = **1945**. Pre-H-1 (Session-#28-Messung, `fa51084`): 97+82+105+161+190+76+169+259+95+165+149+82+61+126+7+115 = **1939**. **Diff: +6 exakt = 6 neue H-1-Tests** (`e6246fe` Commit, root_tests 115 → 121). Keine andere Phase berührt.
-- Session-#27's behauptete Σ=1940 wurde untersucht: `git log --oneline 3969f8c..ba39bca -- '**/tests/*'` ist LEER, d.h. zwischen Session #22 (Σ=1940 per Akzeptanz-J-Diff) und Session #28 (Σ=1939) gab es **null** Test-Datei-Commits. **Schluss:** Session #27 hat die Σ=1940 aus Session #22 ungeprüft übernommen (read-only verification, keine per-Phase-Aufschlüsselung); Session #28's 1939 ist der wahre Anker-Stand vor H-1. Session #29 +6 H-1-Tests → 1945 = F-Exec-Plan §3 H-Akzeptanz-Wert exakt.
-- **Konsequenz:** Σ-Drift ist **kein Code-Touch**, sondern ein Mess-Artefakt der Session-#27-Doku. Heute (Session #30) bestätigt 1939 → 1945 = +6 exakt, der „1940"-Anker aus #27 ist als „Session-#22-Erbe" entzaubert. Im Findings-Block dokumentiert.
+**1. Drift #8 Root Cause bestätigt (Source-of-Truth-Anker):**
+- `autonomy_report.py:193-231` `count_starts_in_window()` filtert via `_parse_scheduler_ts()` + `_SCHED_TS_RE = r"^(?P<ts>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}...)"` — verlangt Timestamp am Zeilenanfang.
+- 3 Wrapper-Start-Lines ohne Timestamp bestätigt: `phase8_scheduler/scripts/run_webui.sh:47`, `phase12_data_foundation/scripts/run_recorder.sh:37`, `phase14_discovery/scripts/run_discovery.sh:46`.
+- K1 gibt heute `note: "full-file-count (untimestamped start-lines: opaque to window filter)"` für alle 3 Wrapper-Dienste zurück (Live-Beweis Session #26: `discovery: 7, recorder: 6, scheduler: 6, webui: 10` Starts).
+- 4. Wrapper `phase8_scheduler/scripts/run_scheduler.sh:64` braucht KEINEN Fix (Python `basicConfig` schreibt timestamped `starting scheduler daemon (...)` in dieselbe Log-Datei, K1-Pattern matcht dort, Wrapper-Echo ist dekorativ).
 
-**2. Item 2 — Drift #8 v3 §11 + W2-Definition-Update (1 Doc-Commit `d1d8791`):**
-- **`phase16_activation/PHASE16_E3_RUNBOOK_v3.md` §11 Diff-Tabelle: +1 Zeile für Drift #8 (K1 full-file-count).** Root Cause: `autonomy_report.py:189` `count_starts_in_window` filtert nur Zeilen MIT Timestamp-Prefix; die Wrapper-Start-Lines (`[run_recorder] starting` / `[run_discovery] starting` / `[run_webui] dashboard on`) sind **untimestamped** weil `restart-services.sh` die Wrapper ohne `date '+%Y-%m-%d %H:%M:%S'`-Prefix aufruft. Live-Beweis Session #26: K1 meldete `discovery: 7, recorder: 6, scheduler: 6, webui: 10` Starts — alle außer scheduler waren `note: "full-file-count (untimestamped start-lines: opaque to window filter)"`. Fix-Pfad out-of-scope heute (3 Wrapper-Skript-Edits `run_recorder.sh` / `run_discovery.sh` / `run_webui.sh`), optional für Tag-10-Closeout. H-1-Tests beweisen die `full-file-count`-Toleranz-Logik bereits (test_header_card_double_dotdot_is_flagged = file-globaler Pattern-Pin, gleiche Toleranz-Klasse).
-- **`phase16_activation/PHASE16_E3_RUNBOOK_v3.md` §7 Watch-Items W2: Definition-Update.** W2 war „DAX-Only: aktive Epics außer Wochenend = alle DAX". Nach B3 (Phase 16) + Phase-14-Discovery-Output ist die Live-Substrat-Erwartung „DAX-dominant mit MIB/FTSE/STXE/DOW/SPTRD als Sekundär-Slots". Neue Schwelle: „DAX-Anteil < 50 % der aktiven Epics = Befund". Heute gemessen 2026-09-13: 8 active (1 DAX-IFMM + 1 DAX-IGN + MIB + FTSE + DOW + SPTRD + 2 SUNDAX-IGN aus pre-B3-Promotions) ⇒ **DAX-Anteil 25 % → W2 FAIL by design** (B3 + Phase-14-Discovery-Output kombiniert, AK9 prereg-formal noch offen). Operative Lesart: W2 ist heute FAIL by design, kein Strategy-Befund, Pflegschaft mit Phase-17 (Universums-Konsolidierung).
+**2. Commit `5cd9168 phase8: code -- run_webui.sh: timestamp prefix for wrapper-start-line (Drift #8 Root Cause fix)`:**
+- `phase8_scheduler/scripts/run_webui.sh:47` von `echo "[run_webui] dashboard on http://127.0.0.1:${PORT}..."` zu `printf '%s [run_webui] dashboard on http://127.0.0.1:%s...\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${PORT}"`.
+- `${PORT}` als `%s`-Argument (keine Format-String-Re-Interpretation), Backslash-Continuation matched File-Style.
+- `bash -n` exit 0.
+- Cross-Phase-Freigabe: Phase 16 Plan §4 Z. 260 (P8 freigegeben für Phase 16).
 
-**3. Item 1 — Tagesroutine-Lücke 09-10/11/12/13 nachgeholt (4 daily reports):**
-- `python3 phase16_activation/scripts/autonomy_report.py --day 2026-09-10` → `K1 PASS K2 PASS K3 FAIL K4 FAIL K5 PASS K6 PASS K7 PASS` (Di, Mi)
-- `... --day 2026-09-11` → identisch (Do)
-- `... --day 2026-09-12` → `K1 PASS K2 FAIL K3 FAIL K4 FAIL K5 PASS K6 PASS K7 PASS` (Fr, Sa → K2 Sa/So = erwartet FAIL weil kein Heartbeat-Event)
-- `... --day 2026-09-13` → identisch 09-12 (heute, Sonntag → K2 FAIL erwartet)
-- 4 JSON-Dateien in `data/reports/` geschrieben (gitignored, kein Commit). K1 PASS durchgängig (post-J6 Scheduler-only), K2 nur an Wochenend-Tagen FAIL (kein Handel, kein Heartbeat, by-design), K3+K4 erwartungsgemäß FAIL (≥5 trades / ≥8/10 ok_days brauchen Laufzeit über mehrere Tage), K5+K6+K7 stabil PASS.
+**3. Commit `cc73462 phase12: code -- run_recorder.sh: timestamp prefix...`:**
+- Selbe Form auf `phase12_data_foundation/scripts/run_recorder.sh:37`.
+- Cross-Phase-Freigabe: Nikinger 2026-09-13 explizit erteilt (Phase 12 nicht in Phase-16-Plan §4 Z. 253-264 gelistet).
 
-**4. Verifikation Hook + Σ nach Item-2-Commit:**
-- `python3 scripts/check_doc_rotation.py --strict --quiet` → **exit 0** ✓
-- `git rev-list --left-right --count origin/main...HEAD` = `0 0` (alles gepusht nach Session #29)
-- Σ = 1945 unverändert (kein Test-Touch, kein Code-Touch, nur 1 Doc-Commit)
+**4. Commit `774a3e1 phase14: code -- run_discovery.sh: timestamp prefix...`:**
+- Selbe Form auf `phase14_discovery/scripts/run_discovery.sh:46`, UTF-8 `⇒` (U+21D2) preserved durch `%s`-Placeholder.
+- Cross-Phase-Freigabe: Nikinger 2026-09-13 explizit erteilt (Phase 14 nicht in Phase-16-Plan §4 Z. 253-264 gelistet, Phase-14-Plan §4 Z. 275-279 seinerseits verlangt neue Freigabe).
 
-**5. Doc-Rotation Session #29 → SESSIONS_ARCHIVE + Session #30 → Phasenkopf:**
-- `phase16_activation/SESSIONS_ARCHIVE.md` Session-#29-Block verbatim (Z. 15-112 der alten CLAUDE.md) als 30. Eintrag prependiert (newest-first).
-- Preamble-„Stand nach Exec-Session #29" → „Stand nach Exec-Session #30", Archiv-Count **29 → 30**.
-- `phase16_activation/CLAUDE.md` Session-#29-Block durch Session-#30-Block ersetzt.
-- `python3 scripts/check_doc_rotation.py --strict --phase phase16_activation` → exit 0 nach Rotation.
+**5. Commit `9c323e3 phase16: tests -- autonomy_report K1 wrapper-timestamp-prefix test extension (Drift #8 fix regression pin)`:**
+- 3 neue Tests in `phase16_activation/tests/test_autonomy_report.py`:
+  - `test_k1_wrapper_timestamped_start_counts_in_window` — timestamped in-window → count=1, note=filtered-by-timestamp
+  - `test_k1_wrapper_timestamped_start_outside_window_excluded` — timestamped out-of-window → count=0, verdict=PASS (Note ist Folge der Window-Logik, by-design)
+  - `test_k1_wrapper_mixed_timestamped_and_untimestamped` — mixed mode → count=1 (only timestamped in-window), note=filtered-by-timestamp
+- Σ delta: +3 Tests (1945 → 1948).
+- Bestehende 7 Tests bleiben grün (`_START_PATTERNS[svc].search(line)` ist prefix-tolerant).
+
+**6. Plan-Anpassung: v3 §11 Drift-#8-Fix-Marker übersprungen:**
+- v3 Header: „v3 ist locked-nach-Commit: Korrekturen sind nur als PHASE16_E3_RUNBOOK_v4.md mit Datum und Grund möglich — niemals ein Edit hier."
+- Drift-#8-Fix-Dokumentation gehört in den Phasenkopf (dieser Block) als lebender Ort, nicht in locked Runbook.
+- v4-Erstellung wäre Mini-Session-Scope-Überschreitung; bei nächster Runbook-Iteration (z. B. wenn W2 oder andere Watch-Items weitere Drift-Fixes triggern) kann v4 als Sammel-Commit entstehen.
+
+**7. Verifikation:**
+- `bash -n phase8_scheduler/scripts/run_webui.sh` exit 0 ✓
+- `bash -n phase12_data_foundation/scripts/run_recorder.sh` exit 0 ✓
+- `bash -n phase14_discovery/scripts/run_discovery.sh` exit 0 ✓
+- `pytest phase16_activation/tests/test_autonomy_report.py -v` → **10/10** grün (7 existing + 3 new) ✓
+- Σ-Sweep (15 Phase-Suites + root, exkl. meta_m1 per Repo-Konvention): 97+82+105+161+190+76+169+259+95+165+149+82+61+126+10+121 = **1948** ✓
+- `python3 scripts/check_doc_rotation.py --strict --quiet` exit 0 ✓
+- `git rev-list --left-right --count origin/main...HEAD` = `0 4` (4 Commits pending Nikinger push: 3 Code + 1 Test; Session-Rotation noch nicht committed)
+
+**8. Doc-Rotation Session #30 → SESSIONS_ARCHIVE + Session #31 → Phasenkopf (in diesem Commit):**
+- `phase16_activation/SESSIONS_ARCHIVE.md`: Session-#30-Block-Verbatim-Summary als 31. Eintrag prependiert (newest-first)
+- Preamble „Stand nach Exec-Session #30" → „Stand nach Exec-Session #31", Archiv-Count **30 → 31**
+- `phase16_activation/CLAUDE.md` Session-#30-Block durch Session-#31-Block ersetzt
+- `python3 scripts/check_doc_rotation.py --strict --phase phase16_activation` → exit 0 nach Rotation
 
 ### Findings
 
-🟢 **3 Items abgehakt, 1 Doc-Commit, 4 daily reports.** Σ unverändert (kein Test/Code-Touch), Block I Tag-10-Closeout bleibt zeit-blockiert für Di 2026-09-22 nach 17:30 Berlin.
+🟢 **Drift #8 Root Cause strukturell behoben.** K1 ist jetzt deterministisch für alle 4 Dienste — Wrapper-Start-Lines emittieren `YYYY-MM-DD HH:MM:SS [run_X] starting...` Format, `count_starts_in_window()` extrahiert Timestamp + filtert nach Berlin-Day-Fenster. Resultat: `filtered-by-timestamp` statt `full-file-count`, präzise K1-Messung pro Restart im Fenster.
 
-🟢 **Σ-Drift-Auflösung sauber dokumentiert.** Session-#27's Σ=1940 war Session-#22-erbt ohne frische per-Phase-Messung; Session-#28's 1939 ist der wahre Anker vor H-1; +6 neue H-1-Tests in Session #29 → 1945 = exakt F-Exec-Plan §3 H-Akzeptanz. **Konsequenz:** die „Σ-Tally-Drift"-Beobachtung war ein Doku-Artefakt, nicht ein Test-Verlust. Heute (Session #30) verifiziert per eigenem Σ-Sweep (alle 16 Suites + root = 1945). Kein Code-Touch nötig.
+🟢 **3 Wrapper-Edits atomar, Cross-Phase-Freigabe explizit.** 3 Commits (einer pro Phase) entsprechen dem „eine logische Änderung pro Commit"-Prinzip (root-CLAUDE.md Conventions). P12 + P14 Freigabe explizit vom Nikinger erteilt (Phase-12/Phase-14-Code außerhalb des Phase-16-Plan-§4-Whitelist).
 
-🟢 **Drift #8 v3 §11 + W2-Definition-Update strukturell verankert.** K1-full-file-count-Opazität (Wrapper-Start-Lines untimestamped) ist jetzt offiziell als Drift #8 im v3-Runbook dokumentiert — Operator/Exec-Session-Betreuer sehen die `note`-Felder jetzt im Kontext (von „unbekannt opak" zu „by-design opak, Wrapper-Skript-Edits als Fix-Pfad"). W2-Definition-Update (DAX-dominant + 50 %-Schwelle) macht den heutigen W2-FAIL by-design sichtbar (B3 + Phase-14-Discovery-Output kombiniert), entzaubert den vermeintlichen Strategy-Befund.
+🟢 **Test-Pin robust:** 3 Tests decken in-window / out-of-window / mixed-Mode ab. mixed-Mode-Test ist der realistischste nach Fix-Apply (alte untimestamped Log-Inhalte coexistieren mit neuen timestamped Restart-Events). Bestehende 7 Tests bleiben grün.
 
-🟢 **Tagesroutine-Lücke geschlossen.** 4 daily reports für 09-10/11/12/13 nachgeholt; Datengrundlage für Block I Tag-10-Closeout ist vollständig. K5+K6+K7 durchgängig PASS (5 Handelstage stabil), K1 PASS durchgängig (Scheduler-only korrekt), K2 nur an Wochenend-Tagen FAIL (kein Handel = kein Heartbeat, by-design), K3+K4 erwartungsgemäß FAIL (laufen über die 10-Tage-Laufzeit auf, ≥5 Trades bzw. ≥8/10 ok_days brauchen mehrere Handelstage).
+🟢 **Σ exakt am F-Exec-Plan-Akzeptanz-Muster:** +3 Tests (1945 → 1948). Stabil, kein Regression-Risiko (keine Phase-Code-Touches außer Wrapper-Shells, keine Test-Datei außer `phase16_activation/tests/test_autonomy_report.py`).
 
-🟢 **Cross-Phase-Touches minimal.** 1 Doc-File-Edit (`phase16_activation/PHASE16_E3_RUNBOOK_v3.md`) + 1 Session-Rotation (`SESSIONS_ARCHIVE.md` + `CLAUDE.md`). Keine Phase-Code-Touches, keine Test-Edits, keine Migration-Edits. 4 daily-report JSON-Files in `data/reports/` (gitignored).
+🟢 **Locked-Konvention eingehalten.** v3 §11 Drift-#8-Fix-Marker NICHT in v3 eingetragen (header-Verbot), stattdessen Drift-Fix im Phasenkopf dokumentiert (lebender Ort). v4-Erstellung für nachfolgende Drift-Fixes aufgeschoben (Mini-Session-Scope).
 
-🟢 **Pre-Commit-Hook bleibt aktiv und grün.** `check_doc_rotation.py --strict --quiet` exit 0 nach Item-2-Commit; `install_hooks.sh` exit 0 beim letzten Lauf (Session #29 H-1); alle Header-Cards validiert. H-1-Hook (Step 4) hat bereits den Drift #8-Tag überlebt (Doc-Edit hat keine Header-Card berührt, der Hook bleibt still).
+🟢 **Cross-Phase-Touches minimal + alle dokumentiert.** 3 Phase-Code-Files (Phase 8/12/14) + 1 Phase-Test-File (Phase 16). Keine Migration, keine Doku in fremden Phasen, keine Schema-Änderungen, kein Live-Touch (Wrapper-Skripts werden nur bei Restart aktiv).
+
+🟢 **Pre-Commit-Hook bleibt aktiv und grün.** `check_doc_rotation.py --strict --quiet` exit 0 nach jedem Commit; H-1-Hook (Step 4) hat die Code-Edits überlebt (Wrapper-Shells sind keine Header-Card-Files).
 
 ### Open questions / blockers
 
-- **Keine Tag-1-Blocker (Fortschreibung Session #29).** Alle Watch-Items unverändert offen: K3 kumuliert sich weiter (0 CLOSED-Trades seit 2026-08-27 = Phase-17-Strategie-Befund), K6-Auslastung 98,4 % Beobachtung (Di 09-09, seither nicht neu aufgetreten), W5 Zombie-Prozesse (2 pro Scheduler-Lauf, ≤ 2 Schwelle, OK).
-- **Σ-Drift 1940 → 1945 endgültig aufgeklärt.** Session-#27-Doku-Artefakt (Σ=1940 ohne frische per-Phase-Messung übernommen); Session-#28-Baseline 1939 ist der wahre Anker, +6 H-1-Tests → 1945 exakt. Kein Code-Touch nötig, im Findings-Block dokumentiert.
 - **Block I Tag-10-Closeout (Di 2026-09-22 nach 17:30)** unverändert zeit-blockiert. I-1 Tag-10-Summary + I-2 Closeout-Handover + I-3 SVG (1080×1080, 3-Säulen) + I-4 Status-Pflege root/ROADMAP/README/INDEX + I-5 Session-Rotation.
+- **Drift-#8-Fix im Live-Betrieb verifizieren** — nächster Restart (Backoff-KILL-Clear oder Reboot) zeigt jetzt `note: "filtered-by-timestamp"` für alle 3 Wrapper-Dienste; bis dahin weiterhin `note: "full-file-count"` (alter Log-Inhalt pre-Fix in `data/state/run_*.log`).
+- **v4 Runbook-Erstellung aufgeschoben** — Mini-Session-Scope; v4 wird fällig wenn (a) weitere Drift-Fixes hinzukommen oder (b) nächste Operator-Runbook-Iteration ansteht. Cross-Phase-Freigabe für Runbook-Edits nicht nötig (Runbook ist Phase-16-internal).
 - **Trigger on-demand:** K4 FAIL ≥ 2 Tage → T-5, K6 FAIL → T-8, erster OPEN-Trade → A6-Live-Verify (Gate P7/A6).
 
 ### NEXT (für die nächste Session)
 
-**Push-Status:** **1 Commit pending** nach dieser Session (`d1d8791`). **Nikinger pusht jetzt mit `git push origin main`** (working tree clean danach außer `data/`). Die 4 Commits aus Session #29 (`b865808` + `e6246fe` + `4779660` + `d9bbd29`) sind bereits gepusht.
+**Push-Status:** **5 Commits pending** nach dieser Session (`5cd9168` + `cc73462` + `774a3e1` + `9c323e3` + der Session-Rotations-Commit). **Nikinger pusht jetzt mit `git push origin main`** (working tree clean danach außer `data/`).
 
 **Tagesroutine Tag 2–Tag 10 (Operator):** unverändert (Session #27 NEXT-Block).
 
-**Offene Items für die nächste Exec-Session (Session #31, Block I Tag-10-Closeout):**
+**Offene Items für die nächste Exec-Session (Session #32, Block I Tag-10-Closeout):**
 
-1. **Session #31 (Block I, Tag-10-Closeout) — geplant Di 2026-09-22 nach 17:30 Berlin:** Fokus I-1 Tag-10-Summary (`autonomy_report.py --from 2026-09-09 --to 2026-09-22 --summary`) + I-2 Closeout-Handover (analog Phase-15-Pattern) + I-3 SVG (1080×1080, 3-Säulen Status-Bilanz) + I-4 Status-Pflege root/ROADMAP/README/INDEX + I-5 Session-Rotation. Σ = 1945 stabil, alle daily reports Mi-Fr+Mo-Di verfügbar, alle H-Block-Items + Quick-Session-Items erledigt. Total ~5 Commits + 1 neuer SVG.
+1. **Session #32 (Block I, Tag-10-Closeout) — geplant Di 2026-09-22 nach 17:30 Berlin:** Fokus I-1 Tag-10-Summary (`autonomy_report.py --from 2026-09-09 --to 2026-09-22 --summary`) + I-2 Closeout-Handover (analog Phase-15-Pattern) + I-3 SVG (1080×1080, 3-Säulen Status-Bilanz) + I-4 Status-Pflege root/ROADMAP/README/INDEX + I-5 Session-Rotation. Σ = 1948 stabil, alle daily reports Mi-Fr+Mo-Di verfügbar, alle H-Block-Items + Quick-Session-Items + Mini-Session-Items erledigt. Total ~5 Commits + 1 neuer SVG.
 
-**Nikinger-Vorschlag 2026-09-13 (eigene Mini-Session, VOR Session #31, Zeitpunkt noch offen):**
+**Optional für Session #32 oder später:**
 
-2. **Mini-Session „Wrapper-Skript-Fix Drift #8 Root Cause" (Nikinger-Vorschlag, nicht terminiert).** 3 File-Edits `phase8_scheduler/scripts/run_webui.sh` + `phase12_data_foundation/scripts/run_recorder.sh` + `phase14_discovery/scripts/run_discovery.sh`: `date '+%Y-%m-%d %H:%M:%S'`-Prefix vor jeden Wrapper-Start-Print (z. B. `[run_recorder] dashboard on` → `2026-09-14 08:30:00 [run_recorder] dashboard on`). Damit wird K1 auch für Wrapper-Dienste deterministisch korrekt (heute by-design opak, Drift #8 v3 §11). **Mini-Plan wahrscheinlich nötig** — Cross-Phase-Touch (Phase 8 + Phase 12 + Phase 14, je eine Datei) erfordert Cross-Phase-Freigabe P8+P12+P14 (Plan §4 / F-Exec-Plan §10). Plus Test, der nach dem Fix die Wrapper-Start-Lines mit Timestamp verifiziert (analog `test_k1_window_filter` in `test_autonomy_report.py` erweitern). Empfohlener Zeitpunkt: Mo 2026-09-15 oder Di 2026-09-16 (vor Session #31), damit der nächste Restart-Termin planbar ist und nicht am Vorabend eines Handelstages.
+2. **Optional:** Phase-17-Material sammeln (Strategie-Befund K3, Universums-Konsolidierung W2 by-design FAIL, Zombie-Reaping W5, IG-Punkte für verified SUN*-Epics V-5, Log-Rotation v3 §11-Kommentar-Inkonsistenz, v4-Runbook-Erstellung mit Drift-#8-Fix-Marker).
+3. **Falls K4 FAIL an ≥ 2 Tagen:** Trigger T-5 → Exec-Session on demand.
+4. **Falls K6 FAIL:** Trigger T-8 → Exec-Session on demand.
+5. **Falls erster OPEN-Trade:** Gate P7/A6 → A6-Live-Verify-Session on demand.
 
-3. **Optional:** Phase-17-Material sammeln (Strategie-Befund K3, Universums-Konsolidierung W2 by-design FAIL, Zombie-Reaping W5, IG-Punkte für verified SUN*-Epics V-5, Log-Rotation v3 §11-Kommentar-Inkonsistenz).
-4. **Falls K4 FAIL an ≥ 2 Tagen:** Trigger T-5 → Exec-Session on demand.
-5. **Falls K6 FAIL:** Trigger T-8 → Exec-Session on demand.
-6. **Falls erster OPEN-Trade:** Gate P7/A6 → A6-Live-Verify-Session on demand.
+**Push-Freigabe-Stand nach dieser Session:** 5 Commits pending. Nikinger pusht.
 
-**Push-Freigabe-Stand nach dieser Session:** 1 Commit pending (`d1d8791`). Nikinger pusht.
-
-**Block-Status nach Session #30:**
+**Block-Status nach Session #31:**
 
 | Block | Status |
 |---|---|
@@ -95,5 +116,5 @@ updated: 2026-09-13 (+ Exec-Session #30: **Quick-Session: 3 nicht-zeit-blockiert
 | B (Substrat) | ✅ (Session #3) |
 | C (Research-Loop) | ✅ (Sessions #3-#7) |
 | D (Freischaltung) | ✅ (Session #7-#17) |
-| E (2-Wochen-Test) | 🔄 — Tag-1-Verify ✅ (#27), H-3+H-4 ✅ (#28), H-1+H-2+H-5 ✅ (#29), **Quick-Session #30 ✅**, Block I Di 2026-09-22 (#31) |
-| F (Subphase) | 🔄 — G Tag 1 ✅, H ✅ (#28-#29), Quick ✅ (#30), I (#31) |
+| E (2-Wochen-Test) | 🔄 — Tag-1-Verify ✅ (#27), H-3+H-4 ✅ (#28), H-1+H-2+H-5 ✅ (#29), Quick-Session #30 ✅, **Mini-Session #31 ✅**, Block I Di 2026-09-22 (#32) |
+| F (Subphase) | 🔄 — G Tag 1 ✅, H ✅ (#28-#29), Quick ✅ (#30), **Mini #31 ✅**, I (#32) |
