@@ -43,5 +43,6 @@ unset _VENV_BIN
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
-echo "[run_discovery] starting daemon from ${PROJECT_DIR} (unarmed ⇒ noop)..." >&2
+printf '%s [run_discovery] starting daemon from %s (unarmed ⇒ noop)...\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "${PROJECT_DIR}" >&2
 exec python -m source_registry.run "$@"
