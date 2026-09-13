@@ -90,7 +90,8 @@ done
 # (tracked installer — .git/hooks/pre-commit is untracked by git, so this
 # is the only way it survives a fresh clone). Idempotent: re-running this
 # script does not overwrite a hand-edited hook (install_hooks.sh fails
-# loudly on body-mismatch instead).
+# loudly on body-mismatch instead). Step 4 (Header-Card-Link-Check,
+# P16-H-1, 2026-09-13) wird im selben Hook mit-aktiviert.
 bash "${ROOT}/scripts/install_hooks.sh" || true
 
 echo "dev_install: all fourteen packages installed editable. Run: pytest phase15_v4/tests -v"

@@ -28,7 +28,7 @@ HOOK_PATH="${REPO_ROOT}/.git/hooks/pre-commit"
 CANONICAL_BODY="$(cat <<'HOOK_BODY'
 #!/bin/sh
 # Pre-commit hook: doc-rotation hygiene check.
-# Three steps (P14-F + P16-F9, 2026-09-08):
+# Four steps (P14-F + P16-F9 + P16-H-1, 2026-09-13):
 #   Step 1: no phase CLAUDE.md carries more than one "## Session stopped"
 #           block (Doc-Layers-Konvention, root CLAUDE.md "Rotation rule").
 #   Step 2: head-N == archive-max-(N-1) (archive-sequence integrity).
@@ -41,14 +41,25 @@ CANONICAL_BODY="$(cat <<'HOOK_BODY'
 #           (head=17 → expected=16 = OK), aber Step 3 macht den Drift laut.
 #           Genau diese Lücke ist in Session #17 (F8) operativ aufgetreten
 #           und blieb drei Sessions lang unentdeckt.
-# Installed by scripts/install_hooks.sh (P14-F, 2026-08-31, +P16-F9 2026-09-08).
+#   Step 4 (P16-H-1, 2026-09-13): every ``up:`` / ``down:`` link in every
+#           living .md file's YAML header card resolves to an existing file.
+#           Catches the 29-befund class from Audit-Session #19 (Patterns A–E:
+#           ``../../`` statt ``../`` in phase*/ files, ``up: ./CLAUDE.md``
+#           statt ``../<phase>/CLAUDE.md``, tote Referenzen, Prosa-Listen,
+#           falsche Ziele). Body-Links sind out-of-scope per F-Exec-Plan
+#           §1.4 V-8 — Step 4 prüft nur Header-Cards.
+#           Lock H2: erst NACH den Reparatur-Commits (H-3/H-4 Session #28)
+#           eingebaut; ohne diese Reihenfolge würde jeder Commit zwischen
+#           H-3 und H-1 den Pre-Commit-Hook selbst blockieren.
+# Installed by scripts/install_hooks.sh (P14-F 2026-08-31, +P16-F9 2026-09-08,
+# +P16-H-1 2026-09-13).
 # Tracked source: scripts/install_hooks.sh — re-run after every ``git clone`` /
 # fresh venv setup (or just re-run ``bash scripts/dev_install.sh`` which
 # calls this at the end).
 #
 # Override per commit with `git commit --no-verify` when needed (z. B. wenn
-# ein F9-Befund absichtlich noch nicht repariert ist, siehe Doc-Drift-Audit
-# Phase 16 Folgesession).
+# ein Step-4-Befund absichtlich noch nicht repariert ist, siehe Session #30
+# Drift-#8-Plan in der F-Exec-Plan).
 
 if ! command -v python3 >/dev/null 2>&1; then
     echo "pre-commit: python3 not found, skipping doc-rotation check"
@@ -62,6 +73,7 @@ fi
 
 # Step 2 became default after D5-Beweis (Mini-Session 24, 2026-08-31).
 # Step 3 became default with F9 (P16, 2026-09-08, Nikinger-Freigabe).
+# Step 4 became default with H-1 (P16, 2026-09-13, Lock H2: nach H-3/H-4).
 python3 scripts/check_doc_rotation.py --strict --quiet
 result=$?
 

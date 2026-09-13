@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Doc-rotation hygiene check (Mini-Session 16, 2026-08-27).
+"""Doc-Layers hygiene check (Mini-Session 16, 2026-08-27 + Phase-16 H-1, 2026-09-13).
 
 Verifies the Doc-Layers convention (root ``CLAUDE.md`` §"How to work in this repo",
 Rotation rule): each phase head carries **exactly one** ``## Session stopped`` block.
@@ -16,7 +16,8 @@ no keyring, no shell-out. Safe as a pre-commit hook or operator smoke-check.
 
 Exit codes:
   0 — every phase head carries **at most one** ``## Session stopped`` block
-      (0 = no session history, 1 = canonical; 2+ = inline-duplicate drift).
+      (0 = no session history, 1 = canonical; 2+ = inline-duplicate drift);
+      in ``--strict`` also archive-sequence + archive-gaps + header-card-links OK.
   1 — at least one phase head violates the rule (printed to stdout).
   2 — I/O error (missing phase directory, etc.).
 
@@ -29,11 +30,11 @@ below Session 13 → two ``## Session stopped`` blocks in one phasenkopf).
 Usage::
 
     python3 scripts/check_doc_rotation.py                       # Step-1 only (default)
-    python3 scripts/check_doc_rotation.py --strict             # Step-1 + Step-2 (P14-F) + Step-3 (P16-F9)
+    python3 scripts/check_doc_rotation.py --strict             # Steps 1 + 2 (P14-F) + 3 (P16-F9) + 4 (P16-H-1)
     python3 scripts/check_doc_rotation.py --phase phase14_discovery
     python3 scripts/check_doc_rotation.py --quiet              # suppress OK rows
 
-The ``--strict`` mode runs two additional checks beyond the default
+The ``--strict`` mode runs three additional checks beyond the default
 inline-duplicate count (Step 1):
 
 - Step 2 (P14-F): ``check_archive_sequence`` — head's max session number
@@ -45,6 +46,13 @@ inline-duplicate count (Step 1):
   headings in earlier rotations, leaving ``#16, #15, #12, #11, …, #1`` —
   Step 2 still passed because the head's predecessor was correctly set,
   but the gap at #13/#14 was silent. Step 3 makes that drift loud.
+- Step 4 (P16-H-1, 2026-09-13): ``check_header_card_links`` — every
+  ``up:`` / ``down:`` link in every living .md file's YAML header card
+  must resolve to an existing file on disk. Catches the 29-befund
+  class from Audit-Session #19 (Patterns A–E: ``../../`` statt ``../``
+  in phase*/ files, ``up: ./CLAUDE.md`` statt ``../<phase>/CLAUDE.md``,
+  tote Referenzen, Prosa-Listen, falsche Ziele). Body-Links sind explizit
+  out-of-scope per F-Exec-Plan §1.4 V-8 (Step 4 prüft nur Header-Cards).
 """
 
 from __future__ import annotations
@@ -276,6 +284,228 @@ def count_session_blocks(md_text: str) -> int:
     )
 
 
+def _extract_header_card_block(md_text: str) -> str | None:
+    """Return the YAML frontmatter block of a Markdown file, or ``None``.
+
+    Per the Doc-Layers convention (L1 header card), living docs begin with
+    ``---\\n`` and close with the next ``\\n---\\n`` (or ``\\n---`` at EOF).
+    Returns the inner YAML as a single string (without the delimiters), or
+    ``None`` if the file has no header card (snapshot/archive files
+    deliberately carry no card — see ``DOC_LAYERS_CONVENTION.md`` §"L1
+    header card schema"; this is the doc-bug, not a script-bug, path).
+    """
+    lines = md_text.splitlines()
+    if not lines or lines[0].rstrip() != "---":
+        return None
+    # Find the closing `---`. Skip the opening line, then look for the next
+    # line that is exactly `---` (no leading whitespace tolerated — YAML
+    # frontmatter requires the closing delimiter at column 0).
+    for i in range(1, len(lines)):
+        if lines[i].rstrip() == "---":
+            return "\n".join(lines[1:i])
+    # No closing delimiter found — treat as no header card (malformed,
+    # but the spec is for living docs and a stray leading `--- is benign).
+    return None
+
+
+# Inline-comment + markdown-strip regex for Header-Card link values.
+# Matches the comment delimiter `#` and removes everything from there to EOL;
+# backticks and `**`-bold/italic markers come off too. Underscores are
+# PRESERVED (Filenames wie `PHASE10_CLOSEOUT_HANDOVER.md` müssen überleben)
+# — Lock-Schritt 3 aus F-Exec-Plan §3 H-1.
+_INLINE_COMMENT_RE = re.compile(r"\s*#.*$")
+_MD_STRIP_RE = re.compile(r"`+|\*+")
+
+
+def _strip_card_link(value: str) -> str:
+    """Strip inline-comment + markdown markup from a single header-card link value.
+
+    Pipeline (Reihenfolge wie Lock-Schritte 3 der H-1 Spec):
+    1. alles ab dem ersten ``#`` abschneiden (Kommentar)
+    2. ``**`` und Backticks entfernen (``**`` = bold/italic, `` ` `` = code)
+    3. Whitespace an beiden Enden trimmen
+    """
+    no_comment = _INLINE_COMMENT_RE.split(value, maxsplit=1)[0]
+    no_md = _MD_STRIP_RE.sub("", no_comment)
+    return no_md.strip()
+
+
+def _iter_header_card_link_values(yaml_block: str) -> list[tuple[int, str]]:
+    """Yield ``(1-based-line-offset-in-original, stripped-value)`` for every
+    Header-Card link value.
+
+    Header-Card link values live on:
+    - the ``up:`` line (single-line value, indented or not — Doc-Layers
+      convention shows it unindented in the canonical examples),
+    - every ``  - <value>`` entry under ``down:`` (list form, 2-space indent).
+
+    Lines without ``:`` are not link values and are skipped. The
+    1-based-line-offset is relative to the **file** (counting the YAML
+    body lines from line 2 of the file onward) — used for diagnostics
+    like ``phase16_activation_plan.md:6``.
+
+    Werte, die nicht-Link-Markup tragen (z. B. ``purpose:``-Prose,
+    ``status: live``), werden übersprungen — die Funktion nimmt nur
+    Werte aus den zwei bekannten Behältern ``up:`` und ``down:``.
+    """
+    out: list[tuple[int, str]] = []
+    in_down = False
+    for offset, raw in enumerate(yaml_block.splitlines(), start=2):
+        line = raw.rstrip()
+        if not line:
+            in_down = False  # blank line ends the down-list (defensive)
+            continue
+        # `up: <value>` — single-line, value nach dem Doppelpunkt
+        if not line.startswith(" ") and line.startswith("up:"):
+            value = line[len("up:"):].strip()
+            stripped = _strip_card_link(value)
+            if stripped:
+                out.append((offset, stripped))
+            in_down = False
+            continue
+        # `down:` — schaltet in den Listen-Modus (nächste Zeilen müssen
+        # mit `  - ` beginnen, sonst Ende der Liste)
+        if not line.startswith(" ") and line.rstrip() == "down:":
+            in_down = True
+            continue
+        # `  - <value>` innerhalb der down-Liste
+        if in_down and line.startswith("  - "):
+            value = line[len("  - "):].strip()
+            stripped = _strip_card_link(value)
+            if stripped:
+                out.append((offset, stripped))
+            continue
+        # alles andere (status/purpose/read-when/detail/updated/…) beendet
+        # die down-Liste (YAML-Frontmatter ist linear)
+        if not line.startswith("  - "):
+            in_down = False
+    return out
+
+
+# File-ending patterns (Phase 16 H-1 Spec Lock-Schritt 5): ein Wert ohne
+# Slash und ohne ``.md/.py/.sql/.svg``-Endung ist Prosa und wird ignoriert.
+# Das ist die Regel, die ``docs/INDEX.md:7 down: every project doc (that is
+# the point)`` in Ruhe lässt.
+_PATHISH_END_RE = re.compile(r"\.(md|py|sql|svg)$", re.IGNORECASE)
+
+
+def _is_pathish_token(token: str) -> bool:
+    """Heuristik: zählt ein einzelnes Token als potenziellen Pfad?
+
+    Lock-Schritt 5 der H-1 Spec:
+    - enthält ``/`` ⇒ Pfad
+    - endet auf ``.md``/``.py``/``.sql``/``.svg`` ⇒ Pfad
+    - sonst Prosa ⇒ skip
+    """
+    return "/" in token or bool(_PATHISH_END_RE.search(token))
+
+
+# Repository-Top-Level directories that are Tooling-Metadaten und vom Step-4-
+# Check explizit ausgenommen sind (DOC_LAYERS_CONVENTION.md §"INDEX.md (L0)
+# format" + Phase-16-H-2 Klarstellung 2026-09-13): Skill-Internals
+# (``.agents/skills/``) und Harness-Specs (``meta_m1_harness/specs/``) sind
+# keine Projektdocs.
+HERHER_STEP4_EXCLUDE_TOPDIRS: tuple[str, ...] = (
+    ".git",
+    ".venv",
+    "node_modules",
+    ".agents",
+    "scripts/__pycache__",  # scripts/__pycache__ existiert; nur defensive
+    "__pycache__",
+)
+
+
+def _discover_step4_md_files(repo_root: Path) -> list[Path]:
+    """Alle ``*.md`` unter dem Repo-Root, ohne Tooling-/Build-Verzeichnisse.
+
+    Scope entspricht Lock-Schritt Scope der H-1 Spec: alle ``*.md`` unter
+    Repo-Root, außer `.git/`, `.venv/`, `node_modules/`, `.agents/`,
+    `__pycache__/`. (Heute tragen 92 Dateien eine Header-Card — siehe
+    Akzeptanzkriterium Session-#29-Test-Suite.)
+    """
+    md_files: list[Path] = []
+    # Direkte Kinder unter dem Root-Level
+    for child in sorted(repo_root.iterdir()):
+        if not child.is_dir():
+            if child.suffix.lower() == ".md":
+                md_files.append(child)
+            continue
+        if child.name in HERHER_STEP4_EXCLUDE_TOPDIRS:
+            continue
+        # Phase-Ordner / docs-Ordner / meta_m1_harness etc.: rekursiv,
+        # aber nicht in deren ``__pycache__``-Unterordner absteigen.
+        for path in child.rglob("*.md"):
+            rel = path.relative_to(repo_root)
+            parts = rel.parts
+            if any(p == "__pycache__" for p in parts):
+                continue
+            md_files.append(path)
+    return md_files
+
+
+def check_header_card_links(md_path: Path) -> list[tuple[str, str]]:
+    """P16-H-1 (2026-09-13): prüfe Header-Card-Link-Targets in einer .md-Datei.
+
+    Returns:
+        Liste von ``(diagnostic, value)`` für jedes kaputte Target; leer wenn OK.
+
+    Spec — genau die Regeln, mit denen die 29 Befunde aus Audit-Session #19
+    (H-3) reproduziert wurden:
+    1. Header-Card = der YAML-Block vom ersten ``---\\n`` bis zum nächsten
+       ``\\n---\\n``. Snapshot-/Archive-Dateien ohne Karte ⇒ ``[]``
+       (übersprungen, kein Drift — sie tragen absichtlich keine Karte).
+    2. Ziele: die ``up:``-Zeile (einzeiliger Wert) und jeder ``  - ``-Eintrag
+       unter ``down:``.
+    3. Pro Wert: alles ab dem ersten ``#`` abschneiden (Kommentar), dann
+       ``**`` und Backticks entfernen. ``_`` bleibt (Lock-Schritt 3 — Underscores
+       sind Teil der Dateinamen, ``PHASE10_CLOSEOUT_HANDOVER.md``).
+    4. Werte, die mit ``http`` beginnen, werden übersprungen.
+    5. Enthält der Wert Whitespace, wird jedes Token geprüft, das ``/``
+       enthält **oder** auf ``.md``/``.py``/``.sql``/``.svg`` endet. Ein
+       Wert ohne solches Token ist Prosa und wird übersprungen — das ist
+       die Regel, die ``docs/INDEX.md:7 down: every project doc (that is
+       the point)`` in Ruhe lässt.
+    6. Ziel relativ zum **Verzeichnis der Datei** auflösen, ``Path.exists()``.
+
+    Body-Links sind out-of-scope per F-Exec-Plan §1.4 V-8 — die H-1 Spec
+    prüft ausschließlich Header-Cards.
+    """
+    text = md_path.read_text(encoding="utf-8")
+    yaml = _extract_header_card_block(text)
+    if yaml is None:
+        return []  # keine Header-Card ⇒ nichts zu prüfen
+    file_dir = md_path.parent
+    rel_to_repo = md_path.name
+    failures: list[tuple[str, str]] = []
+    for line_offset, value in _iter_header_card_link_values(yaml):
+        # Lock-Schritt 4: HTTP/URL-Werte überspringen
+        if value.lower().startswith("http"):
+            continue
+        # Lock-Schritt 5: Wert in Tokens aufteilen, jedes pathish-Token prüfen
+        # Prosa-Werte (kein /, keine .md/.py/.sql/.svg-Endung) ⇒ skip
+        tokens = value.split()
+        pathish = [t for t in tokens if _is_pathish_token(t)]
+        if not pathish:
+            continue  # Prosa-Zeile (z. B. ``down: every project doc (...)``)
+        for token in pathish:
+            # Bereits von ``#`` und Markdown-Markup befreit; kann aber immer
+            # noch Eckfälle tragen (Klammern in ``phase9_v2_foundation_plan(1).md``)
+            if token.endswith(")") and not token.startswith("("):
+                # trailing `)` aus Markdown-Link-Syntax abstreifen —
+                # im Header-Card-Vokabular ungewöhnlich, aber defensiv
+                token = token.rstrip(")")
+            target = (file_dir / token).resolve()
+            if not target.exists():
+                failures.append(
+                    (
+                        f"{rel_to_repo}:{line_offset} -> '{token}' does not exist "
+                        f"(resolved to {target})",
+                        token,
+                    )
+                )
+    return failures
+
+
 def check_phase(phase_dir: Path) -> tuple[int, str]:
     """Return (count, label) for one phase head.
 
@@ -310,10 +540,10 @@ def main() -> int:
         "--strict",
         action="store_true",
         help=(
-            "Enable Step-2 archive-sequence check in addition to Step-1 "
-            "duplicate-block check (P14-F). Default: Step-1 only — "
-            "the pre-commit hook should only be hardened once the new "
-            "check has been proved against the current archive state."
+            "Enable Steps 2 + 3 + 4 (P14-F + P16-F9 + P16-H-1) in addition "
+            "to Step-1 inline-duplicate check. Step 4 = header-card link "
+            "target existence (29 Audit-Session-#19-Befunde Klasse). "
+            "Default: Step-1 only — the pre-commit hook runs --strict."
         ),
     )
     args = parser.parse_args()
@@ -365,6 +595,19 @@ def main() -> int:
                 print(f"[FAIL] {label}: {diagnostic}")
         if seq_bad:
             return 1  # keine Inline-Duplicates, aber Sequenz- oder Lücken-FAIL → fail
+
+        # P16-H-1 (2026-09-13): Step 4 — Header-Card-Link-Target-Existenz.
+        # Lock H2: erst NACH den Reparatur-Commits (H-3/H-4) eingebaut,
+        # damit der Pre-Commit-Hook nicht jeden Commit zwischen H-3 und
+        # H-1 blockt. Sammelt in dieselbe FAIL-Logik wie Steps 2/3, teilt
+        # den return 1.
+        link_bad: list[tuple[str, str]] = []
+        for md_path in _discover_step4_md_files(REPO_ROOT):
+            for diagnostic, _value in check_header_card_links(md_path):
+                link_bad.append((md_path.name, diagnostic))
+                print(f"[FAIL] {diagnostic}")
+        if link_bad:
+            return 1  # Header-Card-Link-Target fehlt
 
     if not args.quiet:
         print("\nAll phase heads OK.")
