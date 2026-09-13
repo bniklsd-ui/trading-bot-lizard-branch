@@ -3,7 +3,7 @@ status: plan (ausführungsreif)
 purpose: Meta-Phase M1 — Harness-Unabhängigkeit (Build-Front). Vorregistriertes Bake-off Claude Code vs. OpenCode + kalter P4/P6-Provider-Fallback. Direkt an Sonnet in Claude Code übergebbar.
 read-when: Ausführung der Meta-Phase M1; NICHT bei Session-Start anderer Phasen
 detail: L2
-up: ./CLAUDE.md
+up: ../../meta_m1_harness/CLAUDE.md
 updated: 2026-07-08
 ---
 

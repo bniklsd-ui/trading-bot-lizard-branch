@@ -9,11 +9,11 @@ down:
   - ./PHASE14_C_DAEMON_CWD_BUG_PLAN.md                             # 📕 Schwester-Mini-Plan (P14-C, der den Session-21-Drift aufgedeckt hat, Session 11)
   - ./PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md                          # 📕 Schwester-Mini-Plan (P14-D, gleiche Struktur)
   - ./PHASE14_E_RECORDER_LOOP_PLAN.md                              # 📕 Schwester-Mini-Plan (P14-E, Session-20-Block enthielt die D3-Korrekturnotiz, die diese Erkenntnis trägt)
-  - ../../scripts/check_doc_rotation.py                            # das Tool, das erweitert wird (existiert seit Session 16, 2026-08-27)
-  - ../../.git/hooks/pre-commit                                    # der bestehende Hook, der das Tool aufruft (existiert seit Session 16, untracked)
-  - ../SESSIONS_ARCHIVE.md                                         # die Archive-Datei, deren Integrität jetzt zusätzlich geprüft wird
-  - ../../docs/INDEX.md                                            # L0-Index, der den Plan aufnimmt
-  - ../../docs/DOC_LAYERS_CONVENTION.md                            # das Doc-Layers-Protokoll, gegen das geprüft wird
+  - ../scripts/check_doc_rotation.py                            # das Tool, das erweitert wird (existiert seit Session 16, 2026-08-27)
+  - ../.git/hooks/pre-commit                                    # der bestehende Hook, der das Tool aufruft (existiert seit Session 16, untracked)
+  - ./SESSIONS_ARCHIVE.md                                         # die Archive-Datei, deren Integrität jetzt zusätzlich geprüft wird
+  - ../docs/INDEX.md                                            # L0-Index, der den Plan aufnimmt
+  - ../docs/DOC_LAYERS_CONVENTION.md                            # das Doc-Layers-Protokoll, gegen das geprüft wird
 updated: 2026-08-31
 ---
 # P14-F — Doc-Rotation-Hook Step 2 (Mini-Plan)

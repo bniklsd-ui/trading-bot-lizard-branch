@@ -3,7 +3,7 @@ status: plan (ausführungsreif)
 purpose: Phase 10 (V3) — Abstain-/No-Trade-Lessons echt auf main + Persistenz-Reform (Regime-Snapshots, Decision-Context) + Paper-Trades. Direkt an Sonnet in Claude Code übergebbar.
 read-when: Ausführung der Phase 10 (V3); NICHT bei Session-Start anderer Phasen
 detail: L2
-up: ./CLAUDE.md
+up: ../../phase10_v3/CLAUDE.md
 updated: 2026-07-09
 ---
 

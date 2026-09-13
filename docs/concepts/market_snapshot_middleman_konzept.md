@@ -5,7 +5,7 @@ read-when: wenn nach V2b-Live-Betrieb gemessene Divergenz/Degrade-Events die Fra
 detail: L2
 up: ../../ROADMAP.md
 down:
-  - ./phase9_v2_foundation_plan.md          # V2b-Kette + Divergenz-Check (der Ist-Zustand)
+  - ./phase9_v2_foundation_plan(1).md          # V2b-Kette + Divergenz-Check (der Ist-Zustand)
 updated: 2026-07-07
 ---
 # Middleman / MarketSnapshot — kanonisches Datenblatt (Konzeptnotiz)

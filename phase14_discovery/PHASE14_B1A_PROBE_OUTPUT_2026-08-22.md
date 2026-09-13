@@ -3,9 +3,9 @@ status: snapshot
 purpose: Phase-14 B1a Probe-Output (Capital.com /markets Antwort-Form) — die **beobachtete** Form, gegen die `CapitalSource.discover()` (B1b) gebaut wird. Roh-Output des Operator-Runs vom 2026-08-22.
 read-when: Block B1b wird gebaut; jede Frage zur Feldnamen-Wahl in `discover()`; jede Regression-Diagnose, die fragt „hat sich die API verändert?".
 detail: L3
-up: ../../docs/concepts/phase14_discovery_plan.md
+up: ../docs/concepts/phase14_discovery_plan.md
 down:
-  - ../../phase13_live_data/scripts/probe_capital.py   # der Operator-Run, der diesen Output erzeugt hat (--markets-Modus aus Session 5)
+  - ../phase13_live_data/scripts/probe_capital.py   # der Operator-Run, der diesen Output erzeugt hat (--markets-Modus aus Session 5)
 updated: 2026-08-22
 ---
 # Phase-14 B1a Probe-Output — `GET /api/v1/markets?searchTerm=...`

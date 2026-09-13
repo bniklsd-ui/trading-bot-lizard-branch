@@ -10,7 +10,9 @@ down:
   - ../docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md   # 📕 Kickoff-Handover aus M1 → V3
   - ./DATA_SOURCE_STRATEGY_2026-08-11.md   # 📕 die Richtung (mit Korrektur §2.6: nur Workaround, kein Bestätigungs-Beweis)
   - ./ALLOWANCE_INCIDENT_2026-08-08.md   # 📕 das IG-Kontingent + Restart-Gate
-  - ./DATA_WEEK_REVIEW_2026-07-25.md / -07-31.md / -08-07.md   # 📕 die drei Datenwochen (V3-Folgephase Inhalte)
+  - ./DATA_WEEK_REVIEW_2026-07-25.md   # 📕 WI-1..WI-6 + 2 Bugfixes + N1/N2
+  - ./DATA_WEEK_REVIEW_2026-07-31.md   # 📕 Datenwoche 2 (W1/W5 bestätigt + Phase-11-Hypothesen H1-H7)
+  - ./DATA_WEEK_REVIEW_2026-08-07.md   # 📕 Datenwoche 3 (Allowance-Incident, §3 SUPERSEDED durch ALLOWANCE_INCIDENT_2026-08-08.md)
   - ../docs/architecture/phase10_v3.svg   # 📕 diese Phase, bildlich (1080×1080)
   - ./SESSIONS_ARCHIVE.md   # 📦 volle Session-Historie (verbatim, newest-first)
 updated: 2026-08-25

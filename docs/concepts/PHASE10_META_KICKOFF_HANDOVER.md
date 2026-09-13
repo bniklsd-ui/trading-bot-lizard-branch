@@ -3,7 +3,7 @@ status: handover
 purpose: Kickoff-Handover für den nächsten Planungs-Chat nach Phase 9 (V2). Was steht, was offen ist, wo es steht — bevor ein detaillierter Claude-Code-Plan entworfen wird.
 read-when: Onboarding des nächsten Phasen-Chats (Meta-Phase); NICHT während laufender Implementierung
 detail: L3
-up: ./CLAUDE.md
+up: ../../CLAUDE.md
 updated: 2026-07-07
 ---
 # Kickoff-Handover → nächste Phase (Meta-Phase) · nach Phase 9 (V2)

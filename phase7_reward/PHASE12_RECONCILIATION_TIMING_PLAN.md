@@ -15,13 +15,13 @@ detail: L3
 up: ../CLAUDE.md
 down:
   - ./CLAUDE.md                                                    # Phasenkopf, mit Plan-Verweis in Spezial-Pläne-Zeile
-  - ../../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md # Vor-Findings (Phase-13-Beweiswoche-Auswertung 2026-08-31)
-  - ../../phase7_reward/CLAUDE.md                                   # Phase-7-Phasenkopf, dessen pnl_resolver die Wurzel-Logik hat
-  - ../../phase7_reward/reward/recorder.py                          # der reward.recorder-Logger-Prefix, Z. 276 (CRITICAL-Wurzel)
-  - ../../phase7_reward/reward/pnl_resolver.py                       # der PnLUnavailable-Raiser, Z. 212 (no usable history row)
-  - ../../phase8_scheduler/scheduler/reconcile.py                     # der alle-5-Min-Reconcile-Pass, Z. 137 (reconcile_open_trades-Aufruf)
-  - ../../phase2_persistence/persistence/migrations.py                # für die geplante trade_outcomes-Erweiterung
-  - ../../phase2_persistence/migrations/003_phase12_reconcile_backoff.sql # 📕 NEU — die Backoff-Spalte (D2)
+  - ../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md # Vor-Findings (Phase-13-Beweiswoche-Auswertung 2026-08-31)
+  - ../phase7_reward/CLAUDE.md                                   # Phase-7-Phasenkopf, dessen pnl_resolver die Wurzel-Logik hat
+  - ../phase7_reward/reward/recorder.py                          # der reward.recorder-Logger-Prefix, Z. 276 (CRITICAL-Wurzel)
+  - ../phase7_reward/reward/pnl_resolver.py                       # der PnLUnavailable-Raiser, Z. 212 (no usable history row)
+  - ../phase8_scheduler/scheduler/reconcile.py                     # der alle-5-Min-Reconcile-Pass, Z. 137 (reconcile_open_trades-Aufruf)
+  - ../phase2_persistence/persistence/migrations.py                # für die geplante trade_outcomes-Erweiterung
+  - ../phase2_persistence/migrations/008_phase12_reconcile_backoff.sql # 📕 NEU — die Backoff-Spalte (D2)
 updated: 2026-08-31
 ---
 # PHASE12_RECONCILIATION_TIMING_PLAN — Backoff für `RewardSink.reconcile_open_trades`

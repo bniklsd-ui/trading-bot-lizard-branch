@@ -5,7 +5,7 @@ purpose: Kickoff-Handover für den Phase-10/V3-Planungschat (Abstain-Lessons + P
   Priorisierung (V3 vor M2). Einstiegspunkt, keine Plan-Kopie — Code ist Wahrheit.
 read-when: Start des V3-Planungschats, VOR dem Entwurf des detaillierten Claude-Code-Plans
 detail: L3
-up: ./CLAUDE.md
+up: ../../phase10_v3/CLAUDE.md
 updated: 2026-07-09
 ---
 

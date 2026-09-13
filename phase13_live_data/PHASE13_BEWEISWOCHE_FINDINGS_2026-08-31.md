@@ -11,11 +11,11 @@ detail: L3
 up: ../CLAUDE.md
 down:
   - ../CLAUDE.md                                # Phasenkopf, mit Findings-Verweis-Zeile ergänzen
-  - ../../docs/concepts/phase13_live_data_plan.md  # 📕 Mutterplan, unangetastet
-  - ../../docs/concepts/phase13_c_block_c_replan.md # Block-C-Re-Plan, dessen These hier empirisch bestätigt wird
+  - ../docs/concepts/phase13_live_data_plan.md  # 📕 Mutterplan, unangetastet
+  - ../docs/concepts/phase13_c_block_c_replan.md # Block-C-Re-Plan, dessen These hier empirisch bestätigt wird
   - ./scripts/source_delta.py                  # das Diagnose-Tool (Block C3, 7 Tests grün)
-  - ../../phase14_discovery/CLAUDE.md           # Phase-14-Phasenkopf (D5-Handover-Status)
-  - ../../phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md # Phase-14-Schwester, die in dieser Diagnose-Woche auch lebte
+  - ../phase14_discovery/CLAUDE.md           # Phase-14-Phasenkopf (D5-Handover-Status)
+  - ../phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md # Phase-14-Schwester, die in dieser Diagnose-Woche auch lebte
 updated: 2026-08-31 (+ §8 Pfad-C-Nachtrag 2026-08-31, Mini-Session 24)
 ---
 # PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31 — Source-Delta-Diagnose
@@ -295,7 +295,7 @@ pushbar nach Nikinger-Sign-off.
 
 ## §7 Cross-Refs
 
-- **Block-C-Re-Plan** [`../../docs/concepts/phase13_c_block_c_replan.md`](../../docs/concepts/phase13_c_block_c_replan.md)
+- **Block-C-Re-Plan** [`../docs/concepts/phase13_c_block_c_replan.md`](../docs/concepts/phase13_c_block_c_replan.md)
   §0 "drei neu nachgemessene Befunde tragen die Phase: IG liefert für eine Forward-Epic seit
   einem Monat tote Historie mit ok=True" — **empirisch vollständig bestätigt**.
 - **Phase-13-CLAUDE.md** Modul-Tabelle `source_delta.py`-Zeile — Status "✅ C3 — committed,

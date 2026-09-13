@@ -7,11 +7,10 @@ up: ../CLAUDE.md
 down:
   - ./CLAUDE.md                                                    # Phasenkopf, dem dieser Plan folgt
   - ./SESSIONS_ARCHIVE.md                                          # die Archive-Datei, deren Integrität jetzt zusätzlich geprüft wird
-  - ./PHASE15_A1_A6_STEP_RECORDS.md                                # 📕 A-1..A-6 Detail-Protokolle (im Phasenkopf Sektionen, nicht diese Datei)
-  - ../../scripts/check_doc_rotation.py                            # das Tool, das erweitert wird (P14-F-Stand)
-  - ../../tests/test_check_doc_rotation.py                         # die Test-Datei, die erweitert wird (P14-F-Stand)
-  - ../../docs/INDEX.md                                            # L0-Index, der die Plan-Zeile aufnimmt
-  - ../../docs/DOC_LAYERS_CONVENTION.md                            # das Doc-Layers-Protokoll, gegen das geprüft wird
+  - ../scripts/check_doc_rotation.py                            # das Tool, das erweitert wird (P14-F-Stand)
+  - ../tests/test_check_doc_rotation.py                         # die Test-Datei, die erweitert wird (P14-F-Stand)
+  - ../docs/INDEX.md                                            # L0-Index, der die Plan-Zeile aufnimmt
+  - ../docs/DOC_LAYERS_CONVENTION.md                            # das Doc-Layers-Protokoll, gegen das geprüft wird
   - ../phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md  # 📕 Schwester-Mini-Plan (P14-F, Vorlage)
   - ../phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md          # 📕 Schwester-Mini-Plan (P14-E, Cross-Phase-Beispiel)
   - ../phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md       # 📕 Schwester-Mini-Plan (P14-D)
