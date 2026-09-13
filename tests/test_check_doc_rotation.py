@@ -748,3 +748,171 @@ def test_strict_check_fails_for_simulated_pre_f8_phase16_archive(
     assert rc == 1, (
         f"expected exit 1 for pre-F8 simulated archive (gap at #13/#14), got {rc}"
     )
+
+
+# ---------------------------------------------------------------------------
+# P16-H-1 (2026-09-13) — Header-Card-Link-Check (Step 4 im `--strict`-Pfad).
+#
+# Audit-Session #19 hat 29 Header-Card-Link-Drifts aufgedeckt (Patterns A-E),
+# gestreut über 12 Dateien in 6 Phasen + docs/concepts/. H-3 hat sie gestern
+# (Session #28, Commit `fa51084`) repariert. H-1 fügt die maschinelle Prüfung
+# hinzu, damit zukünftige Drifts beim ersten Commit gefangen werden, nicht
+# erst in einer Folgesession.
+#
+# Akzeptanz (F-Exec-Plan §3 H-1):
+# - A1 `test_header_card_up_link_ok` — `up:` zeigt auf existierende Datei → OK
+# - A2 `test_header_card_down_links_with_inline_comment` — Inline-`#`-Kommentare
+#       werden korrekt abgeschnitten
+# - A3 `test_header_card_strip_markdown_preserves_underscores` — ``**`` und
+#       Backticks weg, Underscores bleiben (PHASE10_CLOSEOUT_HANDOVER.md
+#       wäre sonst kaputtgemacht worden)
+# - A4 `test_header_card_prose_down_entry_is_ignored` — Regressions-Pin
+#       für ``docs/INDEX.md:7 down: every project doc (that is the point)``
+# - A5 `test_header_card_double_dotdot_is_flagged` — Pin für die 21
+#       Pattern-A-Bugs aus H-3 (Link zeigt auf nicht-existierendes Ziel)
+# - A6 `test_header_card_repo_is_clean` — End-to-End gegen das echte Repo,
+#       schlägt fehl, sobald jemand eine kaputte Karte einführt
+# ---------------------------------------------------------------------------
+
+
+def test_header_card_up_link_ok(tmp_path: Path) -> None:
+    """A1: `up: <existing-path>` → keine Befunde."""
+    (tmp_path / "CLAUDE.md").write_text(
+        "---\nstatus: live\npurpose: probe\nread-when: a\ndetail: L2\n"
+        "up: ./CLAUDE.md\ndown:\n  - ./README.md\n"
+        "updated: 2026-09-13\n---\n# Body\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "README.md").write_text("hi\n", encoding="utf-8")
+    failures = check_doc_rotation_mod.check_header_card_links(tmp_path / "CLAUDE.md")
+    assert failures == [], (
+        f"expected no failures for self-referential up + existing README, "
+        f"got: {failures}"
+    )
+
+
+def test_header_card_down_links_with_inline_comment(tmp_path: Path) -> None:
+    """A2: `  - <path>  # Kommentar` — Kommentar wird vor der Pfad-Auflösung
+    abgeschnitten, Pfad wird korrekt aufgelöst.
+
+    Reproduziert den Normalfall der H-3-Reparatur-Phase: jeder
+    `down:`-Eintrag trägt einen Inline-Kommentar (z. B. `# 📕 Vorgänger-Closeout`).
+    Ohne Strip würde der Pfad den Kommentar enthalten und nicht auflösen.
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "---\nstatus: snapshot\npurpose: probe\nread-when: a\ndetail: L3\n"
+        "up: ./CLAUDE.md\ndown:\n"
+        "  - ./PHASE12_5_CLOSEOUT_HANDOVER.md   # 📕 Vorgänger\n"
+        "  - ./phase14_discovery_concept.md    # 📕 Concept-Skizze\n"
+        "updated: 2026-09-13\n---\n# Body\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "PHASE12_5_CLOSEOUT_HANDOVER.md").write_text("x", encoding="utf-8")
+    (tmp_path / "phase14_discovery_concept.md").write_text("x", encoding="utf-8")
+    failures = check_doc_rotation_mod.check_header_card_links(tmp_path / "CLAUDE.md")
+    assert failures == [], (
+        f"expected comments stripped + paths resolved, got: {failures}"
+    )
+
+
+def test_header_card_strip_markdown_preserves_underscores(tmp_path: Path) -> None:
+    """A3: ``**``-Bold und Backticks werden entfernt, Underscores bleiben.
+
+    Lock-Schritt 3 der H-1 Spec (F-Exec-Plan §3 H-1): ``_`` darf NICHT
+    entfernt werden — Dateinamen wie ``PHASE10_CLOSEOUT_HANDOVER.md``
+    tragen Underscores. Würde der Strip sie mit entfernen, wäre der
+    Pfad falsch und der Hook FAILt auf einer intakten Datei. Regression-Pin.
+    """
+    (tmp_path / "CLAUDE.md").write_text(
+        "---\nstatus: snapshot\npurpose: probe\nread-when: a\ndetail: L3\n"
+        "up: ./CLAUDE.md\ndown:\n"
+        "  - **`PHASE10_CLOSEOUT_HANDOVER.md`**   # 📕 Closeout, **bold** muss weg\n"
+        "updated: 2026-09-13\n---\n# Body\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "PHASE10_CLOSEOUT_HANDOVER.md").write_text("x", encoding="utf-8")
+    failures = check_doc_rotation_mod.check_header_card_links(tmp_path / "CLAUDE.md")
+    assert failures == [], (
+        f"expected underscores preserved + ** / backticks stripped, "
+        f"got: {failures}"
+    )
+
+
+def test_header_card_prose_down_entry_is_ignored(tmp_path: Path) -> None:
+    """A4: Prosa-Down-Eintrag ohne Slash und ohne .md/.py/.sql/.svg-Endung
+    wird ignoriert (Lock-Schritt 5).
+
+    Regression-Pin für ``docs/INDEX.md:7 down: every project doc (that is
+    the point)`` — der Satz hat weder ``/`` noch eine Datei-Endung, ist
+    also Prosa und wird zu Recht übersprungen. Würde der Check ihn als
+    Link werten, würde er global FAILen und der Hook wäre unbenutzbar.
+    """
+    # up zeigt auf existierende Datei (damit der Test sich auf die Prosa-
+    # Erkennung im `down:` konzentriert; der up:-Fehler wäre sonst Lärm).
+    (tmp_path / "INDEX.md").write_text(
+        "---\nstatus: live\npurpose: probe\nread-when: a\ndetail: L0\n"
+        "up: ./INDEX.md\ndown: every project doc (that is the point)\n"
+        "updated: 2026-09-13\n---\n# Body\n",
+        encoding="utf-8",
+    )
+    failures = check_doc_rotation_mod.check_header_card_links(tmp_path / "INDEX.md")
+    assert failures == [], (
+        f"prosa-style 'down: every project doc (...)' must NOT be flagged, "
+        f"got: {failures}"
+    )
+
+
+def test_header_card_double_dotdot_is_flagged(tmp_path: Path) -> None:
+    """A5: `up: ../../<existing-dir>/X.md` aus einem `phase*/`-File ist ein
+    kaputter Pfad (zeigt auf Repo-Root/<dir>/X.md statt auf phase*/<dir>/X.md
+    — exakt die 21 Pattern-A-Befunde aus H-3).
+
+    Reproduziert den Drift der in Session #28 (H-3, Commit `fa51084`)
+    repariert wurde: die Files lagen in `phase*/` (nicht in `phase*/<dir>/`),
+    also war `../` richtig, nicht `../../`.
+    """
+    phase_dir = tmp_path / "phase13_live_data"
+    phase_dir.mkdir()
+    # `../../phase12_data_foundation/...` aus phase13_live_data/foo.md
+    # → tmp_path/phase12_data_foundation/... (existiert NICHT)
+    (phase_dir / "PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md").write_text(
+        "---\nstatus: snapshot\npurpose: probe\nread-when: a\ndetail: L3\n"
+        "up: ../../phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md\n"
+        "down:\n"
+        "  - ../../phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md"
+        "   # 📕 der falsche Pfad\n"
+        "updated: 2026-09-13\n---\n# Body\n",
+        encoding="utf-8",
+    )
+    failures = check_doc_rotation_mod.check_header_card_links(
+        phase_dir / "PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md"
+    )
+    assert len(failures) == 2, (
+        f"expected 2 failures (up + down both wrong), got: {failures}"
+    )
+    # Diagnostik muss Datei + Zeile nennen (Pin für lesbare Fehlermeldung)
+    for diagnostic, _value in failures:
+        assert "PHASE13_BEWEISWOCHE" in diagnostic, (
+            f"diagnostic must name the offending file, got: {diagnostic!r}"
+        )
+        assert "does not exist" in diagnostic
+
+
+def test_header_card_repo_is_clean() -> None:
+    """A6: End-to-End gegen das echte Repo — alle 92 Header-Cards sind clean.
+
+    Wenn dieser Test grün ist, fängt der Hook die nächste Drift der
+    Audit-Session-#19-Klasse (Patterns A-E) ab dem ersten Commit ab.
+    Body-Links sind out-of-scope per F-Exec-Plan §1.4 V-8 — der Test
+    prüft nur Header-Cards, nicht Markdown-Link-Syntax im Fließtext.
+    """
+    bad: list[tuple[str, str]] = []
+    for md_path in check_doc_rotation_mod._discover_step4_md_files(REPO_ROOT):
+        failures = check_doc_rotation_mod.check_header_card_links(md_path)
+        for diagnostic, _value in failures:
+            bad.append((str(md_path.relative_to(REPO_ROOT)), diagnostic))
+    assert not bad, (
+        f"Header-Card-Link-Drift im Repo (Step 4 FAILt): {bad[:10]}... "
+        f"({len(bad)} Befunde). Reparatur analog H-3-Patterns A-E aus "
+        f"F-Exec-Plan §3."
+    )
