@@ -44,7 +44,8 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 export PYTHONPATH="${PROJECT_DIR}${PYTHONPATH:+:$PYTHONPATH}"
 
-echo "[run_webui] dashboard on http://127.0.0.1:${PORT} (read-only DB, localhost-only)..." >&2
+printf '%s [run_webui] dashboard on http://127.0.0.1:%s (read-only DB, localhost-only)...\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "${PORT}" >&2
 # Phase 16 A-4 (2026-09-05, L8): --no-access-log kills the 16 MB/day uvicorn access log;
 # application logs on stderr stay. Restart der WebUI (Block D) wirkt.
 exec uvicorn webui.api:app --host 127.0.0.1 --port "${PORT}" --no-access-log
