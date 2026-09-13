@@ -75,7 +75,11 @@ updated: 2026-09-13 (+ Exec-Session #30: **Quick-Session: 3 nicht-zeit-blockiert
 **Offene Items für die nächste Exec-Session (Session #31, Block I Tag-10-Closeout):**
 
 1. **Session #31 (Block I, Tag-10-Closeout) — geplant Di 2026-09-22 nach 17:30 Berlin:** Fokus I-1 Tag-10-Summary (`autonomy_report.py --from 2026-09-09 --to 2026-09-22 --summary`) + I-2 Closeout-Handover (analog Phase-15-Pattern) + I-3 SVG (1080×1080, 3-Säulen Status-Bilanz) + I-4 Status-Pflege root/ROADMAP/README/INDEX + I-5 Session-Rotation. Σ = 1945 stabil, alle daily reports Mi-Fr+Mo-Di verfügbar, alle H-Block-Items + Quick-Session-Items erledigt. Total ~5 Commits + 1 neuer SVG.
-2. **Optional:** Wrapper-Skript-Fix für Drift #8 Root Cause (3 File-Edits `run_recorder.sh` + `run_discovery.sh` + `run_webui.sh`: `date '+%Y-%m-%d %H:%M:%S'`-Prefix vor jeden Wrapper-Start-Print) → K1 wird dann auch für Wrapper-Dienste deterministisch korrekt.
+
+**Nikinger-Vorschlag 2026-09-13 (eigene Mini-Session, VOR Session #31, Zeitpunkt noch offen):**
+
+2. **Mini-Session „Wrapper-Skript-Fix Drift #8 Root Cause" (Nikinger-Vorschlag, nicht terminiert).** 3 File-Edits `phase8_scheduler/scripts/run_webui.sh` + `phase12_data_foundation/scripts/run_recorder.sh` + `phase14_discovery/scripts/run_discovery.sh`: `date '+%Y-%m-%d %H:%M:%S'`-Prefix vor jeden Wrapper-Start-Print (z. B. `[run_recorder] dashboard on` → `2026-09-14 08:30:00 [run_recorder] dashboard on`). Damit wird K1 auch für Wrapper-Dienste deterministisch korrekt (heute by-design opak, Drift #8 v3 §11). **Mini-Plan wahrscheinlich nötig** — Cross-Phase-Touch (Phase 8 + Phase 12 + Phase 14, je eine Datei) erfordert Cross-Phase-Freigabe P8+P12+P14 (Plan §4 / F-Exec-Plan §10). Plus Test, der nach dem Fix die Wrapper-Start-Lines mit Timestamp verifiziert (analog `test_k1_window_filter` in `test_autonomy_report.py` erweitern). Empfohlener Zeitpunkt: Mo 2026-09-15 oder Di 2026-09-16 (vor Session #31), damit der nächste Restart-Termin planbar ist und nicht am Vorabend eines Handelstages.
+
 3. **Optional:** Phase-17-Material sammeln (Strategie-Befund K3, Universums-Konsolidierung W2 by-design FAIL, Zombie-Reaping W5, IG-Punkte für verified SUN*-Epics V-5, Log-Rotation v3 §11-Kommentar-Inkonsistenz).
 4. **Falls K4 FAIL an ≥ 2 Tagen:** Trigger T-5 → Exec-Session on demand.
 5. **Falls K6 FAIL:** Trigger T-8 → Exec-Session on demand.
