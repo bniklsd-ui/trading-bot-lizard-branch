@@ -10,7 +10,51 @@ down:
   - ../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md   # 📕 A6 hängt an Migration 008
   - ../phase5_execution/CLAUDE.md                 # B3-Block → Plan D3
   - ./SESSIONS_ARCHIVE.md                         # 📦 Session-Block-Historie (newest-first, A-0 angelegt)
-updated: 2026-09-13 (+ Exec-Session #31: **Mini-Session „Wrapper-Skript-Fix Drift #8 Root Cause"** [4 Commits `5cd9168` + `cc73462` + `774a3e1` + `9c323e3`; 3 Wrapper-Skript-Edits (phase8_scheduler/scripts/run_webui.sh + phase12_data_foundation/scripts/run_recorder.sh + phase14_discovery/scripts/run_discovery.sh) mit `date '+%Y-%m-%d %H:%M:%S'`-Prefix; 3 neue Test-K1-Pin-Tests (in-window / out-of-window / mixed); Σ 1945 → **1948** exakt am F-Exec-Plan-Akzeptanz-Muster; v3-§11-Drift-#8-Fix-Marker **nicht** in v3 (Locked-Regel) — Drift-#8-Fix stattdessen im Phasenkopf dokumentiert; `bash -n` für jeden Wrapper exit 0; `pytest phase16_activation/tests/test_autonomy_report.py` 10/10 grün; `check_doc_rotation.py --strict --quiet` exit 0]). — Vorheriger Stand: Exec-Session #30: **Quick-Session: 3 nicht-zeit-blockierte Items abgehakt**
+updated: 2026-09-15 (+ **Tag-7-Status-Check (OpenCode / MiniMax-M3, no-code-Session)** [Health-Check nach gemeldeter Nikinger-Downtime 17:45–21:00 = remote-Zugang, nicht VM-Outage (15 d uptime stabil, scheduler+webui laufen seit 2026-09-08, recorder+discovery inline-orchestriert per Phase-12/14-Architektur → keine Restarts nötig); **3 neue Drifts #9/#10/#11 gefunden**, alle 3 per Nikinger-Entscheidung **deferred** (Phase-16-Block-E läuft, Block-I-Tag-10-Closeout ist zeit-blockiert 2026-09-22); Kriterien Tag-6+7-Status: K1 ✅, K2 ❌, K3 ❌, K4 ❌, K5 ✅, K6 ✅, K7 ✅ — K2/K4-Fails sind Code-Drift, nicht Live-Problem; Live-Beweis: 8 yF-Bar-Fetches ok, 1 `measurement_heartbeat ok:true worst_coverage=0.996`, 5 Zyklen LLM_ABSTAIN (legit DAX-nahe-30d-Tief), `consecutive_failures=0`]). — Vorheriger Stand: Exec-Session #31: **Mini-Session „Wrapper-Skript-Fix Drift #8 Root Cause"**
+
+## Live-Beobachtungen — 2026-09-15 (Tag 7, Status-Check ohne Code-Edits)
+
+> **Kontext:** Nikinger-Meldung ~17:45–21:00 „Maschine längere Downphase" → Health+Status-Check als Session-Einstieg. **Befund:** VM 15 d stabil (gemeldete Downtime war Remote-Zugang, nicht VM-Outage). 3 neue Drifts in der autonomen Monitoring-/Reporting-Schicht gefunden, alle per Nikinger-Entscheidung dokumentiert+deferred (Phase-16-Block-E läuft, Block-I-Tag-10-Closeout 2026-09-22 ist die nächste zeitlich nicht-blockierte Exec-Session).
+
+### 🟡 Drift #9 — K4 Threshold-Wording Bug (`autonomy_report.py:726`)
+
+- **Code-Stelle:** `threshold=f"≥ {HEARTBEAT_OK_PASS_THRESHOLD} of {len(trading_days)} trading days"` (Plan §33 will „≥ 8 / 10 Handelstage"); Verdict-Logik (Z. 714): `verdict = "PASS" if ok_days >= 8 else "FAIL"` (`HEARTBEAT_OK_PASS_THRESHOLD = 8`, Z. 114)
+- **Bug-Symptom:** Partial-Window-Queries (Operator-Tagesroutine mit `--from Tag-N --to Tag-N+1`) erzeugen Threshold-Strings wie `"≥ 8 of 2 trading days"` (strukturell unerfüllbar) → K4 ist für Tagesroutinen **immer FAIL**, auch wenn alle Tage OK
+- **Live-Beweis Tag 6+7 (Query 09-13→09-15):** `ok_days=2`, beide Tage `per_day_ok_flags={"2026-09-14": true, "2026-09-15": true}`, **Verdict FAIL wegen Schwellwert-Bug, nicht wegen Real-Verhalten**
+- **Fix-Vorschlag (zur Diskussion Block I / Phase 17):** Threshold auf dynamisch `≥ 0.8 × N` ODER explizit `≥ 8 of full_test_window (10)` (immer gegen Full-Window, nie gegen Sub-Window). Achtung: locked-Plan §6 E2 (Prereg-Disziplin) — jede Schwellwert-Änderung ist ein **echter Eingriff** in die Vorregistrierung, braucht explizite Nikinger-Freigabe
+- **Workaround bis Fix:** Tag-Routine-Berichte mit `--from 2026-09-09 --to <heute>` (voller Test-Window) ausführen, dann ist Threshold `≥ 8 of N` sinnvoll
+
+### 🟡 Drift #10 — K2 misst falsche Events (`autonomy_report.py:622-650`)
+
+- **Code-Stelle:** K2 zählt `discovery_heartbeat_event`, `recorder_bars_per_day`, `scheduler_health_events` aus `research_health.jsonl`
+- **Bug-Symptom:** Echte Heartbeats heute vorhanden als `{"event": "measurement_heartbeat", "ok": true, ...}` (z. B. 2026-09-15T17:31:04, `bars_today=457331`, `worst_coverage=0.9958`), werden aber **nicht** von K2 erkannt → gemessene Werte `0/0/0` → K2 immer FAIL obwohl Health-Signal real existiert
+- **Wahrscheinliche Ursache:** K2-Event-Namen veraltet (pre-Phase-14, pre-Migration 009); die echten Heartbeats heißen heute `measurement_heartbeat` mit `ok`-Feld
+- **Fix-Vorschlag (zur Diskussion Block I / Phase 17):** K2 auf `measurement_heartbeat.ok == true` umstellen (Tages-Aggregation); zusätzlich prüfen ob `event: "bar_fetch"` mit `ok:true` als Recorder-Signal zählen sollte
+- **Impact:** K2-Verdict ist aktuell **nicht aussagekräftig** — alle 3 auto-Signale als 0 gemessen, aber Health-OK nachweislich vorhanden
+
+### 🟡 Drift #11 — Report-Filename-Logik überschreibt Vorgänger (`autonomy_report.py` — write-Statement)
+
+- **Code-Stelle:** Filename-Logik schreibt offenbar fixiert auf einen Anker-Datum (vermutlich `--to` oder `today`) — egal welche `--from/--to`-Range gefragt ist
+- **Bug-Symptom:** Query `--from 2026-09-13 --to 2026-09-15` schreibt `data/reports/autonomy_2026-09-13.json` und **überschreibt** den existierenden Tag-5-Report. Operator-Tagesroutine wird riskant, wenn sie versehentlich Partial-Windows re-runt
+- **Reproduziert heute 09-15:** meine Status-Check-Query hat den 09-13-Report überschrieben (nicht destruktiv — Window 09-13→09-15 ist vollständig aus den Roh-Daten reproduzierbar; Tag-5-Original ging verloren)
+- **Fix-Vorschlag (zur Diskussion Block I / Phase 17):** Filename aus Window-Berechnung ableiten (`--from X --to Y` → `autonomy_X_to_Y.json` oder `autonomy_<min-date>_to_<max-date>.json`), plus `--force`/`--no-overwrite`-Flag für Tag-Routine-Schutz
+- **Achtung:** Tag-Routine in Runbook v3 §X ist betroffen — sollte vor jeder Runbook-Iteration (v4) gefixt sein, sonst Audit-Trail-Schaden
+
+### 🟢 Was **nicht** broken ist
+
+- **Token-Budget** (K6) ist **heute sauber**: 287k Mo / 283k Di (Cap 300k) — die C5-Erhöhung von 200k→300k (Plan §1 P3) wirkt.
+- **Bot läuft autonom:** 5 Zyklen LLM_ABSTAIN (legit, DAX-nahe-30d-Tief, keine echte Edge) — Phase-16-Block-D-Defaults greifen (Shadow-Schedule + Paper-Debate aktiv, K2 zeigt 0 heartbeat-events aber Code-Path wird durchlaufen).
+- **Migration 008+009 wirksam:** Schema heute v9 (per CLAUDE.md Korrekturhinweis 2026-09-08, hier nicht reverified — gilt als stable), Backup `data/trading_bot.sqlite.bak-20260905-pre-mig009` ist die Rückfall-Option.
+- **Push-Backlog:** 5 Commits pending (von Session #31) — `git rev-list --left-right --count origin/main...HEAD = 0 5`, working tree clean (außer `data/`-Runtime-Files + sunshine-deb).
+
+### NEXT für nächste Session (unverändert vs Session #31 NEXT-Block)
+
+- **Session #32 (Block I Tag-10-Closeout) — geplant Di 2026-09-22 nach 17:30 Berlin** (zeit-blockiert bis dahin).
+- **Drifts #9/#10/#11** als Agenda-Punkte für Block I / Phase-17-Sammlung mitnehmen.
+- **Drift-#8-Fix-Live-Verifikation:** nächster Restart (Backoff-KILL-Clear oder Reboot) zeigt jetzt `note: "filtered-by-timestamp"` für alle 3 Wrapper-Dienste (alte `run_*.log`-Logs pre-Fix bleiben bis dahin `full-file-count`).
+- **Trigger on-demand:** K4 FAIL ≥ 2 Tage → T-5, K6 FAIL → T-8, erster OPEN-Trade → A6-Live-Verify (Gate P7/A6).
+
+---
 
 ## Session stopped — 2026-09-13 (MiniMax-M3-Exec-Session #31, Phase-16-F-Subphase **Mini-Session „Wrapper-Skript-Fix Drift #8 Root Cause"** — 4 Commits `5cd9168` + `cc73462` + `774a3e1` + `9c323e3` (3 Code + 1 Test), 1 Session-Rotations-Commit; v3 §11 Drift-#8-Fix-Marker **nicht** in v3 eingetragen (Locked-Konvention verlangt v4-Erstellung, Mini-Session-Scope überschritten), stattdessen im Phasenkopf dokumentiert; K1 deterministisch für alle 4 Dienste; Σ 1945 → **1948** [+3 Tests, exakt am F-Exec-Plan-Akzeptanz-Muster]; `bash -n` für jeden Wrapper exit 0; `pytest phase16_activation/tests/test_autonomy_report.py` 10/10 grün; `check_doc_rotation.py --strict --quiet` exit 0)
 
