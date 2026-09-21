@@ -201,3 +201,107 @@ auf tote PIDs. Beide Guards prüfen **Liveness**, nicht Existenz (`run.py:39-46`
 für beide fehl, ein Restart würde sauber durchstarten. **Restrisiko** nach einem Reboot: PID-Reuse —
 wenn ein fremder Prozess dieselbe PID bekommt, verweigert der Daemon den Start mit
 „already running". Heute nicht der Fall.
+
+---
+
+## Session stopped — 2026-09-21 (Opus-5-Session #32, Phase-16-F-Subphase **Tag-9-Status-Check (Block G, no-code)** — 0 Code-Commits, 1 Doc-Commit (dieser Block + Rotation Session #31); **Lauf steht seit Reboot So 2026-09-20 18:29, Montag 09-21 komplett ausgefallen**; 2 neue Struktur-Defekte gefunden (**Drift #12** `NameError: record_event`, 4,37 Mio Tracebacks, 2,37 GB Log · **Drift #13** `_iso_utc_minute` behält ms ⇒ 4,05 Mio Tick-Zeilen als „1m-Bars", 973 MB, Test pinnt den Bug); J1 hält (Bars landen, 0 `ProgrammingError` im laufenden Prozess); K4/yF-Substrat unberührt und ehrlich; 6 Tagesreports nachgeholt (09-14…09-18 + 09-21) ⇒ **K6 an 09-16 + 09-17 gerissen** (Trigger T-8 nie gezogen) und **F8: der Report erkennt einen toten Bot nicht**; Σ **1948 von Session #31 übernommen, diese Session nicht neu gemessen** (kein Test-Touch, keine Suite gelaufen); Session #31 verbatim nach `SESSIONS_ARCHIVE.md` rotiert [32. Eintrag])
+
+> **Auftrag:** Nikinger 2026-09-21 ~19:20 Berlin: „Please do the planned check!" (nach Umzugspause).
+> Ausgeführt: Block-G-Tagesroutine G1/G2/G5 + Health-Check, **read-only**. Keine Restarts, keine
+> Code-Edits, keine Fixes — beides ist Nikinger-Entscheidung, Drift #13 braucht zusätzlich eine
+> P13-Cross-Phase-Freigabe, die nicht vorliegt.
+
+### Completed
+
+1. **G2 Caps-Pin geprüft** — letzte `starting scheduler daemon`-Zeile (Z. 795 707, 2026-09-08 15:27:43)
+   trägt `account=demo, max_trades=5, daily_loss_cap=1800.0, cycle=5min`. ✅
+2. **G5 geprüft** — Log 2,37 GB (Soll < 50 MB) ❌; `ProgrammingError` 98 820, aber **alle** in
+   Zeilen 4 982–795 703 = Vor-J1-Lauf ⇒ im laufenden Prozess 0 ✅. Befund am Prüfverfahren
+   dokumentiert (nie rotiertes Log ⇒ `grep -c` mischt zwei Läufe).
+3. **G1 nachgeholt für 09-14 … 09-18 + 09-21** (6 Reports). Vorher den Write-Pfad gelesen:
+   `autonomy_report.py:992` bildet den Dateinamen aus `args.day or args.from_day`, bei `--day`
+   also **aus dem angefragten Tag** ⇒ **Drift #11 betrifft `--day` nicht**, nur Fenster-Queries
+   (`--from/--to`). Kein bestehender Report überschrieben (`autonomy_2026-09-13.json` unverändert,
+   mtime 2026-09-15). Präzedenz: Session #30 hat 09-10…09-13 genauso nachgeholt. Ergebnis-Tabelle
+   + Befunde F7/F8 im Beobachtungsblock oben.
+4. **Live-Zustand gemessen** — `ps` leer, `last -x reboot` (Shutdown 09-20 12:15 / Boot 18:29),
+   kein systemd-Unit, kein Cron, `uptime` 1 d; letzte Aktivität 09-18 17:33.
+5. **Zwei Struktur-Defekte root-cause-belegt** — Drift #12 (`wiring.py:1240`, latent seit
+   `a58a352`) und Drift #13 (`stream.py:38`, Test `test_stream.py:255` pinnt ihn), beide mit
+   Live-Zahlen und Fix-Pfad im Live-Beobachtungs-Block oben.
+6. **Blast-Radius von Drift #13 eingegrenzt** — `grep` über alle `archive.window(...)`-Aufrufer:
+   `heartbeat.py:175`, `heartbeat.py:338`, `rescue.py:343` lesen `sources=("yf",)`; **kein**
+   Produktions-Konsument liest `source='ls'`. K4 bleibt damit gültig gemessen.
+7. **Tag-Zählung gegen Prereg v2 (Z. 207) verankert** (heute = Tag 9, nicht Tag 11; der 09-15-Block war
+   Tag 5, nicht Tag 7) — dated note im Beobachtungsblock, Block-I-Termin unverändert.
+
+### Findings
+
+🔴 **Der zweite 10-Tage-Lauf ist nicht mehr PASS-fähig** — nicht an Tag 1 wie am 2026-09-08,
+sondern an Tag 9: K5 („ohne Hand") ist gebrochen, sobald jemand neu startet, und AK-G1 verlangt
+10 Tagesreports ohne manuellen Restart. Gültig gemessen sind 8 Handelstage (09-09…09-18).
+
+🔴 **Gleiches Muster wie am 2026-09-08, andere Stelle:** die Kriterien meldeten grün, während das
+Substrat darunter falsch war. Damals schrieb der LS-Pfad nichts; heute schreibt er 140×
+zu viel und das Geschriebene ist keine Minutenkerze. Beide Male hat erst eine Messung am
+laufenden System es gezeigt, keine Statusprosa.
+
+🟢 **J1 (der Fix vom 2026-09-08) hält.** 4,05 Mio `ls`-Zeilen, 0 `ProgrammingError` im laufenden
+Prozess. Der Thread-Bug ist zu; was ihn verdeckt hat, war ein zweiter Bug dahinter.
+
+🔴 **K6 lag 5 Tage unbemerkt rot.** 09-16 und 09-17 haben das 300k-Budget vor Handelsschluss
+geleert (301 225 / 302 892 Tokens bei 113 / 121 Calls). Der vorregistrierte Trigger T-8 wurde nicht
+gezogen — nicht weil er fehlt, sondern weil niemand den Tagesreport erzeugt hat. Die C5-Erhöhung
+200k → 300k reicht an Volltagen nicht.
+
+🔴 **Ein Tagesreport kann „tot" nicht von „ruhig" unterscheiden** (F8): am 09-21 — null Prozesse,
+null Zyklen — meldet er K1 ✅, K5 ✅, K6 ✅, K7 ✅. Für die Neu-Vorregistrierung ist ein echtes
+Liveness-PASS-Kriterium der wichtigste Einzelpunkt.
+
+🟢 **Der Ausfall ist kein Absturz.** Sauberer Shutdown, sauberer Boot, `consecutive_failures=0`,
+`kill_reason=null`. Es fehlt schlicht ein Autostart — vier manuelle `nohup`-Wrapper überleben
+keinen Reboot. Das ist die eigentliche Lehre für die Neu-Vorregistrierung.
+
+### Open questions / blockers
+
+- **Entscheidung Nikinger (1):** Lauf als FAIL abschließen + nach Fix neu vorregistrieren (Muster
+  2026-09-08, dann `PHASE16_AUTONOMY_PREREGISTRATION_v3.md`), **oder** ungefixt neu starten und
+  Tag 9 als Loch dokumentieren.
+- **Entscheidung Nikinger (2):** Cross-Phase-Freigabe **P13** (`live_data/stream.py` +
+  `phase13_live_data/tests/test_stream.py`) für den Drift-#13-Fix. Ohne sie bleibt der Defekt offen.
+- **Entscheidung Nikinger (3):** Autostart (systemd-Unit je Dienst) — heute existiert keiner;
+  ohne ihn kostet jeder Reboot den Lauf.
+- **Entscheidung Nikinger (4):** Aufräumen von `data/state/run_scheduler.log` (2,37 GB) und der
+  4,05 Mio Tick-Zeilen in `data/bars.sqlite` (973 MB) — destruktiv, daher nicht ohne Freigabe.
+- **Block I Tag-10-Closeout (Di 2026-09-22)** steht terminlich, hat aber jetzt einen anderen
+  Inhalt: kein „10 Tage sauber gelaufen"-Abschluss, sondern ein Closeout mit dokumentiertem
+  Abbruch (analog 2026-09-08).
+- **Unverändert offen:** Drifts #9/#10/#11 (deferred 2026-09-15), Drift-#8-Fix live nicht
+  verifiziert (braucht Restart), Gate P7/A6 (wartet auf ersten OPEN-Trade).
+
+### NEXT (für die nächste Session)
+
+1. **Nikinger-Entscheidungen (1)–(4) oben einholen** — alles Weitere hängt daran.
+2. **Bei Freigabe „fixen":** Drift #12 (P8, unblocked, lokaler Import wie `wiring.py:906/1136`,
+   + 1 Regressionstest) und Drift #13 (**nur mit P13-Freigabe**: `.000Z` konstant in
+   `_iso_utc_minute`, `test_stream.py:255` mit-korrigieren, +1 Test „zwei Ticks derselben Minute
+   ⇒ eine Bar mit `tick_count=2`"). Σ-Erwartung 1948 → ~1951.
+3. **T-8 (K6) nachziehen** — 300k reicht an Volltagen nicht (09-16/09-17). Entweder Cap hoch,
+   Call-Zahl runter (113–121/Tag) oder K6-Schwelle in der Neu-Vorregistrierung neu setzen.
+4. **Liveness-PASS-Kriterium** in die Neu-Vorregistrierung aufnehmen (F8).
+5. **Danach:** Autostart einrichten, Log rotieren, Lauf neu vorregistrieren, Tag 1 neu takten.
+6. **Session #33 = Block I** (Closeout), Inhalt wie unter „Open questions" beschrieben.
+
+**Push-Status:** vor dieser Session 5 Commits pending (Session #31); diese Session fügt 1
+Doc-Commit hinzu. Nikinger pusht.
+
+**Block-Status nach Session #32:**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ (Session #1-#4) |
+| B (Substrat) | ✅ (Session #3) |
+| C (Research-Loop) | ✅ (Sessions #3-#7) |
+| D (Freischaltung) | ✅ (Session #7-#17) |
+| E (2-Wochen-Test) | 🔴 **abgebrochen an Tag 9** (Reboot 09-20 ohne Autostart) — 8 gültige Handelstage, Entscheidung über Neu-Vorregistrierung offen |
+| F (Subphase) | 🔄 — G Tag 1 ✅, H ✅ (#28-#29), Quick ✅ (#30), Mini ✅ (#31), **Status-Check ✅ (#32)**, I (#33) |
