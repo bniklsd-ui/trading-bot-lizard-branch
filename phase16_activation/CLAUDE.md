@@ -292,8 +292,11 @@ keinen Reboot. Das ist die eigentliche Lehre für die Neu-Vorregistrierung.
 5. **Danach:** Autostart einrichten, Log rotieren, Lauf neu vorregistrieren, Tag 1 neu takten.
 6. **Session #33 = Block I** (Closeout), Inhalt wie unter „Open questions" beschrieben.
 
-**Push-Status:** vor dieser Session 5 Commits pending (Session #31); diese Session fügt 1
-Doc-Commit hinzu. Nikinger pusht.
+**Push-Status:** die 5 Session-#31-Commits sind gepusht (`origin/main` = `ca4e6ea` beim
+Session-Start). Diese Session fügt **4 Doc-Commits** hinzu (`8ae8bb5` Befunde + `32ae173`
+Nachtrag + `81e1481` Block-Wiederherstellung + `4f6d000` Header-Card) — `git rev-list
+--left-right --count origin/main...HEAD` = `0 4`. Nikinger pusht. Kein Code-Touch, kein
+Test-Touch; `data/reports/*.json` ist gitignored.
 
 **Block-Status nach Session #32:**
 
