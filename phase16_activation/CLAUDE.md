@@ -204,7 +204,7 @@ wenn ein fremder Prozess dieselbe PID bekommt, verweigert der Daemon den Start m
 
 ---
 
-## Session stopped — 2026-09-21 (Opus-5-Session #32, Phase-16-F-Subphase **Tag-9-Status-Check (Block G, no-code)** — 0 Code-Commits, 1 Doc-Commit (dieser Block + Rotation Session #31); **Lauf steht seit Reboot So 2026-09-20 18:29, Montag 09-21 komplett ausgefallen**; 2 neue Struktur-Defekte gefunden (**Drift #12** `NameError: record_event`, 4,37 Mio Tracebacks, 2,37 GB Log · **Drift #13** `_iso_utc_minute` behält ms ⇒ 4,05 Mio Tick-Zeilen als „1m-Bars", 973 MB, Test pinnt den Bug); J1 hält (Bars landen, 0 `ProgrammingError` im laufenden Prozess); K4/yF-Substrat unberührt und ehrlich; 6 Tagesreports nachgeholt (09-14…09-18 + 09-21) ⇒ **K6 an 09-16 + 09-17 gerissen** (Trigger T-8 nie gezogen) und **F8: der Report erkennt einen toten Bot nicht**; Σ **1948 von Session #31 übernommen, diese Session nicht neu gemessen** (kein Test-Touch, keine Suite gelaufen); Session #31 verbatim nach `SESSIONS_ARCHIVE.md` rotiert [32. Eintrag])
+## Session stopped — 2026-09-21 (Opus-5-Session #32, Phase-16-F-Subphase **Tag-9-Status-Check (Block G, no-code)** — 0 Code-Commits, 1 Doc-Commit (dieser Block + Rotation Session #31); **Lauf steht seit Reboot So 2026-09-20 18:29, Montag 09-21 komplett ausgefallen**; 2 neue Struktur-Defekte gefunden (**Drift #12** `NameError: record_event`, 4,37 Mio Tracebacks, 2,37 GB Log · **Drift #13** `_iso_utc_minute` behält ms ⇒ 4,05 Mio Tick-Zeilen als „1m-Bars", 973 MB, Test pinnt den Bug); J1 hält (Bars landen, 0 `ProgrammingError` im laufenden Prozess); K4/yF-Substrat unberührt und ehrlich; 6 Tagesreports nachgeholt (09-14…09-18 + 09-21) ⇒ **K6 an 09-16 + 09-17 gerissen** (Trigger T-8 nie gezogen) und **F8: der Report erkennt einen toten Bot nicht**; Σ **1948 heute selbst gemessen** (16 Suites einzeln, kein Test-Touch); Session #31 verbatim nach `SESSIONS_ARCHIVE.md` rotiert [32. Eintrag])
 
 > **Auftrag:** Nikinger 2026-09-21 ~19:20 Berlin: „Please do the planned check!" (nach Umzugspause).
 > Ausgeführt: Block-G-Tagesroutine G1/G2/G5 + Health-Check, **read-only**. Keine Restarts, keine
@@ -281,7 +281,12 @@ keinen Reboot. Das ist die eigentliche Lehre für die Neu-Vorregistrierung.
 
 ### NEXT (für die nächste Session)
 
-1. **Nikinger-Entscheidungen (1)–(4) oben einholen** — alles Weitere hängt daran.
+0. **Entscheidungen liegen vor (Nikinger 2026-09-21):** fixen + 10 Tage neu starten · **P13
+   freigegeben** (Teilplan nach den 10 Tagen vorbehalten) · Autostart bauen · **archivieren statt
+   löschen** · **kein Closeout jetzt**. Daraus entstand
+   [`PHASE16_R_EXEC_PLAN.md`](./PHASE16_R_EXEC_PLAN.md) (Blöcke R0–R7, Σ-Baseline 1948 gemessen,
+   Ziel 1959) — **wartet auf Freigabe, noch kein Code-Edit.**
+1. ~~Nikinger-Entscheidungen einholen~~ ✅ erledigt (siehe 0).
 2. **Bei Freigabe „fixen":** Drift #12 (P8, unblocked, lokaler Import wie `wiring.py:906/1136`,
    + 1 Regressionstest) und Drift #13 (**nur mit P13-Freigabe**: `.000Z` konstant in
    `_iso_utc_minute`, `test_stream.py:255` mit-korrigieren, +1 Test „zwei Ticks derselben Minute
