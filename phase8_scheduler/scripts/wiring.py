@@ -805,6 +805,25 @@ def _observed_context_recorder(inner: Any, observability_path: str) -> Any:
     return _Observed()
 
 
+def _ls_health_sink(observability_path: str) -> Callable[[dict[str, Any]], None]:
+    """Build the health-sink callback for the LS tick-aggregator recorder.
+
+    Module-level so the ``record_event`` import (done locally by every other caller in this
+    file — Z. 230/653/756/791/906/1136) is testable in isolation: the call site inside
+    ``_build_recorder`` (below, in ``build_scheduler``) is a closure three levels deep that
+    needs a live broker to reach, so a missing import there fails silently until a bar is
+    written in production. Drift #12 (Phase 16, Session #32): this import was missing outright
+    for the life of the LS bar-stream feature (Phase 13 commit a58a352), producing a NameError
+    on every write that the surrounding ``except Exception`` mislabeled as an archive failure.
+    """
+    from scheduler.observability import record_event
+
+    def _sink(event: dict[str, Any]) -> None:
+        record_event(observability_path, event)
+
+    return _sink
+
+
 def build_scheduler(
     config: SchedulerConfig,
     *,
@@ -1237,9 +1256,7 @@ def build_scheduler(
                 archive=bar_archive,
                 epics_fn=_epics_in_measurable,
                 resolution="1m",
-                health_sink=lambda ev: record_event(
-                    config.observability_path, ev,
-                ),
+                health_sink=_ls_health_sink(config.observability_path),
             )
 
         try:
