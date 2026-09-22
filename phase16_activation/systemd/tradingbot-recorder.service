@@ -1,0 +1,26 @@
+[Unit]
+Description=Trading-Bot Recorder (Phase 12, yFinance bars)
+Documentation=file:///home/trading-bot/trading-bot/phase16_activation/PHASE16_R_EXEC_PLAN.md
+# Session-scoped for the same reason as tradingbot-scheduler.service: the
+# Secret Service lives in the graphical session (see that unit's comment).
+After=graphical-session.target gnome-keyring-daemon.service
+PartOf=graphical-session.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+# The wrapper is the canonical single-process start point (it carries the
+# venv PATH prepend and the cd) and it exec's python, so it stays PID 1 of
+# this unit -- Type=simple is correct, no forking.
+ExecStart=/home/trading-bot/trading-bot/phase12_data_foundation/scripts/run_recorder.sh
+# Same log file name the nohup path used -- autonomy_report.py K1 counts the
+# wrapper's start-line in data/state/run_recorder.log.
+StandardOutput=append:/home/trading-bot/trading-bot/data/state/run_recorder.log
+StandardError=append:/home/trading-bot/trading-bot/data/state/run_recorder.log
+Restart=on-failure
+RestartSec=30
+SuccessExitStatus=143
+
+[Install]
+WantedBy=graphical-session.target

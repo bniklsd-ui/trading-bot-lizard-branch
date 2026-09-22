@@ -1,0 +1,35 @@
+[Unit]
+Description=Trading-Bot Scheduler (Phase 8)
+Documentation=file:///home/trading-bot/trading-bot/phase16_activation/PHASE16_R_EXEC_PLAN.md
+# The daemon reads its IG/Anthropic credentials from the Secret Service
+# (gnome-keyring), which is a *graphical-session* user unit unlocked by
+# gdm-autologin. The session -- not network.target -- is the real dependency:
+# on 2026-09-20 default.target was reached at 18:29:07 and
+# graphical-session.target at 18:29:10, so a default.target unit would race
+# the keyring and die on the fail-closed credential preflight.
+After=graphical-session.target gnome-keyring-daemon.service
+PartOf=graphical-session.target
+# R5.5: a flapping service must stop and be noticed, not rack up start-lines
+# (K1 allows <= 2 starts/day). StartLimit* belong in [Unit], not [Service].
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+# Mirrors phase8_scheduler/scripts/run_scheduler.sh MINUS its two nohup lines:
+# the Recorder (Phase 12) and the Discovery daemon (Phase 14) have their own
+# units here, so the wrapper's child-spawning would double-start them inside
+# this unit's cgroup. The wrapper stays unchanged as the manual path
+# (scripts/restart-services.sh). Keep argv in sync with it.
+WorkingDirectory=/home/trading-bot/trading-bot/phase8_scheduler
+ExecStart=/home/trading-bot/trading-bot/phase1_broker_wrapper/.venv/bin/python -m scheduler.run
+# Same log file the nohup path wrote: autonomy_report.py K1/K5/K8 read
+# data/state/run_scheduler.log by name. Journal-only output would blind them.
+StandardOutput=append:/home/trading-bot/trading-bot/data/state/run_scheduler.log
+StandardError=append:/home/trading-bot/trading-bot/data/state/run_scheduler.log
+Restart=on-failure
+RestartSec=30
+SuccessExitStatus=143
+
+[Install]
+WantedBy=graphical-session.target
