@@ -1,5 +1,5 @@
 ---
-status: plan (Entwurf — wartet auf Nikinger-Freigabe)
+status: plan (R0-R4 ausgeführt, Session #33 2026-09-22 — R5-R7 offen)
 purpose: Exec-Plan der Phase-16-R-Subphase — Reparatur der beiden am 2026-09-21 gefundenen Struktur-Defekte (Drift #12 `record_event`-NameError, Drift #13 Tick-statt-Minuten-Bar), Reparatur der Report-Tool-Drifts #9/#11, Archivierung statt Löschung von 2,37 GB Log + 4,06 Mio Tick-Zeilen, systemd-Autostart für alle vier Dienste, Prereg v3 und Neustart des 10-Handelstage-Laufs ab Tag 1.
 read-when: Ausführung der Phase-16-R-Subphase; VOR jedem Edit an wiring.py, stream.py, autonomy_report.py, an den systemd-Units oder an der Vorregistrierung
 detail: L2
