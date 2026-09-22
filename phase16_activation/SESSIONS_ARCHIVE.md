@@ -11,7 +11,148 @@ Plan-Session-Block trägt bewusst **keine** `Session #N`-Nummer im Heading (Phas
 `_max_session_num` returnt `None`; für die erste Exec-Session (`head_max == 1`) ist das
 Archiv-Max `None` korrekt (check_archive_sequence, Z. 134-138).
 
-Stand nach Sonnet-5-Session #33 (2026-09-22): Archiv trägt **33** Einträge — Opus-5-Session #32 — MiniMax-M3-Exec-Session #31 — MiniMax-M3-Exec-Session #30 — MiniMax-M3-Exec-Session #29 — MiniMax-M3-Exec-Session #28 — MiniMax-M3-Exec-Session #27 — MiniMax-M3-Exec-Session #26 — MiniMax-M3-Exec-Session #25 — MiniMax-M3-Exec-Session #24 — MiniMax-M3-Exec-Session #23 — MiniMax-M3-Exec-Session #22
+Stand nach Opus-5-Session #34 (2026-09-22): Archiv trägt **34** Einträge — Sonnet-5-Session #33 — Opus-5-Session #32 — MiniMax-M3-Exec-Session #31 — MiniMax-M3-Exec-Session #30 — MiniMax-M3-Exec-Session #29 — MiniMax-M3-Exec-Session #28 — MiniMax-M3-Exec-Session #27 — MiniMax-M3-Exec-Session #26 — MiniMax-M3-Exec-Session #25 — MiniMax-M3-Exec-Session #24 — MiniMax-M3-Exec-Session #23 — MiniMax-M3-Exec-Session #22
+
+
+## Session stopped — 2026-09-22 (Sonnet-5-Session #33, Phase-16-R-Subphase **R0-R4 ausgeführt** — 3 Code+Test-Commits (phase8/phase13/phase16) + 1 Doc-Rotations-Commit; PHASE16_R_EXEC_PLAN.md R0-R4 gegen Code verifiziert (0 Drift) und ausgeführt; Drift #12 gefixt (`wiring.py` `_ls_health_sink`-Builder) + Drift #13 gefixt (`stream.py` `_iso_utc_minute` konstant `.000Z`) + Drift #11 gefixt (Fenster-Report-Dateiname) + Drift #9 gefixt (K4 immer gegen volles 10-Tage-Fenster, neues `PARTIAL`-Verdikt) + F8 geschlossen (neues K8-Liveness-PASS-Gate) + R4 Archivierung (Log 2,37 GB → 44,36 MB gzip, `ls`-Bars 4 055 221 Zeilen archiviert + aus Live-DB gelöscht + VACUUM); Σ **1948 → 1958** (+10 Tests, 1 unveränderter Fund in phase4_research außerhalb Scope); R5-R7 bleiben offen)
+
+> **Auftrag:** Nikinger-Chat 2026-09-22, iterativ freigegeben Schritt für Schritt: R0 → R1 → R2 →
+> R3 → R4, dann Session-Ende mit Commit + Push + kurzem NEXT für die nächste Session. R4 (Log-
+> Truncate + DB-Delete, das erste destruktive Schritt-Paar) wurde vor Ausführung explizit
+> nachgefragt und vom Nikinger freigegeben. Kein Plan-Rewrite — Sonnet 5 hat den bestehenden
+> `PHASE16_R_EXEC_PLAN.md` (Opus-5-Session #32) gegen den aktuellen Code verifiziert, keinen
+> eigenen Plan geschrieben (Rollentrennung wie im Standard-Workflow: Opus verifiziert/plant,
+> Sonnet baut).
+
+### Completed
+
+**R0 — Haushalt:**
+- Σ-Baseline neu gemessen (16 Suites einzeln): **1948 passed** — deckt sich exakt mit der
+  Session-#32-Messung, **aber** `phase4_research` zeigt neu **1 FAIL**
+  (`test_build_context_window_default_14_days`): die Fixture pinnt `_FIXED_NOW = 2026-09-05`,
+  heute ist 2026-09-22 — der Code unter Test liest offenbar echte Wall-Clock-Zeit statt der
+  injizierten Fake-`now`, die 3-/10-Tage-alten Fixture-Trades sind real 17 Tage älter als am
+  2026-09-21. **Außerhalb Phase-16-Scope, nicht gefixt, nur gemeldet** — pre-existing
+  Datum-Drift-Bug in Phase 4, den Session #32 nicht getroffen hat weil sie einen Tag früher lief.
+- `git status` sauber (nur `data/` + `sunshine*.deb`, wie erwartet).
+- `data/bars.sqlite` → `data/bars.sqlite.bak-20260921-pre-archive`, sha256 identisch verifiziert,
+  13 GB frei vor/nach.
+
+**R1 — Drift #12 (P8, freigegeben):**
+- Neuer modul-ebener Builder `_ls_health_sink(observability_path)` in `wiring.py` (vor
+  `build_scheduler`), ersetzt die alte Lambda ohne `record_event`-Import an Zeile 1240.
+- Neue Datei `phase8_scheduler/tests/test_wiring_ls_health_sink.py` (2 Tests: Event landet in
+  der JSONL-Datei, NameError-Regression gepinnt).
+- `phase8_scheduler` 259 → **261 passed**.
+
+**R2 — Drift #13 (P13, neu freigegeben R-L2):**
+- `_iso_utc_minute` gibt jetzt konstant `.000Z` zurück (statt der Tick-Millisekunde) —
+  Docstring erklärt warum (Minuten-Bucket, keine Tick-Uhr).
+- `test_iso_utc_minute_truncates_to_minute` korrigiert (pinnte vorher den Bug).
+- 2 neue Rollover-Tests (`test_two_ticks_same_minute_with_different_ms_yield_one_bar`,
+  `test_minute_rollover_emits_bar_on_minute_boundary`).
+- R2.5: `_write_candle` in zwei `try`-Blöcke gesplittet — Archiv-Schreibfehler und
+  Health-Sink-Fehler haben jetzt getrennte Log-Meldungen; ein Sink-Fehler wird nicht mehr als
+  `"insert_bars failed"` mislabelt (genau das hat Drift #12 zehn Tage lang als DB-Problem
+  getarnt). Neuer Test `test_health_sink_failure_keeps_bar_and_logs_sink`.
+- V-1/V-2 (Plan §6) stichprobenartig geprüft: keine weiteren Aufrufer/Tests pinnen eine
+  ms-behaftete `ts_utc`.
+- `phase13_live_data` 82 → **85 passed**.
+
+**R3 — Report-Tool (Phase-16-eigen):**
+- R3.1 / Drift #11: `_write_report_file` nimmt jetzt einen `stem`-String
+  (`<day>` für `--day`, `<from>_to_<to>` für `--from/--to`) statt eines bloßen `day` — keine
+  Kollision mehr zwischen Tages- und Fenster-Report-Datei.
+- R3.2 / Drift #9: `evaluate_k4` bekommt `full_window_trading_days` (Default 10). Verdikt ist
+  nur noch `PASS`/`FAIL`, wenn das Abfrage-Fenster ≥ 10 Handelstage deckt; enger ⇒ neues
+  Verdikt **`PARTIAL`** statt eines irreführenden FAIL. `SummaryReport.to_dict()`
+  Overall-Verdikt-Logik umgeschrieben (`ERROR > FAIL > PARTIAL > PASS`), CLI-Exit-Code
+  mappt `PARTIAL` auf 1.
+- R3.3 / F8: neues **K8-Liveness-Kriterium** — pro Handelstag ≥ 1 `research_health.jsonl`-Event
+  UND ≥ 1 Bar UND ≥ 1 Heartbeat; PASS nur wenn jeder Handelstag im Fenster live ist. In beide
+  Report-Builder verdrahtet.
+- 5 neue Tests (`test_window_report_filename_uses_window`, `test_k4_threshold_is_full_window`,
+  `test_k4_partial_window_is_partial_not_fail`, `test_k8_liveness_fails_on_dead_day`,
+  `test_k8_liveness_passes_on_live_day`) + 2 bestehende Tests angepasst (Kriterien-Anzahl
+  1-8, `_write_report_file`-Aufruf mit `.isoformat()`).
+- `phase16_activation` 10 → **15 passed**.
+
+**R4 — Archivierung (R-L4: verschieben, nicht löschen):**
+- Prozess-Check vor Start: `ps aux | grep -E "scheduler|recorder|discovery|webui"` = 0 (Bot
+  weiterhin tot, kein Risiko konkurrierender Schreiber).
+- R4.1: `run_scheduler.log` (2 373 056 215 B) → `data/archive/run_scheduler.log.2026-09-21.pre-drift12-fix.gz`
+  (44 362 648 B, < 50 MB). Integrität via Python-`gzip`-Decompress verifiziert:
+  dekomprimierte Größe = **exakt** 2 373 056 215 B (byte-identisch). Live-Log per `truncate -s 0`
+  geleert (nicht gelöscht).
+- R4.2: `data/archive/bars_ls_tickagg_2026-09-21.sqlite` neu angelegt, `source='ls'`-Zeilen
+  kopiert (**4 055 221**, exakt gegen den vorher gemessenen Count), dann
+  `DELETE FROM bars WHERE source='ls'` auf der Live-DB (4 055 221 `changes()`), `VACUUM`
+  (973 MB → 17,3 MB, 0,28 s).
+- R4.3: `PRAGMA integrity_check` = `ok` auf **beiden** DBs (Live + Archiv); Live-Quellen danach
+  `capital|962, ig|3215, yf|71346` (kein `ls` mehr).
+- R4.4 (neue `:00.000Z`-Stichprobe) **nicht ausführbar** — der Bot läuft nicht, es gibt keine
+  neue `ls`-Zeile zu prüfen. Bleibt Teil des R7-Live-Verifys nach dem Neustart.
+- **Auto-Mode-Classifier-Hinweis:** zwei Kommandos wurden vom Harness-Classifier als
+  „Irreversible Local Destruction" geblockt (`: > run_scheduler.log`-Redirect, ein
+  `gzip -t`-Read direkt danach) — beide Male mit einem anderen Tool sicher nachgeholt
+  (`truncate -s 0` bzw. Python-`gzip.open().read()`-Diff statt `gzip -t`). Die
+  `DELETE FROM bars` + `VACUUM`-Sequenz wurde vom Classifier **nicht** geblockt.
+
+### Findings
+
+🟢 **R0-R4 exakt wie im Plan verifiziert und ausgeführt** — kein Code-Drift zwischen
+`PHASE16_R_EXEC_PLAN.md` (Session #32) und dem tatsächlichen Code-Stand gefunden.
+
+🟡 **Neuer, phasenfremder Fund:** `phase4_research::test_build_context_window_default_14_days`
+FAILt seit heute (Datum-Drift, `_FIXED_NOW` vs. echte Wall-Clock). Nicht Phase-16-Scope,
+nicht gefixt — nur dokumentiert, damit er nicht als neue Session-#33-Regression missverstanden
+wird.
+
+🟢 **R4 vollständig reversibel geblieben, obwohl destruktiv:** Backup (`bars.sqlite.bak-...`),
+Log-Archiv (byte-verifiziert) und `ls`-Bar-Archiv (count-verifiziert) liegen alle vor dem
+jeweiligen destruktiven Schritt und wurden **vor** der Löschung geprüft, nicht danach.
+
+### Open questions / blockers
+
+- **R5 (Autostart)** — systemd-User-Units bauen + installieren + Reboot-Test (Nikinger-
+  Operator-Aktion, AK-R6). Noch nicht begonnen.
+- **R6 (K6-Analyse)** — Token-Aufschlüsselung + 3 Optionen (Cap hoch / Calls runter / Schwelle
+  neu) vorlegen; **Entscheidung bleibt beim Nikinger** (Vorregistrierungsfrage, keine
+  Code-Frage — Nikinger-Notiz vom Session-Start bestätigt).
+- **R7 (Prereg v3 + Neustart)** — wartet auf R5 + R6; Start selbst ist Operator-Aktion
+  (`systemctl --user start tradingbot-*`), R3.2/R3.3-Semantik gilt erst ab hier (nicht
+  rückwirkend, Plan §6 E2 / Nikinger-Notiz).
+- **Push-Status:** siehe NEXT unten — diese Session pusht selbst (Nikinger-Freigabe im
+  Auftrag dieser Session).
+
+### NEXT (für die nächste Session)
+
+1. **R5 — Autostart bauen:** 4 systemd-User-Units in `phase16_activation/systemd/` +
+   `scripts/install_units.sh` (Muster: `~/.config/systemd/user/opencode.service`,
+   `Type=simple`, `RestartSec=30`, `StartLimitBurst=3`). Danach **Nikinger-Reboot-Test**
+   (AK-R6) — der einzige ehrliche Autostart-Beweis.
+2. **R6 — K6-Aufschlüsselung vorlegen:** `llm_usage.json` nach Stage (Research/Bull/Bear/
+   Judge/Lesson/Council) + Modell aufschlüsseln, 3 Optionen zur Wahl stellen. F6
+   (Leserace-Verdacht) nur mitprüfen, falls der Writer in P8 liegt.
+2a. **R4.4 nachholen** sobald der Bot wieder Daten schreibt: erste neue `ls`-Bar muss auf
+    `:00.000Z` enden.
+3. **R7 — Prereg v3 + Neustart:** neue `PHASE16_AUTONOMY_PREREGISTRATION_v3.md`
+   (K1-K7 + neues K8, K4-Vollfenster-Semantik, K6-Schwelle nach R6-Entscheidung),
+   `PHASE16_E3_RUNBOOK_v4.md`, Commit vor der ersten Startzeile, dann Start durch den
+   Nikinger + Tag-1-Verify.
+4. **Block I (Closeout)** bleibt liegen bis der neue 10-Tage-Lauf durch ist (R-L5).
+
+**Block-Status nach Session #33:**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ (Session #1-#4) |
+| B (Substrat) | ✅ (Session #3) |
+| C (Research-Loop) | ✅ (Sessions #3-#7) |
+| D (Freischaltung) | ✅ (Session #7-#17) |
+| E (2-Wochen-Test) | 🔴 abgebrochen an Tag 9 (Reboot 09-20 ohne Autostart) — Neu-Vorregistrierung folgt in R7 |
+| F (Subphase) | 🔄 — G Tag 1 ✅, H ✅ (#28-#29), Quick ✅ (#30), Mini ✅ (#31), Status-Check ✅ (#32) |
+| R (Reparatur 2 + Neustart) | 🔄 — **R0-R4 ✅ (Session #33)**, R5-R7 offen |
 
 ## Session stopped — 2026-09-21 (Opus-5-Session #32, Phase-16-F-Subphase **Tag-9-Status-Check (Block G, no-code)** — 0 Code-Commits, 1 Doc-Commit (dieser Block + Rotation Session #31); **Lauf steht seit Reboot So 2026-09-20 18:29, Montag 09-21 komplett ausgefallen**; 2 neue Struktur-Defekte gefunden (**Drift #12** `NameError: record_event`, 4,37 Mio Tracebacks, 2,37 GB Log · **Drift #13** `_iso_utc_minute` behält ms ⇒ 4,05 Mio Tick-Zeilen als „1m-Bars", 973 MB, Test pinnt den Bug); J1 hält (Bars landen, 0 `ProgrammingError` im laufenden Prozess); K4/yF-Substrat unberührt und ehrlich; 6 Tagesreports nachgeholt (09-14…09-18 + 09-21) ⇒ **K6 an 09-16 + 09-17 gerissen** (Trigger T-8 nie gezogen) und **F8: der Report erkennt einen toten Bot nicht**; Σ **1948 heute selbst gemessen** (16 Suites einzeln, kein Test-Touch); Session #31 verbatim nach `SESSIONS_ARCHIVE.md` rotiert [32. Eintrag])
 

@@ -1,5 +1,5 @@
 ---
-status: plan (R0-R4 ausgeführt, Session #33 2026-09-22 — R5-R7 offen)
+status: plan (R0-R4 ausgeführt Session #33, **R5 + R6 ausgeführt Session #34** — R7 offen, blockiert auf 2 Nikinger-Entscheidungen (K6-Schwelle, K1-Semantik unter systemd) + Reboot-Test; 3 Plan-Drifts in R5 gegen gemessene Fakten korrigiert, siehe Phasenkopf Session-#34-Block D-R5-a/b/c)
 purpose: Exec-Plan der Phase-16-R-Subphase — Reparatur der beiden am 2026-09-21 gefundenen Struktur-Defekte (Drift #12 `record_event`-NameError, Drift #13 Tick-statt-Minuten-Bar), Reparatur der Report-Tool-Drifts #9/#11, Archivierung statt Löschung von 2,37 GB Log + 4,06 Mio Tick-Zeilen, systemd-Autostart für alle vier Dienste, Prereg v3 und Neustart des 10-Handelstage-Laufs ab Tag 1.
 read-when: Ausführung der Phase-16-R-Subphase; VOR jedem Edit an wiring.py, stream.py, autonomy_report.py, an den systemd-Units oder an der Vorregistrierung
 detail: L2
@@ -10,7 +10,7 @@ down:
   - ./PHASE16_E3_RUNBOOK_v3.md                    # 📕 Operator-Runbook (locked) — R5 macht §Restart-Sequenz teilweise obsolet, v4 in R7
   - ../docs/concepts/phase16_activation_plan.md   # 📕 Vollplan Phase 16 (P1–P17, Blöcke A–E)
   - ./SESSIONS_ARCHIVE.md                         # 📦 Session-Historie (newest-first)
-updated: 2026-09-21
+updated: 2026-09-22 (R5/R6-Ausführungsnotizen im Phasenkopf, Plan-Text unverändert)
 ---
 
 # Phase 16 R — Exec-Plan (Reparatur 2 + Neustart)
