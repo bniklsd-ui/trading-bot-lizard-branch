@@ -268,8 +268,8 @@ def test_day_report_against_fixture_db(tmp_path: Path) -> None:
     )
     payload = rep.to_dict()
     assert payload["day"] == day.isoformat()
-    # All 7 criteria present
-    assert set(payload["criteria"].keys()) == {str(i) for i in range(1, 8)}
+    # All 8 criteria present (K8 liveness added Phase 16 R3.3)
+    assert set(payload["criteria"].keys()) == {str(i) for i in range(1, 9)}
     # K3: 3 autonomous trades on that day
     assert payload["criteria"]["3"]["measured"]["in_window_total"] == 3
     # K2: scheduler has 1 health_event + recorder wrote ≥ 1 bar → 3/3 auto signals
@@ -284,7 +284,7 @@ def test_day_report_against_fixture_db(tmp_path: Path) -> None:
     out = reports_dir / f"autonomy_{day.isoformat()}.json"
     assert not out.exists()  # _write_report_file only fires in CLI main(); OK here
     out.parent.mkdir(parents=True, exist_ok=True)
-    autonomy_report._write_report_file(reports_dir, day, payload)
+    autonomy_report._write_report_file(reports_dir, day.isoformat(), payload)
     assert out.exists()
     loaded = json.loads(out.read_text())
     assert loaded["day"] == day.isoformat()
@@ -694,3 +694,97 @@ def test_k1_wrapper_mixed_timestamped_and_untimestamped(tmp_path: Path) -> None:
         f"timestamped line exists; got {result.measured['recorder']['note']!r}"
     )
     assert result.verdict == "PASS"
+
+
+# -- Phase 16 R3.1 (Drift #11) / R3.2 (Drift #9) / R3.3 (F8, K8) --------------
+
+
+def test_window_report_filename_uses_window(tmp_path: Path) -> None:
+    """Drift #11 regression: a ``--from/--to`` window report must not collide with
+    the single-day report filename for the same ``from_day``. Before the fix both
+    wrote ``autonomy_<from_day>.json``, silently overwriting the day report."""
+    reports_dir = tmp_path / "reports"
+    day = date(2026, 9, 8)
+    to_day = date(2026, 9, 9)
+    day_stem = day.isoformat()
+    window_stem = f"{day.isoformat()}_to_{to_day.isoformat()}"
+
+    day_path = autonomy_report._write_report_file(reports_dir, day_stem, {"kind": "day"})
+    window_path = autonomy_report._write_report_file(reports_dir, window_stem, {"kind": "window"})
+
+    assert day_path != window_path
+    assert day_path.name == "autonomy_2026-09-08.json"
+    assert window_path.name == "autonomy_2026-09-08_to_2026-09-09.json"
+    # The day report survives the window write — no overwrite.
+    assert json.loads(day_path.read_text())["kind"] == "day"
+    assert json.loads(window_path.read_text())["kind"] == "window"
+
+
+def test_k4_threshold_is_full_window() -> None:
+    """Drift #9 regression: the threshold string and verdict must always read against
+    the full registered 10-day window, never against a queried sub-window's own day
+    count. A clean 10-trading-day window with 8+ ok-days PASSes with that fixed
+    threshold text."""
+    from_day = date(2026, 9, 8)
+    to_day = date(2026, 9, 21)  # 10 trading days
+    days = [d for d in autonomy_report._iter_trading_days(from_day, to_day)]
+    assert len(days) == 10
+    health_evidence = {d: (1, 1) for d in days[:8]}  # 8 ok, 2 missing
+    result = autonomy_report.evaluate_k4(
+        Path("/nonexistent"), from_day, to_day, health_evidence=health_evidence,
+    )
+    assert "of 10 trading days" in result.threshold
+    assert result.measured["full_window_trading_days"] == 10
+    assert result.verdict == "PASS"
+
+
+def test_k4_partial_window_is_partial_not_fail() -> None:
+    """Drift #9 regression: a query narrower than the full registered window (e.g. a
+    single ``--day`` report, or the 8-valid-day window Session #32 actually measured)
+    must report PARTIAL, not a misleading FAIL against a threshold it can't satisfy
+    by construction."""
+    day = date(2026, 9, 8)
+    result = autonomy_report.evaluate_k4(
+        Path("/nonexistent"), day, day, health_evidence={day: (1, 1)},
+    )
+    assert result.measured["trading_days_considered"] == 1
+    assert result.verdict == "PARTIAL"
+    assert result.verdict != "FAIL"
+
+
+def test_k8_liveness_fails_on_dead_day(tmp_path: Path) -> None:
+    """F8 regression: a day with zero scheduler/recorder/heartbeat evidence must
+    FAIL K8 — this is the exact 2026-09-21 shape (0 processes, 0 cycles, 0 bars),
+    which K1/K5/K6/K7 all read as PASS."""
+    state_dir = tmp_path / "state"
+    bars_db = tmp_path / "bars.sqlite"
+    day = date(2026, 9, 21)
+    _seed_bars_db(bars_db, [])  # no bars at all
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # No research_health.jsonl, no heartbeat events — a fully dead day.
+
+    result = autonomy_report.evaluate_k8(state_dir, bars_db, day, day)
+
+    assert result.criterion == "8"
+    assert result.verdict == "FAIL"
+    assert result.measured["live_days"] == 0
+    assert result.measured["per_day"][day.isoformat()]["live"] is False
+
+
+def test_k8_liveness_passes_on_live_day(tmp_path: Path) -> None:
+    """A day with ≥1 scheduler cycle, ≥1 bar, and ≥1 heartbeat is live ⇒ K8 PASS."""
+    state_dir = tmp_path / "state"
+    bars_db = tmp_path / "bars.sqlite"
+    day = date(2026, 9, 8)
+    _seed_bars_db(bars_db, [day])
+    _build_state_dir(state_dir, days=[day], heartbeat_events=[(day, True)])
+
+    result = autonomy_report.evaluate_k8(state_dir, bars_db, day, day)
+
+    assert result.verdict == "PASS"
+    assert result.measured["live_days"] == 1
+    flags = result.measured["per_day"][day.isoformat()]
+    assert flags["scheduler_cycles"] >= 1
+    assert flags["bars"] >= 1
+    assert flags["heartbeats"] >= 1
+    assert flags["live"] is True

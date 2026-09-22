@@ -50,6 +50,13 @@ Reads ONLY append-only sources per Plan §6 E2:
         run_scheduler.log start-line substring: `max_trades=5, daily_loss_cap=1800.0`
         AND every CLOSED autonomous trade in window has account='demo'.
 
+  K8  Liveness — Dienste liefen an diesem Handelstag (Phase 16 R3.3 / F8)
+        Every trading day in window has ≥ 1 research_health.jsonl event AND
+        ≥ 1 archived bar AND ≥ 1 heartbeat event (any outcome). A hard PASS-gate,
+        not a soft signal like K2: it exists to catch a dead day, which K1/K5/K6/K7
+        all pass vacuously (0 starts, 0 CRITICALs, 0 tokens, unread-but-unchanged
+        caps all read as "fine" on a day with zero processes).
+
 Constraints:
 
 - NO LLM, NO network, NO pgrep, NO writes outside `data/reports/<day>.json`.
@@ -65,7 +72,8 @@ Usage:
 
 Exit codes (--summary only):
     0  every criterion PASS
-    1  at least one criterion FAIL
+    1  at least one criterion FAIL or PARTIAL (queried window narrower than the
+       full registered test window — not judgeable, not a clean PASS either)
     2  ERROR (input malformed, missing file in non-test mode, budget file corrupt)
 
 Both modes print machine-readable JSON to stdout; the human narrative goes to
@@ -114,6 +122,9 @@ TRADES_PASS_THRESHOLD = 5
 HEARTBEAT_OK_PASS_THRESHOLD = 8
 CRITICAL_24H_PASS_THRESHOLD = 5
 RESTARTS_PASS_THRESHOLD_MAX = 2  # 1 baseline + 1 P17 Backoff-KILL-Clear
+# K4's "8 of 10" is a property of the full registered test window (Prereg), not of
+# whatever [from_day, to_day] a caller happens to query (Phase 16 R3.2 / Drift #9).
+K4_FULL_WINDOW_TRADING_DAYS = 10
 
 
 # ----------------------------------------------------------------------------
@@ -516,7 +527,7 @@ def _ro_connect(db_path: Path) -> sqlite3.Connection:
 @dataclass
 class CriterionResult:
     criterion: str
-    verdict: str                # "PASS" | "FAIL" | "NA" | "ERROR"
+    verdict: str                # "PASS" | "FAIL" | "NA" | "ERROR" | "PARTIAL"
     measured: dict[str, Any]
     threshold: str
     note: str = ""
@@ -554,16 +565,25 @@ class SummaryReport:
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        verdicts = {c.verdict for c in self.criteria.values()}
+        # Precedence ERROR > FAIL > PARTIAL > PASS: a PARTIAL (e.g. K4 on a sub-window)
+        # must not read as clean PASS, but it is not a failure either — it means the
+        # query can't judge that criterion, not that the criterion was violated.
+        if "ERROR" in verdicts:
+            overall = "ERROR"
+        elif "FAIL" in verdicts:
+            overall = "FAIL"
+        elif "PARTIAL" in verdicts:
+            overall = "PARTIAL"
+        else:
+            overall = "PASS"
         return {
             "from": self.from_day.isoformat(),
             "to": self.to_day.isoformat(),
             "n_trading_days": self.n_trading_days,
             "criteria": {k: v.to_dict() for k, v in self.criteria.items()},
             "warnings": list(self.warnings),
-            "overall_verdict": (
-                "PASS" if all(c.verdict in {"PASS", "NA"} for c in self.criteria.values())
-                else ("FAIL" if any(c.verdict == "FAIL" for c in self.criteria.values()) else "ERROR")
-            ),
+            "overall_verdict": overall,
         }
 
 
@@ -703,27 +723,48 @@ def evaluate_k4(
     to_day: date,
     *,
     health_evidence: dict[date, tuple[int, int]] | None = None,
+    full_window_trading_days: int = K4_FULL_WINDOW_TRADING_DAYS,
 ) -> CriterionResult:
-    """K4 — Heartbeat ok ≥ 8 / 10 Handelstagen. Trading days are Mo–Fr in window."""
+    """K4 — Heartbeat ok ≥ 8 / 10 Handelstagen. Trading days are Mo–Fr in window.
+
+    Drift #9 (Phase 16 R3.2): the threshold must always read against the **full
+    registered** test window (8 of 10), never against whatever sub-window a caller
+    queried — a ``--day`` report used to print "≥ 8 of 1 trading days", which is not
+    a criterion anyone registered. A query that covers fewer trading days than the
+    full window cannot judge this criterion at all, so it reports ``PARTIAL`` instead
+    of a misleading PASS/FAIL.
+    """
     trading_days = [d for d in _iter_trading_days(from_day, to_day)]
     if health_evidence is None:
         health_evidence = heartbeat_ok_per_day(state_dir / "research_health.jsonl")
     ok_days = sum(
         1 for d in trading_days if health_evidence.get(d, (0, 0))[0] >= 1
     )
-    verdict = "PASS" if ok_days >= HEARTBEAT_OK_PASS_THRESHOLD else "FAIL"
+    is_full_window = len(trading_days) >= full_window_trading_days
+    if is_full_window:
+        verdict = "PASS" if ok_days >= HEARTBEAT_OK_PASS_THRESHOLD else "FAIL"
+    else:
+        verdict = "PARTIAL"
     return CriterionResult(
         criterion="4",
         verdict=verdict,
         measured={
             "ok_days": ok_days,
             "trading_days_considered": len(trading_days),
+            "full_window_trading_days": full_window_trading_days,
             "per_day_ok_flags": {
                 d.isoformat(): bool(health_evidence.get(d, (0, 0))[0] >= 1)
                 for d in trading_days
             },
         },
-        threshold=f"≥ {HEARTBEAT_OK_PASS_THRESHOLD} of {len(trading_days)} trading days with heartbeat.ok",
+        threshold=(
+            f"≥ {HEARTBEAT_OK_PASS_THRESHOLD} of {full_window_trading_days} trading days "
+            "(full registered window) with heartbeat.ok"
+        ),
+        note="" if is_full_window else (
+            f"queried window covers {len(trading_days)} of {full_window_trading_days} "
+            "registered trading days — PARTIAL, not judgeable"
+        ),
     )
 
 
@@ -859,6 +900,70 @@ def evaluate_k7(
     )
 
 
+def evaluate_k8(
+    state_dir: Path,
+    bars_db: Path,
+    from_day: date,
+    to_day: date,
+    *,
+    health_events_per_day: dict[date, int] | None = None,
+    bars_per_day_evidence: dict[date, int] | None = None,
+    heartbeat_total_per_day: dict[date, int] | None = None,
+) -> CriterionResult:
+    """K8 — Liveness: services actually ran on each trading day in window.
+
+    Phase 16 R3.3 / F8: K1/K5/K6/K7 all PASS vacuously on a day with zero
+    processes (0 starts ≤ threshold, 0 CRITICALs ≤ threshold, 0 tokens < budget,
+    caps unread-but-unchanged) — a dead day reads identically to a quiet one. K8
+    is the independent, positive-evidence check that catches exactly that case:
+    a day is "live" only if it has ≥ 1 scheduler research_health event, ≥ 1
+    archived bar, AND ≥ 1 heartbeat event (any outcome, not just ``ok``). PASS
+    requires every trading day in the queried window to be live; one dead day
+    fails the whole criterion (this is a PASS-gate for the re-registration, not
+    a soft signal like K2).
+    """
+    health_path = state_dir / "research_health.jsonl"
+    trading_days = [d for d in _iter_trading_days(from_day, to_day)]
+    if heartbeat_total_per_day is None:
+        heartbeat_totals = {
+            d: total for d, (_ok, total) in heartbeat_ok_per_day(health_path).items()
+        }
+    else:
+        heartbeat_totals = heartbeat_total_per_day
+    per_day_live: dict[str, dict[str, Any]] = {}
+    live_days = 0
+    for d in trading_days:
+        cycles = (
+            health_events_per_day.get(d, 0) if health_events_per_day is not None
+            else _count_health_events_for(health_path, d)
+        )
+        bars = (
+            bars_per_day_evidence.get(d, 0) if bars_per_day_evidence is not None
+            else bars_per_day(bars_db, d)
+        )
+        heartbeats = heartbeat_totals.get(d, 0)
+        live = cycles >= 1 and bars >= 1 and heartbeats >= 1
+        if live:
+            live_days += 1
+        per_day_live[d.isoformat()] = {
+            "scheduler_cycles": cycles,
+            "bars": bars,
+            "heartbeats": heartbeats,
+            "live": live,
+        }
+    verdict = "PASS" if trading_days and live_days == len(trading_days) else "FAIL"
+    return CriterionResult(
+        criterion="8",
+        verdict=verdict,
+        measured={
+            "live_days": live_days,
+            "trading_days_considered": len(trading_days),
+            "per_day": per_day_live,
+        },
+        threshold="every trading day in window has ≥1 scheduler cycle AND ≥1 bar AND ≥1 heartbeat",
+    )
+
+
 # ----------------------------------------------------------------------------
 # Convenience: trading-day iterator
 # ----------------------------------------------------------------------------
@@ -933,6 +1038,7 @@ def _build_day_report(
         expected_max_trades=expected_max_trades,
         expected_daily_loss_cap=expected_daily_loss_cap,
     )
+    report.criteria["8"] = evaluate_k8(state_dir, bars_db, day, day)
     return report
 
 
@@ -984,12 +1090,20 @@ def _build_summary_report(
         expected_max_trades=expected_max_trades,
         expected_daily_loss_cap=expected_daily_loss_cap,
     )
+    report.criteria["8"] = evaluate_k8(state_dir, bars_db, from_day, to_day)
     return report
 
 
-def _write_report_file(reports_dir: Path, day: date, payload: dict[str, Any]) -> Path:
+def _write_report_file(reports_dir: Path, stem: str, payload: dict[str, Any]) -> Path:
+    """Write the report to ``data/reports/autonomy_<stem>.json``.
+
+    ``stem`` is the caller's choice: a single ISO date for ``--day`` reports, or
+    ``<from>_to_<to>`` for windowed ``--from/--to`` reports (Drift #11, Phase 16
+    R3.1). Before this fix both cases wrote ``autonomy_<from_day>.json``, so every
+    windowed report silently overwrote that day's own single-day report file.
+    """
     reports_dir.mkdir(parents=True, exist_ok=True)
-    out = reports_dir / f"autonomy_{day.isoformat()}.json"
+    out = reports_dir / f"autonomy_{stem}.json"
     out.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
     return out
 
@@ -1033,15 +1147,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.day:
         rep = _build_day_report(args.day, **common)
         payload = rep.to_dict()
+        stem = args.day.isoformat()
     else:
         rep = _build_summary_report(args.from_day, args.to_day, **common)
         payload = rep.to_dict()
-    out_path = _write_report_file(args.reports_dir, args.day or args.from_day, payload)
+        stem = f"{args.from_day.isoformat()}_to_{args.to_day.isoformat()}"
+    out_path = _write_report_file(args.reports_dir, stem, payload)
     json.dump(payload, sys.stdout, indent=2, sort_keys=True, default=str)
     sys.stdout.write("\n")
     _LOG.info("wrote %s", out_path)
     if args.summary:
-        return {"PASS": 0, "FAIL": 1, "ERROR": 2}.get(payload["overall_verdict"], 2)
+        return {"PASS": 0, "FAIL": 1, "PARTIAL": 1, "ERROR": 2}.get(payload["overall_verdict"], 2)
     return 0
 
 
