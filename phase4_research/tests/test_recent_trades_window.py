@@ -110,9 +110,16 @@ def test_build_context_window_default_14_days() -> None:
     Plus: the propagated context field carries the configured value so the
     prompt builder can render the matching header.
     """
-    recent_iso = (_FIXED_NOW - timedelta(days=3)).isoformat()  # 3 days old
-    recent_iso_2 = (_FIXED_NOW - timedelta(days=10)).isoformat()  # 10 days old
-    old_iso = (_FIXED_NOW - timedelta(days=20)).isoformat()  # 20 days old (×6)
+    # Dated against the REAL clock, not ``_FIXED_NOW``: ``build_context`` has no
+    # ``now_fn`` seam — it calls ``_drop_older_than`` with the default (wall-clock)
+    # now, which is correct for production. Fixtures pinned to a fixed date
+    # therefore age out: on 2026-09-22 the "3 days old" row built from
+    # ``_FIXED_NOW`` (2026-09-05) was really 20 days old and got dropped, failing
+    # this test 17 days after it was written (corrected 2026-09-22).
+    now = datetime.now(timezone.utc)
+    recent_iso = (now - timedelta(days=3)).isoformat()  # 3 days old
+    recent_iso_2 = (now - timedelta(days=10)).isoformat()  # 10 days old
+    old_iso = (now - timedelta(days=20)).isoformat()  # 20 days old (×6)
     trades = [
         _trade(recent_iso, id_=1),
         _trade(recent_iso_2, id_=2),
