@@ -115,3 +115,42 @@ def test_record_tolerates_corrupt_existing_log(tmp_path) -> None:
 
     data = json.loads(log_path.read_text())
     assert isinstance(data, list) and len(data) == 1
+
+
+def test_record_writes_atomically(tmp_path, monkeypatch) -> None:
+    """Phase 16 R6.3 / F6: the real file is never truncated in place.
+
+    Regression pin for the live defect: the WebUI hit ``llm_usage.json``
+    mid-write, got a JSON parse error and counted "0 tokens today" — which
+    would let the token-budget gate (K6) pass on a day it should fail. The
+    check is structural, not timing-based: we patch ``os.replace`` to observe
+    that the rename happens (i.e. the payload was built in a tmp file), and
+    assert the destination still holds the previous, complete array at the
+    moment the tmp file is fully written.
+    """
+    log_path = tmp_path / "llm_usage.json"
+    config = ResearchConfig()
+    usage = _Usage(input_tokens=10, output_tokens=5)
+
+    token_meter.record(usage, "claude-sonnet-4-6", config, path=str(log_path))
+    first = json.loads(log_path.read_text())
+    assert len(first) == 1
+
+    seen: list[tuple[str, str]] = []
+    real_replace = token_meter.os.replace
+
+    def spy_replace(src, dst):  # type: ignore[no-untyped-def]
+        # At this point the new array is complete in `src`, and `dst` must
+        # still be the untouched previous array — that is the whole point.
+        assert json.loads(open(src, encoding="utf-8").read())
+        assert json.loads(open(dst, encoding="utf-8").read()) == first
+        seen.append((str(src), str(dst)))
+        real_replace(src, dst)
+
+    monkeypatch.setattr(token_meter.os, "replace", spy_replace)
+    token_meter.record(usage, "claude-sonnet-4-6", config, path=str(log_path))
+
+    assert len(seen) == 1
+    assert seen[0][0] == f"{log_path}.tmp"
+    assert len(json.loads(log_path.read_text())) == 2
+    assert not (tmp_path / "llm_usage.json.tmp").exists()

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import Any
 
 from research import timeutil
@@ -166,9 +167,21 @@ def record(
     try:
         records = _load_log(path)
         records.append(rec)
-        with open(path, "w", encoding="utf-8") as fh:
+        # Phase 16 R6.3 / F6 (2026-09-22): write atomically (tmp + os.replace)
+        # instead of truncating the real file in place. The log is a single
+        # ~1 MB JSON array that is rewritten on EVERY call, so an in-place
+        # ``open(path, "w")`` leaves a window in which a concurrent reader sees
+        # a half-written array. That window was hit live: the WebUI logged 5
+        # JSON-parse errors on llm_usage.json and then counted "0 tokens
+        # today" — i.e. the token-budget gate (K6) can silently read 0.
+        # ``os.replace`` is atomic within a filesystem, so a reader sees either
+        # the old or the new array, never a truncated one. Same pattern as
+        # ``scheduler/run.py`` ``_write_pid``.
+        tmp_path = f"{path}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as fh:
             json.dump(records, fh, indent=2)
             fh.write("\n")
+        os.replace(tmp_path, path)
     except OSError as exc:
         log.warning("token_meter: could not append usage to %s (%s)", path, exc)
     return rec
