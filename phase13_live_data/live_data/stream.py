@@ -36,13 +36,19 @@ HealthSink = Callable[[dict[str, Any]], None]
 
 
 def _iso_utc_minute(dt: datetime) -> str:
-    """Truncate to minute and return the ISO 8601 UTC string for the bar's open time."""
+    """Truncate to minute and return the ISO 8601 UTC string for the bar's **open** time.
+
+    Milliseconds are always ``.000`` — this is a minute bucket, not a tick timestamp. Keeping
+    the tick's own millisecond here (Drift #13, Phase 16 Session #32) made every tick land in
+    its own "minute", because ``TickAggregator.on_tick`` compares this string to detect a
+    rollover: two ticks a millisecond apart produced two different bucket strings and were
+    read as two different minutes.
+    """
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     dt = dt.astimezone(timezone.utc)
     truncated = dt.replace(second=0, microsecond=0)
-    ms = dt.microsecond // 1000
-    return truncated.strftime("%Y-%m-%dT%H:%M:00.") + f"{ms:03d}Z"
+    return truncated.strftime("%Y-%m-%dT%H:%M:00.000Z")
 
 
 @dataclass
@@ -496,7 +502,18 @@ class TickAggregatorRecorder:
         )
         try:
             self._archive.insert_bars([bar])
-            if self._health_sink is not None:
+        except ArchiveError as exc:
+            # An archive shape problem (e.g. source not in KNOWN_SOURCES,
+            # which it is — but defend the contract): log, do not raise.
+            logger.error("TickAggregatorRecorder: archive rejected %s @ %s: %s",
+                         epic, candle.get("ts_utc"), exc)
+            return
+        except Exception:  # noqa: BLE001 — the recorder survives a DB hiccup
+            logger.exception("TickAggregatorRecorder: insert_bars failed for %s @ %s",
+                             epic, candle.get("ts_utc"))
+            return
+        if self._health_sink is not None:
+            try:
                 self._health_sink({
                     "event": "ls_tickagg_candle_written",
                     "epic": epic,
@@ -507,14 +524,11 @@ class TickAggregatorRecorder:
                     # "real" 1-tick bars that happen to look identical.
                     "thin": tick_count <= self._thin_threshold,
                 })
-        except ArchiveError as exc:
-            # An archive shape problem (e.g. source not in KNOWN_SOURCES,
-            # which it is — but defend the contract): log, do not raise.
-            logger.error("TickAggregatorRecorder: archive rejected %s @ %s: %s",
-                         epic, candle.get("ts_utc"), exc)
-        except Exception:  # noqa: BLE001 — the recorder survives a DB hiccup
-            logger.exception("TickAggregatorRecorder: insert_bars failed for %s @ %s",
-                             epic, candle.get("ts_utc"))
+            except Exception:  # noqa: BLE001 — Drift #12: a sink failure must not be
+                # mistaken for an archive failure — the bar above is already written.
+                logger.exception(
+                    "TickAggregatorRecorder: health sink failed for %s @ %s — bar was written",
+                    epic, candle.get("ts_utc"))
 
 
 def _parse_iso(ts: str) -> datetime | None:

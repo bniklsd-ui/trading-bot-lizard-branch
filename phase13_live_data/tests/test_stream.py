@@ -253,8 +253,11 @@ def test_tick_aggregator_separates_minutes():
 
 
 def test_iso_utc_minute_truncates_to_minute():
+    """Milliseconds are always ``.000`` — this is a minute bucket, not a tick timestamp
+    (Drift #13 fix, Phase 16 R2: keeping the tick's own ms here made every tick its own
+    "minute" for the rollover comparison in ``TickAggregator.on_tick``)."""
     dt = datetime(2026, 8, 19, 9, 0, 37, 123_000, tzinfo=timezone.utc)
-    assert _iso_utc_minute(dt) == "2026-08-19T09:00:00.123Z"
+    assert _iso_utc_minute(dt) == "2026-08-19T09:00:00.000Z"
 
 
 # ---------- TickAggregator.on_tick return value (B0.5 refactor) -----------
@@ -285,6 +288,43 @@ def test_tick_aggregator_on_tick_returns_closed_candle_on_rollover():
     assert closed["tick_count"] == 2
     assert closed["complete"] is True
     assert closed["epic"] is None  # filled by the caller
+
+
+def test_two_ticks_same_minute_with_different_ms_yield_one_bar():
+    """Drift #13 regression: two ticks a few hundred ms apart, same minute, must
+    NOT roll over — before the fix, the differing millisecond made
+    ``_iso_utc_minute`` return two different bucket strings and every tick
+    looked like a new minute."""
+    from broker_wrapper.streaming.base import PriceTick
+    agg = TickAggregator()
+    assert agg.on_tick(
+        PriceTick(epic="X", bid=100, ask=100, timestamp="2026-08-19T09:00:30.100Z")
+    ) is None
+    closed = agg.on_tick(
+        PriceTick(epic="X", bid=102, ask=102, timestamp="2026-08-19T09:00:30.900Z")
+    )
+    assert closed is None  # still same minute — no rollover yet
+    # First tick of the next minute now closes the buffer as ONE bar.
+    closed = agg.on_tick(
+        PriceTick(epic="X", bid=200, ask=200, timestamp="2026-08-19T09:01:00.050Z")
+    )
+    assert closed is not None
+    assert closed["tick_count"] == 2
+    assert closed["open"] == pytest.approx(100.0)
+    assert closed["close"] == pytest.approx(102.0)
+
+
+def test_minute_rollover_emits_bar_on_minute_boundary():
+    """A tick in minute N+1 closes minute N with exactly one bar whose
+    ``ts_utc`` lands on the minute boundary (``:00.000Z``), never on the
+    triggering tick's own timestamp."""
+    from broker_wrapper.streaming.base import PriceTick
+    agg = TickAggregator()
+    agg.on_tick(PriceTick(epic="X", bid=100, ask=100, timestamp="2026-08-19T09:00:59.987Z"))
+    closed = agg.on_tick(PriceTick(epic="X", bid=101, ask=101, timestamp="2026-08-19T09:01:00.013Z"))
+    assert closed is not None
+    assert closed["ts_utc"] == "2026-08-19T09:00:00.000Z"
+    assert closed["tick_count"] == 1
 
 
 # ---------- TickAggregatorRecorder ---------------------------------------
@@ -372,6 +412,33 @@ def test_recorder_three_tick_candle_is_not_thin(archive, tmp_path):
     assert len(events) == 1
     assert events[0]["tick_count"] == 3
     assert events[0]["thin"] is False
+
+
+def test_health_sink_failure_keeps_bar_and_logs_sink(archive, tmp_path, caplog):
+    """Drift #12 regression at the log-message level: a health-sink exception must not be
+    mislabeled as an archive failure — the bar is already written by the time the sink
+    runs, and the log must say so, naming the sink, not ``insert_bars``."""
+    def _raising_sink(event: dict) -> None:
+        raise RuntimeError("sink boom")
+
+    stream = _FakeStream()
+    rec = TickAggregatorRecorder(stream, archive, _epics("IX.D.DAX.IFMM.IP"),
+                                  health_sink=_raising_sink)
+    rec.start()
+    cb = stream.price_subs["IX.D.DAX.IFMM.IP"]
+    with caplog.at_level("ERROR"):
+        cb(_price_tick("IX.D.DAX.IFMM.IP", 100, 100, "2026-08-19T09:00:30Z"))
+        cb(_price_tick("IX.D.DAX.IFMM.IP", 200, 200, "2026-08-19T09:01:10Z"))  # rollover, sink raises
+
+    rows = archive.window("IX.D.DAX.IFMM.IP", "1m",
+                          "2026-08-19T00:00:00.000Z", "2026-08-19T23:59:00.000Z",
+                          sources=("ls",))
+    assert len(rows) == 1, "the bar must be written even though the sink raised"
+
+    messages = " ".join(r.message for r in caplog.records)
+    assert "health sink failed" in messages
+    assert "bar was written" in messages
+    assert "insert_bars failed" not in messages
 
 
 def test_recorder_on_tick_after_stop_is_dropped(archive, tmp_path):
