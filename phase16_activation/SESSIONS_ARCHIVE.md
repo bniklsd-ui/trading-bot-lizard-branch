@@ -1,3 +1,196 @@
+## Session stopped — 2026-09-22 (Opus-5-Session #34, Phase-16-R-Subphase **R5 gebaut + installiert, R6 gemessen + vorgelegt, F6 gefixt** — 4 Commits (scripts/phase4/phase4/phase16-docs); **R5 Autostart**: 4 getrackte systemd-**User**-Units + `scripts/install_units.sh`, `systemd-analyze --user verify` grün, installiert + `enable`d (**nicht** gestartet), Keyring-Erreichbarkeit aus einer echten Unit-Umgebung per `systemd-run --user` **bewiesen**; **zwei Plan-Drifts korrigiert** (`WantedBy=graphical-session.target` statt `default.target`, `StartLimit*` in `[Unit]` statt `[Service]`) + **eine Plan-Lücke geschlossen** (`StandardOutput=append:` auf `data/state/run_*.log`, sonst wären K1/K5/K8 blind); **R6** Token-Aufschlüsselung gemessen (301 225/302 892 gegen den Plan reconciled) — Aufschlüsselung **pro Stage strukturell unmöglich** (kein `stage`-Feld), pro Modell geliefert; **F6 gefixt** (`token_meter` schreibt atomar); **phase4-Datum-Drift gefixt** (Fixture gegen echte Uhr); Σ **1958 → 1960**, alle 16 Suites grün, 0 Fails; **R7 blockiert auf zwei Nikinger-Entscheidungen** (K6-Schwelle, K1-Semantik unter systemd) + Reboot-Test; Session #33 verbatim nach `SESSIONS_ARCHIVE.md` rotiert [34. Eintrag])
+
+> **Auftrag:** Nikinger-Notiz zum Session-Start (2026-09-22): R5 (Units + Installer + Reboot-Test),
+> R6 (K6-Aufschlüsselung + Entscheidung), R4.4-Nachzug, R7 (Prereg v3 + Neustart), plus die Frage,
+> ob der `phase4_research`-Datum-Drift eine Session wert ist. Kein Plan-Rewrite — der
+> `PHASE16_R_EXEC_PLAN.md` (Session #32) wurde gegen den Code verifiziert; die drei unten
+> dokumentierten Abweichungen sind **Korrekturen am Plan gegen gemessene Fakten**, keine
+> Neuplanung.
+
+### Completed
+
+**R5 — Autostart (R-L3), gebaut + installiert + enabled, nicht gestartet:**
+
+- 4 getrackte Units in `phase16_activation/systemd/`: `tradingbot-scheduler.service`,
+  `-recorder.service`, `-discovery.service`, `-webui.service`.
+- `scripts/install_units.sh` (Muster `scripts/install_hooks.sh`): idempotent, `--dry-run`,
+  `--verify`; ruft **zuerst** `systemd-analyze --user verify`, kopiert nach
+  `~/.config/systemd/user/`, `daemon-reload`, `enable` — **kein `start`** (R7.4, Operator).
+- Ausgeführt: verify grün, 4 Units installiert, 4 Symlinks in
+  `graphical-session.target.wants/` angelegt, `is-enabled` = `enabled` ×4,
+  `is-active` = `inactive` ×4 (**nichts gestartet**).
+
+**Drei Abweichungen vom Plan-Text — alle gegen gemessene Fakten, alle notiert:**
+
+| # | Plan (§3 R5) | Gebaut | Warum |
+|---|---|---|---|
+| D-R5-a | `WantedBy=default.target`, `After=network-online.target` | `WantedBy=graphical-session.target`, `After=graphical-session.target gnome-keyring-daemon.service`, `PartOf=graphical-session.target` | Die Credentials liegen im Secret Service, und `gnome-keyring-daemon.service` ist ein **User-Unit der graphischen Sitzung**, entsperrt von `gdm-autologin` (PAM-Worker `pam/gdm-autologin` heute gemessen). Am 2026-09-20 wurde `default.target` **18:29:07** aktiv, `graphical-session.target` **18:29:10** — eine `default.target`-Unit startet also ~3 s **vor** dem Keyring, fällt in den fail-closed Credential-Preflight und wäre nach `RestartSec=30` × `StartLimitBurst=3` in 90 s endgültig tot. |
+| D-R5-b | `RestartSec=30` + `StartLimitIntervalSec/Burst` im selben Block | `StartLimit*` in `[Unit]` | systemd liest `StartLimitIntervalSec`/`StartLimitBurst` nur in `[Unit]`; in `[Service]` werden sie ignoriert (und `systemd-analyze verify` warnt). Der Flap-Schutz hätte still gefehlt. |
+| D-R5-c | (im Plan nicht erwähnt) | `StandardOutput=append:…/data/state/run_<svc>.log` + `StandardError=` dito | `autonomy_report.py` liest K1/K5/K8 **aus diesen Dateien** (`run_scheduler.log` timestamped Start-Zeile, die drei Wrapper-Logs als full-file-count). Ohne `append:` landet alles im Journal und die Messgrundlage des gesamten Vorregistrierungs-Laufs verschwindet. |
+
+**Eine bewusste Konstruktionsentscheidung (dokumentiert, statt still):** `run_scheduler.sh`
+startet selbst per `nohup` den Recorder **und** den Discovery-Daemon (Z. 60-66). Vier Units, die
+den Wrapper aufrufen, hätten beide doppelt gestartet — und zwar in der **Cgroup der
+Scheduler-Unit**, so dass `systemctl stop tradingbot-scheduler` die beiden fremden Units
+mitgerissen hätte. Deshalb:
+
+- `-recorder`/`-discovery`/`-webui` rufen **ihren Wrapper** auf (die `exec`en python, bleiben
+  also PID 1 der Unit ⇒ `Type=simple` korrekt, V-3 damit verifiziert), und ihre K1-Start-Zeile
+  (`[run_recorder] starting recorder from …`) bleibt erhalten.
+- **nur** `-scheduler` umgeht den Wrapper: `ExecStart=<venv>/bin/python -m scheduler.run`,
+  `WorkingDirectory=…/phase8_scheduler` (genau das `cd` des Wrappers). K1/K5 hängen an der
+  Start-Zeile des **Daemons** (`scheduler/run.py:207`, timestamped) — die bleibt unberührt,
+  ebenso die Caps `max_trades=5, daily_loss_cap=1800.0` (argparse-Defaults; `restart-services.sh`
+  übergibt keine Flags, im Archiv-Log so belegt). Ein Kommentar in der Unit nennt
+  `run_scheduler.sh` als gespiegelte Quelle.
+- `scripts/restart-services.sh` bleibt **unverändert** (R5.4, manueller Notweg).
+
+**Keyring-Beweis ohne Reboot (der Teil von AK-R6, der vorab entscheidbar ist):**
+`systemd-run --user --wait --pipe <venv>/python -c "get_credential('ig_demo_api_key')"` läuft
+**als transiente User-Unit** (also mit Unit-Umgebung, nicht mit der Shell-Umgebung) und liefert
+`DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`, `XDG_RUNTIME_DIR=/run/user/1000`,
+`ig_demo_api_key: FOUND len 41`, Exit 0. Damit ist bewiesen: eine User-Unit erreicht den
+entsperrten Keyring. **Nicht** bewiesen (und nur per Reboot beweisbar): dass die Reihenfolge
+beim Boot hält. Das bleibt AK-R6 und Operator-Aktion.
+
+**R6 — K6-Analyse (F7), gemessen:**
+
+- **Reconciliation gegen den Plan exakt:** mit der Budget-Definition aus `scheduler/budget.py`
+  (alle vier Token-Felder incl. `cache_*`) und Berliner Tagesgrenze ergibt sich 09-16 =
+  **301 225** (Überschreitung 17:22 Berlin), 09-17 = **302 892** (16:45) — identisch zu den
+  Plan-Zahlen §1.4.
+- **R6.1 ist so nicht erfüllbar:** `llm_usage.json` trägt **kein `stage`-Feld** (Record =
+  `ts, model, input_tokens, output_tokens, cache_*, est_cost_*`). Eine Aufschlüsselung nach
+  Research/Bull/Bear/Judge/Lesson/Council **existiert in den Daten nicht** und wird hier
+  **nicht geraten**. Modell-Ebene ist die Obergrenze: Sonnet = Research + Judge + Council,
+  Haiku = Bull + Bear + Lesson/Instinct (`research/models.py`, `debate/models.py:134-135`,
+  `reward/models.py:378`).
+
+| Tag (Berlin) | billed | Calls | Sonnet | Haiku | 300k gerissen |
+|---|---|---|---|---|---|
+| 09-11 | 283 966 | 100 | 95 Calls / 281 777 | 5 / 2 189 | — |
+| 09-14 | 287 002 | 100 | 95 / 284 854 | 5 / 2 148 | — |
+| 09-15 | 283 122 | 99 | 94 / 280 910 | 5 / 2 212 | — |
+| **09-16** | **301 225** | 113 | 100 / 287 770 | 13 / 13 455 | **17:22** |
+| **09-17** | **302 892** | 121 | 98 / 277 810 | 23 / 25 082 | **16:45** |
+| 09-18 | 277 345 | 100 | 95 / 275 158 | 5 / 2 187 | — |
+
+- **Der Befund in einem Satz:** ~95 Research-Calls/Tag × ~2 950 Token = **94 % des Caps**,
+  bevor irgendeine Debatte stattfindet. Research läuft **pro Zyklus unbedingt**
+  (`runner.py:393` → `research_tick.ensure_candidates` → `research.run()`, keine
+  Frische-/Änderungs-Bedingung), bei `cycle=5min` also ~96 Zyklen/Tag. Die ~17 k Restluft
+  reichen für ~6 Haiku-Calls; 09-16 (13) und 09-17 (23) haben genau das überschritten. Ein Tag
+  **mit** Debatten reißt K6 strukturell.
+- **Kostenlage:** ~1,10 USD/Tag (Sonnet 3/15 USD per Mtok). Der Cap ist eine **Sicherheits-
+  bremse, keine Kostengrenze** — Cap-Anhebung ist in Euro billig und in Bedeutung teuer (sie
+  wurde in Phase 16 C3 schon einmal 200k → 300k angehoben, `scheduler/config.py:140`, wegen
+  genau dieses Symptoms).
+- **F6 (Leserace) ist strukturell bestätigt und gefixt** (siehe unten). V-5 damit beantwortet:
+  der Writer liegt in **P4** (`research/token_meter.py`), nicht P8 — P4 ist per R-L6/Plan §4
+  freigegeben, die engere Plan-Formulierung R6.3 („nur wenn in Phase 16 / P8") ist Plan-Drift,
+  keine fehlende Freigabe.
+
+**F6 — `llm_usage.json` wird jetzt atomar geschrieben (P4):**
+`token_meter.record` schrieb die ~1 MB große JSON-Array-Datei bei **jedem** Call mit
+`open(path, "w")` in-place — ein Leser (WebUI) trifft dabei zwangsläufig irgendwann eine
+halb geschriebene Datei, loggt einen Parse-Fehler und zählt „0 tokens today"; d. h. **K6 kann
+still 0 messen**. Fix: `tmp` + `os.replace` (Muster `run.py:_write_pid`). +1 Test
+(`test_record_writes_atomically`) pinnt, dass das Ziel im Moment des Rename noch das
+vollständige alte Array trägt.
+
+**`phase4_research`-Datum-Drift (Nikinger-Frage: eine Session wert?) — nein, 1 Fixture-Zeile:**
+`build_context` hat **keinen** `now_fn`-Seam und vergleicht gegen die echte Uhr — das ist
+**produktiv richtig**. Falsch war der Test: `test_build_context_window_default_14_days` datierte
+seine Fixture-Trades gegen `_FIXED_NOW = 2026-09-05`, also war der „3 Tage alte" Trade am
+2026-09-22 real 20 Tage alt und fiel korrekt aus dem 14-Tage-Fenster. Fixture jetzt gegen
+`datetime.now(timezone.utc)` + Kommentar warum. Kein Produktionsdefekt, keine eigene Session.
+
+**Σ:** 16 Suites einzeln nachgemessen (Konvention ohne `meta_m1_harness`, das 28 trägt):
+97+82+105+**163**+190+76+261+169+95+165+149+85+61+126+15+121 = **1960 passed, 0 failed**
+(1958 aus Session #33 **+1** neuer F6-Test **+1** der zuvor rote phase4-Test).
+
+### Findings
+
+🔴 **Der Plan hätte AK-R6 verfehlt.** `WantedBy=default.target` + `After=network-online.target`
+(Plan §3 R5.1) ignoriert, dass der Keyring in der graphischen Sitzung hängt. Die 3-Sekunden-
+Differenz vom letzten Boot ist der Beleg, nicht eine Vermutung.
+
+🔴 **Ohne `StandardOutput=append:` hätte der Autostart die Messung des Laufs zerstört** — Units
+loggen per Default ins Journal, `autonomy_report.py` liest Dateien. Das wäre erst an Tag 1 des
+neuen Laufs aufgefallen.
+
+🟡 **`StartLimit*` im falschen Abschnitt** wäre still gescheitert (Flap-Schutz ohne Wirkung).
+
+🟡 **K6 ist unter der heutigen Zyklus-Zahl nicht haltbar** — nicht wegen Ausreißern, sondern
+weil Research allein 94 % des Caps verbraucht. Entscheidung Nikinger (unten).
+
+🟡 **systemd invertiert die Bedeutung von K1.** K1 („≤ 2 Starts/Tag", aus Start-Zeilen gezählt)
+existiert, um zu beweisen, dass **niemand von Hand** neu gestartet hat. Unter
+`Restart=on-failure` schreibt eine gesunde Selbstheilung eine Start-Zeile, **ohne** dass jemand
+etwas angefasst hat — ein selbstheilender Tag liest sich dann als K1-FAIL. Der natürliche
+Diskriminator ist `systemctl --user show -p NRestarts <unit>` (systemd-eigener Zähler) gegen die
+Log-Start-Zeilen. **Das ist eine Vorregistrierungs-Frage und blockiert Prereg v3** — genau wie
+die K6-Schwelle.
+
+🟢 **V-3 und V-5 beantwortet** (Type=simple korrekt; Writer in P4). **V-1/V-2** waren in Session
+#33 geprüft. **V-6** ist mit dem VACUUM in Session #33 erledigt. **V-7** bleibt offen bis zum
+Reboot-Test — `enable` hat die Symlinks angelegt, das Boot-Verhalten ist damit nicht bewiesen.
+
+### Open questions / blockers
+
+**Zwei Nikinger-Entscheidungen blockieren R7** (Prereg v3 darf **nicht** mit einem TBD
+geschrieben werden — AK-R8 verlangt sie vollständig und committet **vor** der ersten
+Startzeile):
+
+1. **K6-Schwelle / Token-Haushalt.** (a) Cap anheben (z. B. 300k → 400k; ~1,10 USD/Tag heute,
+   die zweite Anhebung nach C3) · (b) Call-Zahl senken (Zyklus 5 → 10 min halbiert Research auf
+   ~48 Calls ≈ 145k und halbiert die Einstiegs-Chancen; oder Research nur bei geänderter
+   Datenlage — **neue Logik, nicht lazy**) · (c) K6-Schwelle in v3 neu setzen bzw. das Kriterium
+   auf „kein Zyklus wurde budget-gated" umformulieren statt auf eine absolute Zahl.
+2. **K1-Semantik unter systemd** (siehe Finding oben): K1 an `NRestarts` koppeln, oder Schwelle
+   anheben, oder K1 explizit als „Operator-Starts" definieren und Auto-Restarts separat zählen.
+
+**Operator-Aktionen (Nikinger):**
+- **Reboot-Test (AK-R6)** — der einzige ehrliche Beweis. Erwartung: alle vier Units nach dem
+  Boot `active`, ohne Handgriff. Prüfen mit `systemctl --user status 'tradingbot-*'` +
+  `bash scripts/restart-services.sh status`. Wenn eine Unit `failed` ist:
+  `journalctl --user -u tradingbot-scheduler -b` — der erste Verdächtige ist die
+  Keyring-Reihenfolge, **nicht** die Unit-Syntax (die ist verify-geprüft).
+- **Push** der 4 Commits dieser Session.
+- **Start des neuen Laufs** erst nach R7 (Prereg v3 + Runbook v4 committet).
+
+**R4.4 bleibt offen** — die erste neue `ls`-Bar auf `:00.000Z` ist erst prüfbar, wenn der Bot
+wieder schreibt (also nach dem Start).
+
+### NEXT (für die nächste Session)
+
+1. **Antworten des Nikinger zu K6 + K1 einholen** (die zwei Fragen oben) — ohne sie kein
+   Prereg v3.
+2. **R7.1** `PHASE16_AUTONOMY_PREREGISTRATION_v3.md` schreiben (v2 bleibt byte-identisch):
+   K1 (neue Semantik) · K2-K5 unverändert · K4 „≥ 8 von 10 des **vollen** Fensters" (R3.2) ·
+   K6 nach Entscheidung · K7 · **K8 Liveness** (R3.3) · W1-W5 + **W6** (`ls`-Bars enden auf
+   `:00.000Z`) + **W7** (`run_scheduler.log` < 200 MB); Tag 1 / Tag 10 als Datum eintragen.
+3. **R7.2** `PHASE16_E3_RUNBOOK_v4.md`: Restart-Sequenz über `systemctl --user`,
+   `restart-services.sh` als Notweg, Tagesroutine G1/G2/G5 mit den korrigierten Kommandos.
+4. **R7.3/R7.4** Commit **vor** der ersten Startzeile, dann Start durch den Nikinger +
+   Tag-1-Verify (inkl. **R4.4**-Stichprobe und `grep -c NameError run_scheduler.log` = 0 für
+   AK-R1).
+5. **Block I (Closeout)** bleibt liegen bis der neue 10-Tage-Lauf durch ist (R-L5).
+
+**Block-Status nach Session #34:**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ (Session #1-#4) |
+| B (Substrat) | ✅ (Session #3) |
+| C (Research-Loop) | ✅ (Sessions #3-#7) |
+| D (Freischaltung) | ✅ (Session #7-#17) |
+| E (2-Wochen-Test) | 🔴 abgebrochen an Tag 9 — Neu-Vorregistrierung in R7 |
+| F (Subphase) | 🔄 — G Tag 1 ✅, H ✅ (#28-#29), Quick ✅ (#30), Mini ✅ (#31), Status-Check ✅ (#32) |
+| R (Reparatur 2 + Neustart) | 🔄 — **R0-R4 ✅ (#33), R5 ✅ + R6 ✅ (#34)**; R7 blockiert auf 2 Nikinger-Entscheidungen + Reboot-Test |
+
+---
+
 # SESSIONS_ARCHIVE.md — Phase 16 (Freischaltung)
 
 Newest-first. Rotation rule (root `CLAUDE.md`, mandatory since 2026-07-06): the phase head
