@@ -62,12 +62,34 @@ _TZ = ZoneInfo("Europe/Berlin")
 _SLEEP = _time.sleep
 
 # Retry budget for the single network call (concept §11 / correction §1.2).
-_MAX_RETRIES = 3
+#
+# Phase 16 R-Fix (2026-09-30, Operator-Nikinger): 3 → 5 attempts, base 1 s kept.
+# Recovery window grows from 1+2+4 = 7 s of backoff to 1+2+4+8 = 15 s of backoff
+# (plus fetch times), enough to ride out a brief physical-server-rebuild-induced
+# network outage (~minutes, observed 2026-09-29 22:55 CEST: hard shutdown + reboot
+# + network reconnect). The previous 3 × 1-2-4 s budget exhausted too quickly and
+# the daemon logged 2 433 yfinance "possibly delisted" / empty-DataFrame errors
+# before the network came back.
+_MAX_RETRIES = 5
 _BACKOFF_BASE_S = 1.0
 
 # yFinance's rate-limit exception is matched by class name so this module never
 # has to import yFinance at top level (keeps unit tests yFinance-free).
+#
+# Phase 16 R-Fix: also retry on transient network errors. Matched by class name
+# to stay yfinance-/curl_cffi-free at import time. curl_cffi's RequestsError is
+# the real "network down / connection refused / timeout" class during a rebuild;
+# ``ConnectionError`` and ``Timeout`` cover the stdlib equivalents and other HTTP
+# backends. A genuine programmer error (KeyError, AttributeError, ...) keeps the
+# old "raise immediately" behaviour — only the named network/limit classes retry.
 _RATE_LIMIT_EXC_NAMES = {"YFRateLimitError"}
+_TRANSIENT_EXC_NAMES = {
+    "RequestsError",        # curl_cffi.requests.exceptions.RequestsError
+    "ConnectionError",      # builtin / requests.exceptions.ConnectionError
+    "Timeout",              # builtin socket.timeout / curl_cffi Timeout
+    "ChunkedEncodingError", # incomplete HTTP response on flaky network
+}
+_RETRY_EXC_NAMES = _RATE_LIMIT_EXC_NAMES | _TRANSIENT_EXC_NAMES
 
 # Cache TTLs by bar resolution (concept §9). ``1d`` is special-cased to expire at
 # the next Europe/Berlin midnight (the day's bar is final once the day rolls over).
@@ -102,7 +124,29 @@ def _is_rate_limit_error(exc: BaseException) -> bool:
 
     Matching by name (rather than ``isinstance``) avoids importing yFinance at
     module level, so unit tests can simulate it with a locally-defined
-    ``YFRateLimitError`` class.
+    ``YFRateLimitError`` class. Retained as a back-compat wrapper around
+    :func:`_is_retryable_error` for any external caller.
+    """
+    return _is_retryable_error(exc)
+
+
+def _is_retryable_error(exc: BaseException) -> bool:
+    """Return whether ``exc`` is in the retry budget (rate-limit or transient network).
+
+    Phase 16 R-Fix: also matches transient network errors (curl_cffi RequestsError,
+    builtin ConnectionError/Timeout) so the single retry loop covers both the
+    rate-limit case and a brief network outage. Other exceptions (KeyError,
+    AttributeError, ValueError, etc.) propagate unchanged — a real programmer
+    error must not be swallowed into a 5× retry storm.
+    """
+    return any(t.__name__ in _RETRY_EXC_NAMES for t in type(exc).__mro__)
+
+
+def _is_rate_limit_error_only(exc: BaseException) -> bool:
+    """Whether ``exc`` is specifically a rate-limit error (not a transient network one).
+
+    Used by the retry loop only to pick the right log message. Implementation is
+    the inverse complement of ``_is_retryable_error`` minus the transient set.
     """
     return any(t.__name__ in _RATE_LIMIT_EXC_NAMES for t in type(exc).__mro__)
 
@@ -112,10 +156,16 @@ def _fetch_with_retry(
 ) -> "pd.DataFrame":
     """Fetch via :func:`_raw_download` with exponential backoff over both failure modes.
 
-    Backoff is ``1s → 2s → 4s`` across at most :data:`_MAX_RETRIES` attempts:
+    Backoff is ``1s → 2s → 4s → 8s`` across at most :data:`_MAX_RETRIES` (5)
+    attempts (Phase 16 R-Fix): previously ``1s → 2s → 4s`` × 3. Total recovery
+    window: ~15 s of backoff + 5× fetch latency. Tuned to ride out a brief
+    physical-server-rebuild-induced network outage (~minutes, observed once).
 
-    - A yFinance rate-limit error (``YFRateLimitError``) is retried, then on
-      exhaustion re-raised as :class:`RateLimitError`.
+    Failure modes:
+
+    - A retryable error (``YFRateLimitError`` or transient network —
+      :func:`_is_retryable_error`) is retried, then on exhaustion re-raised as
+      :class:`RateLimitError`.
     - A ``None`` / empty / shorter-than-``min_expected`` DataFrame is retried, then
       on exhaustion raised as :class:`DataUnavailableError`.
     - Any other exception propagates unchanged (e.g. real programmer errors).
@@ -139,11 +189,17 @@ def _fetch_with_retry(
         try:
             df = _raw_download(symbol, period=period, interval=interval)
         except Exception as exc:  # noqa: BLE001 — narrowed immediately below
-            if not _is_rate_limit_error(exc):
+            if not _is_retryable_error(exc):
                 raise
-            log.warning("rate-limited fetching %s (attempt %d/%d)", symbol, attempt + 1, _MAX_RETRIES)
+            if _is_rate_limit_error_only(exc):
+                log.warning("rate-limited fetching %s (attempt %d/%d)", symbol, attempt + 1, _MAX_RETRIES)
+            else:
+                log.warning(
+                    "transient network error fetching %s (%s, attempt %d/%d)",
+                    symbol, type(exc).__name__, attempt + 1, _MAX_RETRIES,
+                )
             if last_attempt:
-                raise RateLimitError(f"yFinance rate-limited for {symbol!r}", retryable=True) from exc
+                raise RateLimitError(f"yFinance/network kept failing for {symbol!r}", retryable=True) from exc
             _SLEEP(_BACKOFF_BASE_S * (2 ** attempt))
             continue
 

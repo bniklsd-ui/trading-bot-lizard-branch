@@ -210,13 +210,14 @@ def test_circuit_success_after_failures_resets(
 
     def flaky_then_healthy(symbol, *, period, interval):
         calls.append(symbol)
-        if len(calls) <= 3:  # exhausts _fetch_with_retry's 3-attempt budget once
+        if len(calls) <= fetcher._MAX_RETRIES:  # exhausts _fetch_with_retry's budget once
             return pd.DataFrame()
         return sample_dax_daily.copy()
 
     monkeypatch.setattr(fetcher, "_raw_download", flaky_then_healthy)
 
-    # First call: 3 internal retries all empty -> DataUnavailableError, 1 circuit failure.
+    # First call: _MAX_RETRIES internal retries all empty -> DataUnavailableError,
+    # 1 circuit failure (Phase 16 R-Fix: budget is now 5, not 3).
     with pytest.raises(DataUnavailableError):
         mdf.get_history(EPIC, days=5)
     assert circuit.is_open(SYMBOL) is False  # only 1 of 4 needed

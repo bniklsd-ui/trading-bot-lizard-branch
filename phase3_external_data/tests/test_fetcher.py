@@ -116,6 +116,81 @@ def test_rate_limit_retries_then_raises_rate_limit_error(
     assert len(calls) == fetcher._MAX_RETRIES
 
 
+class RequestsError(Exception):
+    """Stand-in for ``curl_cffi.requests.exceptions.RequestsError`` (matched by name).
+
+    Note: class name must be exactly ``RequestsError`` for the fetcher's class-name
+    match (no isinstance — keeps fetcher yfinance-/curl_cffi-free at import time).
+    """
+
+
+class _FakeTimeout(Exception):
+    """Stand-in for ``socket.timeout`` / ``curl_cffi.Timeout`` (matched by name)."""
+
+
+def test_transient_network_error_retries_then_raises_rate_limit_error(
+    monkeypatch, tmp_cache, frozen_clock, no_sleep
+):
+    """Phase 16 R-Fix: a transient network error (curl_cffi RequestsError class-name match)
+    is now inside the retry budget, exhausts the same ``_MAX_RETRIES`` as rate-limit.
+    """
+    calls: list = []
+    monkeypatch.setattr(
+        fetcher,
+        "_raw_download",
+        make_fake_download(calls=calls, raise_exc=RequestsError("Connection refused")),
+    )
+    md = fetcher.MarketDataFetcher(TickerMapper(), tmp_cache)
+
+    with pytest.raises(RateLimitError):
+        md.get_history(EPIC)
+    assert len(calls) == fetcher._MAX_RETRIES
+
+
+def test_transient_network_error_recovers_within_budget(
+    monkeypatch, tmp_cache, frozen_clock, no_sleep, sample_dax_daily
+):
+    """Phase 16 R-Fix: a brief network outage (2 failures, then recovery) returns data
+    instead of raising — exercises the new transient-error retry path end-to-end.
+    """
+    calls: list = []
+
+    def flaky_then_ok(symbol, *, period, interval):
+        calls.append((symbol, period, interval))
+        if len(calls) <= 2:
+            raise RequestsError("Connection refused")
+        if interval == "1d":
+            return sample_dax_daily.copy()
+        return pd.DataFrame()
+
+    monkeypatch.setattr(fetcher, "_raw_download", flaky_then_ok)
+    md = fetcher.MarketDataFetcher(TickerMapper(), tmp_cache)
+
+    bars = md.get_history(EPIC)
+    assert len(bars) >= 5  # days=5 → at least 5 bars returned
+    assert len(calls) == 3  # 2 transient errors + 1 success
+
+
+def test_unknown_exception_propagates_without_retry(
+    monkeypatch, tmp_cache, frozen_clock, no_sleep
+):
+    """Phase 16 R-Fix: a non-retryable exception (e.g. KeyError — programmer error)
+    propagates on the first attempt and is NOT swallowed into a retry storm.
+    """
+    calls: list = []
+
+    def boom(symbol, *, period, interval):
+        calls.append(symbol)
+        raise KeyError("missing field")
+
+    monkeypatch.setattr(fetcher, "_raw_download", boom)
+    md = fetcher.MarketDataFetcher(TickerMapper(), tmp_cache)
+
+    with pytest.raises(KeyError):
+        md.get_history(EPIC)
+    assert len(calls) == 1  # exactly one attempt, no retry
+
+
 # -- off-hours discipline -----------------------------------------------------
 
 def _saturday(frozen_clock):
