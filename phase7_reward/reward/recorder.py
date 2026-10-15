@@ -102,22 +102,41 @@ def _parse_iso_safe(s: str | None) -> datetime | None:
         return None
 
 
-def _next_retry_in_s(last_attempt_iso: str | None, now_utc: datetime | None = None) -> int:
+def _next_retry_in_s(
+    last_attempt_iso: str | None,
+    open_ts_iso: str | None = None,
+    now_utc: datetime | None = None,
+) -> int:
     """Return seconds until next retry is allowed (D1).
 
-    ``0`` means 'proceed immediately' (no prior attempt). Otherwise: pick the
-    largest step whose duration has passed since the last attempt. Caps at 24 h
-    (D1); after that, return 0 (= always retry, caller decides severity per D4).
+    ``0`` means 'proceed immediately' (no prior attempt, or the interval has passed).
+    The retry interval is the largest D1 step that does not exceed the trade's age
+    (``now - open_ts``), floored at the first step (15 min) — so a fresh trade is
+    retried every 15 min, a 3 h old one hourly, a 30 h old one daily.
+
+    Corrected 2026-10-15 (Phase 16 Session #37): the original walked the ladder
+    against ``elapsed since the last attempt`` alone, which always ran to the top —
+    every retry waited the full 24 h (measured: all 8 broker-closed v3-run trades
+    booked after 24.06–27.22 h). Anchored on ``open_ts`` instead of an attempt
+    counter so no schema migration is needed (the plan sketch already passed
+    ``open_ts_iso`` and never used it).
+
+    ponytail: age-anchored, not attempt-anchored — a stop-out after the 4 h step
+    (~max_hold) waits up to 4 h for its next retry. Upgrade path: anchor on the
+    in-memory ``_pending_close[...].closed_at`` (NOT the cold-reconstructed one:
+    its ``closed_at`` is ``updated_at``, which every stamp bumps).
     """
     last = _parse_iso_safe(last_attempt_iso)
     if last is None:
         return 0
     now = now_utc if now_utc is not None else datetime.now(timezone.utc)
-    elapsed = (now - last).total_seconds()
+    opened = _parse_iso_safe(open_ts_iso)
+    age = (now - opened).total_seconds() if opened is not None else 0.0
+    interval = _RETRY_BACKOFF_STEPS_S[0]
     for step in _RETRY_BACKOFF_STEPS_S:
-        if elapsed < step:
-            return int(step - elapsed)
-    return 0
+        if step <= age:
+            interval = step
+    return max(0, int(interval - (now - last).total_seconds()))
 
 
 def _hours_open(open_ts_iso: str | None, now_utc: datetime | None = None) -> float | None:
@@ -338,10 +357,10 @@ class RewardSink:
         opened = self._opened.get(deal_id)
 
         # P12-Reconcile-Timing (Mini-Session 26, D5): backoff-skip if a recent attempt
-        # happened within the next-step window. NULL last_attempt_iso => proceed
+        # happened within the age-dependent interval. NULL last_attempt_iso => proceed
         # immediately (first attempt). Caps at 24 h (D1).
         last_attempt_iso = row.get("last_resolve_attempt_utc")
-        retry_in_s = _next_retry_in_s(last_attempt_iso)
+        retry_in_s = _next_retry_in_s(last_attempt_iso, row.get("open_ts"))
         if retry_in_s > 0:
             logger.debug(
                 "reward: deal_id=%s backoff-skip (retry in %ds)", deal_id, retry_in_s

@@ -586,3 +586,29 @@ def test_backoff_replay_reduces_critical_count(make_opened, make_closed, caplog)
     # (frisch, kein prior attempt). Alle weiteren 13 fallen in den Backoff-Skip.
     critical_count = sum(1 for r in caplog.records if r.levelno == logging.CRITICAL)
     assert critical_count == 4  # genau die 4 deal-ids, jeweils 1 CRITICAL beim ersten Attempt
+
+
+def test_backoff_interval_follows_trade_age_not_ladder_top():
+    """Phase 16 #37 (2026-10-15): the retry interval is the largest D1 step <= the
+    trade's age. The pre-fix code waited the full 24 h after *every* failed attempt."""
+    from datetime import datetime, timezone, timedelta
+    from reward.recorder import _next_retry_in_s
+
+    now = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
+
+    def iso(**kw):
+        return (now - timedelta(**kw)).isoformat()
+
+    # 3 h old trade, last attempt 61 min ago -> 1 h step passed -> retry now.
+    assert _next_retry_in_s(iso(minutes=61), iso(hours=3), now) == 0
+    # 3 h old trade, last attempt 20 min ago -> wait the remaining 40 min.
+    assert _next_retry_in_s(iso(minutes=20), iso(hours=3), now) == 40 * 60
+    # Fresh trade (10 min old) -> 15 min floor.
+    assert _next_retry_in_s(iso(minutes=5), iso(minutes=10), now) == 10 * 60
+    # 5 h old trade -> 4 h step.
+    assert _next_retry_in_s(iso(hours=1), iso(hours=5), now) == 3 * 3600
+    # 30 h old trade, last attempt 5 h ago -> 24 h cap, 19 h left.
+    assert _next_retry_in_s(iso(hours=5), iso(hours=30), now) == 19 * 3600
+    # No prior attempt -> proceed; unparseable open_ts -> 15 min floor.
+    assert _next_retry_in_s(None, iso(hours=3), now) == 0
+    assert _next_retry_in_s(iso(minutes=16), "garbage", now) == 0
