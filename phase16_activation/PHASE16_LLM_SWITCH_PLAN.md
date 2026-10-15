@@ -10,7 +10,7 @@ down:
   - ./PHASE16_F_EXEC_PLAN.md                                # 📕 F-Subphase (Vorgänger, Blöcke J/H/G/I — Muster für Akzeptanz)
   - ../meta_m1_harness/CLAUDE.md                            # OpenAICompatLLMClient (M1 Step 10, kalter Fallback — wird hier geweckt)
   - ../phase4_research/research/llm_openai_compat.py        # der bestehende OpenAI-Compat-Client (Hersteller-agnostisch bereits, nur cold)
-updated: 2026-10-07 (MiniMax-M3-Exec-Session #36, Plan-Entwurf, Nikinger-Freigabe §2 ausstehend)
+updated: 2026-10-11 (Note from other project: eurofyx-fleet S6, neuer §8: LLM-Guthaben seit 10-09 erschöpft) | 2026-10-07 (MiniMax-M3-Exec-Session #36, Plan-Entwurf, Nikinger-Freigabe §2 ausstehend)
 ---
 # Phase 16 L — Exec-Plan (LLM-Switch)
 
@@ -245,3 +245,24 @@ Smoke-Verifikation den exakten String ohne Code-Edit einsetzen kann.**
 - Streaming / Tool-Use — kein Use-Case
 - Kosten-Auto-Pilot / dynamische Provider-Switch — out
 - Live-Account-Schaltung — out (eigene Subphase)
+
+## §8 Note from other project — `eurofyx-fleet` (2026-10-11)
+
+> **Absender:** Claude Code im Repo `eurofyx-fleet` (privates Zentral-Infra-Repo des Nikingers), Session S6.
+> **Einzige Änderung an diesem Repo:** genau dieser Abschnitt plus die `updated:`-Zeile der Card. Ausdrücklich freigegeben vom Nikinger (2026-10-11), sonst gilt dort die Regel „nie in Projekt-Repos schreiben“. **Nicht committet**, der Commit gehört in die Bot-Session. Dienste, `data/state/KILL` und `DISCOVERY_ARMED` wurden nicht angefasst, gelesen wurde nur `data/state/run_scheduler.log`.
+> **Kein Auftrag an Subphase L.** Ein Befund, der F8 und die Motivation dieses Plans direkt betrifft.
+
+**Befund: Seit 2026-10-09 scheitern alle LLM-Aufrufe am Guthaben des bisherigen Anbieters.**
+- Die API antwortet mit **HTTP 400 `invalid_request_error`: „Your credit balance is too low“**.
+- Gezählt am 2026-10-09 in `run_scheduler.log`: **260×** in `research.*` (strukturierte Ausgabe abgelehnt, danach `research abstain`), **72×** `CRITICAL abstain_lessons.paper: PaperTradeTracker reflect failed … LLM call failed: BadRequestError(…)`, **6×** an anderer Stelle. Vor dem 2026-10-09 kommt die Meldung nicht vor.
+- Folge im Tick: `scheduler.research_tick: research tick: abstain (no candidate, reason=LLM_ABSTAIN)` → `execution.executor: no trade … research abstained or empty`. **Der Bot lief also weiter (Scheduler-Schleife, Reconcile), konnte aber keine Handelsentscheidung treffen.** Letzter Research-Tick: 2026-10-09 17:28 (danach Marktschluss und Wochenende, deshalb seither keine neuen Treffer, über das Guthaben sagt das nichts).
+- Das ist genau das Muster aus F8 („ein toter Bot meldet grün“): Prozess, Units und Reconcile sind gesund, die Entscheidungsstrecke ist tot. Der Fleet-Healthcheck sieht es ebenfalls nicht, weil er bewusst nur Broker-Logger auswertet (das Log ist sonst zu laut).
+
+**Daneben (klein, unabhängig):** `PaperEngine.open_scheduled_pairs` / `on_debate_abstain` melden einzeln `get_price not ok` für mehrere Epics (je 2–3×). Kein Zusammenhang mit dem Guthaben erkennbar.
+
+**Was Subphase L wissen sollte:**
+1. Bis zum Wechsel (oder bis das Guthaben aufgefüllt ist) wird jeder Research-Tick zu `LLM_ABSTAIN`. Messwerte aus diesem Zeitraum (Abstain-Quote, K6/Token-Verbrauch, `autonomy_report`) sind dadurch verzerrt und sollten nicht in die Bewertung des Wechsels einfließen.
+2. Ein Guthaben-/Auth-Fehler ist kein „Abstain“ im fachlichen Sinn. Vorschlag zur Prüfung: ihn als eigenen Grund führen (z. B. `LLM_UNAVAILABLE`) und ab N aufeinanderfolgenden Ticks laut melden, damit F8 auch diesen Fall abdeckt. Das gilt für jeden Anbieter, also auch nach dem Wechsel.
+3. Fleet ergänzt auf seiner Seite einen **weichen** Check (gelb) auf eine Serie von `reason=LLM_ABSTAIN` in Handelszeiten, ohne LLM- oder Broker-Aufruf. Der Bot-Code bleibt davon unberührt.
+
+> 🟡 **Nachtrag 2026-10-14 (Bot-Session, gegen `run_scheduler.log` nachgemessen):** der Guthaben-Ausfall war **auf einen Handelstag begrenzt**. `credit balance is too low`: 338× am 2026-10-09, **0×** davor und danach. `api.anthropic.com` antwortet seit 2026-10-12 durchgehend `200` (149 / 142 / 103 Calls am 12./13./14.10.), `research PASS` wieder 35 / 29 / 5 pro Tag. Das Guthaben wurde also zwischen 09.10. 17:28 und 12.10. Handelsbeginn aufgefüllt. Punkt 1 oben gilt damit **nur für den 2026-10-09**; Punkt 2 (`LLM_UNAVAILABLE` als eigener Grund + laute Meldung) bleibt als Vorschlag offen. Der Abschnitt wird in der Bot-Session committet.

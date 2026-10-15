@@ -468,3 +468,10 @@ Backoff-Stufe** (= 5 CRITICALs max, statt 6+ ohne Backoff). Nach 24 h ohne Aufl�
 **Stand:** 2026-08-31 ~07:50 UTC, Mini-Session 25 (Plan-Vorbereitung Session).
 **Nächste Aktion:** Nikinger-Sign-off für Phase-7-Cross-Phase-Freigabe (D2), dann
 Schritt 1 (Migration + Whitelist) ausführen.
+
+> 🟡 **Korrekturhinweis 2026-10-15 (Phase 16 Session #37):** der Sketch in Schritt 2 (und der daraus
+> gebaute Code, `cdf49db`) erfüllt D1 nicht — er misst jede Stufe gegen dieselbe „Zeit seit letztem
+> Versuch" und gibt erst nach 24 h frei; der Parameter `open_ts_iso` blieb ungenutzt. Live gemessen:
+> 24,06–27,22 h Buchungsverzug für alle 8 broker-geschlossenen Trades 09-29…10-08. Korrigiert gegen
+> Code in `phase7_reward/reward/recorder.py` (Intervall = größte D1-Stufe ≤ Trade-Alter seit `open_ts`).
+> Details: `phase7_reward/CLAUDE.md` (Korrektur-Vermerk 2026-10-15). Dieser Snapshot bleibt sonst unverändert.

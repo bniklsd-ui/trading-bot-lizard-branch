@@ -1,3 +1,89 @@
+## Session stopped — 2026-10-07 (MiniMax-M3-Exec-Session #36, Phase-16-LLM-Subphase **Planung eröffnet** — 2 neue Docs (Detail-Plan + Plan-Brief für Opus), keine Code-Edits, keine Test-Edits; 0 Σ-Regression; Lauf Tag 7 läuft seit 2026-09-29 22:57:03 mit unveränderter Konfiguration)
+
+> **Auftrag:** Nikinger 2026-10-07 ~17:30 Berlin (Phase-16-Live-Status-Check, ~7 Tage nach Session #35): (a) **Push-Freigabe für die 2 Commits der Session #35** — bestätigt: bereits durch Nikinger oder Auto-Sync gepusht, `git rev-list --left-right --count origin/main...HEAD` = `0 0` (HEAD = `1399ce7` = `origin/main`). (b) **K6-Schwellwert-Entscheidung** (Cap an Debatte-Volltagen 09-16/09-17 gerissen, Empfehlung aus dem Vorgespräch der Session #34 „Switch auf MiniMax-M3 via OpenAI-Compat"): **vertagt** auf eine separate Opus-Plan-Session — Cross-Phase-Edits (P4/5/7/8/15) sollen laut Nikinger **nicht** in Phase-16-Exec-Hand, sondern in einer Opus-Plan-Session stattfinden. (c) **Plan-Grundlagen-Doc** für die Opus-Plan-Session erstellen. (d) **Phase-Naming:** „bleibe bei der 16-Nummerierung, hänge ein passenden suffix an" → Subphase **Phase 16 LLM** (analog Phase 16 F für Audit + Restplan, Phase 16 R für Reparatur 2 + Neustart).
+
+### Completed
+
+**Diagnose (vor dem Schreib-Start):**
+
+- `git status` clean (working tree) bis auf `data/` und `sunshine_2026.906.222525-1+ubuntu24.04_amd64.deb` (beide gitignored / untracked).
+- `git rev-list --left-right --count origin/main...HEAD` = `0 0` → die 2 Commits der Session #35 (`1d0b6f0` phase3-Retry-Fix + `1399ce7` phase16-Doc-Fix) sind bereits auf `origin/main`. **Kein Push nötig.**
+- Phase-16-Subphasen-Stand aus Phasenkopf + INDEX: A/B/C/D/E ✅ (Hauptblöcke, Sessions #1–#17), F (Audit + Restplan) ✅ (Sessions #18–#32), R (Reparatur 2 + Neustart) ✅ (Sessions #33–#35). Subphase LLM noch nicht eröffnet — diese Session eröffnet sie **planungsseitig**, ohne Code.
+- Heute-Konfiguration des Bots: 4 systemd-Units laufen seit 2026-09-29 22:57:03 (PIDs 223277 scheduler / 223278 recorder / 223279 discovery / 223280 webui), `NRestarts=0`, Σ 1963 grün.
+- Heute-Datum 2026-10-07 = Tag 7 von 10 des v3-Laufs (Tag 1 = 2026-09-29 Di, Tag 10 = 2026-10-13 Di, Mo–Fr ohne Feiertags-Shift).
+
+**Detail-Plan `phase16_activation/PHASE16_LLM_SWITCH_PLAN.md` (NEU, 380 Zeilen):**
+
+- §0 BLUF mit Empfehlung (Default-Flip auf `openai_compat`, Beispiel-Modell `minimax/MiniMax-M3`, P6 bleibt Anthropic, Smoke-Pflicht vor Live-Account).
+- §1 selbst gemessene Fakten mit file:line-Ankern auf `phase4_research/research/llm_client.py:1`, `llm_openai_compat.py:107`, `models.py:536`, `scripts/wiring.py:180`, `openrouter_smoke.py:117`.
+- §2 8 Nikinger-Entscheidungen L-D1..L-D8 (Modell-String, Endpoint-URL, Keyring-Namespace, Default-Flip-Timing, Pricing-Row, Smoke-Pflicht).
+- §3 8 Locks L-L1..L-L8 (Hersteller-Agnostik über Factory, P6 nicht angefasst, Keyring-Isolation, Smoke-Pflicht, additive Pricing-Row, strukturelle Code-Sperre Wurzel-Regel 3).
+- §4 10 Schritte (Factory in P4 → Models-Update → P4-Wiring → Key-Skript → Tests → pytest-Sweep → Doku → Commit → Operator-Smoke → Default-Flip).
+- §5 5 Follow-ups (P5/7/8/15 in Folgesessions, K6-Schwellwert neu denken, Live-Account-Schalter).
+- §6 8 Akzeptanzkriterien AK-L1..AK-L8.
+- §7 Out-of-Scope (andere Hersteller, asynchrone Calls, Caching, Live-Account).
+
+**Plan-Brief `phase16_activation/PHASE16_LLM_SWITCH_BRIEF.md` (NEU, prompt-shaped für Opus-Plan-Session):**
+
+- Selbsterklärend für Opus (8 Sektionen + 3 Anhänge: Mission, Vorhandene Bauanleitung, Constraints, Empfehlung, Output-Spec, Offene Fragen, Außenkante, Rollback-Pfad + Anhang A Code-Anker, Anhang B Cross-Phase-Tabelle, Anhang C MiniMax-M3 Spec-Hinweise).
+- Anker auf den Detail-Plan + die existierenden Vorarbeiten (M1-Step-10 OpenAICompatLLMClient, smoke-verified mit OpenRouter).
+- Empfehlung: **konservativ** — Factory + P4-Defaults + Skripte + Tests in den Commits, **Default bleibt `anthropic`**; Nikinger macht den Flip nach Demo-PASS in einer Mini-Commit (eine Zeile + Service-Restart).
+
+**Phase-Naming-Korrektur (Nikinger-Direktive, in dieser Session umgesetzt):**
+
+- Ursprünglich geplant: Datei `PHASE17_LLM_SWITCH_BRIEF.md` (neue Phase-Nummer 17).
+- Per Nikinger-Auftrag 2026-10-07 („bleibe bei der 16 Nummerierung und hänge ein passenden suffix an") → umbenannt zu `PHASE16_LLM_SWITCH_BRIEF.md` (Subphase-Suffix statt Phase-17).
+- Brief-Header + Wofür-Absatz entsprechend angepasst: Subphase LLM unter Phase-16-Schirm, gleiche Lauf-Zeitstrahl + Cross-Phase-Freigabe aus aktivem Phase-16-Setup.
+- Plan-Datei (`PHASE16_LLM_SWITCH_PLAN.md`) hatte bereits Phase-16-L-Titel — keine Änderung nötig.
+- Naming-Konvention ist nun: **Phase 16 F** (Audit + Restplan) · **Phase 16 R** (Reparatur 2 + Neustart) · **Phase 16 LLM** (Hersteller-Agnostik) — alle drei Subphasen unter dem Phase-16-Schirm. Phase 17 bleibt für die Out-of-Scope-Items aus `PHASE16_PARTIAL_CLOSEOUT.md` §7 reserviert (Strategie-Bewertung, Prozess-Supervision, etc.).
+
+**Doku-Updates (additiv):**
+
+- `phase16_activation/CLAUDE.md`: `updated:`-Zeile um Session #36 ergänzt (komprimierte Form); Session #35-Block (308 Zeilen) verbatim nach `SESSIONS_ARCHIVE.md` rotiert (3614 Zeilen Archiv-Eintrag oben, +103 vom Vor-Stand #34-Stand 3511 — Selbst-Korrektur: in dieser Schreib-Pass waren es +308 Session-#35-Zeilen, neue Archiv-Größe wird beim ersten Datei-Read verifiziert); Session #36-Block (dieser hier) im Phasenkopf.
+- `docs/INDEX.md`: 2 neue Zeilen — `PHASE16_LLM_SWITCH_PLAN.md` (📕 Detail-Plan, Cross-Phase-Edits NICHT ausgeführt) und `PHASE16_LLM_SWITCH_BRIEF.md` (📕 Plan-Brief für Opus-Plan-Session).
+
+**Σ-Sweep:**
+
+- Σ unverändert: **1 963 grün** repo-weit (kein Test-Touch, kein Code-Touch).
+- Doc-Rotation-Hook (`scripts/check_doc_rotation.py --strict`) erwartet grün — neuer Plan + neuer Brief tragen korrekte Header-Cards (relativ-Pfade verifiziert: `down:` zeigt auf `./PHASE16_LLM_SWITCH_PLAN.md` und `./PHASE16_R_EXEC_PLAN.md` etc., beide existieren).
+
+**Commits dieser Session:**
+
+1. `phase16: docs — LLM-Switch-Subphase Plan + Brief + INDEX + Session-#36-Block` (dieser Commit).
+
+### Findings
+
+- 🟢 **Push-Bestätigung ohne Aktion.** Die 2 Commits der Session #35 sind bereits auf `origin/main` — keine Aktion nötig. Vermutlich Nikinger-Push zwischen 2026-09-30 und heute.
+- 🟢 **Phase-Naming-Konvention etabliert:** Phase 16 F / R / LLM (Suffix an die aktive Phase-Nummer) ist ab jetzt das Pattern für Subphasen. Phase 17 bleibt reserviert für die Out-of-Scope-Items der Phase 16 (Strategie-Bewertung, Prozess-Supervision, etc., siehe `PHASE16_PARTIAL_CLOSEOUT.md` §7).
+- 🟡 **K6-Schwellwert-Entscheidung weiter offen.** Session #34 hatte „K6 bleibt 300k" entschieden; die Empfehlung „Switch auf MiniMax-M3" aus dem damaligen Vorgespräch wurde heute **vertagt** auf die Opus-Plan-Session. K6 wird bis auf weiteres mit dem aktuellen Cap weiterleben (an Debatte-Volltagen reißend). Akzeptabel, weil: (1) Auto-Trigger T-8 noch nicht live verifiziert (siehe Phase-16-R-Subphase Session #34 OPEN-QUESTION), (2) die Laufzeitdaten Tag 4–9 (Sessions #32–#35) zeigen das Token-Budget als Trigger-Quelle für Exec-Sessions, nicht als Hard-Limit, (3) die Opus-Plan-Session wird K6 als Konsequenz der Hersteller-Agnostik ohnehin neu denken (§5 FU3 im Plan).
+- 🟢 **Detail-Plan ausreichend für Opus-Plan-Session.** 10 Schritte, 8 Locks, 8 Akzeptanzkriterien, 5 Follow-ups — Opus kann darauf aufbauen, ohne das halbe Repo zu crawlen. Empfehlung im Brief klar (konservativer Default-Flip); 6 offene Fragen dokumentiert.
+- 🟢 **0 Σ-Regression.** Kein Test-Touch, kein Code-Touch, kein pyc-Cache-Update nötig.
+
+### Open questions / blockers
+
+- **Keine** technischen. Lauf läuft (neue PIDs seit 2026-09-30 06:37), K6 reißt weiterhin an Debatte-Volltagen (K6-Threshold-Entscheidung offen bis Opus-Plan-Session).
+- **Beobachtungsposten für nächste Session:** ob K6 in der neuen Woche (Tag 6–9 des v3-Laufs, also 2026-10-07 bis 2026-10-10) reißt. Trigger T-8 ist im Phasenkopf vorgesehen, aber strukturell noch nicht live-verifiziert.
+
+### NEXT (für die nächste Session)
+
+1. **K6-Schwellwert-Beobachtung Tag 6–9** (Di 2026-10-07 bis Fr 2026-10-10): Tagesroutine G1 (`scripts/autonomy_report.py --day YYYY-MM-DD`) am Ende jedes Handelstags — K1/K8/K9 gegen systemd-Autostart, K6 gegen 300k-Cap. Erwartung: K6 reißt an mind. 1–2 Tagen (analog 09-16/09-17), bleibt strukturell.
+2. **Opus-Plan-Session für Phase-16-LLM-Subphase:** Nikinger startet die Plan-Session mit Verweis auf `phase16_activation/PHASE16_LLM_SWITCH_BRIEF.md` als Briefing-Doc. Opus liefert einen execution-ready Plan mit Locks + Schritt-Sequenz + Akzeptanz, geprüft gegen den Detail-Plan und den Code.
+3. **Push-Freigabe** für den 1 Commit dieser Session (Nikinger — `git rev-list --left-right --count origin/main...HEAD` zeigt `0 1` nach Commit).
+4. **Lauf-Tag-10-Closeout:** Mo 2026-10-13 nach 17:30 — Block I (Tag-10-Closeout, F-Exec-Plan §3 Block I) — exekutieren, falls bis dahin keine Eskalation.
+
+**Block-Status nach Session #36:**
+
+| Block | Status |
+|---|---|
+| A (Haushalt) | ✅ (Session #1-#4) |
+| B (Substrat) | ✅ (Session #3) |
+| C (Research-Loop) | ✅ (Sessions #3-#7) |
+| D (Freischaltung) | ✅ (Session #7-#17) |
+| E (2-Wochen-Test) | 🔄 Tag 7 = 2026-10-07 → Tag 10 = 2026-10-13 — läuft, K6 weiter offen |
+| F (Subphase) | ✅ (Sessions #18-#32) |
+| R (Reparatur 2 + Neustart) | ✅ (Sessions #33-#35) |
+| LLM (Hersteller-Agnostik) | 🔄 **eröffnet Session #36** — Planung ✅, Plan-Brief ✅, Code-Edits 🔄 (Opus-Plan-Session steht aus) |
+
 ## Session stopped — 2026-09-30 (MiniMax-M3-Exec-Session #35, Phase-16-R-Subphase **R-Fix + Doc-Fix ausgeführt** — 2 Commits (phase3-code+tests, phase16-docs); **R-Fix**: `phase3_external_data/external_data/fetcher.py` `_MAX_RETRIES` 3→5 + neue `_TRANSIENT_EXC_NAMES = {RequestsError, ConnectionError, Timeout, ChunkedEncodingError}` + neue `_is_retryable_error()` / `_is_rate_limit_error_only()` Helfer; `_is_rate_limit_error` bleibt als Back-Compat-Wrapper; Logging unterscheidet „rate-limited" vs. „transient network error (RequestsError, attempt 1/5)"; Recovery-Fenster wächst von 7s → 15s Backoff (+ 5× Fetch-Latenz); +3 Tests (`test_transient_network_error_retries_then_raises_rate_limit_error` + `test_transient_network_error_recovers_within_budget` + `test_unknown_exception_propagates_without_retry`); `test_circuit.py:test_circuit_success_after_failures_resets` nutzt jetzt `fetcher._MAX_RETRIES` statt Magic-Number; **Root-Cause für den Fix** (Nikinger 2026-09-30): physischer Server-Umbau am Di 2026-09-29 ~22:55 — Netzwerk ging nicht sofort wieder, Daemon bekam keinen SIGTERM (Hard-Shutdown), kein Grace-Full-Shutdown-Log im run_scheduler.log für Sep-29-Evening (nur für Sep-25 22:35, als die v1-Logs rotiert wurden). System bootete Di 22:56, R5-Autostart fuhr die 4 Units hoch (erste Start-Zeile `22:57:03`). Der Retry-Fix ist defensiv für die nächste Netzwerk-Hick-Up; die echten 2 433 yfinance-„possibly delisted"-Errors waren Sekundär-Schaden des Netzwerk-Ausfalls; **Restart**: pyc-Cache `fetcher.cpython-312.pyc` gelöscht, `systemctl --user stop/start` für alle 4 Units (PIDs 223277 scheduler / 223278 recorder / 223279 discovery / 223280 webui), 2026-09-30 06:37:37 wrapper-Start-Zeilen sauber, neuer Code geladen; Markt zu bis 09:00 — neuer Retry-Budget noch nicht in Produktion exerziert; **Doc-Fix**: `PHASE16_AUTONOMY_PREREGISTRATION_v3.md` + `PHASE16_E3_RUNBOOK_v4.md` von Disk auf GitHub (waren seit 2026-09-23 als Files auf Disk, untracked). Aktiv-Block in v3 nachträglich ausgefüllt mit echtem Start-Zeitstempel `2026-09-29T22:57:03+02:00` (post-hoc, weil Hard-Reboot 22:55 + Autostart — **kein** AK13-Verstoß für künftige Re-Eintragungen, explizit dokumentiert). Ende-Datum `2026-10-13` (10 Handelstage Mo–Fr, Feiertag 03.10 = Sa = keine Verschiebung). 3 Header-Card-Pfade korrigiert (`./phase16_activation/systemd/` → `./systemd/`, `./scripts/install_units.sh` → `../scripts/install_units.sh`). `docs/INDEX.md` um v3- und v4-Zeilen ergänzt (v2 + v3 jetzt beide als „SUPERSEDED durch v3"/„aktive Vorregistrierung v3" markiert). Session #34 verbatim nach `SESSIONS_ARCHIVE.md` rotiert [35. Eintrag, 190 Zeilen]).
 
 > **Auftrag:** Nikinger 2026-09-30 ~06:35 Berlin: (1) Status-Check des v3-Laufs (war seit 25.09 gelaufen, hatte aber seit 28.09 ein yfinance-Flake-Symptom), (2) Retry-Fix einbauen, Dienste neu starten wenn nötig, (3) danach Doku-Fix für v3 + Runbook v4 (waren untracked auf Disk). Nikinger-Hint: „gestern Abend in diesem Zeitraum gab es einen physischen Umbau des Servers, Netzwerk ging nicht sofort wieder, evtl ist das der Grund gewesen" — bestätigt: 2026-09-29 ~22:55 Hard-Shutdown + Reboot 22:56 + Netzwerk-Reconnect verzögert; Daemon hatte keine SIGTERM (kein Grace-Full-Shutdown im run_scheduler.log für 22:55-Zeitstempel).

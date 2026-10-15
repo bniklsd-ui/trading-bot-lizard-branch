@@ -9,7 +9,7 @@ down:
   - ./README.md
   - ../docs/concepts/phase7_reward_concept.md   # full concept/plan snapshot (L3)
   - ./PHASE12_RECONCILIATION_TIMING_PLAN.md    # 📕 Mini-Plan P12-Recon-Timing-Fix (2026-08-31, Mini-Session 26, Nikinger-signed-off): Backoff für `RewardSink.reconcile_open_trades` (Migration 003 `last_resolve_attempt_utc` + Exponential-Backoff 15 min → 30 min → 1 h → 4 h → 24 h + persistent-fail-WARNING nach 24 h); Cross-Phase-Freigabe Phase 7 + Phase 2; D1–D5 gelockt, A1–A6 Akzeptanz; **bei jedem Phase-7-Closeout referenzieren**
-updated: 2026-08-31 (+ Phase-12-Reconciliation-Timing-Plan Mini-Session 26)
+updated: 2026-10-15 (🟡 Backoff-Anker-Korrektur, Phase 16 Session #37) | 2026-08-31 (+ Phase-12-Reconciliation-Timing-Plan Mini-Session 26)
 ---
 # CLAUDE.md — Phase 7: Reward/Brain (`phase7_reward/`)
 
@@ -354,6 +354,20 @@ Docstring, nur genutzte Methoden, `EnvelopeLike` für Broker-Returns (immer `.ok
   `phase2_persistence_konzept.md` waren bereits konsistent (unverändert).
 
 ---
+
+> 🟡 **Korrektur 2026-10-15 (Phase 16 Session #37, cross-phase mit Nikinger-Freigabe):** der
+> Backoff aus Step 14 (`cdf49db`) lief nie als Leiter. `_next_retry_in_s` maß jede Stufe gegen
+> „Zeit seit dem **letzten** Versuch" und gab erst bei ≥ 24 h frei → **jeder** Retry wartete 24 h
+> (gemessen: alle 8 broker-geschlossenen Trades des v3-Laufs nach 24,06–27,22 h gebucht; die
+> TIME_STOP-Trades lag-frei über den Close-Confirm). Folge: Daily-Loss-Breaker
+> (`phase8_scheduler/scheduler/safety.py`, liest `profit_loss IS NOT NULL`) war für Stop-outs am
+> selben Tag blind. **Fix:** Intervall = größte D1-Stufe ≤ Trade-Alter (`now − open_ts`), Boden
+> 15 min (`recorder.py` `_next_retry_in_s`, neuer 2. Parameter `open_ts_iso`, einziger Aufrufer
+> `_on_trade_closed`). D1-Stufen unverändert; nur der Anker ist neu. Keine Migration (Attempt-Zähler
+> hätte eine gebraucht; der Plan-Sketch reichte `open_ts_iso` bereits durch und nutzte es nicht).
+> Bekannte Grenze (`ponytail:`-Kommentar im Code): nach dem 4-h-Step wartet ein Stop-out bis zu
+> 4 h. Endpoint `/history/transactions` → kein Verbrauch der IG-`/prices`-Allowance. Neuer
+> Sequenz-Test `test_backoff_interval_follows_trade_age_not_ladder_top`; P7 170 grün, P8 261 grün.
 
 ## Session stopped — 2026-08-31 (Step 14 — P12-Reconcile-Timing-Backoff, 5 Commits, 1 Operator-Aktion)
 

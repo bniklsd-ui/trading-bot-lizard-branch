@@ -203,88 +203,30 @@ wenn ein fremder Prozess dieselbe PID bekommt, verweigert der Daemon den Start m
 „already running". Heute nicht der Fall.
 
 ---
-## Session stopped — 2026-10-07 (MiniMax-M3-Exec-Session #36, Phase-16-LLM-Subphase **Planung eröffnet** — 2 neue Docs (Detail-Plan + Plan-Brief für Opus), keine Code-Edits, keine Test-Edits; 0 Σ-Regression; Lauf Tag 7 läuft seit 2026-09-29 22:57:03 mit unveränderter Konfiguration)
+## Session stopped — 2026-10-14 (Opus-5.5-Session #37, Status-Check nach ~1 Woche Abwesenheit des Nikingers — read-only Diagnose + 3 Doc-Nachträge, keine Code-/Test-Edits, Σ 1963 unverändert (nicht neu gemessen); Session #36 verbatim nach `SESSIONS_ARCHIVE.md` rotiert)
 
-> **Auftrag:** Nikinger 2026-10-07 ~17:30 Berlin (Phase-16-Live-Status-Check, ~7 Tage nach Session #35): (a) **Push-Freigabe für die 2 Commits der Session #35** — bestätigt: bereits durch Nikinger oder Auto-Sync gepusht, `git rev-list --left-right --count origin/main...HEAD` = `0 0` (HEAD = `1399ce7` = `origin/main`). (b) **K6-Schwellwert-Entscheidung** (Cap an Debatte-Volltagen 09-16/09-17 gerissen, Empfehlung aus dem Vorgespräch der Session #34 „Switch auf MiniMax-M3 via OpenAI-Compat"): **vertagt** auf eine separate Opus-Plan-Session — Cross-Phase-Edits (P4/5/7/8/15) sollen laut Nikinger **nicht** in Phase-16-Exec-Hand, sondern in einer Opus-Plan-Session stattfinden. (c) **Plan-Grundlagen-Doc** für die Opus-Plan-Session erstellen. (d) **Phase-Naming:** „bleibe bei der 16-Nummerierung, hänge ein passenden suffix an" → Subphase **Phase 16 LLM** (analog Phase 16 F für Audit + Restplan, Phase 16 R für Reparatur 2 + Neustart).
+> **Auftrag:** Nikinger 2026-10-14 ~18:50 Berlin: kurzer BLUF zum Stand, Empfehlung für den nächsten Schritt, Notes aus einem anderen Projekt sichten.
 
 ### Completed
 
-**Diagnose (vor dem Schreib-Start):**
+- **v3-Lauf (Tag 1 = 2026-09-29, Tag 10 = 2026-10-13) gemessen:** 13 Trades, 12 CLOSED (5 Gewinner, Σ −2 499,15 EUR, `trade_outcomes` `session_date>='2026-09-29'`) + 1 OPEN (id 26, s. u.). Letzte Trades 2026-10-08. Alle 4 systemd-Units laufen; **Autostart live bewiesen** — Reboot 2026-10-12 21:09, Units ohne Hand-Restart hoch (pid-Files 21:09–21:10). Schema v9.
+- **AEX-Trade id 26 (`DIAAAAYMDDNBRAQ`, BUY 0.6, offen seit 2026-10-08 15:42) — Root Cause:** Monitor startete 15:43, Scheduler wurde am selben Tag neu gestartet (systemd 16:59, Daemon-Log 22:26, Ursache des Stopps unbekannt — Journal abgeschnitten), danach überwacht **niemand** die Position (`reconcile_startup` lässt `present` stehen, `phase5_execution/execution/order.py:68`). Time-Stop (`max_hold_minutes=240`) nie angewendet; `max_parallel_positions=1` blockierte 09.–14.10. jeden neuen Trade (`abstain_records` `reason_gate_constraints`). IG-Screenshot des Nikingers: Long-Zinsen 12./13./14.10. → Position real offen, +261,60 EUR laufend. **Nikinger hat sie am 2026-10-14 ~19:00 manuell geschlossen.**
+- **Bot-Reaktion auf den manuellen Close:** 19:02:24 `reconcile: bot-e6e7… missing at broker — marking closed (orphan)` ✅ (execution_state ohne OPEN/PENDING). 19:12:25 Reward-Recorder: `no usable history row … IG lag — retry later` → `trade_outcomes` id 26 steht **noch OPEN ohne P&L** (bekanntes IG-Demo-Settlement-Lag, s. Phase 7).
+- **Fleet-Note (`eurofyx-fleet` S6, 2026-10-11, uncommitted §8 in `PHASE16_LLM_SWITCH_PLAN.md`) gegen Log nachgemessen:** `credit balance is too low` 338× **nur** am 2026-10-09; seit 10-12 Anthropic durchgehend `200`. Dated 🟡-Nachtrag an §8 angehängt.
+- **`PHASE16_PARTIAL_CLOSEOUT.md` §7:** +2 Phase-17-Kandidaten (Nikinger: Restart-Plan „für die nächste Phase"): Monitor-Re-Adoption nach Restart; `InstinctValidator.validate()`-Signatur-Bruch live (CRITICAL für trade_id 12–19).
+- 🔴 **Backoff-Defekt (2026-10-15 gemessen, nicht behoben):** `_next_retry_in_s` (`phase7_reward/reward/recorder.py:105-120`, Commit `cdf49db`) misst jede Stufe ab **demselben** letzten Versuch und gibt erst bei `elapsed ≥ 24 h` frei → effektives Retry-Intervall **immer 24 h**, nicht die geplante Leiter 15 min → 30 min → 1 h → 4 h → 24 h (`phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md` D1, Idempotenz-Satz „Trades, die IG nach 5 h postet, werden beim ersten Backoff-Slot nach Settlement erkannt"). Beleg: alle 8 broker-geschlossenen Trades des v3-Laufs gebucht nach 24,06–27,22 h (id 15: 70 h über das Wochenende); die 4 TIME_STOP-Trades lag-frei (0 h, Close-Confirm-Pfad). **Folge:** der Daily-Loss-Breaker liest `SUM(profit_loss) … WHERE profit_loss IS NOT NULL` (`phase8_scheduler/scheduler/safety.py:24-36`, `wiring.py:1009`) und ist für Stop-outs am selben Tag **blind** (z. B. 2026-10-08: −790 + −550 erst am 10-09 gebucht, AEX-Einstieg 15:42 sah 0 statt −1 341). Gleiches gilt für den Daily-PNL-Lock (Hard Rule 5). Fix-Ort: Phase 7 (gemeinsame Stelle), cross-phase → Nikinger-Freigabe.
+- ✅ **Backoff-Defekt gefixt (2026-10-15, Opus 5.5)** — ausdrückliche Nikinger-Ausnahme von der Analyse/Fix-Trennung („kleiner Fix, mit detaillierter Doku"), Cross-Phase P7 freigegeben. `_next_retry_in_s(last_attempt_iso, open_ts_iso, now_utc)`: Intervall = größte D1-Stufe ≤ Trade-Alter, Boden 15 min. +1 Sequenz-Test (schlägt gegen alten Code fehl: alter Code wartete bei „letzter Versuch vor 61 min" noch 2,98 h, bei „vor 5 h" noch 19 h). P7 170 grün, P8 261 grün. Endpoint `/history/transactions` (`ig_adapter.py:613`) → keine `/prices`-Allowance. Advisor konsultiert ([VERIFY]-Mismatch Plan↔Code). **Nicht** behoben: Breaker bleibt bis zur ersten erfolgreichen Auflösung blind (jetzt ≤ ~1 h im Hold-Fenster statt 24 h; echte IG-Settle-Zeit noch unbekannt, der gemessene 24,06-h-Wert war der Backoff-Boden). Null-Blindheit bräuchte einen Breaker, der ungelöste broker-geschlossene Zeilen mit `−initial_risk` zählt → **Nikinger 2026-10-15: Phase-17-Kandidat** (in `PHASE16_PARTIAL_CLOSEOUT.md` §7 eingetragen). **Scheduler-Restart 2026-10-15 07:42:26** (Nikinger-Go; OPEN/PENDING leer, `recorder`-pyc gelöscht, neue MainPID 670575, Startzeile sauber) → Fix live. id 26 bleibt unberührt (letzter Versuch 14.10. 19:12 CEST in der DB, Alter > 24 h → 24-h-Stufe → nächster Versuch ~15.10. 19:12).
+- Weitere Log-Befunde (nicht behoben): 1× transienter Reconcile-`ExecutionAbort` 2026-10-14 16:52 (fail-closed korrekt, kein Dauer-Defekt); 16× `PaperEngine … get_price not ok`; yFinance `^IBEX possibly delisted`-Lärm (Hauptteil der 2 857 ERROR-Zeilen).
 
-- `git status` clean (working tree) bis auf `data/` und `sunshine_2026.906.222525-1+ubuntu24.04_amd64.deb` (beide gitignored / untracked).
-- `git rev-list --left-right --count origin/main...HEAD` = `0 0` → die 2 Commits der Session #35 (`1d0b6f0` phase3-Retry-Fix + `1399ce7` phase16-Doc-Fix) sind bereits auf `origin/main`. **Kein Push nötig.**
-- Phase-16-Subphasen-Stand aus Phasenkopf + INDEX: A/B/C/D/E ✅ (Hauptblöcke, Sessions #1–#17), F (Audit + Restplan) ✅ (Sessions #18–#32), R (Reparatur 2 + Neustart) ✅ (Sessions #33–#35). Subphase LLM noch nicht eröffnet — diese Session eröffnet sie **planungsseitig**, ohne Code.
-- Heute-Konfiguration des Bots: 4 systemd-Units laufen seit 2026-09-29 22:57:03 (PIDs 223277 scheduler / 223278 recorder / 223279 discovery / 223280 webui), `NRestarts=0`, Σ 1963 grün.
-- Heute-Datum 2026-10-07 = Tag 7 von 10 des v3-Laufs (Tag 1 = 2026-09-29 Di, Tag 10 = 2026-10-13 Di, Mo–Fr ohne Feiertags-Shift).
-
-**Detail-Plan `phase16_activation/PHASE16_LLM_SWITCH_PLAN.md` (NEU, 380 Zeilen):**
-
-- §0 BLUF mit Empfehlung (Default-Flip auf `openai_compat`, Beispiel-Modell `minimax/MiniMax-M3`, P6 bleibt Anthropic, Smoke-Pflicht vor Live-Account).
-- §1 selbst gemessene Fakten mit file:line-Ankern auf `phase4_research/research/llm_client.py:1`, `llm_openai_compat.py:107`, `models.py:536`, `scripts/wiring.py:180`, `openrouter_smoke.py:117`.
-- §2 8 Nikinger-Entscheidungen L-D1..L-D8 (Modell-String, Endpoint-URL, Keyring-Namespace, Default-Flip-Timing, Pricing-Row, Smoke-Pflicht).
-- §3 8 Locks L-L1..L-L8 (Hersteller-Agnostik über Factory, P6 nicht angefasst, Keyring-Isolation, Smoke-Pflicht, additive Pricing-Row, strukturelle Code-Sperre Wurzel-Regel 3).
-- §4 10 Schritte (Factory in P4 → Models-Update → P4-Wiring → Key-Skript → Tests → pytest-Sweep → Doku → Commit → Operator-Smoke → Default-Flip).
-- §5 5 Follow-ups (P5/7/8/15 in Folgesessions, K6-Schwellwert neu denken, Live-Account-Schalter).
-- §6 8 Akzeptanzkriterien AK-L1..AK-L8.
-- §7 Out-of-Scope (andere Hersteller, asynchrone Calls, Caching, Live-Account).
-
-**Plan-Brief `phase16_activation/PHASE16_LLM_SWITCH_BRIEF.md` (NEU, prompt-shaped für Opus-Plan-Session):**
-
-- Selbsterklärend für Opus (8 Sektionen + 3 Anhänge: Mission, Vorhandene Bauanleitung, Constraints, Empfehlung, Output-Spec, Offene Fragen, Außenkante, Rollback-Pfad + Anhang A Code-Anker, Anhang B Cross-Phase-Tabelle, Anhang C MiniMax-M3 Spec-Hinweise).
-- Anker auf den Detail-Plan + die existierenden Vorarbeiten (M1-Step-10 OpenAICompatLLMClient, smoke-verified mit OpenRouter).
-- Empfehlung: **konservativ** — Factory + P4-Defaults + Skripte + Tests in den Commits, **Default bleibt `anthropic`**; Nikinger macht den Flip nach Demo-PASS in einer Mini-Commit (eine Zeile + Service-Restart).
-
-**Phase-Naming-Korrektur (Nikinger-Direktive, in dieser Session umgesetzt):**
-
-- Ursprünglich geplant: Datei `PHASE17_LLM_SWITCH_BRIEF.md` (neue Phase-Nummer 17).
-- Per Nikinger-Auftrag 2026-10-07 („bleibe bei der 16 Nummerierung und hänge ein passenden suffix an") → umbenannt zu `PHASE16_LLM_SWITCH_BRIEF.md` (Subphase-Suffix statt Phase-17).
-- Brief-Header + Wofür-Absatz entsprechend angepasst: Subphase LLM unter Phase-16-Schirm, gleiche Lauf-Zeitstrahl + Cross-Phase-Freigabe aus aktivem Phase-16-Setup.
-- Plan-Datei (`PHASE16_LLM_SWITCH_PLAN.md`) hatte bereits Phase-16-L-Titel — keine Änderung nötig.
-- Naming-Konvention ist nun: **Phase 16 F** (Audit + Restplan) · **Phase 16 R** (Reparatur 2 + Neustart) · **Phase 16 LLM** (Hersteller-Agnostik) — alle drei Subphasen unter dem Phase-16-Schirm. Phase 17 bleibt für die Out-of-Scope-Items aus `PHASE16_PARTIAL_CLOSEOUT.md` §7 reserviert (Strategie-Bewertung, Prozess-Supervision, etc.).
-
-**Doku-Updates (additiv):**
-
-- `phase16_activation/CLAUDE.md`: `updated:`-Zeile um Session #36 ergänzt (komprimierte Form); Session #35-Block (308 Zeilen) verbatim nach `SESSIONS_ARCHIVE.md` rotiert (3614 Zeilen Archiv-Eintrag oben, +103 vom Vor-Stand #34-Stand 3511 — Selbst-Korrektur: in dieser Schreib-Pass waren es +308 Session-#35-Zeilen, neue Archiv-Größe wird beim ersten Datei-Read verifiziert); Session #36-Block (dieser hier) im Phasenkopf.
-- `docs/INDEX.md`: 2 neue Zeilen — `PHASE16_LLM_SWITCH_PLAN.md` (📕 Detail-Plan, Cross-Phase-Edits NICHT ausgeführt) und `PHASE16_LLM_SWITCH_BRIEF.md` (📕 Plan-Brief für Opus-Plan-Session).
-
-**Σ-Sweep:**
-
-- Σ unverändert: **1 963 grün** repo-weit (kein Test-Touch, kein Code-Touch).
-- Doc-Rotation-Hook (`scripts/check_doc_rotation.py --strict`) erwartet grün — neuer Plan + neuer Brief tragen korrekte Header-Cards (relativ-Pfade verifiziert: `down:` zeigt auf `./PHASE16_LLM_SWITCH_PLAN.md` und `./PHASE16_R_EXEC_PLAN.md` etc., beide existieren).
-
-**Commits dieser Session:**
-
-1. `phase16: docs — LLM-Switch-Subphase Plan + Brief + INDEX + Session-#36-Block` (dieser Commit).
-
-### Findings
-
-- 🟢 **Push-Bestätigung ohne Aktion.** Die 2 Commits der Session #35 sind bereits auf `origin/main` — keine Aktion nötig. Vermutlich Nikinger-Push zwischen 2026-09-30 und heute.
-- 🟢 **Phase-Naming-Konvention etabliert:** Phase 16 F / R / LLM (Suffix an die aktive Phase-Nummer) ist ab jetzt das Pattern für Subphasen. Phase 17 bleibt reserviert für die Out-of-Scope-Items der Phase 16 (Strategie-Bewertung, Prozess-Supervision, etc., siehe `PHASE16_PARTIAL_CLOSEOUT.md` §7).
-- 🟡 **K6-Schwellwert-Entscheidung weiter offen.** Session #34 hatte „K6 bleibt 300k" entschieden; die Empfehlung „Switch auf MiniMax-M3" aus dem damaligen Vorgespräch wurde heute **vertagt** auf die Opus-Plan-Session. K6 wird bis auf weiteres mit dem aktuellen Cap weiterleben (an Debatte-Volltagen reißend). Akzeptabel, weil: (1) Auto-Trigger T-8 noch nicht live verifiziert (siehe Phase-16-R-Subphase Session #34 OPEN-QUESTION), (2) die Laufzeitdaten Tag 4–9 (Sessions #32–#35) zeigen das Token-Budget als Trigger-Quelle für Exec-Sessions, nicht als Hard-Limit, (3) die Opus-Plan-Session wird K6 als Konsequenz der Hersteller-Agnostik ohnehin neu denken (§5 FU3 im Plan).
-- 🟢 **Detail-Plan ausreichend für Opus-Plan-Session.** 10 Schritte, 8 Locks, 8 Akzeptanzkriterien, 5 Follow-ups — Opus kann darauf aufbauen, ohne das halbe Repo zu crawlen. Empfehlung im Brief klar (konservativer Default-Flip); 6 offene Fragen dokumentiert.
-- 🟢 **0 Σ-Regression.** Kein Test-Touch, kein Code-Touch, kein pyc-Cache-Update nötig.
+### Next
+- ✅ **id 26 gebucht 2026-10-15 19:15:22** (`reconcile: resolved 1 open trade(s)`, Lesson extrahiert): `CLOSED`, `close_level` 1136,2, `profit_loss` **+266,40 EUR** (IG-Deal-P&L; Long-Zinsen ~−20,73 EUR laufen separat über die IG-Transaktionen und sind darin nicht enthalten). v3-Lauf final: **13 CLOSED, 6 Gewinner, Σ −2 232,75 EUR**. Kleiner Datenbefund: `close_ts` = Zeitstempel des letzten Fehlversuchs (2026-10-14 17:12:25Z), nicht der echte Close (~17:00Z) — Cold-Reconstruct nimmt `updated_at` als `closed_at` (`recorder.py` `_reconstruct_closed`); `hold_duration_min` entsprechend leicht zu lang. Closeout-Notiz, kein Fix.
+- Brückenfenster Tag 1 (Stand 19:17): 0 Trades, 86× `reason_no_candidates`, 0× `reason_gate_constraints` (Q2 bisher ok), 0× `credit balance` (Q3 ok).
+- Ab 2026-10-15 sollte wieder gehandelt werden (Slot frei) — erste Zeile in `trade_outcomes` mit `session_date='2026-10-15'` oder `reason_gate_constraints` = 0 ist der Beleg.
+- **2-Tage-Brückenfenster läuft** (Nikinger 2026-10-15): Do 10-15 09:00 → Fr 10-16 17:30, vorregistriert in `PHASE16_AUTONOMY_PREREGISTRATION_v4.md` (Commit `90b75b1`, 07:48:36 < Start). Nach Fensterende: `autonomy_report.py --from 2026-10-15 --to 2026-10-16 --summary` (Operator) + Q1–Q4 auswerten → Eingang für v3-Closeout + Plan am Wochenende 17./18.10. `eurofyx-fleet` liest im selben Zeitraum (FYI, rein lesend = kein Operator-Ereignis).
+- **Run-10-Closeout** (Auswertung v3 gegen Prereg-AK, Ursachen der 0-Trade-Tage trennen: 10-09 LLM-Guthaben, 10-12..14 blockierter Slot, sonst echte Abstains) — wartet auf Nikinger-Go.
+- Commit der 3 Doc-Änderungen + dieser Rotation wartet auf Nikinger-Go.
 
 ### Open questions / blockers
-
-- **Keine** technischen. Lauf läuft (neue PIDs seit 2026-09-30 06:37), K6 reißt weiterhin an Debatte-Volltagen (K6-Threshold-Entscheidung offen bis Opus-Plan-Session).
-- **Beobachtungsposten für nächste Session:** ob K6 in der neuen Woche (Tag 6–9 des v3-Laufs, also 2026-10-07 bis 2026-10-10) reißt. Trigger T-8 ist im Phasenkopf vorgesehen, aber strukturell noch nicht live-verifiziert.
-
-### NEXT (für die nächste Session)
-
-1. **K6-Schwellwert-Beobachtung Tag 6–9** (Di 2026-10-07 bis Fr 2026-10-10): Tagesroutine G1 (`scripts/autonomy_report.py --day YYYY-MM-DD`) am Ende jedes Handelstags — K1/K8/K9 gegen systemd-Autostart, K6 gegen 300k-Cap. Erwartung: K6 reißt an mind. 1–2 Tagen (analog 09-16/09-17), bleibt strukturell.
-2. **Opus-Plan-Session für Phase-16-LLM-Subphase:** Nikinger startet die Plan-Session mit Verweis auf `phase16_activation/PHASE16_LLM_SWITCH_BRIEF.md` als Briefing-Doc. Opus liefert einen execution-ready Plan mit Locks + Schritt-Sequenz + Akzeptanz, geprüft gegen den Detail-Plan und den Code.
-3. **Push-Freigabe** für den 1 Commit dieser Session (Nikinger — `git rev-list --left-right --count origin/main...HEAD` zeigt `0 1` nach Commit).
-4. **Lauf-Tag-10-Closeout:** Mo 2026-10-13 nach 17:30 — Block I (Tag-10-Closeout, F-Exec-Plan §3 Block I) — exekutieren, falls bis dahin keine Eskalation.
-
-**Block-Status nach Session #36:**
-
-| Block | Status |
-|---|---|
-| A (Haushalt) | ✅ (Session #1-#4) |
-| B (Substrat) | ✅ (Session #3) |
-| C (Research-Loop) | ✅ (Sessions #3-#7) |
-| D (Freischaltung) | ✅ (Session #7-#17) |
-| E (2-Wochen-Test) | 🔄 Tag 7 = 2026-10-07 → Tag 10 = 2026-10-13 — läuft, K6 weiter offen |
-| F (Subphase) | ✅ (Sessions #18-#32) |
-| R (Reparatur 2 + Neustart) | ✅ (Sessions #33-#35) |
-| LLM (Hersteller-Agnostik) | 🔄 **eröffnet Session #36** — Planung ✅, Plan-Brief ✅, Code-Edits 🔄 (Opus-Plan-Session steht aus) |
+- K6-Schwelle + LLM-Switch weiter offen (Session #36 → Opus-Plan-Session).
+- Fleet-Vorschlag `LLM_UNAVAILABLE` als eigener Abstain-Grund + laute Meldung — offen, nicht entschieden.
+- Ursache des Scheduler-Stopps 2026-10-08 zwischen 15:43 und 16:59 unbekannt.
