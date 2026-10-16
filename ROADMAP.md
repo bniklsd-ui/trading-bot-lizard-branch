@@ -436,6 +436,7 @@ angefasst wird. `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` ist leer
 dann "Phase 13", dann "Phase 14", jetzt Phase 15 — umnummeriert 2026-08-11, 2026-08-18 und 2026-08-22)*
 
 > **Status: ✅ ABGESCHLOSSEN am 2026-09-05 (Session #13, MiniMax-M3-Exec)** — Closeout-Handover [`phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md`](../phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md), Bild [`docs/architecture/phase15_closeout.svg`](../docs/architecture/phase15_closeout.svg). Pattern-Vergleich zu Phase-12/13/14. **4 Blöcke alle ✅**: A (Haushalt) endgültig · B (Reward-Kalibrierung) live-validiert (Score 78,72 → 50,00) · C (Instinct-ECC) code-complete, heute bit-identical via VETO-5-leere-Regelliste (AK9) · D (Erbstücke + Folgefix Variante C) endgültig. **Σ 1843 grün repo-weit**. 18 Commits gepusht, 6 Commits lokal ahead (Push-Freigabe ausstehend). **Offen (alle nicht-Phase-15-Blocker):** Promotion-Bridge (Plan §10), Ledger-Restore (250 Punkte, Nikinger-Aktion), Live-DB Migration 008+009 (nicht automatisch — Phase 16 B1/B2, korrigiert 2026-09-05 → Phase-16-Plan §3 L3), Gate P7/A6 (wartet auf nächsten OPEN-Trade).
+> 🟡 *Nachtrag 2026-10-16 (Phase-16-Closeout):* von den „Offen"-Punkten sind Ledger-Restore und Migration 008+009 erledigt; die Promotion-Bridge ist gebaut (Phase 16 D2), live aber tot (`bridge.py:146`); Gate P7/A6 ist gemessen (deal-bezogene CRITICALs max 2 je Trade) — Öffnen = Entscheidung E6 im [Phase-16-Handover](./phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md).
 >
 > Phasenkopf: [`phase15_v4/CLAUDE.md`](../phase15_v4/CLAUDE.md). Plan: [`docs/concepts/phase15_v4_plan.md`](./docs/concepts/phase15_v4_plan.md) (P1–P16, AK1–AK14, 📕).
 
@@ -468,28 +469,33 @@ dann "Phase 13", dann "Phase 14", jetzt Phase 15 — umnummeriert 2026-08-11, 20
 
 ---
 
-## Phase 16 — Freischaltung *(eröffnet 2026-09-05, Plan-Session Fable 5.1)*
+## Phase 16 — Freischaltung *(eröffnet 2026-09-05, Plan-Session Fable 5.1; abgeschlossen 2026-10-16)*
 
-> **Status: 🔄 in Arbeit seit 2026-09-05.** Execution-ready Plan
-> [`docs/concepts/phase16_activation_plan.md`](./docs/concepts/phase16_activation_plan.md)
-> (P1–P17, L1–L9, Blöcke A–E, AK1–AK16). Phasenkopf:
-> [`phase16_activation/CLAUDE.md`](./phase16_activation/CLAUDE.md).
+> **Status: ✅ abgeschlossen mit Teilbilanz (Closeout 2026-10-16, Session #38).** Handover
+> [`phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md`](./phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md),
+> Bild [`docs/architecture/phase16_activation.svg`](./docs/architecture/phase16_activation.svg). Plan
+> [`docs/concepts/phase16_activation_plan.md`](./docs/concepts/phase16_activation_plan.md) (P1–P18, L1–L9,
+> Blöcke A–E, AK1–AK17). Phasenkopf: [`phase16_activation/CLAUDE.md`](./phase16_activation/CLAUDE.md).
+> 🟡 *Korrigiert 2026-10-16 gegen Code/Git:* die Checkboxen B–E standen seit 09-05 auf offen, obwohl B–D seit
+> Sessions #3–#10 im Code sind.
 
 **Goal:** jedes gebaute Feature läuft, jeder Bruch ist zu, ein vorregistrierter 2-Wochen-Lauf
 (Demo) beweist Autonomie ohne Hand. Der Bot ist seit 2026-08-31 faktisch tot (100 % Research-
 Abstain) — Ursache Infrastruktur, nicht Strategie.
 
-- [x] **A Haushalt** — Ritual, Σ-Baseline 1843, Code↔.md-Sweep, WebUI-Log, Push *(A-0..A-4
-  ✅ Stand 2026-09-05, MiniMax-M3-Exec-Session #1; A-5 = Operator-Push, ausstehend)*
-- [ ] **B Substrat** — Schema-Floor (Live-DB v7, Migrations 008/009 nie angewendet) + Operator-
-  Apply + Ledger-Restore; Wochenend-Epics raus
-- [ ] **C Research-Loop** — 14-Tage-Fenster für die Trade-Historie + ein Prompt-Satz; Token-Budget
-  300 k; Breaker-Semantik (P3 freigegeben)
-- [ ] **D Freischaltung** — vier Arme **Default ON** (`--no-*`), Bar-Stream-Token-Wrapper,
-  Promotion-Bridge + Compiler (Gatter n ≥ 50 bleibt), Margin-Headroom (B3)
-- [ ] **E 2-Wochen-Autonomie-Test** — Vorregistrierung, `autonomy_report.py`, Runbook, Closeout
+- [x] **A Haushalt** — Ritual, Σ-Baseline 1843, Code↔.md-Sweep, WebUI-Log, Push
+- [x] **B Substrat** — Schema-Floor + Operator-Apply (Live-DB v9) + Ledger-Restore; Wochenend-Epics raus
+- [x] **C Research-Loop** — 14-Tage-Fenster (Bot handelt wieder) · Breaker-Semantik ✓ · Token-Budget 300 k
+  gebaut, **reicht live nicht** (K6 FAIL)
+- [x] **D Freischaltung** — vier Arme Default ON ✓ · Bar-Stream-Token-Wrapper ✓ · Margin-Headroom ✓ ·
+  Promotion-Bridge gebaut, **live tot** (Validator-Aufruf ohne `trades`)
+- [ ] **E 2-Wochen-Autonomie-Test** — Prereg v1–v4 + Report-Skript + Runbook + systemd-Autostart gebaut;
+  **kein Lauf PASS** (v1/v2 abgebrochen, v3 FAIL K1/K5/K6, v4 FAIL K6)
+- Subphasen unter dem Phase-16-Schirm: **F** (Audit + J-Fixes) ✅ · **R** (Drift #12/#13, Autostart) ✅ ·
+  **LLM** (Modellwechsel für K6) nur geplant, kein Code
 
-**Done when:** AK1–AK16 des Plans, insbesondere AK15 (sieben PASS-Kriterien; Profit ist keines).
+**Done when:** AK1–AK16 des Plans, insbesondere AK15 — **AK15 nicht erreicht**; Folgearbeit (Token-Budget,
+Bridge, Monitor-Re-Adoption, Breaker-Blindfenster, neuer Lauf) siehe Handover §4/§5.
 
 **Directory:** `phase16_activation/`
 

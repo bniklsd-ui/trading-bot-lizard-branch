@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" font-family="Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6470"/>
+    </marker>
+  </defs>
+
+  <rect width="1080" height="1080" fill="#f7f8fa"/>
+
+  <!-- ============== HEADER ============== -->
+  <text x="40" y="46" font-size="26" font-weight="bold" fill="#1b1f24">Phase 16 — Freischaltung · Closeout mit Teilbilanz</text>
+  <text x="40" y="72" font-size="15" fill="#5b6470">2026-09-05 → 2026-10-16 · Mission: jedes Feature läuft · jeder Bruch zu · ein vorregistrierter 2-Wochen-Lauf beweist Autonomie</text>
+  <text x="40" y="94" font-size="15" fill="#1b1f24">Ergebnis: <tspan font-weight="bold" fill="#1e7a4d">6 von 9 Löchern live zu</tspan> (+ L7 per Probe), Bot handelt wieder — aber <tspan font-weight="bold" fill="#c0392b">kein Autonomie-Lauf hat PASS erreicht</tspan> (AK15 offen).</text>
+  <line x1="40" y1="108" x2="1040" y2="108" stroke="#d5d9de"/>
+
+  <!-- ============== ① LÖCHER L1–L9 ============== -->
+  <rect x="40" y="120" width="1000" height="290" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="120" width="1000" height="32" rx="6" fill="#eef1f4"/>
+  <text x="56" y="142" font-size="16" font-weight="bold" fill="#1b1f24">1 · Die neun Löcher vom 2026-09-05 — Fehlerbild links, As-Built heute rechts</text>
+  <text x="56" y="172" font-size="13" font-weight="bold" fill="#c0392b">Fehlerbild 2026-09-05 (Bot seit 08-31 tot)</text>
+  <text x="440" y="172" font-size="13" font-weight="bold" fill="#5b6470">Fix (Block)</text>
+  <text x="640" y="172" font-size="13" font-weight="bold" fill="#1e7a4d">Stand 2026-10-16 (selbst gemessen)</text>
+
+  <g font-size="14" fill="#1b1f24">
+    <circle cx="628" cy="191" r="6" fill="#1e7a4d"/>
+    <text x="56" y="196">L1 Research-Todesspirale (100 % Abstain)</text><text x="440" y="196">C1 14-Tage-Fenster</text><text x="640" y="196">17 Trades seit 09-28 (v3: 13 · v4: 2)</text>
+    <circle cx="628" cy="215" r="6" fill="#c0392b"/>
+    <text x="56" y="220">L2 Token-Budget täglich 15:48 leer</text><text x="440" y="220">C3 Cap 200k → 300k</text><text x="640" y="220">K6 FAIL an 4 Tagen · LLM-Subphase nur Plan</text>
+    <circle cx="628" cy="239" r="6" fill="#1e7a4d"/>
+    <text x="56" y="244">L3 Schema v7, Migrationen nie angewendet</text><text x="440" y="244">B1 Floor + B2 Apply</text><text x="640" y="244">Live-DB Schema v9</text>
+    <circle cx="628" cy="263" r="6" fill="#1e7a4d"/>
+    <text x="56" y="268">L4 Flags nicht restart-fest</text><text x="440" y="268">D1 vier Arme Default ON</text><text x="640" y="268">ls-Bars minutengenau · 1 631 Paper resolved</text>
+    <circle cx="628" cy="287" r="6" fill="#1e7a4d"/>
+    <text x="56" y="292">L5 Wochenend-Epics im Universum</text><text x="440" y="292">B3 Filter + Demotion</text><text x="640" y="292">0 SUN*-Epics aktiv</text>
+    <circle cx="628" cy="311" r="6" fill="#c98a1a"/>
+    <text x="56" y="316">L6 Promotion-Bridge fehlt</text><text x="440" y="316">D2 Bridge + Compiler</text><text x="640" y="316">gebaut, live tot · 29 proposed / 0 validated</text>
+    <circle cx="628" cy="335" r="5" fill="#ffffff" stroke="#1e7a4d" stroke-width="2.5"/>
+    <text x="56" y="340">L7 Margin-Headroom (B3)</text><text x="440" y="340">D3 marginFactor-Cap</text><text x="640" y="340">Code + Live-Probe (DAX 5 · IBEX/AEX 10)</text>
+    <circle cx="628" cy="359" r="6" fill="#1e7a4d"/>
+    <text x="56" y="364">L8 WebUI-Access-Log bläht</text><text x="440" y="364">--no-access-log</text><text x="640" y="364">run_webui.log 5 KB</text>
+    <circle cx="628" cy="383" r="6" fill="#1e7a4d"/>
+    <text x="56" y="388">L9 yF-Breaker jeden Morgen 09:05</text><text x="440" y="388">C5 leerer Frame ≠ Fehler</text><text x="640" y="388">0× „circuit open“ im Log</text>
+  </g>
+
+  <!-- ============== ② AUTONOMIE-LÄUFE ============== -->
+  <rect x="40" y="424" width="1000" height="246" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="424" width="1000" height="32" rx="6" fill="#eef1f4"/>
+  <text x="56" y="446" font-size="16" font-weight="bold" fill="#1b1f24">2 · Vier Anläufe zum Autonomie-Beweis — jeder fand den nächsten Defekt, keiner PASS</text>
+
+  <g font-size="13">
+    <rect x="56" y="468" width="225" height="96" rx="5" fill="#fdecea" stroke="#e6b0aa"/>
+    <text x="66" y="488" font-size="14" font-weight="bold" fill="#c0392b">v1 · 09-07 · tot an Tag 1</text>
+    <text x="66" y="508" fill="#1b1f24">LS-Stream schreibt nichts</text>
+    <text x="66" y="526" fill="#1b1f24">K1 ohne Fenster, K4 unerreichbar</text>
+    <text x="66" y="550" fill="#5b6470">→ F-Subphase (J-Fixes)</text>
+
+    <rect x="299" y="468" width="225" height="96" rx="5" fill="#fdecea" stroke="#e6b0aa"/>
+    <text x="309" y="488" font-size="14" font-weight="bold" fill="#c0392b">v2 · 09-09 · tot an Tag 9</text>
+    <text x="309" y="508" fill="#1b1f24">Reboot ohne Autostart</text>
+    <text x="309" y="526" fill="#1b1f24">Drift #12 + #13 (Log 2,4 GB)</text>
+    <text x="309" y="550" fill="#5b6470">→ R-Subphase (systemd)</text>
+
+    <rect x="542" y="468" width="225" height="96" rx="5" fill="#fff6e5" stroke="#e8c98a"/>
+    <text x="552" y="488" font-size="14" font-weight="bold" fill="#a86f0f">v3 · 09-30 → 10-13</text>
+    <text x="552" y="508" fill="#1b1f24">10 Tage durchgelaufen</text>
+    <text x="552" y="526" fill="#1b1f24">13 Trades · Σ −2 232,75 EUR</text>
+    <text x="552" y="550" fill="#5b6470">FAIL: K1 · K5 · K6</text>
+
+    <rect x="785" y="468" width="239" height="96" rx="5" fill="#fff6e5" stroke="#e8c98a"/>
+    <text x="795" y="488" font-size="14" font-weight="bold" fill="#a86f0f">v4 · 10-15/16 · Brücke</text>
+    <text x="795" y="508" fill="#1b1f24">2 Tage, Fix-Fragen Q1–Q4 ok</text>
+    <text x="795" y="526" fill="#1b1f24">2 Trades · Σ +1 593,71 EUR</text>
+    <text x="795" y="550" fill="#5b6470">FAIL: K6</text>
+
+    <line x1="281" y1="516" x2="297" y2="516" stroke="#5b6470" stroke-width="1.5" marker-end="url(#a)"/>
+    <line x1="524" y1="516" x2="540" y2="516" stroke="#5b6470" stroke-width="1.5" marker-end="url(#a)"/>
+    <line x1="767" y1="516" x2="783" y2="516" stroke="#5b6470" stroke-width="1.5" marker-end="url(#a)"/>
+  </g>
+
+  <!-- K-Matrix -->
+  <g font-size="13" text-anchor="middle">
+    <text x="175" y="594" fill="#5b6470">K1 Restart</text>
+    <text x="270" y="594" fill="#5b6470">K2 Dienste</text>
+    <text x="365" y="594" fill="#5b6470">K3 ≥5 Trades</text>
+    <text x="460" y="594" fill="#5b6470">K4 Heartbeat</text>
+    <text x="555" y="594" fill="#5b6470">K5 CRITICAL</text>
+    <text x="650" y="594" fill="#5b6470">K6 Token</text>
+    <text x="745" y="594" fill="#5b6470">K7 Caps</text>
+    <text x="840" y="594" fill="#5b6470">K8 Liveness</text>
+    <text x="945" y="594" fill="#5b6470">K9 Auto-Restart</text>
+
+    <text x="90" y="621" text-anchor="start" font-weight="bold" fill="#1b1f24">v3</text>
+    <rect x="135" y="604" width="80" height="24" rx="3" fill="#c0392b"/><text x="175" y="621" fill="#fff">FAIL</text>
+    <rect x="230" y="604" width="80" height="24" rx="3" fill="#c98a1a"/><text x="270" y="621" fill="#fff">3/3 + UI?</text>
+    <rect x="325" y="604" width="80" height="24" rx="3" fill="#1e7a4d"/><text x="365" y="621" fill="#fff">13</text>
+    <rect x="420" y="604" width="80" height="24" rx="3" fill="#1e7a4d"/><text x="460" y="621" fill="#fff">10/10</text>
+    <rect x="515" y="604" width="80" height="24" rx="3" fill="#c0392b"/><text x="555" y="621" fill="#fff">max 17</text>
+    <rect x="610" y="604" width="80" height="24" rx="3" fill="#c0392b"/><text x="650" y="621" fill="#fff">2 Tage</text>
+    <rect x="705" y="604" width="80" height="24" rx="3" fill="#1e7a4d"/><text x="745" y="621" fill="#fff">PASS</text>
+    <rect x="800" y="604" width="80" height="24" rx="3" fill="#1e7a4d"/><text x="840" y="621" fill="#fff">10/10</text>
+    <rect x="895" y="604" width="100" height="24" rx="3" fill="#9aa3ad"/><text x="945" y="621" fill="#fff">ungemessen</text>
+
+    <text x="90" y="653" text-anchor="start" font-weight="bold" fill="#1b1f24">v4</text>
+    <rect x="135" y="636" width="80" height="24" rx="3" fill="#1e7a4d"/><text x="175" y="653" fill="#fff">PASS</text>
+    <rect x="230" y="636" width="80" height="24" rx="3" fill="#1e7a4d"/><text x="270" y="653" fill="#fff">3/3 + UI ok</text>
+    <rect x="325" y="636" width="80" height="24" rx="3" fill="#9aa3ad"/><text x="365" y="653" fill="#fff">2 (ber.)</text>
+    <rect x="420" y="636" width="80" height="24" rx="3" fill="#9aa3ad"/><text x="460" y="653" fill="#fff">1/2 (ber.)</text>
+    <rect x="515" y="636" width="80" height="24" rx="3" fill="#1e7a4d"/><text x="555" y="653" fill="#fff">max 5</text>
+    <rect x="610" y="636" width="80" height="24" rx="3" fill="#c0392b"/><text x="650" y="653" fill="#fff">2 Tage</text>
+    <rect x="705" y="636" width="80" height="24" rx="3" fill="#1e7a4d"/><text x="745" y="653" fill="#fff">PASS</text>
+    <rect x="800" y="636" width="80" height="24" rx="3" fill="#1e7a4d"/><text x="840" y="653" fill="#fff">2/2</text>
+    <rect x="895" y="636" width="100" height="24" rx="3" fill="#1e7a4d"/><text x="945" y="653" fill="#fff">0 (manuell)</text>
+  </g>
+
+  <!-- ============== ③ FEHLERBILD HEUTE ============== -->
+  <rect x="40" y="684" width="490" height="262" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="40" y="684" width="490" height="32" rx="6" fill="#fdecea"/>
+  <text x="56" y="706" font-size="16" font-weight="bold" fill="#c0392b">3 · Fehlerbild heute — was den PASS verhindert</text>
+  <g font-size="14" fill="#1b1f24">
+    <text x="56" y="738"><tspan font-weight="bold">Token-Budget:</tspan> 300k reißt an Handelstagen,</text>
+    <text x="72" y="756" fill="#5b6470">Research ≈ 94 % des Verbrauchs (K6)</text>
+    <text x="56" y="780"><tspan font-weight="bold">Bridge tot:</tspan> bridge.py:146 ruft validate()</text>
+    <text x="72" y="798" fill="#5b6470">ohne trades; Extractor-JSON abgeschnitten</text>
+    <text x="56" y="822"><tspan font-weight="bold">Monitor-Orphan:</tspan> nach Restart überwacht</text>
+    <text x="72" y="840" fill="#5b6470">niemand die Position (id 26: 6 Tage offen)</text>
+    <text x="56" y="864"><tspan font-weight="bold">Breaker blind</tspan> bis IG-Settlement</text>
+    <text x="72" y="882" fill="#5b6470">gemessen 1 h 06 – 1 h 54 (vorher 24 h)</text>
+    <text x="56" y="906"><tspan font-weight="bold">K5-Rauschen:</tspan> CRITICALs aus Bridge + Paper;</text>
+    <text x="72" y="924" fill="#5b6470">deal-bezogen max 2 → A6-Ziel erreicht (E6)</text>
+  </g>
+
+  <!-- ============== ④ ZIELBILD ============== -->
+  <rect x="550" y="684" width="490" height="262" rx="6" fill="#ffffff" stroke="#d5d9de"/>
+  <rect x="550" y="684" width="490" height="32" rx="6" fill="#e8f5ee"/>
+  <text x="566" y="706" font-size="16" font-weight="bold" fill="#1e7a4d">4 · Zielbild Folgephase — der PASS-Pfad</text>
+  <g font-size="14" fill="#1b1f24">
+    <text x="566" y="738"><tspan font-weight="bold">K6:</tspan> Modell-/Kadenz-Entscheidung treffen</text>
+    <text x="582" y="756" fill="#5b6470">(LLM-Switch-Plan liegt vor, ungebaut)</text>
+    <text x="566" y="780"><tspan font-weight="bold">Bridge:</tspan> validate(instinct, trades) +</text>
+    <text x="582" y="798" fill="#5b6470">Contract-Test an der Naht + Tokenlimit</text>
+    <text x="566" y="822"><tspan font-weight="bold">Startup</tspan> re-adoptiert jede offene Position</text>
+    <text x="582" y="840" fill="#5b6470">unter einen Monitor, max_hold sofort prüfen</text>
+    <text x="566" y="864"><tspan font-weight="bold">Breaker</tspan> zählt ungelöste Broker-Closes</text>
+    <text x="582" y="882" fill="#5b6470">konservativ mit −initial_risk</text>
+    <text x="566" y="906"><tspan font-weight="bold">Dann:</tspan> neuer 10-Tage-Lauf, alle 9 K messbar</text>
+    <text x="582" y="924" fill="#5b6470">(K9 + Discovery-Signal im Report-Skript)</text>
+  </g>
+
+  <!-- ============== ⑤ STATUS-LEISTE ============== -->
+  <rect x="40" y="960" width="1000" height="104" rx="6" fill="#1b1f24"/>
+  <g font-size="13" fill="#ffffff">
+    <text x="56" y="984" font-weight="bold" fill="#7fd1a5">FERTIG</text>
+    <text x="56" y="1004">Blöcke A–D · F/J · R0–R6</text>
+    <text x="56" y="1022">Backoff-Fix (75b070f)</text>
+    <text x="56" y="1040">systemd-Autostart</text>
+
+    <text x="256" y="984" font-weight="bold" fill="#7fd1a5">GETESTET</text>
+    <text x="256" y="1004">Σ 1964 grün (16 Suites)</text>
+    <text x="256" y="1022">+121 seit Baseline 1843</text>
+    <text x="256" y="1040">+ meta 28 = 1992, 0 rot</text>
+
+    <text x="456" y="984" font-weight="bold" fill="#7fd1a5">LIVE VALIDIERT (DEMO)</text>
+    <text x="456" y="1004">L1 L3 L4 L5 L8 L9 (+L7 Probe)</text>
+    <text x="456" y="1022">Autostart nach Reboot 10-12</text>
+    <text x="456" y="1040">Q1–Q4 im Brückenfenster</text>
+
+    <text x="676" y="984" font-weight="bold" fill="#7fd1a5">GEPUSHT</text>
+    <text x="676" y="1004">94 Commits seit 09-05</text>
+    <text x="676" y="1022">origin/main = HEAD</text>
+    <text x="676" y="1040">(vor Closeout-Commit)</text>
+
+    <text x="856" y="984" font-weight="bold" fill="#f1948a">OFFEN</text>
+    <text x="856" y="1004">AK15 nie PASS · L2 · L6</text>
+    <text x="856" y="1022">Monitor · Breaker</text>
+    <text x="856" y="1040">LLM-Plan ungebaut</text>
+  </g>
+</svg>
