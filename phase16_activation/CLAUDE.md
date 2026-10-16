@@ -224,6 +224,21 @@ wenn ein fremder Prozess dieselbe PID bekommt, verweigert der Daemon den Start m
 - Ab 2026-10-15 sollte wieder gehandelt werden (Slot frei) — erste Zeile in `trade_outcomes` mit `session_date='2026-10-15'` oder `reason_gate_constraints` = 0 ist der Beleg.
 - **2-Tage-Brückenfenster läuft** (Nikinger 2026-10-15): Do 10-15 09:00 → Fr 10-16 17:30, vorregistriert in `PHASE16_AUTONOMY_PREREGISTRATION_v4.md` (Commit `90b75b1`, 07:48:36 < Start). Nach Fensterende: `autonomy_report.py --from 2026-10-15 --to 2026-10-16 --summary` (Operator) + Q1–Q4 auswerten → Eingang für v3-Closeout + Plan am Wochenende 17./18.10. `eurofyx-fleet` liest im selben Zeitraum (FYI, rein lesend = kein Operator-Ereignis).
 - **Brückenfenster Tag 2 — erster Live-Test Q1 (2026-10-16):** id 27 `DIAAAAYN53SMVAS` DAX BUY 16.7 @ 25 556,3, open 09:55:50, **broker-geschlossen 10:05:56** (`closed by broker SL/TP`, Limit getroffen: close 25 601,3, **+738,98 EUR**). Auflösungsversuche: 10:05:57 ✗ · 10:48:25 ✗ · **12:00:22 ✓** (`reconcile: resolved` 12:00:53, Lesson extrahiert). **Buchungsverzug 1 h 54 min** (alt: ~24 h) → Q1 **nicht FAIL** (Schwelle > 4 h), aber **Erwartung ≤ 1 h 15 min verfehlt**. **IG-Demo-Settlement-Zeit erstmals eingegrenzt: zwischen 42 min und 1 h 54 min nach Close.** Ursache der Lücke (Code-Analyse, keine Änderung): Intervall wächst mit dem Trade-**Alter** (Step bei 30 min Alter → 30 min, ab 60 min → 1 h), plus Reconcile-Takt `reconcile_interval_min = 15` (`phase8_scheduler/scheduler/config.py:143`) → reale Abstände 42 min / 72 min. Breaker war für diesen Trade 1 h 54 min blind (W10; unkritisch, Gewinn). Upgrade-Pfad aus dem `ponytail:`-Kommentar (Anker `_pending_close[...].closed_at` statt `open_ts`) hätte nach dem 10:48-Fehlversuch (42 min nach Close → 30-min-Step) ~11:20 erneut versucht; ob IG da schon gesettelt hatte, ist **unbekannt** — Bewertung für die Closeout-/Plan-Session.
+- **Brückenfenster-Ergebnis (v4, 2026-10-15/16) — Report `data/reports/autonomy_2026-10-15_to_2026-10-16.json`** (lokal, `--summary`, Nikinger-Go, gelaufen 2026-10-16 17:31). Script-Gesamtverdikt `FAIL` — **nach v4-Regeln** (K3/K4 nur berichtet) bleibt **ein** echtes FAIL: **K6**.
+
+  | K | Script | v4-Bewertung | Messwert |
+  |---|---|---|---|
+  | 1 | PASS | PASS | scheduler 1 Start (= Restart 10-15 07:42:26, vor Fensterbeginn), recorder/discovery 0 |
+  | 2 | PASS | PASS | 3/3 Auto-Signale; WebUI nicht gesichtet (Operator-Pflicht offen) |
+  | 3 | FAIL | berichtet | 2 CLOSED (beide 10-16) |
+  | 4 | PARTIAL | berichtet | 1/2: 10-15 ok, **10-16 nicht ok** (`DAX.IFMM` + `DAX.IGN` unter 90 %-Dichte/5-min-Gap, CRITICAL 17:30:56) |
+  | 5 | PASS | PASS | id 27: **5** CRITICAL in 24 h (= Grenze), id 28: 3 |
+  | 6 | FAIL | **FAIL** | Token-Budget leer **10-15 16:45** (303 910) und **10-16 15:35** (301 031) — Research danach aus; bekanntes K6-Thema (LLM-Subphase) |
+  | 7 | PASS | PASS | Start-Zeile `max_trades=5, daily_loss_cap=1800.0` |
+  | 8 | PASS | PASS | beide Tage live (Zyklen, Bars, Heartbeat) |
+  | 9 | — | **nicht vom Script gemessen** | `NRestarts=0` für alle 4 Units (manuell, 10-16 ~17:35) → PASS. Drift: Script bewertet 8 Kriterien, v3 vorregistriert 9 |
+
+  **Q1** 2 Samples: id 27 1 h 54 min ✗ Erwartung (nicht FAIL), id 28 **1 h 06 min ✓** · **Q2** 0× `reason_gate_constraints` ✓ · **Q3** 0× `credit balance` ✓ · **Q4** 0 Restarts bei offener Position ✓ · **W1** 2/2 BUY DAX · **W9** `InstinctValidator`-CRITICAL 0× — **aber** Extractor scheitert jetzt 3/3 vorher (`extractor returned ok=False … JSONDecodeError … Unterminated string`, trade_id 26/27/28 — LLM-JSON abgeschnitten, Verdacht `max_tokens`, nicht verifiziert) → Bridge weiter tot, Defekt wandert eine Stufe nach vorn · **W10** Breaker-Blindzeit = Q1-Verzüge. **P&L Fenster:** 2 Trades, 2 Gewinner (beide Limit +45 Pkt), **+1 593,71 EUR** (kein Kriterium).
 - **Run-10-Closeout** (Auswertung v3 gegen Prereg-AK, Ursachen der 0-Trade-Tage trennen: 10-09 LLM-Guthaben, 10-12..14 blockierter Slot, sonst echte Abstains) — wartet auf Nikinger-Go.
 - Commit der 3 Doc-Änderungen + dieser Rotation wartet auf Nikinger-Go.
 
