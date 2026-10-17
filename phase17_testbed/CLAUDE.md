@@ -67,7 +67,7 @@ echo "root | $($PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1)"
 | Stand | Σ | Quelle |
 |---|---:|---|
 | Baseline (Plan-Session, 2026-10-17) | **1964** (+ meta 28) | Plan §2.1 |
-| Ziel nach Block B / C / D / E-1 | ≥ 1992 / ≥ 2014 / ≥ 2017 / ≥ 2024 | Plan §6 |
+| Ziel nach Block B / C / D / E-1 | ≥ 1992 / ≥ 2015 / ≥ 2018 / ≥ 2025 | Plan §6 |
 
 ## Phase-17-Status
 
@@ -102,6 +102,7 @@ echo "root | $($PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1)"
 - **Bridge-Befund erweitert:** drei Nahtfehler statt einem (`validate` ohne `trades`, `.value` statt `.decision`, Keys ohne `_json` → 29/29 Evidence NULL).
 - **„Unbekannte" Phase-16-Stopps aufgeklärt:** VM-Reboots, plus SIGKILL nach dem 90-s-Stop-Timeout (Journal). Nikinger: Reboots vom VM-Host.
 - **Nikinger-Entscheidungen** F1–F14 eingearbeitet (Plan §1).
+- **Advisor zweimal** — vor dem Ansatz und vor „fertig". Die sieben Punkte des zweiten Reviews stehen im Folge-Commit (Plan §13): Flip-2-Tag vorregistriert, Modell-ID-Drift prüft der Start, Verbatim-Anker ergänzt.
 
 ### Next
 - **Nikinger:** Plan-Commit pushen (`git push -u origin main`, nimmt `e19c178` mit) · `sunshine_…deb` aus dem Repo-Root räumen.

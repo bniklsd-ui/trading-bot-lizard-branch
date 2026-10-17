@@ -409,7 +409,7 @@ grep -rn "EPIC_MAP" --include="*.py" . --exclude-dir=.venv | grep -v "/.venv/"
 |---|---|---|
 | `README.md:40` | `\| 16    \| Freischaltung (alle Löcher zu, alle Arme scharf, 2-Wochen-Autonomie-Test) \| 🔄 **in execution seit 2026-09-05** — Plan execution-ready; Block A läuft (A-0..A-2 ✅) \|` | Status → `✅ **abgeschlossen mit Teilbilanz (Closeout 2026-10-16)**`; darunter neue Zeile `\| 17    \| Prüfstand (Mess-/Geldpfad-Defekte zu, LLM austauschbar, Report + Prereg v5) \| 🔄 **in execution seit <Datum>** \|` |
 | `ARCHITECTURE.md:260-266` | die sieben Zeilen `- Phase 9 (V2 — Foundation, in Arbeit) — …` bis `- Phase 15 (V4 — Sophisticated/Optional, deferred) — no concept doc yet` | Statuswörter gegen root-`CLAUDE.md`-Tabelle angleichen (10/12/13/14/15/16 ✅ mit Konzept-Link `docs/concepts/phase10_v3_plan…`/`phase15_v4_plan.md`/`phase16_activation_plan.md` — Dateinamen per `ls docs/concepts/` prüfen); neue Zeilen Phase 16 + 17; Header-Card `updated:` |
-| `ROADMAP.md` | Abschnitte von `## Phase 9 — V2: Foundation (Autonome Epic-Research + Daten-Input-Zuverlässigkeit)` (Z. 58) bis vor `## Phase 15 — V4: …` (Z. 435) | **wortgleich** ans Ende von `ROADMAP_ARCHIVE.md` verschieben (Archiv-Card: `purpose` „Phasen 1–14", `updated`, Intro-Satz um „+ Phasen 9–14 rotiert <Datum>, Phase 17 A-3" ergänzen); in `ROADMAP.md` die Summary-Tabelle um 6 Einzeiler (9–14) erweitern, Überschrift `## Abgeschlossene Phasen (1–14) → …`, **neuer Abschnitt `## Phase 17 — Prüfstand`** (Goal = §0-Mission, Blöcke A–E als Checkboxen, Done-When = AK19+AK20, Directory). **AK: `ROADMAP.md` < 40 000 B** |
+| `ROADMAP.md` | Abschnitte von `## Phase 9 — V2: Foundation (Autonome Epic-Research + Daten-Input-Zuverlässigkeit)` (Z. 58) bis vor `## Phase 15 — V4: …` (Z. 435) | **wortgleich** ans Ende von `ROADMAP_ARCHIVE.md` verschieben (Archiv-Card: `purpose` „Phasen 1–14", `updated`, Intro-Satz um „+ Phasen 9–14 rotiert <Datum>, Phase 17 A-3" ergänzen); in `ROADMAP.md` die Summary-Tabelle um 6 Einzeiler (9–14, Status wie in der root-Tabelle: 9 🔄 formal offen, 11 🛑 deferred) erweitern, Überschrift `## Phasen 1–14 → [ROADMAP_ARCHIVE.md](./ROADMAP_ARCHIVE.md) (archiviert; 9 formal offen, 11 deferred)` — **nicht** „Abgeschlossene Phasen": den Phase-9-Closeout entscheidet der Nikinger (§10), **neuer Abschnitt `## Phase 17 — Prüfstand`** (Goal = §0-Mission, Blöcke A–E als Checkboxen, Done-When = AK19+AK20, Directory). **AK: `ROADMAP.md` < 40 000 B** |
 | root `CLAUDE.md` | Banner-Blöcke Z. 104–113 (`> **🔄 2026-09-05 — Phase 16 (Freischaltung) ERÖFFNET …`), 115–133 (`> **✅ 2026-09-05 — Phase 15 (V4) ABGESCHLOSSEN …`), 135–163 (`> 🟡 **Korrekturhinweis 2026-09-08 …`), 175–192 (`> ✅ **2026-08-31 — Phase 13 + Phase 14 ABGESCHLOSSEN …`) | **wortgleich** in einen neuen datierten Abschnitt am Ende von `docs/sessions/root_claude_md_phase_status_archive.md` verschieben; Tabellenzeilen 12–16 auf je **eine** Zeile kürzen (Status + Link Phasenkopf/Handover) — der alte Zeilentext geht wortgleich in denselben Archiv-Abschnitt. Zeile 9: datierter Vermerk „🟡 *2026-10-xx: Status-Prosa veraltet — Phase-9-Code produktiv seit 2026-07-06, formaler Closeout nie geschrieben (Nikinger-Entscheidung, nicht Phase 17)*". Zeile 15 (Gate P7/A6): Vermerk „*E6 entschieden 2026-10-17: Gate P7/A6 erfüllt (deal-bezogen max 2 CRITICALs je Trade, Quell-Definition)*". **AK: < 25 000 B** |
 | `docs/INDEX.md` | Zeile 24 `- [CLAUDE.md](../CLAUDE.md) — 📗 20KB · …`, Zeile 27 `… ROADMAP.md … 📗 **38 KB** …` | Größen auf die gemessenen Werte nach dem Sweep; Phase-16-Einträge aus „Active phases" unter „Closed phases" verschieben; Header-Card `updated:` |
 | `phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md` (📕) | Dateiende | **nur anhängen:** `> 🟡 **Korrekturhinweis <Datum> (Phase 17 A-3):** §4 „Unbekannt geblieben" — Scheduler-Stopp 10-08 und Start 10-11 19:02 sind VM-Reboots (Journal: Boot-Ende 10-08 16:38:49 / -Start 16:59:39; Boot-Ende 10-11 15:40:58, Scheduler SIGKILL 15:40:57 nach Stop-Timeout, Start 19:02 = grafischer Login). Nikinger 2026-10-17: Reboots vom VM-Host ausgelöst. §5 E1–E8 entschieden → docs/concepts/phase17_testbed_plan.md §1.` |
@@ -471,7 +471,7 @@ Erwartung: beide Felder vorhanden, `snapshotTimeUTC` = `snapshotTime` − 2 h, a
 #### B-2 — Divergenz-Sampler (D2, P12 + P8)
 
 **P12 `data_foundation/heartbeat.py`:**
-1. `compute_return_divergence` (Z. 228–251, Anker `def compute_return_divergence(ig_bars: list[Any], yf_bars: list[Any]) -> float | None:`) **ersetzen** durch:
+1. `compute_return_divergence` (Z. 228–251, Anker `def compute_return_divergence(ig_bars: list[Any], yf_bars: list[Any]) -> float | None:`) **ersetzen**. Geprüft per `rg -n compute_return_divergence` (2026-10-17): der **einzige Code-Aufrufer** ist `heartbeat.py:351`, die übrigen Treffer sind 📕-Doku und der Testkommentar `test_heartbeat.py:217`. Ein Alias ist also nicht nötig; den Docstring-Verweis `heartbeat.py:271` (`siehe :func:`compute_return_divergence``) auf `window_return_divergence` umstellen. Neuer Code:
    ```python
    # Phase 17 B-2 (2026-10-17): yF 1m bars reach the archive 15.6–20.3 min after their timestamp
    # (p10/max, measured 2026-10-16); the comparator window must end this long before "now".
@@ -493,7 +493,15 @@ Erwartung: beide Felder vorhanden, `snapshotTimeUTC` = `snapshotTime` − 2 h, a
        yf_r = (yf_bars[-1].close - yf_bars[0].open) / abs(yf_bars[0].open)
        return abs(ig_r - yf_r)
    ```
-2. `DivergenceSampler.sample_epic` (Z. 297–371): Docstring anpassen und den Rumpf ab `today = …` ersetzen:
+2. `DivergenceSampler.sample_epic` (Z. 297–371): Docstring anpassen und den Rumpf **von Z. 311 bis zum Methodenende Z. 371** ersetzen. Die verbatim Anker:
+   - Z. 311 `        today = self.now_fn().strftime("%Y-%m-%d")`
+   - Z. 312 `        if self._last_sample_date.get(epic) == today:`
+   - Z. 314 `        self._last_sample_date[epic] = today` (wandert nach (g))
+   - Z. 316 `        ig_bars = self.budgeted_ig.get_bars(epic, resolution="5m", count=3)`
+   - Z. 319 `        ig_bar = ig_bars[-1]`
+   - Z. 351 `        delta = compute_return_divergence(ig_bars, yf_bars)`
+
+   Der neue Ablauf:
    - (a) Throttle prüfen, aber **noch nicht setzen**.
    - (b) `ig_bars = self.budgeted_ig.get_bars(epic, resolution="5m", count=IG_SAMPLE_COUNT)`; leer → `return`. Kein Throttle, der nächste Pass versucht es erneut.
    - (c) `now = _parse(self.now_fn().isoformat())`. Frische-Check auf `ig_bars[-1]` wie bisher. Bei stale: Event + `mark_stale_fn` + Throttle setzen + `return`.
@@ -630,7 +638,7 @@ Erwartung: beide Felder vorhanden, `snapshotTimeUTC` = `snapshotTime` − 2 h, a
 
 **P8 `scheduler/runner.py`:**
 
-5. `_ExecutorLike`-Docstring (Z. 153–160) um einen Satz zu `resume_open_position` ergänzen („optional, read via getattr").
+5. `_ExecutorLike` (Z. 154 `class _ExecutorLike(Protocol):`, Methode Z. 162 `    def run(self) -> Any: ...`): an den Docstring (Z. 155–160) den Satz anhängen „Optionally ``resume_open_position() -> ExecutionResult | None`` (Phase 17 B-5) — read via ``getattr``, so a fake without it keeps the runner bit-identical."
 6. WINDOW-Zweig, Anker Z. 386–388 `        elif phase is Phase.WINDOW:` / `            self._warm_session()` / `            self._maybe_reconcile(state, now)`. **Direkt danach** einfügen:
    ```python
                # Phase 17 B-5: a position left open by a restart is monitored first (T8).
@@ -711,7 +719,12 @@ Jede Stelle bekommt den Kommentar `# Phase 17 B-8 (E4): external-dependency fail
 
 #### B-10 — Discovery-Beleg + Wrapper-Text (D12, P14)
 
-1. `source_registry/run.py` `run_once`: an **allen drei** Rückgabestellen (Z. 205–207 unarmed, 212–214 nothing stale, 254–255 Ende) **vor** `return result`:
+1. `source_registry/run.py` `run_once`, an **allen drei** Rückgabestellen jeweils direkt **vor** der `return`-Zeile:
+   - unarmed: Z. 205 `            result = CycleResult(ts_utc=ts_utc, armed=False, stale_count=0, rows_written=0)` … Z. 207 `            logger.debug("discovery cycle skipped: not armed")` → vor Z. 208 `            return result`;
+   - nothing stale: Z. 212 `            result = CycleResult(ts_utc=ts_utc, armed=True, stale_count=0, rows_written=0)` … Z. 214 `            logger.debug("discovery cycle skipped: nothing stale (ttl=%d days)", self._profile_ttl_days)` → vor Z. 215 `            return result`;
+   - Ende: Z. 247 `        result = CycleResult(` … → vor Z. 255 `        return result`.
+
+   Die eingefügte Zeile:
    - `logger.info("discovery cycle %s: armed=%s stale=%d rows_written=%d errors=%d", result.ts_utc, result.armed, result.stale_count, result.rows_written, len(result.errors))`.
    - Das ist eine Zeile pro Stunde (`interval_s=3600`, Z. 169). Der Zeitstempel steckt **im Text**, weil `basicConfig` ohne `asctime` loggt (Z. 336).
    - Die zwei `logger.debug(...)`-Zeilen bleiben.
@@ -777,21 +790,26 @@ LLM_PROFILES: dict[str, dict[str, RoleSpec]] = {
 
 def role_spec(profile: str, role: str) -> RoleSpec: ...           # KeyError-frei: ValueError mit Liste
 def check_llm_profile(profile: str, *, pricing: Mapping[str, tuple[float, float]],
-                      default_models: Mapping[str, str]) -> None: ...
+                      default_models: Mapping[str, str],
+                      exempt_models: tuple[str, ...]) -> None: ...
 ```
 
-`check_llm_profile` wirft `ValueError` in drei Fällen:
+Signatur mit Ausnahmeliste: `check_llm_profile(profile, *, pricing, default_models, exempt_models: tuple[str, ...])`. Sie wirft `ValueError` in vier Fällen:
 - unbekanntes Profil oder unbekannter Provider;
 - eine `claude-*`-ID an einen Provider mit `kind != "anthropic"`;
-- ein aufgelöstes Modell (`spec.model or default_models[role]`) **ohne** Preiszeile.
+- ein aufgelöstes Modell (`spec.model or default_models[role]`) **ohne** Preiszeile;
+- ein Modell eines Nicht-Anthropic-Providers, das **nicht** in `exempt_models` steht.
 
-**Tests P8 (+6)** `tests/test_llm_profiles.py`:
+Der vierte Fall gibt es, weil die Modell-ID an **drei** Stellen als Literal steht (`_M3.model` hier, Preiszeile P4 `models.py`, `SchedulerConfig.budget_exempt_models`). Eine Umbenennung, die die Ausnahmeliste vergisst, würde Research still wieder unter den Cap stellen. So fällt der Fehler beim Start laut auf (T7).
+
+**Tests P8 (+7)** `tests/test_llm_profiles.py`:
 - `test_anthropic_profile_keeps_phase_defaults`.
 - `test_research_m3_routes_only_research_to_minimax`.
 - `test_all_m3_routes_every_role_to_minimax`.
 - `test_check_rejects_unknown_profile`.
 - `test_check_rejects_claude_on_foreign_provider`.
 - `test_check_rejects_model_without_pricing`.
+- `test_check_rejects_non_exempt_foreign_model`.
 
 Ein siebter Test `test_check_accepts_shipped_profiles` (echte `ResearchConfig().pricing_usd_per_mtok` + echte Default-Modelle) kommt erst im **C-3-Commit** dazu: er braucht die neue Preiszeile, und ein Commit darf keinen roten Test hinterlassen.
 
@@ -829,9 +847,9 @@ Ein siebter Test `test_check_accepts_shipped_profiles` (echte `ResearchConfig().
 - `test_400_with_response_format_retries_once_without_it`.
 - `test_custom_api_key_username_is_used`.
 
-**Test P8 (+1):** `test_check_accepts_shipped_profiles` (aus C-1 nachgezogen).
+**Test P8 (+1):** `test_check_accepts_shipped_profiles` (aus C-1 nachgezogen; mit `exempt_models=SchedulerConfig().budget_exempt_models`).
 
-**AK:** P4 ≥ 171, P8 ≥ 279.
+**AK:** P4 ≥ 171, P8 ≥ 280.
 
 #### C-4 — Eine Bau-Funktion für alle Clients + Profil-Check + Preflight + Startzeile (P8)
 
@@ -859,7 +877,7 @@ Ein siebter Test `test_check_accepts_shipped_profiles` (echte `ResearchConfig().
 
    Die dann ungenutzten lokalen Importe `LLMClient` / `get_credential` in diesen Funktionen entfernen.
 4. `build_scheduler`, vor `research = _build_research(…)` (Anker `    research = _build_research(` Z. ~935):
-   - `check_llm_profile(config.llm_profile, pricing=ResearchConfig().pricing_usd_per_mtok, default_models={...})` mit den Defaults `research: ResearchConfig().model`, `debate`/`paper_debate: DebateConfig().model_judge`, `lesson`/`instinct`/`reflect: RewardConfig().lesson_model`.
+   - `check_llm_profile(config.llm_profile, pricing=ResearchConfig().pricing_usd_per_mtok, default_models={...}, exempt_models=config.budget_exempt_models)` mit den Defaults `research: ResearchConfig().model`, `debate`/`paper_debate: DebateConfig().model_judge`, `lesson`/`instinct`/`reflect: RewardConfig().lesson_model`.
    - Den drei Buildern `llm_profile=config.llm_profile` übergeben.
 5. `preflight_fn` (Z. 1178–1197), nach Punkt 3: Punkt 4 „every non-anthropic provider of the active profile has its key". Ablauf: `import keyring`; für jeden Provider `{role_spec(config.llm_profile, r).provider for r in LLM_ROLES}` mit `kind != "anthropic"` und `not keyring.get_password(p.api_key_service, p.api_key_username)` → `RuntimeError` mit dem exakten Seed-Befehl (`python scripts/store_minimax_key.py --service … --username …`).
 
@@ -873,17 +891,21 @@ Ein siebter Test `test_check_accepts_shipped_profiles` (echte `ResearchConfig().
   - `test_debate_config_all_m3_renames_all_three_roles`.
   - `test_debate_config_anthropic_is_default`.
 
-**AK:** P8 ≥ 283. `rg -n "\bLLMClient\(" phase8_scheduler/scripts/wiring.py` und `rg -n "OpenAICompatLLMClient\(" phase8_scheduler/scripts/wiring.py` → je genau 1 Treffer (beide in `_build_llm`). Das `\b` ist nötig, sonst trifft das erste Muster auch `OpenAICompatLLMClient(`.
+**AK:** P8 ≥ 284. `rg -n "\bLLMClient\(" phase8_scheduler/scripts/wiring.py` und `rg -n "OpenAICompatLLMClient\(" phase8_scheduler/scripts/wiring.py` → je genau 1 Treffer (beide in `_build_llm`). Das `\b` ist nötig, sonst trifft das erste Muster auch `OpenAICompatLLMClient(`.
 
 #### C-5 — `LLM_UNAVAILABLE` (D9, T11/E7, P4 + P8 + P10)
 
 1. **P4 `research/research.py`:** `self.last_llm_error: bool = False` neben `self.last_abort_detail` (Z. 154) und Reset neben Z. 175. Im `except LLMResponseError as exc:` (Z. 200) vor dem `return` `self.last_llm_error = True`. Kommentar: „display/observability only — gates nothing (root rule 3)".
 2. **P8 `scheduler/research_tick.py`:**
    - Unter Z. 89 `REASON_LLM_UNAVAILABLE: str = "LLM_UNAVAILABLE"  # Phase 17 C-5 (E7): research.run() abstained on an LLM error` und `_LLM_UNAVAILABLE_ALERT_STREAK: int = 3`.
-   - `__init__`: `self._llm_fail_streak = 0`.
-   - Pick-Zweig (Z. 210–216): Streak auf 0.
-   - Abstain-Zweig (Anker Z. 219 `        state.last_no_trade_reason = REASON_LLM_ABSTAIN`): `getattr(self._research, "last_llm_error", False)` → `reason = REASON_LLM_UNAVAILABLE`, Streak +1, genau bei `== 3` ein `logger.critical("research tick: LLM unavailable for %d consecutive ticks — last error: %s", …, abort_detail)`; sonst Streak 0, `reason = REASON_LLM_ABSTAIN`.
-   - `reason` in State, Log und `ResearchResult` verwenden.
+   - `__init__` (Z. 156–163, nach `        self._now_fn = now_fn or (lambda: datetime.now(timezone.utc))`): `self._llm_fail_streak = 0`.
+   - Pick-Zweig: nach Z. 210 `        if candidates:` / Z. 211 `            state.last_no_trade_reason = None` → `            self._llm_fail_streak = 0`.
+   - Abstain-Zweig, Anker Z. 219 `        state.last_no_trade_reason = REASON_LLM_ABSTAIN`, Z. 223 `        logger.info("research tick: abstain (no candidate, reason=%s).", REASON_LLM_ABSTAIN)`, Z. 225 `            picked=False, n=0, reason=REASON_LLM_ABSTAIN,`. Neu:
+     - `getattr(self._research, "last_llm_error", False)` → `reason = REASON_LLM_UNAVAILABLE`, Streak +1, genau bei `== 3` ein `logger.critical("research tick: LLM unavailable for %d consecutive ticks — last error: %s", …, abort_detail)`;
+     - sonst Streak 0, `reason = REASON_LLM_ABSTAIN`;
+     - `reason` an allen drei Ankern verwenden.
+   - **Begriff (verbindlich):** `LLM_UNAVAILABLE` = **jeder** nicht behebbare LLM-Fehler, also auch ein B-4-Abschneiden. Ein dauerhaft abschneidendes Modell ist für Entscheidungen genauso ausgefallen; der Alarm nach 3 Ticks ist dort gewollt.
+   - Die Unterscheidung „abgeschnitten" vs. „nicht erreichbar" steckt im `detail`/Log-Text (`LLM output truncated` bzw. `HTTP …`). D-2 und der Shakedown-Bericht zählen beides getrennt per `grep -c`.
 3. **P8 `scripts/wiring.py` `_enrich_abstain_detail`** (Z. 736–742): im `research_empty`-Zweig zuerst `if getattr(research, "last_llm_error", False):` → `cycle_outcome = {**cycle_outcome, "llm_unavailable": True, "detail": getattr(research, "last_abort_detail", None) or "LLM error"}`, sonst die bestehende `reasoning`-Logik.
 4. **P10 `abstain_lessons/models.py`:**
    - `AbstainReason` um `REASON_LLM_UNAVAILABLE = "reason_llm_unavailable"`.
@@ -900,7 +922,7 @@ Ein siebter Test `test_check_accepts_shipped_profiles` (echte `ResearchConfig().
 - P10 (+1): `test_research_empty_with_llm_unavailable_classifies_own_reason`.
 - P10 `test_models.py:47` `== 12` → `== 13`. **Erwarteter** Rot-Test, kein Bug (§8).
 
-**AK:** P4 ≥ 172, P8 ≥ 286, P10 ≥ 167.
+**AK:** P4 ≥ 172, P8 ≥ 287, P10 ≥ 167.
 
 #### C-6 — Key-Skript + Smoke-Skript (root + P4)
 
@@ -928,18 +950,20 @@ Ein siebter Test `test_check_accepts_shipped_profiles` (echte `ResearchConfig().
    ```
    Erwartung: `PASS (pick)` oder `PASS (valid abstain)`, `finish_reason=stop`, Tokens und Latenz in den Phasenkopf.
    - FAIL → **nicht flippen**. Diagnose nach §8 (400 / truncated / 401 / unterminated think), dann ggf. `max_tokens`/`timeout_s` in `_M3` anpassen (eigener Commit) und den Smoke wiederholen.
+   - Verlangt der Endpoint eine **andere Modell-ID** (z. B. mit Suffix), betrifft die Änderung **drei** Stellen in einem Commit: `_M3.model` (`scheduler/llm_profiles.py`), die Preiszeile (`phase4_research/research/models.py`) und `SchedulerConfig.budget_exempt_models` (`scheduler/config.py`). `check_llm_profile` meldet eine vergessene Stelle beim Start (C-1).
 3. **Exec:** **Flip-1-Commit allein** — `config.py` `llm_profile: str = "research_m3"` + Test-Pin. Commit-Message: `phase17+phase8: flip research to MiniMax M3 (Flip 1, after demo smoke PASS <ts>)`.
 
 #### C-8 — Flip 2 (`all_m3`) — **gegated** (T5)
 
 - Nur nach Nikinger-Go in E-5.
-- Dann eigener Commit `llm_profile: str = "all_m3"`, Restart, **1 Handelstag** Shakedown auf `all_m3`, Auswertung mit Report v5.
-- Abbruch → Revert-Commit, wenn eine dieser Schwellen am ersten Tag erreicht ist:
+- Dann eigener Commit `llm_profile: str = "all_m3"`, Restart, **1 Handelstag** Shakedown auf `all_m3`, Auswertung mit Report v5 (`--expect-llm-profile all_m3`).
+- Kriterien und Abbruchregel dieses Tages stehen **vorab** im Abschnitt „§F2 Flip-2-Tag" der Shakedown-Vorregistrierung (E-2). Sie ist vor dem ersten Restart committet, damit gilt T23 auch für diesen bedingten Lauf.
+- Abbruch → Revert-Commit, wenn eine dieser Schwellen erreicht ist:
   - ≥ 3 × `DebateLLMError`;
-  - ≥ 3 × `truncated`;
+  - ≥ 3 × `LLM output truncated`;
   - `LLM_UNAVAILABLE`-CRITICAL.
 - Ohne Go: nichts tun, Prereg v5 pinnt `research_m3`.
-- **Block-C-Sweep Σ ≥ 2014** (+22: P4 +5 · P8 +15 · P10 +1 · root +1).
+- **Block-C-Sweep Σ ≥ 2015** (+23: P4 +5 · P8 +16 · P10 +1 · root +1).
 
 ---
 
@@ -953,13 +977,13 @@ Ein siebter Test `test_check_accepts_shipped_profiles` (echte `ResearchConfig().
                    continue  # Phase 17 D-1 (T7): Abo-Kontingent — measured (llm_usage.json), not capped
    ```
    Den Docstring von `consumed_today` um den Satz ergänzen.
-2. **`webui/api.py:289-307`**: im Schleifenrumpf `exempt_tokens` getrennt summieren (`rec.get("model") in cfg.budget_exempt_models`); `tokens` zählt nur Nicht-Ausnahmen. Neues Feld `"exempt_tokens": exempt_tokens` im Return. `app.js` bleibt unverändert, das Feld steht für `curl` und Report bereit.
+2. **`webui/api.py:289-307`**, Anker Z. 294 `            if _record_local_date(rec.get("ts"), tz) == today:` / Z. 295 `                tokens += _record_tokens(rec)`: Z. 295 ersetzen durch ein `if rec.get("model") in cfg.budget_exempt_models: exempt_tokens += _record_tokens(rec)` / `else: tokens += _record_tokens(rec)`. `exempt_tokens = 0` steht neben `tokens = calls = 0` (Z. 289). Die Kosten- und Call-Summen zählen weiter alle Records. Neues Feld `"exempt_tokens": exempt_tokens` im Return. `app.js` bleibt unverändert, das Feld steht für `curl` und Report bereit.
 3. **Report:** E-1 (gleiche Quelle `SchedulerConfig().budget_exempt_models`).
 - **Tests P8 (+3):**
   - `test_budget_ignores_exempt_model_records`.
   - `test_budget_counts_non_exempt_records`.
   - `test_webui_token_usage_separates_exempt_tokens`.
-- **AK:** P8 ≥ 289; Σ ≥ 2017.
+- **AK:** P8 ≥ 290; Σ ≥ 2018.
 
 #### D-2 — Entscheidungspunkt K6 (Nikinger, nach dem Shakedown, **kein Code**)
 
@@ -986,6 +1010,21 @@ Der Nikinger wählt die K6-Einheit für Prereg v5:
 #### E-1 — Report v5 (D11, T21, P16 `scripts/autonomy_report.py`)
 
 Alles hinter `--prereg {v4,v5}`. Default `v4` bleibt **verdikt-identisch**; die 15 bestehenden Tests pinnen das.
+
+Anker (die `def`-Zeilen, e19c178):
+- `def llm_usage_per_day(` Z. 369
+- `def critical_count_after_opens(` Z. 428
+- `def extract_caps_from_scheduler_log(scheduler_log: Path) -> dict[str, Any]:` Z. 480
+- `def evaluate_k2(` Z. 633
+- `def evaluate_k5(` Z. 771
+- `def evaluate_k6(` Z. 804
+- `def evaluate_k7(` Z. 858
+- `def _build_day_report(` Z. 990
+- `def _build_summary_report(` Z. 1045
+- `def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:` Z. 1111
+- `def main(argv: list[str] | None = None) -> int:` Z. 1135
+
+Die neuen Evaluatoren stehen **hinter** `evaluate_k8` (`def evaluate_k8(` Z. 903) und vor `_iter_trading_days`.
 
 1. **`_parse_args`** (Z. 1111–1133):
    - `--prereg` (choices `v4`, `v5`, Default `v4`).
@@ -1022,7 +1061,7 @@ Alles hinter `--prereg {v4,v5}`. Default `v4` bleibt **verdikt-identisch**; die 
   - `test_k10_na_without_close_fail_on_bridge_critical`.
   - `test_k11_requires_divergence_event_every_trading_day`.
 - **Regression-AK:** `--from 2026-09-30 --to 2026-10-13 --summary` (v4) liefert weiter FAIL K1/K5/K6 und PASS K3/K4/K7/K8 — dieselben Verdikte wie Session #38 (Handover §2). Ausgabe nach `/tmp`.
-- **AK:** P16 ≥ 22; Σ ≥ 2024 (Endstand vor E-2).
+- **AK:** P16 ≥ 22; Σ ≥ 2025 (Endstand vor E-2).
 
 #### E-2 — Shakedown-Vorregistrierung (📕, VOR dem Restart)
 
@@ -1049,6 +1088,13 @@ Neue Datei `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md` (Header-Card `
   - (b) Tagesexport Journal (E-4).
   - Ein VM-Host-Reboot = K1 FAIL, mit Ursache „VM-Host" (T10).
 - **FAIL-Regel:** Befund → Fix-Step in Phase 17 → **neue** Shakedown-Vorregistrierung `-S2` → neuer Lauf. **Kein** Kriterium wird gelockert.
+- **§F2 Flip-2-Tag (bedingt, nur bei Nikinger-Go in E-5):**
+  - 1 Handelstag mit `llm_profile=all_m3`;
+  - dieselben Kriterien, K7 gegen `all_m3`;
+  - Abbruch + Revert nach C-8;
+  - Start = die erste Start-Zeile nach dem Flip-2-Commit.
+
+  Der Abschnitt wird **jetzt** mit vorregistriert, sonst wäre der Flip-2-Tag ein Lauf ohne vorab festgelegte Kriterien (T23).
 - **Report-Befehl** (Operator, nach Tag 2):
   ```bash
   phase1_broker_wrapper/.venv/bin/python phase16_activation/scripts/autonomy_report.py --prereg v5 \
@@ -1168,6 +1214,10 @@ grep "starting scheduler daemon" data/state/run_scheduler.log | tail -1   # … 
 | K2-v5 FAIL „discovery 0" | Discovery-Dienst nicht neu gestartet (alte Code-Version) | Daemon unarmed (`DISCOVERY_ARMED` fehlt) |
 | `database is locked` beim E-3-DELETE | Recorder lief noch | WebUI hält `mode=ro`-Handle (harmlos für `bars.sqlite`) |
 | Scheduler startet nicht: `ValueError … no pricing row` | C-3-Preiszeile fehlt oder Modell-ID-Tippfehler (`MiniMax-M3`) | — |
+| Scheduler startet nicht: `ValueError … not budget-exempt` | Modell-ID an nur einer oder zwei der drei Stellen geändert (`_M3.model` / P4-Preiszeile / `budget_exempt_models`, C-7) | — |
+| Research wird nach einer Modell-ID-Änderung wieder vom Budget gebremst | `budget_exempt_models` nicht mitgezogen **und** `check_llm_profile` umgangen (z. B. Test-Profil) | WebUI `exempt_tokens` = 0 → die Records tragen eine andere ID |
+| K11 FAIL („kein Divergenz-Event an Tag X") | **Erst die Pass-Zeiten prüfen:** der Sampler läuft nur im Universe-Refresh (alle 240 min). Wegen der 40-min-Sperre zählen nur die Pässe gegen 13:0x und 17:0x (`bar_fetch`-Stunden in `research_health.jsonl`), ein Neustart kann sie verschieben | erst danach der Sampler selbst: `reason` im `no_comparator`-Event (`no_complete_bar` / `partial_yf_window` / `no_yf_bars`) |
+| `LLM_UNAVAILABLE` steigt, aber der Endpoint antwortet | **Gewollt:** auch Abschneiden zählt dazu (C-5-Begriff) — `grep -c "LLM output truncated"` im Log trennt es | `unterminated <think>` |
 | SQL-Fenster über `open_ts`/`close_ts` zählen falsch | gemischte Offsets: `open_ts` trägt `+02:00`, `close_ts` `Z` — erst parsen, nie String-vergleichen | `date(open_ts)` in SQLite rechnet nach UTC um |
 | `journalctl`-Export dauert Minuten | ohne Unit-Filter/`--since` gerufen | — |
 | Flip 2: Debatte abstained alles / `DebateLLMError` | `max_tokens_agent=512` zu klein für ein Reasoning-Modell → `_debate_config` übernimmt `max_tokens` aus der RoleSpec nicht | `ask_agent` setzt ein `claude-*`-Modell (DebateConfig nicht überschrieben) |
@@ -1255,4 +1305,11 @@ Was hier **nicht** steht, gilt als geprüft (Stand 2026-10-17).
   - zwei Starts je Boot (`PartOf=graphical-session.target`, §2.2) und Journal als K9-Quelle (E-1);
   - statischer Discovery-Text (B-10);
   - Abnahme bei Prereg v5 + Shakedown (T3).
-- **Advisor vor „fertig"** — siehe Phasenkopf-Session-Block.
+- **Advisor vor „fertig" (2026-10-17, nach Commit `988f8da`)**. Alle sieben Punkte sind im Folge-Commit eingearbeitet:
+  - (1) Der bedingte Flip-2-Tag bekommt vorab Kriterien: E-2 §F2, C-8.
+  - (2) Die Modell-ID steht an drei Stellen. `check_llm_profile` prüft jetzt auch die Budget-Ausnahme (C-1, C-4, C-7, §8).
+  - (3) `compute_return_divergence` hat als einzigen Code-Aufrufer `heartbeat.py:351`; per `rg` belegt (B-2).
+  - (4) Fehlende Verbatim-Anker ergänzt: B-2, B-5, B-10, C-5, D-1, E-1.
+  - (5) Die ROADMAP-Überschrift behauptet keinen Phase-9-Closeout mehr (A-3).
+  - (6) Begriff `LLM_UNAVAILABLE` umfasst auch Abschneiden; getrennt gezählt per Log (C-5, §8).
+  - (7) K11-Fehlgriff: zuerst die Pass-Zeiten prüfen (§8).
