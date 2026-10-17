@@ -5,7 +5,7 @@ read-when: locating any doc, or deciding whether a file is worth reading at all
 detail: L0
 up: ../CLAUDE.md
 down: every project doc (that is the point)
-updated: 2026-09-05
+updated: 2026-10-17
 ---
 # Doc Index (L0)
 
@@ -30,7 +30,9 @@ updated: 2026-09-05
 - [HANDOVER_PROMPT.md](./HANDOVER_PROMPT.md) — 📗 · wiederverwendbarer Auftragstext für Phasen-Abschluss/-Deferral; seit 2026-08-11 auf Claude Code umgeschrieben (Repo statt Google Drive)
 - [DOC_LAYERS_CONVENTION.md](./DOC_LAYERS_CONVENTION.md) — 📗 · generic (project-agnostic) doc-layers spec
 
-## Active phases (16 — Freischaltung 🔄 eröffnet 2026-09-05 [Blöcke A–E ✅, Block F = Audit + Restplan, eröffnet 2026-09-08 als Phase-16-F-Subphase, Tag 1 von 10 läuft seit Di 2026-09-08]; 10 — V3-Fortsetzung: Funnel-/Mess-Fixes [🛑 deferred 2026-08-11], lives in the same directory; Phase 15 closed 2026-09-05 → "Closed phases" unten)
+## Active phases (17 — Prüfstand 🔄 eröffnet 2026-10-17, Plan-Session Opus 5.5; 16 — Freischaltung ✅ abgeschlossen mit Teilbilanz 2026-10-16 — Einträge stehen bis Phase-17-Step A-3 noch hier; 10 — V3-Fortsetzung: Funnel-/Mess-Fixes [🛑 deferred 2026-08-11], lives in phase10_v3/; 🟡 Überschrift korrigiert 2026-10-17: nannte Phase 16 noch „🔄 Tag 1 von 10“)
+- [phase17_testbed/CLAUDE.md](../phase17_testbed/CLAUDE.md) — 🔄 phase head (Phase 17 / Prüfstand, eröffnet 2026-10-17): Mission (keine neuen Features — tiefe Härtung des Bestehenden, LLM pro Rolle austauschbar, Report + Prereg v5 als Test-Fundament), gelockte Kurzform T4–T22, Bot-Ritual (nur Scheduler stoppen), Test-Sweep + Σ-Ziele je Block, Block-Status, Plan-Session-Block
+- [docs/concepts/phase17_testbed_plan.md](./concepts/phase17_testbed_plan.md) — 📕 **Execution-ready Plan für Phase 17 (Prüfstand), 2026-10-17** — T1–T24 gelockt (je mit Begründung; E1–E8 aus dem Phase-16-Handover entschieden, E6 = Gate P7/A6 erfüllt) · §2 selbst gemessen (Σ-Baseline **1964**, Journal: Phase-16-„Unbekannte“ = VM-Reboots + SIGKILL nach 90-s-Stop-Timeout, Funktions-Inventar aller Arme) · D1–D13 (u. a. **IG-REST-Bars +2 h** `ig_adapter.py:909`, **Divergenz-Sampler 233/233 ohne Vergleich**, **`abstain_record_id` 3 669/3 669 NULL**, Bridge mit drei Nahtfehlern) · Blöcke A–E mit Verbatim-Ankern (MiniMax M3 über OpenAI-Compat, Flip 1 = Research nach Demo-Smoke, M3 budgetfrei, Monitor-Re-Adoption, Breaker Worst-Case, Report v5 + 2-Tage-Shakedown → Prereg v5) · AK1–AK21 · §8 Fehlgriffe · §9 Verify (14) · direkt an Sonnet 5 übergebbar
 - [phase16_activation/CLAUDE.md](../phase16_activation/CLAUDE.md) — ✅ phase head (Phase 16 / Freischaltung, eröffnet 2026-09-05, **abgeschlossen mit Teilbilanz 2026-10-16, Session #38**): 6/9 Löcher live zu + L7 per Live-Probe, Bot handelt wieder, systemd-Autostart bewiesen; AK15 (2-Wochen-PASS) nie erreicht — v3 FAIL K1/K5/K6, v4 FAIL K6. Trägt den Live-Beobachtungs-Block 09-21 und den Closeout-`## Session stopped`-Block. Einstieg: [PHASE16_CLOSEOUT_HANDOVER.md](../phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md). Plan: [phase16_activation_plan.md](./concepts/phase16_activation_plan.md).
 - [phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md](../phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md) — 📕 **Phase-16-Closeout-Handover (2026-10-16, Session #38)**: §0 BLUF + 5-Zeilen-Bilanz · §1 was nur offline bewiesen ist · §2 Kriterien-Matrix v1–v4 (v3 erstmals ausgewertet; A6 deal-bezogen max 2, K5 registriert FAIL) · §3 Delta seit Phase-15-Handover · §4 vier PASS-Blocker mit file:line (Token-Budget, Bridge `bridge.py:146`, Monitor-Orphan, Breaker-Blindfenster) · §5 Entscheidungen E1–E8 (E1 Nummer der Folgearbeit, E6 Gate P7) · §6 Operator-Aktionen · §8 Datei-Anker
 - [docs/architecture/phase16_activation.svg](./architecture/phase16_activation.svg) — 📕 1080×1080: Phase-16-Closeout-Bild — ① L1–L9 Fehlerbild 09-05 vs. As-Built 10-16 · ② vier Autonomie-Anläufe v1–v4 + K1–K9-Matrix · ③ Fehlerbild heute (PASS-Blocker) · ④ Zielbild Folgephase · ⑤ Status-Leiste
