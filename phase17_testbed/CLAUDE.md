@@ -81,7 +81,7 @@ echo "root | $($PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1)"
 
 ---
 
-## Session stopped — 2026-10-17 (Plan-Session, Opus 5.5 — Phase 17 eröffnet, Plan committet)
+## Session stopped — 2026-10-18 (Plan-Session, Opus 5.5 — begonnen 2026-10-17; Phase 17 eröffnet, Plan committet + gepusht)
 
 > **Auftrag:** Nikinger 2026-10-17. „Du bist der Phase-17-Chat — die Planungssession." Fragen gebündelt in zwei Runden (F1–F12, F13–F14), danach den ausführungsreifen Plan für Sonnet 5 schreiben und committen. Push = Nikinger.
 
@@ -103,9 +103,12 @@ echo "root | $($PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1)"
 - **„Unbekannte" Phase-16-Stopps aufgeklärt:** VM-Reboots, plus SIGKILL nach dem 90-s-Stop-Timeout (Journal). Nikinger: Reboots vom VM-Host.
 - **Nikinger-Entscheidungen** F1–F14 eingearbeitet (Plan §1).
 - **Advisor zweimal** — vor dem Ansatz und vor „fertig". Die sieben Punkte des zweiten Reviews stehen im Folge-Commit (Plan §13): Flip-2-Tag vorregistriert, Modell-ID-Drift prüft der Start, Verbatim-Anker ergänzt.
+- **Plan-Step A-4 ist schon in dieser Session erledigt** (Nikinger-Freigabe 2026-10-17):
+  - Push `be15cf9..399a9df` nach `origin/main`; das nimmt `e19c178` mit.
+  - `sunshine_2026.906.222525-1+ubuntu24.04_amd64.deb` aus dem Repo-Root nach `~/Downloads/` **verschoben**, nicht gelöscht. Sunshine selbst bleibt per `dpkg` installiert (`install ok installed`) und läuft als `/usr/bin/sunshine`.
+  - Exec-Session: A-4 nur noch als ✅ abhaken. Die A-Commits pusht wie üblich der Nikinger.
 
 ### Next
-- **Nikinger:** Plan-Commit pushen (`git push -u origin main`, nimmt `e19c178` mit) · `sunshine_…deb` aus dem Repo-Root räumen.
 - **Exec-Session #1 (Sonnet 5):** startet mit Plan **A-0**:
   - diesen Block wortgleich nach `SESSIONS_ARCHIVE.md` (NEU) rotieren;
   - `scripts/check_doc_rotation.py:88` um `"phase17_testbed",` ergänzen;
