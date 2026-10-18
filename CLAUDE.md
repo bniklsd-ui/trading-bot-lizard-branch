@@ -9,7 +9,7 @@ down:
   - ROADMAP.md
   - ARCHITECTURE.md
   - phase17_testbed/CLAUDE.md   # active phase head (🟡 korrigiert 2026-10-17: stand seit 09-05 auf phase9_universe)
-updated: 2026-10-17
+updated: 2026-10-18
 ---
 # CLAUDE.md — Project Instructions
 
@@ -98,10 +98,10 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 > - drei neu gemessene stille Totalausfälle: IG-REST-Bars +2 h in der Zukunft gestempelt; der
 >   Divergenz-Sampler hat in 233 von 233 Läufen nie verglichen; `decision_context.abstain_record_id`
 >   ist 3 669/3 669 leer;
-> - LLM pro Rolle austauschbar, Research zuerst auf MiniMax M3, Abo-Calls budgetfrei;
+> - LLM pro Rolle austauschbar. Research zuerst auf GLM über die z.ai-API mit Pay-per-use (Plan §14, 2026-10-18; ersetzt MiniMax M3). Der Bot nutzt nie den Coding-Plan-Endpoint;
 > - Report + Shakedown → Prereg v5 als Fundament der ausgiebigen Tests.
 >
-> Exec: Sonnet 5 (Claude Code). Σ-Baseline 1964. E1–E8 aus dem Phase-16-Handover sind entschieden
+> Exec: offener Test GLM in OpenCode (z.ai Coding Plan), Claude Code bleibt Anthropic-only mit Pflicht-Review vor dem Deploy (Plan §14). Σ-Baseline 1964. E1–E8 aus dem Phase-16-Handover sind entschieden
 > (Plan §1); **E6: Gate P7/A6 gilt als erfüllt.**
 
 > **✅ 2026-10-16 — Phase 16 (Freischaltung) ABGESCHLOSSEN MIT TEILBILANZ (Session #38, Opus 5.5).**

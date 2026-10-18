@@ -10,10 +10,12 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-10-17
+updated: 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
 ---
 
 # Phase 17 — Prüfstand: Execution-ready Plan (2026-10-17)
+
+> ⚠ **Nachtrag 2026-10-18 (§14, Nikinger): §14 hat Vorrang.** Der Executor ist ein offener Test mit GLM in OpenCode und Review-Gate vor E-3. Bot-Provider ist die z.ai-API mit Pay-per-use statt MiniMax M3. §14 überschreibt T4–T7, T22 und alle MiniMax-Stellen in C/D/E — **zuerst §14 lesen.**
 
 > **Adressat:** die ausführende Session (**Sonnet 5 in Claude Code**, Nikinger-Auftrag 2026-10-17).
 > Nichts hier muss neu hergeleitet werden. Jede Zahl in §2/§3 ist in der Plan-Session selbst gegen
@@ -1313,3 +1315,122 @@ Was hier **nicht** steht, gilt als geprüft (Stand 2026-10-17).
   - (5) Die ROADMAP-Überschrift behauptet keinen Phase-9-Closeout mehr (A-3).
   - (6) Begriff `LLM_UNAVAILABLE` umfasst auch Abschneiden; getrennt gezählt per Log (C-5, §8).
   - (7) K11-Fehlgriff: zuerst die Pass-Zeiten prüfen (§8).
+
+---
+
+## §14 Nachtrag 2026-10-18 — Executor-Test GLM (OpenCode) + Bot-Provider z.ai Pay-per-use
+
+> **Auslöser (Nikinger 2026-10-18):** Der 20-€-MiniMax-Plan wird durch den 20-€-z.ai-Coding-Plan ersetzt.
+> Der Executor soll ein fähigeres Modell als M3 werden („offener Test", Rückweg: MiniMax-Endpoint bis **2026-11-15**).
+>
+> Antworten:
+> 1. **nur OpenCode** — Claude Code bleibt Anthropic-only;
+> 2. Start `glm-5.3-flash`, die **ganze Familie** (`glm-5.2`, `glm-5.3`, `glm-5.3-flash`) bleibt für die Evaluation zugelassen;
+> 3. Bot-Provider = **Option b**, die allgemeine z.ai-API mit Pay-per-use;
+> 4. Review-Gate und Rückfallregel **ja**. Dazu der Quirk: zeigt `glm-5.2` auf dem Kontingent einen Flash-ähnlichen Verbrauch, ist ein 5.2-Durchlauf ein sinnvoller Test.
+>
+> **Dieser Abschnitt hat Vorrang** vor §1 und §6, wo sie sich widersprechen.
+
+### 14.1 Was überschrieben wird
+
+| Stelle | bisher | neu |
+|---|---|---|
+| T4 | MiniMax M3 über OpenAI-Compat | **GLM über die allgemeine z.ai-API (Pay-per-use)**, weiter mit `OpenAICompatLLMClient`. Das Modell wählt der Nikinger nach dem Familien-Smoke (14.4) |
+| T5 | Profile `research_m3` / `all_m3` | **`research_glm` / `all_glm`**; Flip 1 / Flip 2 gegated wie bisher |
+| T6 | Bot-Key `trading-bot-minimax-bot` / `api_key` | **`trading-bot-zai-bot` / `api_key`** (Pay-per-use, Keyring). **Nie** der Coding-Plan-Key oder -Endpoint |
+| T7 | M3 budgetfrei, „Grenzkosten 0" | Das gewählte GLM-Bot-Modell bleibt **budgetfrei**, weil die Kadenz Research auf ≤ 102 Calls/Tag begrenzt. Es bekommt aber eine **echte Preiszeile**, damit € gemessen wird; D-2 entscheidet dann € vs. Token |
+| T22 | Exec Sonnet 5 (Claude Code) | **OpenCode + z.ai Coding Plan**, Start `zai-coding-plan/glm-5.3-flash`. Claude Code (Anthropic) macht nur das Review-Gate (14.2) |
+| C-1 | `PROVIDERS["minimax"]`, `_M3`, `research_m3`/`all_m3` | `PROVIDERS["zai"] = ProviderSpec(kind="openai_compat", base_url="https://api.z.ai/api/paas/v4", api_key_service="trading-bot-zai-bot", api_key_username="api_key")`; `_GLM = RoleSpec(provider="zai", model="<C-7-Wahl>", max_tokens=4096, timeout_s=90.0)`; Profile `research_glm`/`all_glm` |
+| C-1 (neu) | — | `check_llm_profile` wirft zusätzlich, wenn eine Nicht-Anthropic-`base_url` den Pfad **`/coding/`** enthält. Der Coding-Plan-Endpoint ist für den Bot verboten; eine Sperre träfe auch den Executor. Test `test_check_rejects_coding_plan_endpoint` (+1) |
+| C-2 | `budget_exempt_models = ("MiniMax-M3",)` | `("<C-7-Wahl>",)` |
+| C-3 | Preiszeile `"MiniMax-M3": (0.0, 0.0)` | Preiszeilen für die ganze Familie mit **echten** USD/Mtok (in, out): `"glm-5.3": (1.4, 4.4)`, `"glm-5.2": (1.4, 4.4)`, `"glm-5.3-flash": (0.15, 0.5)`. Quelle: models.dev-Katalog `~/.cache/opencode/models.json`, Provider `zai`, Stand 2026-10-18; vor dem Commit gegen die z.ai-Preisseite prüfen (14.6 Nr. 17). Ein späterer Modellwechsel braucht dann nur noch `_GLM.model` + `budget_exempt_models` |
+| C-6 | Seed-Aufruf MiniMax | `store_minimax_key.py --service trading-bot-zai-bot --username api_key`. Der Skriptname bleibt, der Seeder ist generisch |
+| C-7 | M3-Smoke | **Familien-Smoke** (14.4) |
+| C-8 | `all_m3` | `all_glm` |
+| D-1, E-2, E-5 | `MiniMax-M3`, `research_m3` | das gewählte GLM-Modell, `research_glm` |
+| §8/§9, MiniMax-Zeilen | MiniMax | gelten sinngemäß für z.ai; Ergänzungen in 14.5/14.6 |
+| §7 (neu) | — | **AK22:** Review-Gate PASS ist vor dem E-3-Start im Phasenkopf dokumentiert (Session, Befunde, Fix-Commits) |
+
+### 14.2 Executor-Test (OpenCode)
+
+- **Setup (Nikinger):** `opencode auth login` → Provider „Z.AI Coding Plan" (`zai-coding-plan`) → Key.
+  - `opencode.json` bleibt **unverändert**: Der Katalog kennt `glm-5.2`, `glm-5.2-highspeed`, `glm-5.3`, `glm-5.3-flash`, `glm-5.3-highspeed` bereits.
+  - Endpoint ist `https://api.z.ai/api/coding/paas/v4` (Katalog `~/.cache/opencode/models.json`, 2026-10-18).
+  - `opencode models zai-coding-plan` listet die Modelle erst **nach** dem Login. Heute meldet der Befehl „Provider not found", das ist erwartet.
+  - Der Key landet in `~/.local/share/opencode/auth.json` (0600), wie heute bei `minimax`/`google`/`nvidia`. Das ist Harness-Infrastruktur außerhalb des Repos, keine Bot-Credential; der Bot-Key liegt im Keyring (T6).
+- **Einstieg:** `AGENTS.md` → root `CLAUDE.md` → `phase17_testbed/CLAUDE.md` → dieser Plan, **zuerst §14**.
+- **Modelle:**
+  - Start `glm-5.3-flash`.
+  - Zur Evaluation zugelassen: `glm-5.2` und `glm-5.3`; die `-highspeed`-Varianten nur auf Nikinger-Wunsch.
+  - **5.2-Quirk:** zeigt `glm-5.2` auf dem Plan-Kontingent einen Flash-ähnlichen Verbrauch, folgt ein 5.2-Durchlauf auf einem vergleichbaren Step.
+- **Evaluations-Protokoll** (Tabelle im Phasenkopf), je Exec-Session:
+  - Modell;
+  - Steps;
+  - Kontingent vorher/nachher (der Nikinger liest es im z.ai-Dashboard ab);
+  - Tests grün/rot;
+  - Rückfall-Ereignisse.
+- **Rückfallregel:** Der Step geht an MiniMax M3.1 Flash Preview in OpenCode (Endpoint bis 2026-11-15) oder an Claude Code (Anthropic), wenn eines davon eintritt:
+  - der Executor scheitert zweimal am selben Step;
+  - ein roter Test steht nach 3 Fix-Versuchen noch.
+- **Review-Gate (Pflicht, vor E-3):** Eine Claude-Code-Session (Anthropic, Opus) prüft alle Exec-Commits von A-0 bis D-1. Schwerpunkte:
+  - **B-5** — Order-Pfad;
+  - **B-6** — Breaker, Hard Rule 5;
+  - **C-4** — LLM-Verdrahtung, Startup-Check;
+  - **B-3** — Bridge;
+  - **B-2** — die `mismatch`-Einbahnstraße.
+
+  Befunde werden **vor** dem Deploy als Fix-Commits erledigt. Erst „Review PASS" gibt E-3 frei.
+
+### 14.3 Bot-Provider (Option b)
+
+- Allgemeine z.ai-API, Pay-per-use: **`https://api.z.ai/api/paas/v4`** (Katalog-Provider `zai`).
+- **Nie** `https://api.z.ai/api/coding/paas/v4`. Laut [Usage Policy](https://docs.z.ai/devpack/usage-policy) ist der Coding Plan „only … within officially supported tools"; Verstöße führen zu Drosselung, Sperre und ab dem dritten Mal zum Bann. Die C-1-Prüfung erzwingt das beim Start.
+- Eigener Key `trading-bot-zai-bot` / `api_key` mit Guthaben (Nikinger).
+- GLM liefert Reasoning in **`reasoning_content`**, nicht in `content`. Der C-3-`<think>`-Strip bleibt als harmloser Schutz.
+- **Kostenschätzung Research** — eine **Annahme**, der Reasoning-Anteil ist unbekannt. Gerechnet mit 102 Calls/Tag × ≈ 3,5 k Input + ≈ 1,5 k Output:
+  - `glm-5.3` ≈ 1,2 $/Tag;
+  - `glm-5.3-flash` ≈ 0,13 $/Tag;
+  - zum Vergleich heute: Sonnet ≈ 1,0 €/Tag, aber nur bis zum Cap.
+
+### 14.4 C-7 neu — Familien-Smoke (Nikinger, 3 Calls Pay-per-use, < 0,01 $)
+
+```bash
+for m in glm-5.3 glm-5.3-flash glm-5.2; do
+  phase1_broker_wrapper/.venv/bin/python phase4_research/scripts/openrouter_smoke.py \
+    --model "$m" --base-url https://api.z.ai/api/paas/v4 \
+    --key-service trading-bot-zai-bot --key-username api_key \
+    --max-tokens 4096 --timeout-s 90 --show-raw
+done
+```
+
+- Je Modell kommen PASS/FAIL, Tokens, `finish_reason` und Latenz in den Phasenkopf.
+- Danach **wählt der Nikinger das Research-Modell**.
+- Ein Commit setzt `_GLM.model` + `budget_exempt_models`; die Preiszeilen liegen seit C-3 vor.
+- Erst dann folgt der Flip-1-Commit `llm_profile="research_glm"`.
+
+### 14.5 Ergänzung §8 (Fehlgriffe)
+
+| Symptom | Erster Verdächtiger | Zweiter |
+|---|---|---|
+| Scheduler startet nicht: `ValueError … /coding/ endpoint` | **Gewollt fail-closed:** die `base_url` zeigt auf den Coding Plan | — |
+| Research `LLM_UNAVAILABLE` mit HTTP 402/429 und „balance" | z.ai-Guthaben (Pay-per-use) leer | Rate-Limit des Kontos |
+| OpenCode: `Provider not found: zai-coding-plan` | `opencode auth login` fehlt | Katalog veraltet (`~/.cache/opencode/models.json`) |
+| Kontingent schmilzt schneller als erwartet | Session läuft auf `glm-5.3` statt `-flash` (Modell im Session-Header prüfen) | großer Kontext: der Plan (111 KB) wird wiederholt komplett gelesen → nur die nötigen Abschnitte lesen |
+
+### 14.6 Ergänzung §9 (bei Ausführung verifizieren)
+
+15. **Pay-per-use-Endpoint:** Der Katalog sagt `https://api.z.ai/api/paas/v4`, eine Doku-Zusammenfassung nannte `https://api.z.ai/api/v1`. Der C-7-Smoke entscheidet.
+16. Braucht Pay-per-use einen **eigenen Key**, oder rechnet z.ai denselben Account-Key je nach Endpoint ab? (z.ai-Konsole, Nikinger)
+17. **Echte z.ai-Preise** je Modell. Der models.dev-Katalog nennt `glm-5.3`/`glm-5.2` mit 1,4/4,4 und `glm-5.3-flash` mit 0,15/0,5 USD/Mtok. Vor dem C-3-Commit gegen die z.ai-Preisseite prüfen.
+18. Zählen **Reasoning-Tokens gegen `max_tokens`** (Abschneiden bei 4096)? Der Smoke zeigt es am `finish_reason`.
+19. Unterstützt z.ai **`response_format: {"type": "json_object"}`**? Sonst greift der C-3-Fallback.
+20. **Kontingent-Verbrauch je GLM-Modell** im Coding Plan (z.ai-Dashboard) — die Grundlage des 5.2-Quirks.
+
+### 14.7 Σ-Ziele
+
+Die C-1-Prüfung auf `/coding/` bringt **+1** P8-Test. Damit gilt:
+- Block C Σ ≥ **2016** (P8 ≥ 288 nach C-5);
+- D-1 Σ ≥ **2019** (P8 ≥ 291);
+- E-1 Σ ≥ **2026**.
+
+Die P8-Schwellen der einzelnen Steps in §6 ab C-1 verschieben sich um +1.

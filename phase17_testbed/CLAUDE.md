@@ -1,6 +1,6 @@
 ---
 status: live
-purpose: PHASE-HEAD, Phase 17 (Prüfstand) — 🔄 eröffnet 2026-10-17 (Plan-Session, Opus 5.5). Keine neuen Features. Tiefe Härtung des Bestehenden — vier Phase-16-PASS-Blocker + drei neu gemessene stille Totalausfälle zu, LLM pro Rolle austauschbar (Research zuerst auf MiniMax M3), Report + Vorregistrierung v5 als Fundament für die ausgiebigen Tests.
+purpose: PHASE-HEAD, Phase 17 (Prüfstand) — 🔄 eröffnet 2026-10-17 (Plan-Session, Opus 5.5). Keine neuen Features. Tiefe Härtung des Bestehenden — vier Phase-16-PASS-Blocker + drei neu gemessene stille Totalausfälle zu, LLM pro Rolle austauschbar (Research zuerst auf GLM über die z.ai-API mit Pay-per-use, Plan §14), Report + Vorregistrierung v5 als Fundament für die ausgiebigen Tests. Executor: offener Test GLM in OpenCode (§14).
 read-when: jede Phase-17-Exec-Session — zuerst diesen Kopf, dann den `## Session stopped`-Block, dann den Plan
 detail: L1
 up: ../CLAUDE.md
@@ -8,7 +8,7 @@ down:
   - ../docs/concepts/phase17_testbed_plan.md               # 📕 der Plan (T1–T24, D1–D13, Blöcke A–E, AK1–AK21, §8 Fehlgriffe, §9 Verify)
   - ../phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md     # 📕 Vorgänger-Handover (§4 PASS-Blocker, §5 E1–E8)
   - ../phase16_activation/scripts/autonomy_report.py       # Report-Skript, Block E erweitert es in place (--prereg v5)
-updated: 2026-10-17 (Plan-Session, Opus 5.5 — Phase eröffnet, Plan committet; Σ-Baseline 1964 selbst gemessen)
+updated: 2026-10-18 (Plan-§14-Nachtrag: Executor GLM in OpenCode + Review-Gate, Bot-Provider z.ai Pay-per-use) | 2026-10-17 (Plan-Session, Opus 5.5 — Phase eröffnet, Plan committet; Σ-Baseline 1964 selbst gemessen)
 ---
 
 # CLAUDE.md — Phase 17: Prüfstand (`phase17_testbed/`)
@@ -30,18 +30,18 @@ tiefe Optimierung von dem, was schon da ist."*
 **Abnahme:** Shakedown-Vorregistrierung → 2-Tage-Shakedown PASS → Prereg v5 committet (Plan AK19 + AK20 + AK21).
 Der 10-Tage-Lauf selbst ist die Testreihe **nach** Phase 17.
 
-## Gelockt (Kurzform — volle Begründung Plan §1)
+## Gelockt (Kurzform — volle Begründung Plan §1, **Vorrang hat Plan §14** vom 2026-10-18)
 
 | ID | Kern |
 |---|---|
-| T4/T5 | MiniMax M3 über OpenAI-kompatiblen Endpoint. **Flip 1** = nur Research (nach Demo-Smoke, eigener Commit). **Flip 2** = alle Rollen, nur auf Nikinger-Go nach dem Shakedown |
-| T6 | Bot-Key im eigenen Namespace `trading-bot-minimax-bot` / `api_key` |
-| T7 | M3-Calls budgetfrei (`budget_exempt_models`), Anthropic bleibt bei 300 k; K6-Einheit entscheidet der Nikinger nach dem Shakedown |
+| T4/T5 (§14) | **GLM über die allgemeine z.ai-API, Pay-per-use** (`https://api.z.ai/api/paas/v4`, **nie** `/api/coding/` — prüft `check_llm_profile` beim Start). Das Modell wählt der Nikinger nach dem Familien-Smoke C-7 (`glm-5.3` / `glm-5.3-flash` / `glm-5.2`). **Flip 1** = `research_glm`, **Flip 2** = `all_glm`, nur auf Nikinger-Go nach dem Shakedown |
+| T6 (§14) | Bot-Key im eigenen Namespace `trading-bot-zai-bot` / `api_key` (Keyring; nie der Coding-Plan-Key) |
+| T7 (§14) | Das GLM-Bot-Modell ist budgetfrei (`budget_exempt_models`; die Kadenz begrenzt es auf ≤ 102 Research-Calls/Tag). Es hat eine **echte Preiszeile**, also wird € gemessen. Anthropic bleibt bei 300 k; K6-Einheit entscheidet der Nikinger nach dem Shakedown |
 | T8 | Monitor-Re-Adoption nach Restart, nur im WINDOW, inklusive Sofort-Close bei überschrittener Haltezeit |
 | T9 | Breaker zählt heutige OPEN-Zeilen mit `−initial_risk`; NULL → fail-closed |
 | T13 | Code in P1, P4, P5, P8, P10, P12, P14, P15, P16; P2 nur Tests; **kein** Code in P6/P7/P13 |
 | T14/T15 | IG-Zeitstempel-Fix (+ Löschen der 3 730 falschen `ig`-Bars), Divergenz-Sampler-Reparatur |
-| T22 | Exec = Sonnet 5 (Claude Code); Scheduler gestoppt von B-0 bis E-3 |
+| T22 (§14) | Exec = **offener Test in OpenCode + z.ai Coding Plan**, Start `zai-coding-plan/glm-5.3-flash`, Familie `glm-5.2`/`glm-5.3` zugelassen. Claude Code bleibt Anthropic-only und macht das **Pflicht-Review-Gate vor E-3**. Rückfall auf MiniMax (bis 2026-11-15) oder Claude, wenn ein Step zweimal scheitert oder ein Test nach 3 Versuchen rot bleibt. Scheduler gestoppt von B-0 bis E-3 |
 
 ## Bot-Ritual (vor jedem bot-berührenden Edit)
 
@@ -67,7 +67,7 @@ echo "root | $($PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1)"
 | Stand | Σ | Quelle |
 |---|---:|---|
 | Baseline (Plan-Session, 2026-10-17) | **1964** (+ meta 28) | Plan §2.1 |
-| Ziel nach Block B / C / D / E-1 | ≥ 1992 / ≥ 2015 / ≥ 2018 / ≥ 2025 | Plan §6 |
+| Ziel nach Block B / C / D / E-1 | ≥ 1992 / ≥ 2016 / ≥ 2019 / ≥ 2026 | Plan §6 + 1 Test aus §14 (C-1 `/coding/`-Prüfung) |
 
 ## Phase-17-Status
 
@@ -78,6 +78,14 @@ echo "root | $($PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1)"
 | C LLM-Austausch | ⏳ |
 | D Token-Budget | ⏳ |
 | E Test-Fundament | ⏳ |
+
+## Executor-Evaluation (Plan §14.2 — je Exec-Session eine Zeile)
+
+| Session | Datum | Modell (`zai-coding-plan/…`) | Steps | Kontingent vorher → nachher (z.ai-Dashboard) | Tests | Rückfall | Notiz |
+|---|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | — | Der 5.2-Quirk: bei Flash-ähnlichem Kontingent-Verbrauch einen vergleichbaren Step mit `glm-5.2` fahren |
+
+**Review-Gate vor E-3 (AK22):** ⏳ (Claude-Code-Session, Anthropic; Schwerpunkte B-5, B-6, C-4, B-3, B-2)
 
 ---
 
@@ -103,6 +111,7 @@ echo "root | $($PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1)"
 - **„Unbekannte" Phase-16-Stopps aufgeklärt:** VM-Reboots, plus SIGKILL nach dem 90-s-Stop-Timeout (Journal). Nikinger: Reboots vom VM-Host.
 - **Nikinger-Entscheidungen** F1–F14 eingearbeitet (Plan §1).
 - **Advisor zweimal** — vor dem Ansatz und vor „fertig". Die sieben Punkte des zweiten Reviews stehen im Folge-Commit (Plan §13): Flip-2-Tag vorregistriert, Modell-ID-Drift prüft der Start, Verbatim-Anker ergänzt.
+- **Plan-Nachtrag §14 (2026-10-18, Nikinger):** Executor-Test GLM in OpenCode (Claude Code bleibt Anthropic-only; Review-Gate vor E-3; Rückfallregel; 5.2-Quirk), Bot-Provider z.ai mit Pay-per-use statt MiniMax M3. Belege aus der z.ai Usage Policy, dem Coding Plan nur für unterstützte Tools, und dem OpenCode-Katalog `~/.cache/opencode/models.json` mit Modellen, Endpoints und Preisen. `opencode.json` bleibt unverändert.
 - **Plan-Step A-4 ist schon in dieser Session erledigt** (Nikinger-Freigabe 2026-10-17):
   - Push `be15cf9..399a9df` nach `origin/main`; das nimmt `e19c178` mit.
   - `sunshine_2026.906.222525-1+ubuntu24.04_amd64.deb` aus dem Repo-Root nach `~/Downloads/` **verschoben**, nicht gelöscht. Sunshine selbst bleibt per `dpkg` installiert (`install ok installed`) und läuft als `/usr/bin/sunshine`.
