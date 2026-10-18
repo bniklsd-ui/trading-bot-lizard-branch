@@ -1434,3 +1434,26 @@ Die C-1-Prüfung auf `/coding/` bringt **+1** P8-Test. Damit gilt:
 - E-1 Σ ≥ **2026**.
 
 Die P8-Schwellen der einzelnen Steps in §6 ab C-1 verschieben sich um +1.
+
+### 14.8 Notiz 2026-10-18 — die Executor-Integration macht **eurofyx-fleet**, nicht dieser Plan
+
+> **Nikinger 2026-10-18:** „die Integration selbst passiert über die Eurofleet (getrennt vom Plan)".
+> Ersetzt den Punkt „Setup (Nikinger)" in 14.2.
+
+**Zuständigkeiten:**
+
+| Wer | Was |
+|---|---|
+| **eurofyx-fleet** (privates Infra-Repo des Nikingers) | OpenCode-Provider `zai-coding-plan` einrichten (Auth), Modellwahl/Default, Neustart von `opencode.service`, Kündigung/Rückweg MiniMax (Endpoint bis 2026-11-15) |
+| **Phase-17-Exec-Session** | fasst `~/.config/opencode/`, `~/.local/share/opencode/auth.json` und `opencode.service` **nicht** an. Sie trägt nur ihre Zeile in die Executor-Evaluation im Phasenkopf ein |
+| **Bot / dieses Repo** | unverändert. Der Bot nutzt **nie** den Coding-Plan (14.3); sein Pay-per-use-Key `trading-bot-zai-bot` ist ein Bot-Thema (C-6/C-7) und gehört nicht zur Fleet-Integration |
+
+**Was die Fleet-Integration wissen muss** (Stand 2026-10-18, selbst gemessen):
+- OpenCode **1.18.33** (`~/.opencode/bin/opencode`).
+- Der Katalog `~/.cache/opencode/models.json` führt Provider `zai-coding-plan` mit API `https://api.z.ai/api/coding/paas/v4` und den Modellen `glm-5.2`, `glm-5.2-highspeed`, `glm-5.3`, `glm-5.3-flash`, `glm-5.3-highspeed`. In `opencode.json` sind deshalb keine eigenen Modell-Einträge nötig.
+- `opencode models` listet nur Provider mit Login. Vor dem Login meldet `zai-coding-plan` „Provider not found".
+- Heutige Keys in `auth.json` (0600): `google`, `nvidia`, `minimax`.
+- `opencode.service` startet `opencode serve` auf der Tailscale-IP, Port 4096. Ein Neustart unterbricht laufende Sessions.
+- Start-Modell `glm-5.3-flash`. Die Familie `glm-5.2`/`glm-5.3` ist zur Evaluation zugelassen, inklusive 5.2-Quirk (14.2).
+
+**Schnittstelle zurück zum Plan:** Die erste Exec-Session (A-0) startet erst, wenn die Fleet „OpenCode + z.ai bereit" meldet (Nikinger). Bis dahin gilt der Rückweg aus 14.2 (MiniMax in OpenCode bis 2026-11-15 oder Claude Code). Am Plan selbst ändert sich dadurch nichts.
