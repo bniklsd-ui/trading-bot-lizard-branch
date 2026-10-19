@@ -196,37 +196,46 @@ def test_assess_day_typed_expiry_counts_as_measurement(archive, db_path):
 
 
 class _FakeIGBroker:
-    """Returns a bar in IG's real raw ``get_ohlcv`` shape (``"yyyy/MM/dd HH:mm:ss"``,
-    never ISO) whose ``timestamp`` tracks an injectable "current day" — a fixed
-    timestamp here would make every probe query the same archive window regardless
-    of which day the test has advanced ``now_fn`` to.
+    """Returns ``count`` 5m bars in IG's real raw ``get_ohlcv`` shape
+    (``"yyyy/MM/dd HH:mm:ss"``, never ISO) ending at ``latest_minute`` minutes after
+    midnight on ``day`` (Phase 17 B-2 default 09:30 ⇒ bars at 08:55..09:30; Test-``now``
+    at 09:35 ⇒ comparison bar 09:05). ``count`` is honored exactly when the window fits.
 
     Wired through the real :class:`BudgetedIGBarProvider` (not a stand-in that hands
     ``DivergenceSampler`` an already-ISO ``ts``) so these tests exercise the actual U1
     fix (``service.py``'s ``normalize_bar_ts`` call) instead of skipping the seam it
     fixes (P12.5 plan §3/U1)."""
 
-    def __init__(self, close: float):
+    def __init__(self, close: float, *, latest_minute: int = 9 * 60 + 30):
         self.close = close
         self.calls = 0
         self.day = DAY
+        self.latest_minute = latest_minute
 
     def get_ohlcv(self, epic, resolution, count):
         self.calls += 1
-        # Three 5m bars at 08:50, 08:55, 09:00 with stable close — A6.0's
-        # compute_return_divergence needs >= 2 bars per source.
         day = datetime.strptime(self.day, "%Y-%m-%d")
+        pairs: list[tuple[int, int]] = []
+        for i in range(count):
+            total = self.latest_minute - (count - 1 - i) * 5
+            if total < 0:
+                break
+            h, m = divmod(total, 60)
+            pairs.append((h, m))
         bars = [
             {"timestamp": day.strftime("%Y/%m/%d") + f" {h:02d}:{m:02d}:00",
              "open": self.close, "high": self.close,
              "low": self.close, "close": self.close, "volume": 1}
-            for h, m in [(8, 50), (8, 55), (9, 0)]
+            for h, m in pairs
         ]
         return SimpleNamespace(ok=True, data={"bars": bars})
 
 
-def _budgeted_ig(tmp_path, close: float, *, now_fn=None, stale_tolerance_min: int = 120) -> tuple[_FakeIGBroker, BudgetedIGBarProvider]:
-    broker = _FakeIGBroker(close)
+def _budgeted_ig(
+    tmp_path, close: float, *, now_fn=None, stale_tolerance_min: int = 120,
+    latest_minute: int = 9 * 60 + 30,
+) -> tuple[_FakeIGBroker, BudgetedIGBarProvider]:
+    broker = _FakeIGBroker(close, latest_minute=latest_minute)
     budget = SourceBudget(tmp_path / "ig_budget.sqlite", IG_QUOTA_V1)
     # Phase 13 §6 A4: BudgetedIGBarProvider now gates fresh-history-stale. The
     # heartbeat tests bump a fake `now` (2026-08-16) but the broker's `_default_now`
@@ -241,13 +250,38 @@ def _budgeted_ig(tmp_path, close: float, *, now_fn=None, stale_tolerance_min: in
     )
 
 
+def _insert_window_yf_bars(
+    archive, *, day: str, start_h: int, start_m: int, n: int,
+    open_p: float = 100.0, close_p: float = 100.0,
+) -> None:
+    """Insert ``n`` yF 1m bars starting at ``day`` ``start_h:start_m`` (1-minute spacing).
+
+    Phase 17 B-2: the divergence sampler's comparison window is always
+    ``[bar.ts, bar.ts+5m)``. The yF source is filtered via ``sources=("yf",)``
+    (Phase-13 L10), so these bars must carry ``source="yf"`` to be picked up.
+    """
+    from datetime import timedelta
+    day_dt = datetime.strptime(day, "%Y-%m-%d")
+    for i in range(n):
+        ts = day_dt + timedelta(hours=start_h, minutes=start_m + i)
+        archive.insert_bars([Bar(
+            epic=EPIC, resolution="1m",
+            ts_utc=f"{day}T{ts.strftime('%H:%M:00')}.000Z",
+            open=open_p, high=open_p, low=open_p, close=close_p,
+            volume=1, source="yf",
+            fetched_at=f"{day}T{ts.strftime('%H:%M:01')}.000Z",
+        )])
+
+
 def test_sampler_throttles_to_once_per_day(archive, tmp_path):
-    now = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
+    """B-2: Throttle wird NACH einem echten Vergleich gesetzt — die zwei Calls am
+    selben Tag führen nur einen IG-Call. Voraussetzung: yF-Bars im
+    Vergleichsfenster [09:05, 09:10), sonst kommt (e) ohne Throttle."""
+    now = datetime(2026, 8, 16, 9, 35, tzinfo=timezone.utc)
     broker, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: now)
     sampler = DivergenceSampler(ig, archive, now_fn=lambda: now)
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T09:00:00.000Z",
-                              open=100, high=100, low=100, close=100.0, volume=1, source="yf",
-                              fetched_at=f"{DAY}T09:00:01.000Z")])
+    _insert_window_yf_bars(archive, day=DAY, start_h=9, start_m=5, n=5,
+                            open_p=100.0, close_p=100.0)
 
     sampler.sample_epic(EPIC, lambda e: None, lambda e: None)
     sampler.sample_epic(EPIC, lambda e: None, lambda e: None)
@@ -262,110 +296,88 @@ def test_sampler_compares_only_yf_bars_not_ig(archive, tmp_path):
     structurally — even if a same-minute IG bar exists in the archive, it cannot
     reach the comparison. We prove the yF row drives the check by giving the yF
     bars a different return-trend from the IG bars."""
-    now = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 16, 9, 35, tzinfo=timezone.utc)
     broker, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: now)
-    broker.close = 100.0  # IG stays flat
-    # yF bars in the probe's 5m window (09:00–09:05): rising close.
-    archive.insert_bars([
-        Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T09:00:00.000Z",
-            open=90, high=90, low=90, close=90.0, volume=1, source="yf",
-            fetched_at=f"{DAY}T09:00:01.000Z"),
-        Bar(epic=EPIC, resolution="1m", ts_utc=f"{DAY}T09:01:00.000Z",
-            open=100, high=100, low=100, close=100.0, volume=1, source="yf",
-            fetched_at=f"{DAY}T09:01:01.000Z"),
-    ])
+    broker.close = 100.0  # IG stays flat (8 bars at 08:55..09:30)
+    # Same-window yF bars [09:05, 09:10): rising close — divergent vs IG.
+    _insert_window_yf_bars(archive, day=DAY, start_h=9, start_m=5, n=5,
+                            open_p=90.0, close_p=100.0)
     events = []
     sampler = DivergenceSampler(ig, archive, health_sink=events.append, now_fn=lambda: now)
     sampler.sample_epic(EPIC, lambda e: None, lambda e: None)
     assert len(events) == 1
     assert events[0]["event"] == "quote_divergence"
     assert events[0].get("kind") == "return"  # A6.0 marker: return-based, not level
+    assert events[0]["n_yf"] == 5
+    assert events[0]["ig_bar_ts"] == f"{DAY}T09:05:00.000Z"
 
 
 def test_sampler_no_yf_bar_emits_typed_no_comparator_event(archive, tmp_path):
-    """A6.1: kein yF-Komparator ist ein typisierter Event, nicht Stille. Genau
-    die Stille war F2."""
-    now = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
+    """B-2 (e): kein yF-Komparator ⇒ typisiertes ``no_comparator`` mit reason —
+    NICHT Stille, NICHT throttle-Setzen. Genau die Stille war F2."""
+    now = datetime(2026, 8, 16, 9, 35, tzinfo=timezone.utc)
     _, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: now)
     events = []
     sampler = DivergenceSampler(ig, archive, health_sink=events.append, now_fn=lambda: now)
-    # archive has no bars at all for this window
+    # archive has no bars at all for this window — partial_yf_window
     sampler.sample_epic(EPIC, lambda e: None, lambda e: None)
     assert len(events) == 1
-    assert events[0]["event"] == "divergence_no_comparator"
+    assert events[0]["event"] == "no_comparator"
+    assert events[0]["reason"] == "partial_yf_window"
+    assert events[0]["n_yf"] == 0
 
 
 def test_sampler_mismatch_fires_after_two_consecutive_divergences_not_one(archive, tmp_path):
-    day1 = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
-    day2 = datetime(2026, 8, 17, 9, 5, tzinfo=timezone.utc)
+    day1 = datetime(2026, 8, 16, 9, 35, tzinfo=timezone.utc)
+    day2 = datetime(2026, 8, 17, 9, 35, tzinfo=timezone.utc)
     broker, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: day1)
     marked = []
     sampler = DivergenceSampler(ig, archive, now_fn=lambda: day1)
 
     broker.day = "2026-08-16"
     broker.close = 100.0
-    # yF bars in the same 5m window the probe targets (09:00–09:05).
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-16T09:00:00.000Z",
-                              open=90, high=90, low=90, close=90.0, volume=1, source="yf",
-                              fetched_at="2026-08-16T09:00:01.000Z")])
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-16T09:01:00.000Z",
-                              open=100, high=100, low=100, close=100.0, volume=1, source="yf",
-                              fetched_at="2026-08-16T09:01:01.000Z")])
+    # yF bars in window [09:05, 09:10) on day 1 — divergent (rising close vs flat IG).
+    _insert_window_yf_bars(archive, day="2026-08-16", start_h=9, start_m=5, n=5,
+                            open_p=90.0, close_p=100.0)
     sampler.sample_epic(EPIC, marked.append, lambda e: None)
     assert marked == []  # first divergence — not yet a sticky mismatch
 
     sampler.now_fn = lambda: day2
     broker.day = "2026-08-17"
     broker.close = 100.0
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-17T09:00:00.000Z",
-                              open=90, high=90, low=90, close=90.0, volume=1, source="yf",
-                              fetched_at="2026-08-17T09:00:01.000Z")])
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-17T09:01:00.000Z",
-                              open=100, high=100, low=100, close=100.0, volume=1, source="yf",
-                              fetched_at="2026-08-17T09:01:01.000Z")])
+    _insert_window_yf_bars(archive, day="2026-08-17", start_h=9, start_m=5, n=5,
+                            open_p=90.0, close_p=100.0)
     sampler.sample_epic(EPIC, marked.append, lambda e: None)
     assert marked == [EPIC]  # second consecutive divergence — now mark mismatch
 
 
 def test_sampler_agreement_resets_streak(archive, tmp_path):
-    day1 = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
-    day2 = datetime(2026, 8, 17, 9, 5, tzinfo=timezone.utc)
-    day3 = datetime(2026, 8, 18, 9, 5, tzinfo=timezone.utc)
+    day1 = datetime(2026, 8, 16, 9, 35, tzinfo=timezone.utc)
+    day2 = datetime(2026, 8, 17, 9, 35, tzinfo=timezone.utc)
+    day3 = datetime(2026, 8, 18, 9, 35, tzinfo=timezone.utc)
     broker, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: day1)
     marked = []
     sampler = DivergenceSampler(ig, archive, now_fn=lambda: day1)
 
     broker.day = "2026-08-16"
     broker.close = 100.0
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-16T09:00:00.000Z",
-                              open=90, high=90, low=90, close=90.0, volume=1, source="yf",
-                              fetched_at="2026-08-16T09:00:01.000Z")])
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-16T09:01:00.000Z",
-                              open=100, high=100, low=100, close=100.0, volume=1, source="yf",
-                              fetched_at="2026-08-16T09:01:01.000Z")])
+    _insert_window_yf_bars(archive, day="2026-08-16", start_h=9, start_m=5, n=5,
+                            open_p=90.0, close_p=100.0)
     sampler.sample_epic(EPIC, marked.append, lambda e: None)  # divergence 1
 
     sampler.now_fn = lambda: day2
     broker.day = "2026-08-17"
     broker.close = 100.0
     # Agreement: yF stable, IG stable -> no divergence, streak resets.
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-17T09:00:00.000Z",
-                              open=100, high=100, low=100, close=100.0, volume=1, source="yf",
-                              fetched_at="2026-08-17T09:00:01.000Z")])
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-17T09:01:00.000Z",
-                              open=100, high=100, low=100, close=100.0, volume=1, source="yf",
-                              fetched_at="2026-08-17T09:01:01.000Z")])
+    _insert_window_yf_bars(archive, day="2026-08-17", start_h=9, start_m=5, n=5,
+                            open_p=100.0, close_p=100.0)
     sampler.sample_epic(EPIC, marked.append, lambda e: None)  # agreement — resets streak
 
     sampler.now_fn = lambda: day3
     broker.day = "2026-08-18"
     broker.close = 100.0
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-18T09:00:00.000Z",
-                              open=90, high=90, low=90, close=90.0, volume=1, source="yf",
-                              fetched_at="2026-08-18T09:00:01.000Z")])
-    archive.insert_bars([Bar(epic=EPIC, resolution="1m", ts_utc="2026-08-18T09:01:00.000Z",
-                              open=100, high=100, low=100, close=100.0, volume=1, source="yf",
-                              fetched_at="2026-08-18T09:01:01.000Z")])
+    _insert_window_yf_bars(archive, day="2026-08-18", start_h=9, start_m=5, n=5,
+                            open_p=90.0, close_p=100.0)
     sampler.sample_epic(EPIC, marked.append, lambda e: None)  # divergence 1 again (not 3rd consecutive)
 
     assert marked == []
@@ -376,13 +388,13 @@ def test_sampler_stale_ig_emits_event_and_marks_stale(archive, tmp_path):
     Sampler ruft mark_stale_fn + emittiert ein stale_source-Event, statt einen
     Vergleich zu fälschen, der gegen die tote Historie „stimmen würde"."""
     from data_foundation.models import DS_STALE_SOURCE
-    # Broker produces bars at 2026-08-16T09:00:00; the provider's now_fn is 3 days
-    # later — exactly the F1 situation (Plan §4 F1, IX.D.IBEX.FWM2.IP).
-    broker_now = datetime(2026, 8, 16, 9, 5, tzinfo=timezone.utc)
+    # Broker produces 8 bars ending at 09:00 on 2026-08-16; the provider's now_fn is
+    # 3 days later — exactly the F1 situation (Plan §4 F1, IX.D.IBEX.FWM2.IP).
     fresh_now = datetime(2026, 8, 19, 9, 5, tzinfo=timezone.utc)
     broker, ig = _budgeted_ig(
         tmp_path, 100.0, now_fn=lambda: fresh_now,
         stale_tolerance_min=7 * 24 * 60,  # A4 ceiling way up: let the bar through
+        latest_minute=9 * 60,            # 09:00 — broker ends here, ages 3 days
     )
     events, marked_stale = [], []
     sampler = DivergenceSampler(
@@ -406,6 +418,96 @@ def test_sampler_budget_veto_is_a_noop(archive):
     sampler = DivergenceSampler(_RefusingIG(), archive, health_sink=events.append)
     sampler.sample_epic(EPIC, lambda e: None, lambda e: None)
     assert events == []
+
+
+# -- Phase 17 B2 new tests ---------------------------------------------------
+
+
+def test_no_comparator_does_not_consume_daily_throttle(archive, tmp_path):
+    """B-2 (g): the daily throttle is set only AFTER a real comparison. A ``no_comparator``
+    day (here: empty archive ⇒ ``partial_yf_window``) leaves ``_last_sample_date[epic]``
+    unset, so the **next** call still hits the IG broker.
+
+    This pins the regression: pre-B-2 the throttle was set BEFORE the comparison,
+    which meant a single empty-archive day killed sampling for the rest of the day —
+    on exactly the days we most needed the verdict."""
+    now = datetime(2026, 8, 16, 9, 35, tzinfo=timezone.utc)
+    broker, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: now)
+    events = []
+    sampler = DivergenceSampler(ig, archive, health_sink=events.append, now_fn=lambda: now)
+    sampler.sample_epic(EPIC, lambda e: None, lambda e: None)  # partial_yf_window, no throttle
+    sampler.sample_epic(EPIC, lambda e: None, lambda e: None)  # re-try: still no yF, but IG re-called
+    assert broker.calls == 2  # throttle was NOT set after a no_comparator
+    assert all(ev["event"] == "no_comparator" for ev in events)
+
+
+def test_partial_yf_window_is_no_comparator(archive, tmp_path):
+    """B-2 (e): the comparison window [09:05, 09:10) has 5 minute slots; we feed only
+    3 yF bars. ``MIN_YF_BARS = 4`` ⇒ ``no_comparator`` with ``reason="partial_yf_window"``,
+    ``n_yf = 3``, **no throttle consumed**."""
+    now = datetime(2026, 8, 16, 9, 35, tzinfo=timezone.utc)
+    broker, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: now)
+    events = []
+    sampler = DivergenceSampler(ig, archive, health_sink=events.append, now_fn=lambda: now)
+    # Only 3 of 5 minute slots filled (09:05, 09:06, 09:07) — below MIN_YF_BARS=4.
+    _insert_window_yf_bars(archive, day=DAY, start_h=9, start_m=5, n=3,
+                            open_p=100.0, close_p=100.0)
+    sampler.sample_epic(EPIC, lambda e: None, lambda e: None)
+    assert len(events) == 1
+    assert events[0]["event"] == "no_comparator"
+    assert events[0]["reason"] == "partial_yf_window"
+    assert events[0]["n_yf"] == 3
+    assert events[0]["ig_bar_ts"] == f"{DAY}T09:05:00.000Z"
+    # Throttle NOT consumed: a second call re-fetches.
+    broker.calls = 0
+    sampler.sample_epic(EPIC, lambda e: None, lambda e: None)
+    assert broker.calls == 1
+
+
+def test_agreement_emits_divergence_ok(archive, tmp_path):
+    """B-2 (g): agreement (delta below threshold) emits the new ``divergence_ok`` event —
+    the K11 anchor: every trading day needs at least one ``divergence_ok`` or
+    ``quote_divergence`` event. Pre-B-2 an agreement was silent."""
+    now = datetime(2026, 8, 16, 9, 35, tzinfo=timezone.utc)
+    broker, ig = _budgeted_ig(tmp_path, 100.0, now_fn=lambda: now)
+    broker.close = 100.0  # IG flat
+    # Same-window yF bars [09:05, 09:10) — flat too. window_return_divergence = 0.
+    _insert_window_yf_bars(archive, day=DAY, start_h=9, start_m=5, n=5,
+                            open_p=100.0, close_p=100.0)
+    events = []
+    sampler = DivergenceSampler(ig, archive, health_sink=events.append, now_fn=lambda: now)
+    sampler.sample_epic(EPIC, lambda e: None, lambda e: None)
+    assert len(events) == 1
+    assert events[0]["event"] == "divergence_ok"
+    assert events[0]["delta"] == 0.0
+    assert events[0]["ig_bar_ts"] == f"{DAY}T09:05:00.000Z"
+    assert events[0]["n_yf"] == 5
+
+
+def test_window_return_divergence_same_window(archive, tmp_path):
+    """B-2: ``window_return_divergence`` compares an IG 5m bar's full return to yF 1m
+    bars over the **same** 5-minute window. Pre-B-2 it summed 5m and 1m returns —
+    different horizons, silent false negatives."""
+    from data_foundation.heartbeat import window_return_divergence
+
+    class _Bar:
+        def __init__(self, open_, close_):
+            self.open = open_
+            self.close = close_
+
+    # Same-window yF bars rise by 1 %; IG falls by 1 % — |10⁻² − (−10⁻²)| = 2 %.
+    ig_bar = _Bar(open_=100.0, close_=99.0)
+    yf = [_Bar(open_=100.0, close_=100.5), _Bar(open_=100.5, close_=101.0)]
+    delta = window_return_divergence(ig_bar, yf)
+    assert delta is not None
+    assert abs(delta - 0.02) < 1e-9
+
+    # Empty yF list → None.
+    assert window_return_divergence(ig_bar, []) is None
+    # Zero-open yF → None (division guard).
+    assert window_return_divergence(ig_bar, [_Bar(open_=0.0, close_=1.0)]) is None
+    # Zero-open IG → None.
+    assert window_return_divergence(_Bar(open_=0.0, close_=1.0), yf) is None
 
 
 # -- Phase 16 §3 J3: coverage on the Berlin trading session ----------------------------

@@ -225,31 +225,25 @@ def _default_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def compute_return_divergence(ig_bars: list[Any], yf_bars: list[Any]) -> float | None:
-    """Phase 13 §6 A6.0: per-bar log return over both series, return the **difference
-    of returns**. A constant basis (CFD vs Kassa, Forward vs Index) cancels out; a
-    genuine decoupling shows up as a non-zero delta.
+# Phase 17 B-2 (2026-10-17): yF 1m bars reach the archive 15.6–20.3 min after their timestamp
+# (p10/max, measured 2026-10-16); the comparator window must end this long before "now".
+COMPARATOR_LAG_MIN: int = 25
+IG_SAMPLE_COUNT: int = 8        # 8 × 5m = 40 min → always ≥ 1 complete bar older than the lag
+MIN_YF_BARS: int = 4            # ≥ 4 of the 5 one-minute bars, or the window is not comparable
 
-    Returns ``None`` if fewer than two bars per series (no return defined) — the
-    caller should emit ``divergence_no_comparator`` rather than silently 0.0, which
-    is the bug Phase 12.5 had (a stuck "no divergence" answer on one-row windows).
+
+def window_return_divergence(ig_bar: Any, yf_bars: list[Any]) -> float | None:
+    """|return(IG 5m bar) − return(yF 1m bars over the SAME five minutes)| (Phase 17 B-2).
+
+    return = (last close − first open) / first open; a constant CFD-vs-cash basis cancels.
+    ``None`` when a side has no usable open. Replaces ``compute_return_divergence``, which
+    summed two 5-minute IG returns against two 1-minute yF returns (different horizons).
     """
-    if len(ig_bars) < 2 or len(yf_bars) < 2:
+    if not yf_bars or not ig_bar.open or not yf_bars[0].open:
         return None
-    def _returns(bars: list[Any]) -> list[float]:
-        out: list[float] = []
-        for i in range(1, len(bars)):
-            prev, cur = bars[i - 1].close, bars[i].close
-            if prev == 0:
-                continue
-            out.append((cur - prev) / abs(prev))
-        return out
-    ig_r = _returns(ig_bars)
-    yf_r = _returns(yf_bars)
-    if not ig_r or not yf_r:
-        return None
-    n = min(len(ig_r), len(yf_r))
-    return abs(sum(ig_r[:n]) - sum(yf_r[:n]))
+    ig_r = (ig_bar.close - ig_bar.open) / abs(ig_bar.open)
+    yf_r = (yf_bars[-1].close - yf_bars[0].open) / abs(yf_bars[0].open)
+    return abs(ig_r - yf_r)
 
 
 @dataclass
@@ -268,7 +262,7 @@ class DivergenceSampler:
     requires persistence across restarts).
 
     Phase 13 §6 A6:
-    - **A6.0 rendite** statt Niveau — siehe :func:`compute_return_divergence`.
+    - **A6.0 rendite** statt Niveau — siehe :func:`window_return_divergence`.
     - **A6.1 stale** — wenn der IG-Bar schon älter als ``stale_tolerance_min`` ist,
       wird ``mark_stale_fn(epic)`` gerufen statt eines Vergleichs. Knopf getrennt
       von A4 (Schreibpfad vs Diagnose).
@@ -308,64 +302,94 @@ class DivergenceSampler:
 
         Both are single-arg rather than calling the registry directly — same shape
         as the original callback, just one extra parameter."""
+        # (a) Throttle prüfen, aber noch nicht setzen — eine „no_comparator"-Wartezeit
+        # darf das Tageskontingent NICHT verbrauchen, sonst trifft der Sampler den
+        # yF-Lag an Tagen ohne ein einziges vollständiges IG-Fenster und liefert für
+        # den Rest des Tages keine echten Vergleiche mehr (Plan §6 B-2).
         today = self.now_fn().strftime("%Y-%m-%d")
         if self._last_sample_date.get(epic) == today:
             return
-        self._last_sample_date[epic] = today
 
-        ig_bars = self.budgeted_ig.get_bars(epic, resolution="5m", count=3)
+        # (b) IG-Bars laden. Leer = Budget-Veto oder Fetch-Fehler: fail-soft, KEIN
+        # Throttle, morgen wieder versuchen.
+        ig_bars = self.budgeted_ig.get_bars(epic, resolution="5m", count=IG_SAMPLE_COUNT)
         if not ig_bars:
-            return  # budget veto or fetch failure — fail-soft, try again tomorrow
-        ig_bar = ig_bars[-1]
+            return
 
-        # A6.1: Frische-Prüfung. Knopf getrennt von A4 (Plan §6 A6.1: Schreibpfad vs
-        # Diagnose). Bei F1 (tote IG-Historie) wäre der Vergleich gegen yF eine
-        # Fata Morgana — beide Reihen „stimmen überein", weil die IG-Reihe selbst
-        # schon wochenalt ist.
-        ig_age_min = (_parse(self.now_fn().isoformat()) - _parse(ig_bar.ts)).total_seconds() / 60.0
+        # (c) Frische-Check auf dem neuesten IG-Bar (A6.1). Bei stale: Event +
+        # mark_stale_fn + Throttle setzen + return. Hier setzen wir den Throttle
+        # mit, weil der Fehler echt ist (kein Komparator-Problem).
+        ig_bar_latest = ig_bars[-1]
+        ig_age_min = (_parse(self.now_fn().isoformat()) - _parse(ig_bar_latest.ts)).total_seconds() / 60.0
         if ig_age_min > self.stale_tolerance_min:
+            self._last_sample_date[epic] = today
             self._emit({
                 "event": "stale_source", "epic": epic, "provider": "ig",
-                "bar_ts": ig_bar.ts, "age_min": ig_age_min,
+                "bar_ts": ig_bar_latest.ts, "age_min": ig_age_min,
             })
             mark_stale_fn(epic)
             return
 
-        window_start = ig_bar.ts
-        window_end = _iso(_parse(ig_bar.ts) + timedelta(minutes=5))
-        # A6.1 + L10: sources-filter macht die yF-Quellenrein-Lesung direkt im Store;
-        # kein Nachfiltern im Aufrufer mehr nötig.
-        archived = self.archive.window(epic, "1m", window_start, window_end, sources=("yf",))
-        yf_bars = list(archived)
-        if not yf_bars:
-            # A6.1: ehrlich — kein Komparator ist ein typisierter Event, kein stiller
-            # return. Genau die Stille war F2.
+        # (d) Comparator-Lag-Filter. Wir suchen den letzten IG-5m-Bar, dessen
+        # 5-Minuten-Fenster **vollständig** älter als now-COMPARATOR_LAG_MIN ist —
+        # erst dieser Bar ist ein ehrlicher Vergleichspunkt, weil yF-Bars desselben
+        # Fensters mit Sicherheit im Archiv liegen (Lag gemessen 15,6–20,3 min).
+        cutoff = _parse(self.now_fn().isoformat()) - timedelta(minutes=COMPARATOR_LAG_MIN)
+        complete = [b for b in ig_bars if _parse(b.ts) + timedelta(minutes=5) <= cutoff]
+        if not complete:
+            # Kein einziger IG-5m-Bar ist alt genug — wir warten, bis die Recorder-
+            # Lag-Toleranz überschritten ist. KEIN Throttle: morgen / nächste Stunde
+            # wieder versuchen.
             self._emit({
                 "event": "divergence_no_comparator", "epic": epic,
-                "ig_bar_ts": ig_bar.ts, "ig_close": ig_bar.close,
+                "reason": "no_complete_bar",
             })
             return
 
-        # A6.0: Rendite-Differenz statt Niveau-Differenz. Eine konstante Basis (CFD
-        # vs Kassa, Forward vs Index) fällt heraus, eine echte Entkopplung nicht.
-        delta = compute_return_divergence(ig_bars, yf_bars)
-        if delta is None:
-            # Weniger als 2 Bars je Seite — keine Rendite definiert.
+        # (e) yF-Bars im **gleichen** 5-Minuten-Fenster (L10: sources=("yf",) macht
+        # die Quellenrein-Lesung direkt im Store). Zu wenig yF-Bars ⇒ ehrlich
+        # typisierter Event, KEIN Throttle.
+        ig_bar = complete[-1]
+        window_start = ig_bar.ts
+        window_end = _iso(_parse(ig_bar.ts) + timedelta(minutes=5))
+        yf_bars = list(self.archive.window(epic, "1m", window_start, window_end, sources=("yf",)))
+        if len(yf_bars) < MIN_YF_BARS:
             self._emit({
-                "event": "divergence_no_comparator", "epic": epic,
-                "ig_bar_ts": ig_bar.ts, "reason": "too_few_bars",
+                "event": "no_comparator", "epic": epic,
+                "ig_bar_ts": ig_bar.ts, "reason": "partial_yf_window",
+                "n_yf": len(yf_bars),
             })
             return
-        # ``threshold_pct`` ist in **Prozent** (Default 0.5 = 0.5 %), ``delta`` ist die
-        # Fraktion der kumulierten Return-Differenz. Vergleich in einer Einheit:
-        # delta*100 > threshold_pct ⇔ delta > threshold_pct/100.
+
+        # (f) Rendite-Vergleich (window_return_divergence: IG-5m gegen yF-1m im
+        # SELBEN Fenster — verschiedene Horizonte sind weg). None = keine offene
+        # Bar auf einer Seite, kein sinnvoller Vergleich.
+        delta = window_return_divergence(ig_bar, yf_bars)
+        if delta is None:
+            self._emit({
+                "event": "no_comparator", "epic": epic,
+                "ig_bar_ts": ig_bar.ts, "reason": "zero_open",
+            })
+            return
+
+        # (g) **Erst jetzt** Throttle setzen — wir haben einen echten Vergleich
+        # gefahren. Agreement / Divergence wie bisher; bei Agreement gibt es das
+        # neue ``divergence_ok``-Event, das dem Shakedown-Kriterium K11
+        # („jeder Handelstag ≥ 1 Event divergence_ok oder quote_divergence") als
+        # Wahrheits-Quelle dient.
+        self._last_sample_date[epic] = today
         if delta * 100.0 <= self.threshold_pct:
             self._mismatch_streak[epic] = 0
+            self._emit({
+                "event": "divergence_ok", "epic": epic,
+                "delta": delta, "ig_bar_ts": ig_bar.ts, "n_yf": len(yf_bars),
+            })
             return
         self._mismatch_streak[epic] = self._mismatch_streak.get(epic, 0) + 1
         self._emit({
             "event": "quote_divergence", "epic": epic, "delta": delta,
             "kind": "return",  # A6.0 marker: this is a return-divergence, not level
+            "ig_bar_ts": ig_bar.ts, "n_yf": len(yf_bars),
         })
         if self._mismatch_streak[epic] >= 2:
             mark_mismatch_fn(epic)
