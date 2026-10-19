@@ -906,7 +906,10 @@ def _parse_bar(p: dict[str, Any]) -> OHLCBar:
         return (bid + ask) / 2 if (bid and ask) else (bid or ask)
 
     return OHLCBar(
-        timestamp=p.get("snapshotTime") or p.get("snapshotTimeUTC", ""),
+        # Phase 17 B-1: UTC first. ``snapshotTime`` is the account's LOCAL time (Europe/Berlin,
+        # +2 h CEST, measured 2026-10-17) and normalize_bar_ts stored it as UTC — every IG REST
+        # bar landed in the future (divergence sampler 233/233 no_comparator, F1 gate blind).
+        timestamp=p.get("snapshotTimeUTC") or p.get("snapshotTime", ""),
         open=mid(p.get("openPrice")),
         high=mid(p.get("highPrice")),
         low=mid(p.get("lowPrice")),

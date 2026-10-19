@@ -519,6 +519,52 @@ def test_parse_bar_missing_one_side_falls_back_to_other():
     assert bar.volume == 0.0
 
 
+def test_parse_bar_prefers_snapshot_time_utc_over_local_snapshot_time():
+    """Phase 17 B-1 (D1): ``snapshotTime`` is the account's LOCAL time (Europe/Berlin,
+    +2 h CEST, measured 2026-10-17) and ``normalize_bar_ts`` stored it as UTC — every
+    IG REST bar landed in the future (D1: 3730 `source='ig'` rows with `ts_utc` 2 h
+    ahead of bar time, divergence sampler 233/233 `no_comparator`, F1 gate blind).
+
+    IG emits both fields. With both present, ``_parse_bar`` must take the UTC ISO
+    one verbatim — not the local-time string. If only ``snapshotTime`` is present
+    (older IG accounts or older proxies), the local-time string is still used as
+    a fallback so existing fixtures stay green.
+    """
+    # Both fields present: prefer UTC ISO.
+    bar = _parse_bar({
+        "snapshotTime": "2026/10/19 17:35:00",          # Europe/Berlin local
+        "snapshotTimeUTC": "2026-10-19T15:35:00",       # UTC ISO (correct)
+        "openPrice": {"bid": 24900.0, "ask": 24901.0},
+        "highPrice": {"bid": 24910.0, "ask": 24911.0},
+        "lowPrice": {"bid": 24890.0, "ask": 24891.0},
+        "closePrice": {"bid": 24905.0, "ask": 24906.0},
+        "lastTradedVolume": 1,
+    })
+    assert bar.timestamp == "2026-10-19T15:35:00"
+
+    # Only ``snapshotTime`` present: existing fallback (local-time string) — must stay green.
+    bar_local_only = _parse_bar({
+        "snapshotTime": "2026/07/04 12:00:00",
+        "openPrice": {"bid": 18000.0, "ask": 18001.0},
+        "highPrice": {"bid": 18010.0, "ask": 18011.0},
+        "lowPrice": {"bid": 17990.0, "ask": 17991.0},
+        "closePrice": {"bid": 18005.0, "ask": 18006.0},
+        "lastTradedVolume": 0,
+    })
+    assert bar_local_only.timestamp == "2026/07/04 12:00:00"
+
+    # Only ``snapshotTimeUTC`` present: that string is used verbatim.
+    bar_utc_only = _parse_bar({
+        "snapshotTimeUTC": "2026-10-19T15:35:00",
+        "openPrice": {"bid": 1.0, "ask": 1.0},
+        "highPrice": {"bid": 1.0, "ask": 1.0},
+        "lowPrice": {"bid": 1.0, "ask": 1.0},
+        "closePrice": {"bid": 1.0, "ask": 1.0},
+        "lastTradedVolume": 0,
+    })
+    assert bar_utc_only.timestamp == "2026-10-19T15:35:00"
+
+
 def test_get_ohlcv_happy_path_envelope_shape():
     """The exact shape P9's IGBarProvider (external_data/providers.py) relies on."""
     a = _authed_adapter()
