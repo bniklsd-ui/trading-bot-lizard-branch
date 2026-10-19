@@ -570,6 +570,75 @@ def test_window_cycle_writes_one_observability_record(tmp_path) -> None:
     assert records[0]["abort_detail"] == "weak setup"
 
 
+# --- Phase 17 B-5: monitor re-adoption seam (T8) ---------------------------
+
+
+class _FakeResumableExecutor:
+    """Duck-typed Phase-5 executor that ALSO implements ``resume_open_position()``.
+
+    Distinct from ``_FakeExecutor`` so we can isolate the resume branch. ``resume_result``
+    of ``None`` simulates "nothing to adopt" -> the runner's ``getattr(...callable(resume))``
+    path falls through and the cycle behaves like the baseline.
+    """
+
+    def __init__(
+        self,
+        *,
+        run_result: _Result | None = None,
+        resume_result: _Result | None = None,
+    ) -> None:
+        self._run_result = run_result if run_result is not None else _Result("NO_TRADE")
+        self._resume_result = resume_result
+        self.run_calls = 0
+        self.resume_calls = 0
+
+    def run(self) -> _Result:
+        self.run_calls += 1
+        return self._run_result
+
+    def resume_open_position(self) -> _Result | None:
+        self.resume_calls += 1
+        return self._resume_result
+
+
+def test_window_without_resume_method_is_unchanged(tmp_path) -> None:
+    """Phase 17 B-5: the default ``_FakeExecutor`` has no ``resume_open_position`` ->
+    the runner's ``getattr(self._executor, "resume_open_position", None)`` returns ``None``,
+    the WINDOW branch falls through, and the cycle is bit-identical to pre-B-5
+    (research_tick + executor.run + the standard flow)."""
+    rt = _FakeResearchTick()
+    ex = _FakeExecutor(result=_Result("OPEN"))
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T], research_tick=rt, executor=ex, max_iterations=1
+    )
+
+    runner.run()
+
+    assert rt.calls == 1
+    assert ex.run_calls == 1
+    assert store.load().trades_today == 1
+
+
+def test_window_runs_resumed_position_instead_of_research(tmp_path) -> None:
+    """Phase 17 B-5 (T8): a fake executor whose ``resume_open_position()`` returns a real
+    cycle result -> the WINDOW branch records it, and the auto-confirm gate, the
+    research tick and ``executor.run()`` are all skipped (a re-adopted position takes
+    priority over new picks in the same WINDOW iteration)."""
+    rt = _FakeResearchTick()
+    ex = _FakeResumableExecutor(resume_result=_Result("TIME_STOP", profit_loss=-30.0))
+    runner, _, store, _ = _make_runner(
+        tmp_path, times=[_WINDOW_T], research_tick=rt, executor=ex, max_iterations=1
+    )
+
+    runner.run()
+
+    assert ex.resume_calls == 1
+    assert ex.run_calls == 0
+    assert rt.calls == 0  # research never triggered
+    assert store.load().trades_today == 1  # TIME_STOP counts as a real trade (Contract E)
+    assert store.load().realized_pnl_today == pytest.approx(-30.0)
+
+
 def test_cap_blocked_cycle_writes_no_observability_record(tmp_path) -> None:
     """A cap-blocked cycle never triggers research → nothing to log; no file is even created."""
     from scheduler import observability

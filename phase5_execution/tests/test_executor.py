@@ -15,7 +15,8 @@ abort — lives in ``test_order.py``.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -1063,3 +1064,143 @@ def test_context_recorder_raising_does_not_crash_cycle(exec_state: ExecutionStat
 
     assert result.status == "NO_TRADE"
     assert len(recorder.calls) == 1
+
+
+# --- 32–35) Phase-17 B-5 monitor re-adoption seam (T8) ----------------------
+#
+# ``resume_open_position()`` is called by the P8 scheduler runner in the WINDOW phase
+# after a restart (the bot was down with an open trade — AEX id 26 ran 6 days without
+# ``max_hold`` ever being checked, Phase-17-Block-B). Picker over open references,
+# rebuilds an ``OrderPlan`` from the recorded state, hands ``recorded_at`` to
+# ``monitor_position`` as ``entry_at`` so an already-elapsed ``max_hold`` closes immediately.
+# Never touches the regular run() path — see test_executor.py for the existing 31 tests.
+
+
+def _seed_open_reference(
+    exec_state: ExecutionState,
+    *,
+    deal_id: str = "DIAAAA-FAKE",
+    recorded_at: str = "2026-06-11T09:00:00.000Z",
+) -> str:
+    """Write a synthetic ``OPEN`` record into ``exec_state`` and return its ``deal_reference``.
+
+    Uses the public :class:`ExecutionState` API (``record_pending`` + ``mark_open``) and then
+    pokes ``recorded_at`` to the requested string — same shape the live boot produces
+    (``_format_iso(_utcnow())`` always emits the trailing ``Z``).
+    """
+    plan = OrderPlan(
+        epic=DEFAULT_EPIC, direction="BUY", size=1.0,
+        stop_level=17970.0, limit_level=18045.0,
+        deal_reference=f"bot-{uuid.uuid4().hex}",
+        currency="EUR",
+    )
+    exec_state.record_pending(plan)
+    exec_state.mark_open(plan.deal_reference, deal_id)
+    # record_pending/_write already produced a recorded_at; overwrite via the public store.
+    records = exec_state._read()  # noqa: SLF001 — test-only direct poke
+    records[plan.deal_reference]["recorded_at"] = recorded_at
+    exec_state._write(records)  # noqa: SLF001
+    return plan.deal_reference
+
+
+def _tz_aware_now() -> Callable[[], datetime]:
+    """A tz-aware UTC ``now_fn`` compatible with recorded_at deserialization (the
+    executed ``recorded_at`` is tz-aware UTC; subtracting a naive now would TypeError)."""
+    return lambda: datetime(2026, 6, 11, 10, 0, tzinfo=timezone.utc)
+
+
+def test_resume_monitors_present_open_record_from_recorded_at(
+    exec_state: ExecutionState,
+) -> None:
+    """Phase 17 B-5: an OPEN ref whose deal_id the broker still holds is rebuilt into an
+    OrderPlan + watched from its recorded open time. A broker-side close → CLOSED_BY_BROKER,
+    the write-ahead ref is marked CLOSED, and the Phase-7 close seam receives the result."""
+    ref = _seed_open_reference(exec_state)
+    broker = FakeBroker(
+        positions_sequence=[_positions(_open_position()), _positions()],
+    )
+    sink = _RecordingSink()
+    executor, _ = _build(
+        broker, FakeState(fresh=True, candidates=[]), exec_state,
+        now_fn=_tz_aware_now(), reward_sink=sink,
+    )
+
+    result = executor.resume_open_position()
+
+    assert result is not None
+    assert result.status == "CLOSED_BY_BROKER"
+    assert result.deal_id == "DIAAAA-FAKE"
+    assert exec_state.get(ref)["status"] == CLOSED
+    assert exec_state.open_references() == []
+    # The Phase-7 close seam fired with the same ClosedTrade snapshot it gets in run().
+    assert len(sink.closed) == 1
+    assert sink.closed[0].status == "CLOSED_BY_BROKER"
+    assert sink.closed[0].deal_id == "DIAAAA-FAKE"
+
+
+def test_resume_returns_none_when_position_missing_at_broker(
+    exec_state: ExecutionState,
+) -> None:
+    """Phase 17 B-5: an OPEN ref whose deal_id is gone at the broker is left to
+    ``reconcile_startup``'s missing-set — ``resume_open_position()`` returns ``None``
+    without calling ``close_position`` (the broker closed it, not us)."""
+    _seed_open_reference(exec_state)
+    broker = FakeBroker(positions_env=_positions())  # no DIAAAA-FAKE in the list
+    executor, _ = _build(
+        broker, FakeState(fresh=True, candidates=[]), exec_state,
+        now_fn=_tz_aware_now(),
+    )
+
+    result = executor.resume_open_position()
+
+    assert result is None
+    # Nothing was closed by us; broker had already closed it.
+    assert broker.close_position_calls == []
+
+
+def test_resume_skips_pending_without_deal_id(exec_state: ExecutionState) -> None:
+    """Phase 17 B-5: a PENDING ref without a deal_id is reconcile_startup's job (orphan
+    PENDING). ``resume_open_position()`` skips it — broker is never even queried."""
+    plan = OrderPlan(
+        epic=DEFAULT_EPIC, direction="BUY", size=1.0,
+        stop_level=17970.0, limit_level=18045.0,
+        deal_reference=f"bot-{uuid.uuid4().hex}",
+        currency="EUR",
+    )
+    exec_state.record_pending(plan)  # PENDING with deal_id=None
+    broker = FakeBroker()
+    executor, _ = _build(
+        broker, FakeState(fresh=True, candidates=[]), exec_state,
+        now_fn=_tz_aware_now(),
+    )
+
+    result = executor.resume_open_position()
+
+    assert result is None
+    assert broker.get_open_positions_calls == 0  # never queried the broker
+    # The PENDING ref is still in the store; reconcile_startup decides what to do with it.
+    assert plan.deal_reference in exec_state.open_references()
+
+
+def test_resume_closes_immediately_when_max_hold_elapsed(
+    exec_state: ExecutionState,
+) -> None:
+    """Phase 17 B-5 (T8): recorded_at + max_hold already elapsed before the first poll ->
+    one close_position call, TIME_STOP with ``max_hold`` in detail, the ref is closed."""
+    _seed_open_reference(exec_state, recorded_at="2026-06-11T09:00:00.000Z")
+    broker = FakeBroker(positions_env=_positions(_open_position()))
+    # Now is 14:00 UTC; recorded 09:00 UTC = 5 h ago > 4 h default max_hold.
+    now_fn = lambda: datetime(2026, 6, 11, 14, 0, tzinfo=timezone.utc)
+    sink = _RecordingSink()
+    executor, _ = _build(
+        broker, FakeState(fresh=True, candidates=[]), exec_state,
+        now_fn=now_fn, reward_sink=sink,
+    )
+
+    result = executor.resume_open_position()
+
+    assert result is not None
+    assert result.status == "TIME_STOP"
+    assert "max_hold" in result.detail
+    assert broker.close_position_calls == ["DIAAAA-FAKE"]  # exactly one close attempt
+    assert len(sink.closed) == 1 and sink.closed[0].status == "TIME_STOP"

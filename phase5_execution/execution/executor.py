@@ -56,7 +56,7 @@ from execution.gates import (
     gate_time_window,
 )
 from execution.models import ExecutionResult, OrderPlan
-from execution.monitor import monitor_position
+from execution.monitor import _position_present, monitor_position
 from execution.order import build_order_plan, place_order, reconcile_startup
 from execution.sizing import compute_size, select_risk_pct
 from execution.vetos import pre_trade_check
@@ -431,6 +431,55 @@ class Executor:
             self.reward_sink.on_trade_closed(build_closed(result, now=self.now_fn()))
         except Exception as exc:  # noqa: BLE001 - the sink must never kill the cycle (J)
             logger.critical("reward_sink.on_trade_closed failed: %s", exc)
+
+    # -- Phase-17 (B-5) monitor re-adoption seam (T8) ------------------------
+
+    def resume_open_position(self) -> ExecutionResult | None:
+        """Phase 17 B-5 (T8): re-adopt a position still open at the broker after a restart.
+
+        ``reconcile_startup`` leaves a *present* reference alone ("the monitor handles it") —
+        but the monitor only ever runs inside :meth:`run` right after :func:`~execution.order.place_order`,
+        so after a restart nobody watched it (AEX id 26: 6 days open, ``max_hold`` never applied).
+        This picks the first ``OPEN`` record with a ``deal_id`` the broker still holds, monitors it
+        from its **recorded** open time (an already-elapsed ``max_hold`` / ``square_off`` closes
+        immediately — T8) and fires the Phase-7 close seam. ``None`` when nothing needs adopting.
+        The runner calls this only in the WINDOW phase (a close needs an open market).
+        """
+        for ref in self.exec_state.open_references():
+            rec = self.exec_state.get(ref) or {}
+            deal_id = rec.get("deal_id")
+            if rec.get("status") != "OPEN" or not deal_id:
+                continue  # PENDING without a deal_id is reconcile_startup's job
+            positions_env = self.broker.get_open_positions()
+            if not positions_env.ok:
+                logger.warning(
+                    "resume: open-positions read failed — not re-adopting %s this cycle", ref
+                )
+                return None
+            if not _position_present(positions_env, deal_id):
+                continue  # gone at the broker → reconcile_startup marks it closed (missing)
+            plan = OrderPlan(
+                epic=rec["epic"], direction=rec["direction"], size=float(rec["size"]),
+                stop_level=float(rec["stop_level"]), limit_level=float(rec["limit_level"]),
+                deal_reference=ref, currency=self.config.default_currency,
+            )
+            entry_at = datetime.fromisoformat(
+                str(rec["recorded_at"]).replace("Z", "+00:00")
+            )
+            logger.warning(
+                "resume: re-adopting open position %s (deal_id=%s, opened %s)",
+                ref, deal_id, rec["recorded_at"]
+            )
+            try:
+                result = monitor_position(
+                    self.broker, self.exec_state, plan, deal_id, self.config,
+                    now_fn=self.now_fn, sleep_fn=self.sleep_fn, entry_at=entry_at,
+                )
+            except ExecutionAbort as exc:
+                return self._abort(str(exc), plan=plan, deal_id=deal_id)
+            self._notify_closed(result)
+            return result
+        return None
 
     # -- Phase-10 (V3) abstain-lessons seam (Decision J) ---------------------
 

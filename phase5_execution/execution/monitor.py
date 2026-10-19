@@ -69,6 +69,7 @@ def monitor_position(
     *,
     now_fn: Callable[[], datetime] = datetime.now,
     sleep_fn: Callable[[float], None] = _time.sleep,
+    entry_at: datetime | None = None,
 ) -> ExecutionResult:
     """Poll an open position until it closes (broker SL/TP) or the time-stop fires.
 
@@ -79,6 +80,10 @@ def monitor_position(
         deal_id: the broker deal id of the open position to watch.
         config: tunables (``poll_interval_s`` / ``square_off_time`` / ``max_hold_minutes``).
         now_fn / sleep_fn: injected clock / sleep — tests drive the loop with no real wait.
+        entry_at: the real open time when re-adopting after a restart; default ``now_fn()``.
+            Threaded by :meth:`execution.executor.Executor.resume_open_position` (Phase 17 B-5,
+            T8) so an already-elapsed ``max_hold`` / ``square_off`` closes immediately rather
+            than burning a fresh full window.
 
     Returns:
         ``ExecutionResult`` with status ``CLOSED_BY_BROKER`` or ``TIME_STOP``.
@@ -87,7 +92,7 @@ def monitor_position(
         ExecutionAbort: a ``close_position`` at the time-stop failed (operator attention).
     """
     ref = plan.deal_reference
-    entry = now_fn()
+    entry = entry_at if entry_at is not None else now_fn()
     max_hold = timedelta(minutes=config.max_hold_minutes)
     logger.info("monitoring %s (deal_id=%s) from %s", ref, deal_id, entry.isoformat())
 

@@ -254,3 +254,28 @@ def test_not_ok_read_does_not_infer_close(
     # Not CLOSED_BY_BROKER (we never inferred a close from the failed read).
     assert result.status == "TIME_STOP"
     assert broker.close_position_calls == [DEAL_ID]
+
+
+# --- entry_at: Phase 17 B-5 (re-adoption seam, T8) --------------------------
+
+
+def test_entry_at_applies_max_hold_from_recorded_open(
+    exec_state: ExecutionState, open_plan: OrderPlan
+) -> None:
+    """Phase 17 B-5 (T8): a non-None ``entry_at`` overrides ``now_fn()`` so an already-elapsed
+    ``max_hold`` triggers an immediate TIME_STOP instead of burning a fresh full window."""
+    broker = FakeBroker(positions_env=_present_env())
+    config = ExecutionConfig()  # max_hold 240 min = 4 h
+    # Recorded 5 h before ``now`` -> max_hold already elapsed by the first poll.
+    entry_at = _at(9, 0)
+
+    result = monitor_position(
+        broker, exec_state, open_plan, DEAL_ID, config,
+        now_fn=_Clock(_at(14, 0)),
+        sleep_fn=lambda _s: None,
+        entry_at=entry_at,
+    )
+
+    assert result.status == "TIME_STOP"
+    assert "max_hold" in result.detail
+    assert broker.close_position_calls == [DEAL_ID]

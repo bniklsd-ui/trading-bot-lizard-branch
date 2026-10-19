@@ -157,9 +157,12 @@ class _ExecutorLike(Protocol):
     ``run()`` is **arg-less** (Contract A: ``confirm_fn`` is a constructor argument set by the
     wiring) and returns an ``ExecutionResult`` — itself a ``state.CycleResult`` (``.status`` /
     ``.profit_loss``) the runner hands straight to ``StateStore.record_cycle``.
+    Optionally ``resume_open_position() -> ExecutionResult | None`` (Phase 17 B-5) — read via
+    ``getattr``, so a fake without it keeps the runner bit-identical.
     """
 
     def run(self) -> Any: ...
+    def resume_open_position(self) -> Any: ...
 
 
 class SchedulerRunner:
@@ -386,6 +389,13 @@ class SchedulerRunner:
         elif phase is Phase.WINDOW:
             self._warm_session()
             self._maybe_reconcile(state, now)
+            # Phase 17 B-5: a position left open by a restart is monitored first (T8).
+            resume = getattr(self._executor, "resume_open_position", None)
+            resumed = resume() if callable(resume) else None
+            if resumed is not None:
+                state = self._state_store.record_cycle(state, resumed)
+                self._clock.sleep(self._cycle_interval_s)
+                return
             self._maybe_refresh_universe(state, now)
             self._maybe_run_shadow_pairs(state, now)
             ok, reason = self._auto_confirm.can_open(state)
