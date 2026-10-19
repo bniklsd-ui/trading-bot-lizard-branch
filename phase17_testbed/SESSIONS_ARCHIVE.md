@@ -7,6 +7,76 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-10-19 (Exec-Session #2 ENDE — Block B-2 Divergenz-Sampler, 2 Commits in P12+P8, Σ 1965 + 4 P12 + 2 P8 = **1971** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung)
+
+> **Auftrag:** Nikinger 2026-10-19 (später Session): „Lets go on with the next step!" → Exec-Session #2 setzt die explizite **Next**-Priorität aus Session #1 um: **B-2 Divergenz-Sampler (D2, P12 + P8)** per Plan §6 verbatim (T13: Code in P12 + P8 ✓, beide Phasen für Cross-Phase-Edits freigegeben).
+>
+> **Executor-Modus:** MiniMax-M3-Fallback (Plan §14.2) — unverändert. `~/.config/opencode/`, `auth.json`, `opencode.service` weiterhin unangefasst.
+
+### Completed — diese Exec-Session (2 Commits)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | `phase17+phase12: B-2 — Divergenz-Sampler (compute_return_divergence → window_return_divergence)` | P12 | `data_foundation/heartbeat.py`: `compute_return_divergence` (Z. 228–252) ersetzt durch `window_return_divergence` (5m IG vs. **gleiches** 5m-yF-Fenster, nicht mehr 2m/5m-Mix); 3 neue Konstanten (`COMPARATOR_LAG_MIN=25`, `IG_SAMPLE_COUNT=8`, `MIN_YF_BARS=4`); `DivergenceSampler.sample_epic` Rumpf Z. 311–371 nach Plan §6 (a)–(g) ersetzt — Throttle erst **nach** erfolgreichem Vergleich, explizites `divergence_ok`-Event, typisierte `no_comparator`-Events. Docstring A6.0-Verweis angepasst |
+| 1b | (gleicher Commit) | P12 | `phase12_data_foundation/tests/test_heartbeat.py`: 7 Sampler-Tests umgestellt auf neues Setup (`now=09:35`, 8 IG-Bars endend 09:30, yF-Fenster [09:05, 09:10)) + 4 neue Tests (`test_no_comparator_does_not_consume_daily_throttle`, `test_partial_yf_window_is_no_comparator`, `test_agreement_emits_divergence_ok`, `test_window_return_divergence_same_window`) |
+| 2 | `phase17+phase8: B-2 — Divergenz-Sampler-Gate (_sampler_due)` | P8 | `scripts/wiring.py`: neue Helper-Funktion `_sampler_due(now, config)` (Clock-WINDOW + ≥40min nach Öffnung, Clock-Phase via lazy `from scheduler.clock import Phase`) + Edit Z. 1095: `if divergence_sampler is not None:` → `if divergence_sampler is not None and _sampler_due(_now(), config):`. Reuse der Clock-Klassifikation als single source of truth |
+| 2b | (gleicher Commit) | P8 | Neue Datei `phase8_scheduler/tests/test_wiring_sampler_gate.py` (Muster `test_wiring_schema_floor.py`): `test_sampler_due_false_on_weekend_and_before_open_plus_40` (Sa 12:00, Mo 09:00, Mo 09:39:59 → False) + `test_sampler_due_true_mid_window` (Mo 09:50, Mo 12:00, Mo 17:29:59 → True; Mo 18:00 → False). +2 P8-Tests grün |
+
+**Σ-Steigerung:** P12 149 → **153** (+4 ✓ Plan-AK), P8 261 → **263** (+2 ✓ Plan-AK), Σ 1965 → **1971** (+6). Keine Regressionen in den übrigen 14 Suites.
+
+### Next (geplante Folgesessions, in Priorität)
+- **B-3 Promotion-Bridge (D3, P15 + P8).** 3 Nahtfehler (`validate` ohne `trades`, `.value` statt `.decision`, Keys ohne `_json` → 29/29 NULL) + Contract-Test mit echter `persistence.Database`. Eigener Extractor-Client (`max_tokens=2048`, `timeout_s=60`). +2 P15-Tests + 1 P8-Test.
+- **B-4 Abschneiden sichtbar (D4, P4).** `_attempt`: Meter **vor** Parse; `stop_reason=="max_tokens"` / `finish_reason=="length"` → `LLMResponseError` ohne Retry. +4 P4-Tests.
+- **B-5 Monitor-Re-Adoption (D5, T8, P5 + P8).** `monitor_position(entry_at=...)` + `Executor.resume_open_position()` + `_ExecutorLike` Protocol-Erweiterung + WINDOW-Zweig im Runner. +5 P5-Tests + 2 P8-Tests.
+- **B-6, B-7, B-8, B-9, B-10** in Plan §6.
+- **Block C (LLM-Austausch)** wartet auf OpenCode + z.ai-Fleet-„bereit"-Meldung (Plan §14.8). Heute nicht blockierend (MiniMax-Fallback läuft).
+- **Datenreparatur der 3 730 alten `source='ig'`-Bars** (Plan T14) folgt erst in **E-3** zusammen mit dem Scheduler-Restart; bis dahin bleibt der DB-Zustand mit den +2-h-Bars stehen.
+
+### B-2 Σ-Steigerung (2026-10-19, Plan §6 Kommandoform)
+
+| Suite | grün (nach B-1) | grün (nach B-2) | Δ |
+|---|---:|---:|---:|
+| P1 broker_wrapper | 98 | 98 | — |
+| P2 persistence | 82 | 82 | — |
+| P3 external_data | 108 | 108 | — |
+| P4 research | 163 | 163 | — |
+| P5 execution | 190 | 190 | — |
+| P6 debate | 76 | 76 | — |
+| P7 reward | 170 | 170 | — |
+| **P8 scheduler** | 261 (1 alt Warning) | **263** | **+2** |
+| P9 universe | 95 | 95 | — |
+| P10 v3 | 165 | 165 | — |
+| **P12 data_foundation** | 149 | **153** | **+4** |
+| P13 live_data | 85 | 85 | — |
+| P14 discovery | 61 | 61 | — |
+| P15 v4 | 126 | 126 | — |
+| P16 activation | 15 | 15 | — |
+| root `tests/` | 121 | 121 | — |
+| **Σ 16 Suites** | **1965** | **1971** | **+6** |
+| meta_m1 (informativ, nicht in Σ) | 28 | 28 | — |
+
+### Open questions / blockers
+- **Scheduler ist gestoppt** (`is-active=failed`). Vor E-3 muss er wieder hochfahren — der Recorder muss dann mit dem Klonen-Bar-Löschen (Plan T14, `DELETE FROM bars WHERE source='ig'`) zusammen laufen, weil sonst `bars.sqlite is locked` (Plan §8 Fehlgriff). Bis zum E-3 wird die alte IG-Historie (3 730 Bars mit `ts_utc` +2h in der Zukunft) NICHT angerührt; das ist **gewollt** und **kein Datenverlust**, weil der Fix in `ig_adapter.py:909` wirkt und neue Bars korrekt schreibt.
+- **Fleet §14.8 (OpenCode + z.ai)** weiterhin offen. Heute nicht blockierend.
+- **C-1-Step `check_llm_profile`** wird um `/coding/`-Endpoint-Check erweitert (Plan §14.1, +1 P8-Test) — gehört zu Block C, nicht zu A/B.
+
+### Session-end-Hinweis (für die Exec-Session selbst)
+- **Plan-AK-Stand nach dieser Session:** Session #1 ✅ AK1-AK4 + Session #2 ✅ neu: AK-Block-B Sweep **+6** (P12 +4 + P8 +2 = Plan-Ziel exakt erreicht). B-2 ist Plan-AK für Phase-12-Step-6 (Divergenz-Sampler, D2). Σ 1971 — Block-B Sweep-Ziel ≥ 1992 ist noch **21 Tests entfernt** (B-3..B-10 verbleibend).
+- **K11-Anker (Shakedown):** das neue `divergence_ok`-Event ist genau die Append-Only-Quelle für K11 (`evaluate_k11(health_jsonl, from_day, to_day)`: jeder Handelstag ≥ 1 Event `divergence_ok`/`quote_divergence`). Ohne B-2 wäre K11 strukturell unerreichbar — die alte Rechnung produzierte entweder `quote_divergence` (falsche Horizonte ⇒ falsche-positive) oder `divergence_no_comparator` (still, nicht „vergleichbar").
+- B-2 lokal ahead, wartet auf Nikinger-Push.
+
+### Next start (für die Folgesession, kalt einsteigen ohne Neu-Lesen)
+
+**B-3 Promotion-Bridge (D3, P15 + P8).** Anker: `phase15_v4/instinct/bridge.py:131-132`, `:146-148`, `:167-168`, Docstrings `:22-25` + `:177`. Drei Nahtfehler:
+1. `validate()` bekommt kein `trades` (Parameter `trades_n=500` reserviert, Docstring Z. 91–95 → #541 ergänzen).
+2. `decision.decision` statt `decision.value` (Plan §6 B-3 §2).
+3. `evidence_trade_ids_json` / `contradictions_trade_ids_json` (Keys mit `_json`) → aktuell NULL-INSERTs auf 29/29 Zeilen.
++ Contract-Test mit echter `persistence.Database` (Stub reichte nicht), +2 P15-Tests + 1 P8-Test. Eigener Extractor-Client (`max_tokens=2048`, `timeout_s=60`).
+Block-B Σ-Ziel ≥ 1992 noch 21 Tests entfernt nach B-3 (B-3 = +3, Σ 1974).
+Scheduler bleibt gestoppt (B-0). Push = Nikinger. Block C wartet auf OpenCode-Fleet-„bereit"-Meldung.
+
+---
+
 ## Session stopped — 2026-10-19 (Exec-Session #1 ENDE — Block A + B-0 + B-1, 4 Commits, Σ 1964 + 1 P1-Test = **1965** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung)
 
 > **Auftrag:** Nikinger 2026-10-19 ~16:20 Berlin: „GLM in OpenCode ist im anderen Projekt als nicht fähig genug getestet — du führst als Fallback (MiniMax-M3) aus. Plan bleibt Plan, aber warte nach jedem Schritt auf meine Freigabe." Drei Commits später (~17:30) wurde die Freigabe erweitert: „Das sind eigentlich Aktionen, die auch du ausführen könntest - tue das" → Exec-Session übernahm Push + Scheduler-Stopp + IG-Probe + B-1-Edit. Abschluss mit „Session an dieser Stelle korrekt beenden, commit, push".
