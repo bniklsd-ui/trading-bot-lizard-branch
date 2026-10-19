@@ -12,6 +12,10 @@ created: 2026-10-19
 
 # 01 — Decision Proposal: Provider-Plastizität
 
+> 🟡 **Überholt 2026-10-19:** T25–T28 dieser Skizze sind in Plan §15.2 als **T25–T30** neu gefasst und gelockt —
+> abweichend: keine `QuirkSpec`-Klasse, kein YAML, kein Streaming/`extra_headers`/`response_format_policy`
+> (Begründung je Zeile dort).
+
 > **Quelle der Wahrheit ist der Code.** Diese Notiz ist ein Vorschlag, kein Plan.
 > Stand: Nikingers Auftrag 2026-10-19, unmittelbar nach B-4 (Session #4 ENDE).
 

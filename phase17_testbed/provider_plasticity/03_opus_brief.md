@@ -11,6 +11,10 @@ created: 2026-10-19
 
 # 03 — Opus-Brief: Provider-Plastizität Miniplan
 
+> 🟡 **Überholt 2026-10-19:** Der Auftrag dieses Briefs ist erledigt; sind in Plan §15.2 als **T25–T30** neu gefasst und gelockt —
+> abweichend: keine `QuirkSpec`-Klasse, kein YAML, kein Streaming/`extra_headers`/`response_format_policy`
+> (Begründung je Zeile dort).
+
 > **Adressat:** die nächste Opus-Session (Browser oder Claude Code, je nach Setup
 > des Nikinger). Eingangslektüre in dieser Reihenfolge:
 > `01_decision_proposal.md` (T25–T28) → diese Datei → `02_current_state.md` (was

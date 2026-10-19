@@ -11,6 +11,11 @@ created: 2026-10-19
 
 # 04 — Open Questions (Nikinger)
 
+> ✅ **Entschieden 2026-10-19 (Plan-Session Opus 5.5, Nikinger):** Q1–Q8 beantwortet — Antworten und Folgen stehen in
+> [`../../docs/concepts/phase17_testbed_plan.md` §15.1](../../docs/concepts/phase17_testbed_plan.md). Kurz: Q1 alle +
+> MiniMax, Tests über Gratis-Modelle via OpenCode · Q2 §15-Nachtrag zu Block C · Q3 Python-Dict (T17 bleibt, kein YAML) ·
+> Q4 zwei Stufen (Gateway-Familien-Smoke, nativ wenn Key) · Q5–Q8 von der Plan-Session entschieden (§15.1).
+
 > Jede dieser Fragen muss vor dem Miniplan-Commit entschieden sein. Reihenfolge
 > wie hier — wer Phase-17-Logik kennt, kann manche schon am Telefon klären.
 

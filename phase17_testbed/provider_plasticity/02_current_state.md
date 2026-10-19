@@ -12,6 +12,12 @@ created: 2026-10-19
 
 # 02 — Current State: Provider-Routing im Code (2026-10-19)
 
+> 🟡 **Korrigiert gegen Code 2026-10-19 (Plan-Session Opus 5.5):** Zeilenangaben sind verschoben —
+> `llm_openai_compat.py` `max_tokens` Z. 264 (nicht 254), `response_format` Z. 266 (nicht 256), Keyring-Lookup Z. 174
+> (nicht 170); `wiring.py`-Konstruktionen heute Z. 331/362/428/445/525/582/740 (nicht 313/344/390/400/470/527/685).
+> Die Qwen/Doubao/GLM-Annahmen in §I sind durch Doku-Abruf ersetzt (Plan §15.3); „Qwen lehnt `json_object` ab" ist
+> **nicht** belegt. Quelle ist jetzt Plan §15.
+
 > **Source of Truth ist der Code.** Belegt gegen Plan-§6 (Commit-Bereitschaft
 > 2026-10-17, Plan-Session Opus 5.5; §14-Nachtrag 2026-10-18).
 > Zeilennummern = Stand HEAD-~origin/main von Session #4.

@@ -10,12 +10,14 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
+updated: 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
 ---
 
 # Phase 17 — Prüfstand: Execution-ready Plan (2026-10-17)
 
 > ⚠ **Nachtrag 2026-10-18 (§14, Nikinger): §14 hat Vorrang.** Der Executor ist ein offener Test mit GLM in OpenCode und Review-Gate vor E-3. Bot-Provider ist die z.ai-API mit Pay-per-use statt MiniMax M3. §14 überschreibt T4–T7, T22 und alle MiniMax-Stellen in C/D/E — **zuerst §14 lesen.**
+
+> ⚠ **Nachtrag 2026-10-19 (§15, Nikinger): Provider-Plastizität** ändert C-1/C-3/C-4/C-6/C-7 in place (Reihenfolge §14 → §15 → §6). Vor Block C **§15 lesen.**
 
 > **Adressat:** die ausführende Session (**Sonnet 5 in Claude Code**, Nikinger-Auftrag 2026-10-17).
 > Nichts hier muss neu hergeleitet werden. Jede Zahl in §2/§3 ist in der Plan-Session selbst gegen
@@ -1457,3 +1459,219 @@ Die P8-Schwellen der einzelnen Steps in §6 ab C-1 verschieben sich um +1.
 - Start-Modell `glm-5.3-flash`. Die Familie `glm-5.2`/`glm-5.3` ist zur Evaluation zugelassen, inklusive 5.2-Quirk (14.2).
 
 **Schnittstelle zurück zum Plan:** Die erste Exec-Session (A-0) startet erst, wenn die Fleet „OpenCode + z.ai bereit" meldet (Nikinger). Bis dahin gilt der Rückweg aus 14.2 (MiniMax in OpenCode bis 2026-11-15 oder Claude Code). Am Plan selbst ändert sich dadurch nichts.
+
+---
+
+## §15 Nachtrag 2026-10-19 — Provider-Plastizität (Miniplan, Plan-Session Opus 5.5 in Claude Code)
+
+> **Auslöser (Nikinger 2026-10-19):** *„der Endpunkt für trading bot Aktivitäten sollte so umgebaut werden, das er mit
+> sämtlichen ‚gängigen' Endpunkten funktioniert (anthropic, openai, die chinesischen Anbieter etc)."* Input: die
+> Working-Notes `phase17_testbed/provider_plasticity/` (MiniMax M3, 2026-10-19).
+>
+> **Was §15 ist:** eine **In-place-Änderung von C-1, C-3, C-4, C-6, C-7** — kein Block C2, keine Phase 18
+> (Nikinger Q2). Block C hat am 2026-10-19 **null Zeilen Code** (`ls phase8_scheduler/scheduler/` — kein
+> `llm_profiles.py`; `grep -n "_build_llm\|llm_profile" phase8_scheduler/scripts/wiring.py` trifft nur Kommentare
+> Z. 390/414/443). Ändern kostet also keinen Rückbau. **Reihenfolge §14 → §15 → §6:** wo §15 einer Stelle in §6/§14
+> widerspricht, gilt §15. §14 (z.ai `/paas/v4`, nie `/coding/`; `trading-bot-zai-bot`; Familien-Smoke) bleibt
+> **wortgleich** gültig.
+>
+> **BLUF:** Jeder OpenAI-kompatible Provider ist **ein Daten-Eintrag** in `PROVIDERS` — keine `if provider == …`-Zeile
+> im Code. Der Client lernt genau **drei** Request-Quirks (`max_tokens_field`, `send_temperature`, `extra_body`), deren
+> Defaults den heutigen Payload **bytegleich** lassen. Neun Einträge werden ausgeliefert; Live-Beleg in **zwei Stufen**:
+> Familien-Smoke über kostenlose Gateway-Modelle jetzt, native Endpoints erst, wenn der Nikinger dort einen Key hat.
+> Ehrliche Grenze: „null Code-Commit pro Provider" ist unter T17 **nicht** erreichbar — ein neuer **aktiver** Provider
+> ist ein reiner Daten-Commit an ≤ 3 Literalstellen, und `check_llm_profile` nennt beim Start die vergessene.
+
+### 15.1 Nikinger-Antworten (2026-10-19, diese Session)
+
+| Frage (`04_open_questions.md`) | Antwort |
+|---|---|
+| Q1 Provider-Liste | z.ai/GLM, OpenAI, DeepSeek, Qwen, Kimi, OpenRouter **und MiniMax**; Tests über die **kostenlosen Modelle der jeweiligen Familie via OpenCode** („just for testing") |
+| Q2 Ort | **§15-Nachtrag zu Block C** (empfohlen) |
+| Q3 Konfig-Form | **T17 bleibt: Python-Dict** in `llm_profiles.py` (empfohlen) — kein YAML |
+| Q4 Live-Stufe | **Zwei Stufen** (Rückfrage, empfohlen): Stufe 1 Familien-Smoke über Gateways mit Gratis-Modellen; Stufe 2 nativer Smoke je Eintrag, sobald ein nativer Key existiert |
+| Q5 Block-C-Kompatibilität | (Plan-Session) C-1/C-3/C-4/C-6/C-7 werden **ergänzt**, nicht ersetzt; §15.4 nennt jede Stelle |
+| Q6 Report/K7 | (Plan-Session) nur Anker: E-1 liest `llm_profile` aus der Startzeile (C-4 Punkt 6) — §15 ändert daran nichts, weil keine neuen Profile entstehen |
+| Q7 Budget-Ausnahmen | (Plan-Session) **eine** Liste `budget_exempt_models` (wie C-2/§14). Sie betrifft nur Modelle **aktiver** Profile; Smoke-Modelle laufen ohne Meter-Datei |
+| Q8 Closeout-Reihenfolge | entfällt: §15 läuft **in** Block C, also vor D/E-3 |
+
+### 15.2 Gelockte Entscheidungen T25–T30 (je Zeile mit Begründung — nicht gutgemeint aufmachen)
+
+| ID | Entscheidung | Begründung |
+|---|---|---|
+| **T25** | Genau **zwei** Client-Klassen: `LLMClient` (Anthropic, nativ) und `OpenAICompatLLMClient` (alles andere). Ein Provider = ein `ProviderSpec`-Eintrag. **Keine** Verzweigung nach Provider-Namen im Code | Alle neun Ziel-Provider sprechen `POST {base_url}/chat/completions` mit Bearer-Auth (Doku 2026-10-19, §15.3). Eine dritte Klasse oder `if name == …` wäre die Drift, die die Notes beklagen |
+| **T26** | Quirks sind **Felder direkt auf `ProviderSpec`**, keine eigene `QuirkSpec`-Klasse, und **provider-, nie modellbezogen** | Eine Klasse mit drei Feldern, die nur in `ProviderSpec` lebt, ist Verpackung. Provider-bezogen, weil `ask_agent` (P6) `client.model` je Debatten-Rolle **überschreibt** (§5, C-4 Punkt 2): ein am Modellnamen hängender Quirk würde im Konstruktor für das falsche Modell entschieden. Braucht ein Modell andere Quirks, bekommt es einen eigenen Eintrag (z. B. `openai` vs. ein späteres `openai_legacy`) |
+| **T27** | Genau drei Quirks: `max_tokens_field ∈ {"max_tokens","max_completion_tokens"}`, `send_temperature: bool`, `extra_body: Mapping[str, Any]`. **Gestrichen:** `streaming`, `extra_headers`, `response_format_policy` | Je Feld ein belegter Provider (§15.3): OpenAI GPT-5-Linie verlangt `max_completion_tokens` und lehnt `temperature` ab; Kimi führt `max_tokens` als deprecated; Denk-Schalter (DeepSeek/GLM `thinking`, Qwen `enable_thinking`) sind Nicht-Standard-Body-Felder → `extra_body`. **Streaming** würde Parse- und Meter-Pfad (B-4) umbauen, Non-Stream funktioniert bei allen kommerziellen Modellen; Qwen-Open-Source-Modelle, die nur streamen, sind damit bewusst außen vor. **extra_headers**: kein Ziel-Provider verlangt einen (OpenRouter-Attribution ist optional). **response_format_policy**: alle dokumentierten Provider akzeptieren `json_object`; der Rest fängt der C-3-(a)-400-Fallback |
+| **T28** | Defaults = heutiger Payload **bytegleich** inkl. Schlüssel-Reihenfolge `model, messages, max_tokens, temperature, response_format`. `extra_body` wird **zuerst** eingesetzt und darf **keinen** reservierten Schlüssel enthalten (`model, messages, max_tokens, max_completion_tokens, temperature, response_format, stream`) → `ValueError` im **Client-Konstruktor** | Der Konstruktor ist der eine Engpass, durch den Bot (`_build_llm`) **und** Smoke laufen. `stream` ist reserviert, damit niemand per Hintertür Streaming einschaltet, das der Parser nicht kann (T27) |
+| **T29** | **Eine** Abbildung `ProviderSpec → Client-kwargs`: reine Funktion `client_kwargs(spec)` in `llm_profiles.py`, benutzt von `_build_llm` **und** vom Smoke-Skript (`--provider`). Ein Test erzwingt, dass jedes `ProviderSpec`-Feld außer `kind` abgebildet ist | Sonst testet der Smoke eine andere Konstruktion als der Bot. Der Feld-Abdeckungstest macht ein neues Quirk-Feld ohne Abbildung sofort rot |
+| **T30** | Live-Status je Eintrag steht als **Kommentar** am Eintrag (`# doc 2026-10-19 <url> · live: —`), kein Datenfeld. Stufe 1 = Gateway-Familien-Smoke (Gratis-Modelle), Stufe 2 = nativer Smoke; ein Eintrag gilt erst nach **Stufe 2** als für einen Flip zugelassen | Nikinger Q4 (zwei Stufen). Ein Gateway-Smoke belegt das Antwortformat der Modellfamilie, **nicht** `base_url`/Auth/Feldnamen des nativen Endpoints. Ein Statusfeld würde von keinem Code gelesen (YAGNI) |
+
+**Abgelehnt (nicht wieder vorschlagen):** YAML (`PyYAML` ist im venv **nicht** installiert — `import yaml` → `ModuleNotFoundError`, 2026-10-19; zweite Wahrheit neben der P4-Preistabelle; widerspricht T17). Anthropic-kompatible Shims der Fremdanbieter (T4: `output_config.format` dort ungeprüft). Preise/Ausnahmeliste in dieselbe Datei ziehen (Cross-Phase-Umbau P4→P8 ohne gemessenen Nutzen; `check_llm_profile` fängt die Drift schon beim Start). Umbenennen von `openrouter_smoke.py` (§14.4-Befehle zeigen darauf).
+
+### 15.3 Quirk-Tabelle (Doku-Stand 2026-10-19; „live" trägt nur der Nikinger ein)
+
+| Eintrag | `base_url` | Keyring (service / user) | `max_tokens_field` | `send_temperature` | `extra_body` (Default) | Doku-Beleg 2026-10-19 | Stufe 1 (Gateway) | Stufe 2 (nativ) |
+|---|---|---|---|---|---|---|---|---|
+| `anthropic` | — (SDK) | `tradingbot` (unverändert) | — | — | — | live seit P4 | — | ✅ |
+| `zai` | `https://api.z.ai/api/paas/v4` (§14) | `trading-bot-zai-bot` / `api_key` | `max_tokens` | `True` (Range 0–1, 0,2 ok) | `{}` — **thinking default an** | docs.z.ai/api-reference/llm/chat-completion: `json_object` ja, `thinking.type` enabled/disabled | — | §14.4 + Gratis `glm-4.7-flash` |
+| `minimax` | `https://api.minimax.io/v1` (Plan C-1) | `trading-bot-minimax-bot` / `api_key` | `max_tokens` | `True` | `{}` | **nicht abgerufen** → §15.7 Nr. 21 | `opencode_zen` `minimax-m3.1-flash-free` | optional (Abo-Key bis 2026-11-15) |
+| `openai` | `https://api.openai.com/v1` | `trading-bot-openai-bot` / `api_key` | **`max_completion_tokens`** | **`False`** | `{}` | platform.openai.com 403 für WebFetch; belegt über Microsoft-Foundry-Doku „GPT-5 … use `max_completion_tokens` … don't support temperature" → §15.7 Nr. 22 | — (kein Gratis-Modell) | wenn Key |
+| `deepseek` | `https://api.deepseek.com` | `trading-bot-deepseek-bot` / `api_key` | `max_tokens` | `True` (im Thinking-Modus wirkungslos) | `{}` — **thinking default an** | api-docs.deepseek.com/api/create-chat-completion: `json_object` ja, `thinking.type`, `reasoning_content` | `opencode_zen` `deepseek-v4.1-flash-free` | wenn Key |
+| `qwen` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` | `trading-bot-qwen-bot` / `api_key` | `max_tokens` | `True` | `{}` — Qwen3.5+ **thinking default an**, `enable_thinking` nur via Body | alibabacloud …/compatibility-of-openai-with-dashscope zeigt **workspace-spezifische** URLs `https://{WorkspaceId}.<region>.maas.aliyuncs.com/compatible-mode/v1` → §15.7 Nr. 23 | — | wenn Key **und** URL aus der Konsole |
+| `kimi` | `https://api.moonshot.ai/v1` | `trading-bot-kimi-bot` / `api_key` | **`max_completion_tokens`** (`max_tokens` deprecated) | `True` — Doku schweigt → §15.7 Nr. 24 | `{}` | platform.kimi.ai/docs/api/chat: `json_object` ja, `thinking` (K2.6), `reasoning_effort` (K3) | — | wenn Key |
+| `openrouter` | `https://openrouter.ai/api/v1` | `trading-bot-openrouter-bot` / `api_key` (**nicht** der M1-Key `openrouter`) | `max_tokens` | `True` | `{}` | M1-Smoke 2026-07 (Memory) | `minimax/minimax-m3.1-flash:free` | = Stufe 1 (Gateway ist hier der native Endpoint) |
+| `opencode_zen` | `https://opencode.ai/inference/openai/v1` | `trading-bot-opencode-bot` / `api_key` (**nie** `~/.local/share/opencode/auth.json`, §14.8) | `max_tokens` | `True` | `{}` | Katalog `~/.cache/opencode/models.json` Provider `opencode`, Feld `api` (2026-10-19) → §15.7 Nr. 25 | = Stufe 1 | = Stufe 1 |
+
+**Keine Preiszeilen für die Smoke-Modelle.** `check_llm_profile` verlangt Preiszeilen nur für Modelle **aktiver** Profile; der Smoke schreibt keine Meter-Datei (`token_meter_path=None`), ein unbekanntes Modell kostet dort 0 + WARNING (`token_meter.py`, fail-soft). **Keine neuen Profile** außer §14 (`research_glm`/`all_glm`): ein Profil entsteht erst mit einem Flip.
+
+### 15.4 Änderungen an Block C (Exec: in den genannten Step-Commit einarbeiten, keine eigenen Commits)
+
+Zeilen = Stand HEAD `6dff4bd` (2026-10-19), selbst gelesen. **Der Verbatim-String ist der Anker.**
+
+#### C-1 (+) — `scheduler/llm_profiles.py`
+
+1. Importzeile im C-1-Codeblock: `from dataclasses import dataclass` → `from dataclasses import dataclass, field, fields`; `from typing import Mapping` → `from typing import Any, Mapping`.
+2. `ProviderSpec` erhält **nach** `api_key_username: str | None = None` drei Felder:
+   ```python
+       # §15 T26/T27: provider-level request quirks (never model-level — P6 ask_agent rewrites
+       # client.model per role). Defaults reproduce the pre-§15 payload byte for byte (T28).
+       max_tokens_field: str = "max_tokens"          # "max_tokens" | "max_completion_tokens"
+       send_temperature: bool = True
+       extra_body: Mapping[str, Any] = field(default_factory=dict)
+   ```
+3. `PROVIDERS` = die neun Einträge aus §15.3, je mit Kommentar `# doc 2026-10-19 <url> · live: —` (T30). `zai` exakt wie §14.1. `minimax` bleibt mit `trading-bot-minimax-bot` drin (Nikinger Q1). Nur `openai` setzt `max_tokens_field="max_completion_tokens", send_temperature=False`; nur `kimi` setzt `max_tokens_field="max_completion_tokens"`. Alle `extra_body` leer.
+4. Neue reine Funktionen (unter `role_spec`):
+   ```python
+   _MAX_TOKENS_FIELDS: tuple[str, ...] = ("max_tokens", "max_completion_tokens")
+
+
+   def check_provider(name: str, spec: ProviderSpec) -> None:
+       """Raise ValueError if ``spec`` cannot work. Pure; called by check_llm_profile per active provider."""
+       # kind ∈ {"anthropic","openai_compat"}; for openai_compat: base_url starts with "https://",
+       # contains no "/coding/" (§14.1 — moves the §14 rule here), api_key_service + api_key_username
+       # non-empty, max_tokens_field in _MAX_TOKENS_FIELDS. Message names provider + field + value.
+
+
+   def client_kwargs(spec: ProviderSpec) -> dict[str, Any]:
+       """The ONE ProviderSpec → OpenAICompatLLMClient kwargs mapping (T29) — _build_llm and the smoke use it."""
+       return {"base_url": spec.base_url, "api_key_service": spec.api_key_service,
+               "api_key_username": spec.api_key_username, "max_tokens_field": spec.max_tokens_field,
+               "send_temperature": spec.send_temperature, "extra_body": dict(spec.extra_body)}
+   ```
+5. `check_llm_profile`: die §14-`/coding/`-Prüfung **wohnt** jetzt in `check_provider`; `check_llm_profile` ruft `check_provider(p, PROVIDERS[p])` für jeden Provider des Profils (vor den vier Regeln aus C-1). Der §14-Test `test_check_rejects_coding_plan_endpoint` bleibt unverändert grün (er ruft `check_llm_profile`).
+6. **Tests P8 (+3)** in `tests/test_llm_profiles.py`:
+   - `test_check_provider_rejects_http_missing_key_and_bad_field` — drei `pytest.raises(ValueError)`-Blöcke: `base_url="http://…"`, `api_key_service=None`, `max_tokens_field="max_output_tokens"`.
+   - `test_every_shipped_provider_is_well_formed` — `for n, s in PROVIDERS.items(): check_provider(n, s)`; plus `assert set(PROVIDERS) == {"anthropic","zai","minimax","openai","deepseek","qwen","kimi","openrouter","opencode_zen"}`.
+   - `test_client_kwargs_covers_every_quirk_field` — `assert set(client_kwargs(PROVIDERS["openai"])) == {f.name for f in fields(ProviderSpec)} - {"kind"}`.
+
+#### C-3 (+) — `research/llm_openai_compat.py` (P4)
+
+Zusätzlich zu C-3 Punkt 1–3 (und §14):
+
+4. Konstruktor (Anker Z. 119 `        api_key_service: str = "openrouter",`): nach dem C-3-`api_key_username`-Argument drei kw-Args
+   `max_tokens_field: str = "max_tokens",`, `send_temperature: bool = True,`, `extra_body: Mapping[str, Any] | None = None,`. Im Rumpf (nach Z. 155 `        self.temperature = temperature`):
+   ```python
+           # §15 T27/T28: provider quirks, validated here — the one choke point the bot and the smoke share.
+           if max_tokens_field not in ("max_tokens", "max_completion_tokens"):
+               raise ValueError(f"max_tokens_field must be max_tokens|max_completion_tokens, got {max_tokens_field!r}")
+           reserved = set(extra_body or {}) & _RESERVED_PAYLOAD_KEYS
+           if reserved:
+               raise ValueError(f"extra_body must not set client-owned keys: {sorted(reserved)}")
+           self.max_tokens_field = max_tokens_field
+           self.send_temperature = send_temperature
+           self.extra_body: dict[str, Any] = dict(extra_body or {})
+   ```
+   Modulkonstante unter Z. 82 `_KEYRING_USERNAME = "api_key"`: `_RESERVED_PAYLOAD_KEYS = frozenset({"model", "messages", "max_tokens", "max_completion_tokens", "temperature", "response_format", "stream"})`. Import `from typing import Any` → `from typing import Any, Mapping`. Docstring-Args um die drei Felder ergänzen.
+5. `_attempt`, Payload (Anker Z. 258 `        payload = {` bis Z. 267 `        }`) ersetzen durch:
+   ```python
+           payload: dict[str, Any] = {
+               **self.extra_body,  # first: client-owned keys below always win (T28; reserved keys rejected in __init__)
+               "model": self.model,
+               "messages": [
+                   {"role": "system", "content": f"{system}\n\n{schema_instruction}"},
+                   {"role": "user", "content": user},
+               ],
+               self.max_tokens_field: self.max_tokens,
+           }
+           if self.send_temperature:
+               payload["temperature"] = self.temperature
+           payload["response_format"] = {"type": "json_object"}
+   ```
+   Der C-3-(a)-400-Fallback entfernt danach nur `response_format` (`{k: v for k, v in payload.items() if k != "response_format"}`).
+6. **Bestehenden Test anpassen (erwartet, kein Bug):** `tests/test_llm_openai_compat.py:176` `test_bad_request_400_raises_immediately_no_retry` wird durch C-3 (a) **rot**, aber nur an `assert len(calls) == 1`: der Fallback sendet ein zweites Mal, `responses.pop(0)` auf der leeren Liste wirft `IndexError`, der als `LLMResponseError` gewrappt wird — `pytest.raises` bleibt also grün und täuscht. Neu: **zwei** `_FakeResponse(400, text="bad request")`, `assert len(calls) == 2`, `assert "response_format" in calls[0]["json"]` und `assert "response_format" not in calls[1]["json"]`. Umbenennen in `test_bad_request_400_retries_once_without_response_format_then_raises`. Netto ±0 Tests.
+7. **Tests P4 (+5)** in `tests/test_llm_openai_compat.py` (Muster `_client` Z. 44 + `_fake_post` Z. 49 + `_happy_body` Z. 37):
+   - `test_default_quirks_payload_is_unchanged` — `assert list(calls[0]["json"]) == ["model", "messages", "max_tokens", "temperature", "response_format"]`.
+   - `test_max_completion_tokens_field_replaces_max_tokens` — `max_tokens_field="max_completion_tokens"` → Schlüssel da, `"max_tokens"` fehlt.
+   - `test_send_temperature_false_omits_temperature`.
+   - `test_extra_body_is_merged_into_payload` — `extra_body={"thinking": {"type": "disabled"}}` → im Payload.
+   - `test_invalid_quirks_raise_value_error_at_construction` — `extra_body={"stream": True}` und `max_tokens_field="x"` je `pytest.raises(ValueError)`, ohne Netz-Call.
+
+#### C-4 (+) — `scripts/wiring.py` (P8)
+
+7. `_build_llm`, Nicht-Anthropic-Zweig: statt der einzelnen kwargs `base_url=…, api_key_service=…, api_key_username=…` steht `OpenAICompatLLMClient(model, **client_kwargs(provider), timeout_s=…, max_tokens=…, temperature=…, token_meter_path=…, config=…, cache_system=cache_system)` (T29). Import `client_kwargs` neben `role_spec, PROVIDERS`.
+8. Heutige Anker der sieben Stellen (die Zahlen in C-4/T16 sind verschoben): `_build_research` Z. 331 `    llm = LLMClient(` · `_make_debate_runner._build` Z. 362 `        llm = LLMClient(` · `_build_reward_sink` Z. 428 `    llm = LLMClient(` und Z. 445 `    instinct_llm = LLMClient(` · `_build_abstain_sink` Z. 525 `        client = LLMClient(` · `_build_paper_engine` Z. 582 `        client = LLMClient(` · `_build_paper_tracker` Z. 740 `        client = LLMClient(` · `build_scheduler` Z. 992 `    research = _build_research(`.
+9. **Test P8 (+1)** in `tests/test_wiring_llm_routing.py`: `test_build_llm_passes_provider_quirks_to_openai_compat` — `monkeypatch.setitem(LLM_PROFILES, "t_openai", {r: RoleSpec(provider="openai", model="gpt-x") for r in LLM_ROLES})`, `_build_llm("research", "t_openai", …)` → Instanz `OpenAICompatLLMClient` mit `max_tokens_field == "max_completion_tokens"`, `send_temperature is False`, `base_url == "https://api.openai.com/v1"`. Kein Keyring-Zugriff (der Client liest lazy).
+
+#### C-6 (+) — `phase4_research/scripts/openrouter_smoke.py`
+
+3. Zusätzlich zu den C-6-Flags: `--provider NAME` (Choices = `sorted(PROVIDERS)` ohne `anthropic`). Mit `--provider`: `kw = client_kwargs(PROVIDERS[args.provider])` und `OpenAICompatLLMClient(model=args.model, **kw, max_tokens=args.max_tokens, timeout_s=args.timeout_s)`. `--provider` zusammen mit `--base-url`/`--key-service`/`--key-username` → `parser.error(...)`. Ohne `--provider` verhält sich das Skript wie C-6 (OpenRouter-Default, §14.4-Befehle unverändert).
+   - Import `from scheduler.llm_profiles import PROVIDERS, client_kwargs` — **funktioniert ohne `sys.path`-Eingriff**: das venv hat `scheduler` editable installiert (`python -c "import scheduler"` aus `/tmp` → `phase8_scheduler/scheduler/__init__.py`, 2026-10-19). Bewusste Ausnahme von der Abhängigkeitsrichtung P8→P4: ein Operator-Skript, nicht collected, und genau das, was T29 verlangt.
+   - Ausgabezeile zusätzlich `provider=<name|custom>`.
+   - Kein Test (Operator-Skript, wie C-6).
+
+#### C-7 (+) — Live-Belege in zwei Stufen (Nikinger; T30)
+
+**Vorher (Nikinger, einmalig je Key):** `phase1_broker_wrapper/.venv/bin/python scripts/store_minimax_key.py --service <service> --username api_key` (C-6-Seeder, generisch). Der OpenCode-Zen-Key ist ein **eigener** API-Key aus der OpenCode-Konsole — **nie** aus `auth.json` kopieren (§14.8, Harness-Infrastruktur).
+
+**Stufe 1 — Familien-Smoke, Gratis-Modelle (Kosten 0 €; IDs = Katalog 2026-10-19, vor dem Lauf in `~/.cache/opencode/models.json` gegenprüfen — Gratis-IDs rotieren):**
+```bash
+S=phase4_research/scripts/openrouter_smoke.py; PY=phase1_broker_wrapper/.venv/bin/python
+for m in deepseek-v4.1-flash-free minimax-m3.1-flash-free glm-4.7-free; do
+  $PY $S --provider opencode_zen --model "$m" --max-tokens 4096 --timeout-s 90 --show-raw; done
+$PY $S --provider openrouter --model minimax/minimax-m3.1-flash:free --max-tokens 4096 --timeout-s 90 --show-raw
+$PY $S --provider zai --model glm-4.7-flash --max-tokens 4096 --timeout-s 90 --show-raw   # z.ai Gratis-Modell, nativer Endpoint
+```
+Danach §14.4 (GLM-Familie, Pay-per-use) **mit `--provider zai`** statt der drei Einzelflags.
+
+**Stufe 2 — nativ, nur wo ein Key existiert:** `$PY $S --provider <openai|deepseek|qwen|kimi|minimax> --model <id> --max-tokens 4096 --timeout-s 90 --show-raw`. Für `qwen` zuerst die Workspace-URL aus der Konsole in `PROVIDERS["qwen"].base_url` eintragen (eigener Commit, §15.7 Nr. 23).
+
+**Protokoll:** je Lauf PASS/FAIL, `finish_reason`, Tokens, Latenz als Zeile in den Phasenkopf **und** den `live:`-Kommentar am Eintrag aktualisieren (Exec, ein Doku-Commit für alle). Ein FAIL ist **kein** Blocker für Block C — nur ein Eintrag mit Stufe-2-PASS darf in ein Flip-Profil (T30).
+
+### 15.5 Σ-Ziele (ersetzt §14.7)
+
+| Stand | P4 | P8 | Σ |
+|---|---:|---:|---:|
+| heute (gemessen 2026-10-19, diese Session, 16 Suites einzeln) | 167 | 264 | **1978** |
+| nach Block B (Plan) | 167 | — | ≥ 1992 |
+| nach Block C (§6 + §14 + §15: P4 +5, P8 +4) | ≥ 177 | ≥ 292 | **≥ 2025** |
+| nach D-1 | — | ≥ 295 | ≥ 2028 |
+| nach E-1 | — | — | ≥ 2035 |
+
+### 15.6 Ergänzung §8 (Fehlgriffe, die wie andere Fehler aussehen)
+
+| Symptom | Erster Verdächtiger | Zweiter |
+|---|---|---|
+| `test_bad_request_400_…` rot nur an `len(calls)`, `pytest.raises` grün | **erwartet** durch C-3 (a): Test nach §15.4 C-3 Nr. 6 umbauen — **nicht** den Fallback „reparieren" | — |
+| Smoke `HTTP 400 … max_tokens` / „unsupported parameter" bei `openai` | Eintrag nutzt `max_tokens` statt `max_completion_tokens` | Modell ist **kein** Reasoning-Modell und will `temperature` → eigener Eintrag (T26), nicht Quirk am Modell |
+| Smoke `finish_reason=length` mit leerem `content`, Tokens hoch | Denk-Modus default an (DeepSeek/GLM/Qwen3.5+): Reasoning frisst `max_tokens` | `extra_body={"thinking": {"type": "disabled"}}` (DeepSeek/GLM) bzw. `{"enable_thinking": False}` (Qwen) — Datenänderung am Eintrag, Nikinger-Entscheidung |
+| Qwen `HTTP 400 … enable_thinking … stream` | Open-Source-Qwen-Modell, das nur streamt (T27) | kommerzielles Modell wählen oder `enable_thinking: False` |
+| `ValueError: extra_body must not set client-owned keys` beim Start | gewollt (T28) — Eintrag versucht `stream`/`max_tokens` per Body zu setzen | — |
+| Smoke `401` bei `opencode_zen` | Key aus `auth.json` statt eigenem API-Key, oder Gratis-Modell nicht per API freigegeben | §15.7 Nr. 25 |
+| Smoke `ModuleNotFoundError: scheduler` | Skript mit System-Python statt venv-Python gestartet | — |
+| `test_every_shipped_provider_is_well_formed` rot nach Qwen-URL-Commit | Workspace-URL ohne `https://` oder mit `/coding/` (Alibaba-Coding-Plan `coding-intl.dashscope…` ist **auch** ein Coding-Endpoint) | — |
+
+### 15.7 Ergänzung §9 (bei Ausführung verifizieren — vollständig; was hier nicht steht, ist selbst geprüft)
+
+21. **MiniMax nativ** `https://api.minimax.io/v1`: Feldnamen, `json_object`, Temperatur-Range (Doku nicht abgerufen; Plan C-1 hatte die URL schon unter Vorbehalt). Stufe-2-Smoke entscheidet.
+22. **OpenAI**: `platform.openai.com` lieferte WebFetch **403**. Beleg nur indirekt (Microsoft-Foundry-Reasoning-Doku). Ob `json_object` auf der GPT-5-Linie mit Chat Completions geht → Stufe-2-Smoke.
+23. **Qwen `base_url`**: die Doku zeigt 2026-10-19 nur noch workspace-spezifische Hosts; ob `dashscope-intl.aliyuncs.com/compatible-mode/v1` noch antwortet, ist ungeprüft. Ob `json_object` bei Denk-Modus-Modellen geht: Doku schweigt.
+24. **Kimi `temperature`**: Doku schweigt; ältere Thinking-Modelle verlangten eine feste Temperatur. Bei `HTTP 400 … temperature` → `send_temperature=False` am Eintrag.
+25. **OpenCode Zen per API**: ob ein eigener Zen-API-Key außerhalb von OpenCode erlaubt ist (Nutzungsbedingungen der Gratis-Modelle) und ob `base_url` `…/inference/openai/v1` ohne weiteren Pfad stimmt (Katalogfeld `api`, nicht Doku). Nikinger prüft vor Stufe 1.
+26. **z.ai Gratis-Modell** `glm-4.7-flash` auf `/paas/v4`: Katalog sagt Preis 0; ob es mit einem Pay-per-use-Key ohne Guthaben antwortet, zeigt der Smoke.
+
+### 15.8 Was §15 **nicht** tut
+
+- keine Modell-Empfehlung, kein Flip (bleibt §14/C-7/C-8);
+- kein Streaming, keine Header, keine dritte Client-Klasse (T25/T27);
+- keine Preiszeilen außer §14 (GLM-Familie) — ein neuer **aktiver** Provider bringt seine Preiszeile im Flip-Commit mit, `check_llm_profile` erzwingt das;
+- kein Code in P6/P7/P13 (T13 unverändert); Berührt werden nur P4 (`llm_openai_compat.py`, Smoke-Skript) und P8 (`llm_profiles.py`, `wiring.py`) — beide in T13.
