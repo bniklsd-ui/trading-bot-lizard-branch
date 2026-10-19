@@ -1476,7 +1476,7 @@ Die P8-Schwellen der einzelnen Steps in §6 ab C-1 verschieben sich um +1.
 > **wortgleich** gültig.
 >
 > **BLUF:** Jeder OpenAI-kompatible Provider ist **ein Daten-Eintrag** in `PROVIDERS` — keine `if provider == …`-Zeile
-> im Code. Der Client lernt genau **drei** Request-Quirks (`max_tokens_field`, `send_temperature`, `extra_body`), deren
+> im Code. Der Client lernt genau **drei** Request-Quirks (`max_tokens_field`, `send_temperature`, `extra_body`) plus eine strengere Coding-Plan-Sperre (T31), deren
 > Defaults den heutigen Payload **bytegleich** lassen. Neun Einträge werden ausgeliefert; Live-Beleg in **zwei Stufen**:
 > Familien-Smoke über kostenlose Gateway-Modelle jetzt, native Endpoints erst, wenn der Nikinger dort einen Key hat.
 > Ehrliche Grenze: „null Code-Commit pro Provider" ist unter T17 **nicht** erreichbar — ein neuer **aktiver** Provider
@@ -1495,7 +1495,7 @@ Die P8-Schwellen der einzelnen Steps in §6 ab C-1 verschieben sich um +1.
 | Q7 Budget-Ausnahmen | (Plan-Session) **eine** Liste `budget_exempt_models` (wie C-2/§14). Sie betrifft nur Modelle **aktiver** Profile; Smoke-Modelle laufen ohne Meter-Datei |
 | Q8 Closeout-Reihenfolge | entfällt: §15 läuft **in** Block C, also vor D/E-3 |
 
-### 15.2 Gelockte Entscheidungen T25–T30 (je Zeile mit Begründung — nicht gutgemeint aufmachen)
+### 15.2 Gelockte Entscheidungen T25–T31 (je Zeile mit Begründung — nicht gutgemeint aufmachen)
 
 | ID | Entscheidung | Begründung |
 |---|---|---|
@@ -1504,6 +1504,7 @@ Die P8-Schwellen der einzelnen Steps in §6 ab C-1 verschieben sich um +1.
 | **T27** | Genau drei Quirks: `max_tokens_field ∈ {"max_tokens","max_completion_tokens"}`, `send_temperature: bool`, `extra_body: Mapping[str, Any]`. **Gestrichen:** `streaming`, `extra_headers`, `response_format_policy` | Je Feld ein belegter Provider (§15.3): OpenAI GPT-5-Linie verlangt `max_completion_tokens` und lehnt `temperature` ab; Kimi führt `max_tokens` als deprecated; Denk-Schalter (DeepSeek/GLM `thinking`, Qwen `enable_thinking`) sind Nicht-Standard-Body-Felder → `extra_body`. **Streaming** würde Parse- und Meter-Pfad (B-4) umbauen, Non-Stream funktioniert bei allen kommerziellen Modellen; Qwen-Open-Source-Modelle, die nur streamen, sind damit bewusst außen vor. **extra_headers**: kein Ziel-Provider verlangt einen (OpenRouter-Attribution ist optional). **response_format_policy**: alle dokumentierten Provider akzeptieren `json_object`; der Rest fängt der C-3-(a)-400-Fallback |
 | **T28** | Defaults = heutiger Payload **bytegleich** inkl. Schlüssel-Reihenfolge `model, messages, max_tokens, temperature, response_format`. `extra_body` wird **zuerst** eingesetzt und darf **keinen** reservierten Schlüssel enthalten (`model, messages, max_tokens, max_completion_tokens, temperature, response_format, stream`) → `ValueError` im **Client-Konstruktor** | Der Konstruktor ist der eine Engpass, durch den Bot (`_build_llm`) **und** Smoke laufen. `stream` ist reserviert, damit niemand per Hintertür Streaming einschaltet, das der Parser nicht kann (T27) |
 | **T29** | **Eine** Abbildung `ProviderSpec → Client-kwargs`: reine Funktion `client_kwargs(spec)` in `llm_profiles.py`, benutzt von `_build_llm` **und** vom Smoke-Skript (`--provider`). Ein Test erzwingt, dass jedes `ProviderSpec`-Feld außer `kind` abgebildet ist | Sonst testet der Smoke eine andere Konstruktion als der Bot. Der Feld-Abdeckungstest macht ein neues Quirk-Feld ohne Abbildung sofort rot |
+| **T31** | Die Coding-Plan-Sperre wird verschärft: `check_provider` wirft, wenn `"coding" in base_url.lower()` (statt nur Pfad `/coding/`, §14.1) | Gemessen 2026-10-19 über alle 10 `*coding*`-Provider im Katalog `~/.cache/opencode/models.json`: der Pfad-Test trifft **4**, der neue Test **7**. Alibaba (`coding-intl.dashscope.aliyuncs.com`, `coding.dashscope.aliyuncs.com`) und KUAE tragen „coding" im **Host**. Strenger als §14, nie lockerer; keiner der 9 Einträge enthält „coding". **Grenze:** MiniMax-Coding-Plan (`api.minimax.io/anthropic/v1`) und umans sind per URL unsichtbar. Gegen sie hilft nur die Key-Regel (§15.3 `minimax`, Stufe 2) |
 | **T30** | Live-Status je Eintrag steht als **Kommentar** am Eintrag (`# doc 2026-10-19 <url> · live: —`), kein Datenfeld. Stufe 1 = Gateway-Familien-Smoke (Gratis-Modelle), Stufe 2 = nativer Smoke; ein Eintrag gilt erst nach **Stufe 2** als für einen Flip zugelassen | Nikinger Q4 (zwei Stufen). Ein Gateway-Smoke belegt das Antwortformat der Modellfamilie, **nicht** `base_url`/Auth/Feldnamen des nativen Endpoints. Ein Statusfeld würde von keinem Code gelesen (YAGNI) |
 
 **Abgelehnt (nicht wieder vorschlagen):** YAML (`PyYAML` ist im venv **nicht** installiert — `import yaml` → `ModuleNotFoundError`, 2026-10-19; zweite Wahrheit neben der P4-Preistabelle; widerspricht T17). Anthropic-kompatible Shims der Fremdanbieter (T4: `output_config.format` dort ungeprüft). Preise/Ausnahmeliste in dieselbe Datei ziehen (Cross-Phase-Umbau P4→P8 ohne gemessenen Nutzen; `check_llm_profile` fängt die Drift schon beim Start). Umbenennen von `openrouter_smoke.py` (§14.4-Befehle zeigen darauf).
@@ -1514,7 +1515,7 @@ Die P8-Schwellen der einzelnen Steps in §6 ab C-1 verschieben sich um +1.
 |---|---|---|---|---|---|---|---|---|
 | `anthropic` | — (SDK) | `tradingbot` (unverändert) | — | — | — | live seit P4 | — | ✅ |
 | `zai` | `https://api.z.ai/api/paas/v4` (§14) | `trading-bot-zai-bot` / `api_key` | `max_tokens` | `True` (Range 0–1, 0,2 ok) | `{}` — **thinking default an** | docs.z.ai/api-reference/llm/chat-completion: `json_object` ja, `thinking.type` enabled/disabled | — | §14.4 + Gratis `glm-4.7-flash` |
-| `minimax` | `https://api.minimax.io/v1` (Plan C-1) | `trading-bot-minimax-bot` / `api_key` | `max_tokens` | `True` | `{}` | **nicht abgerufen** → §15.7 Nr. 21 | `opencode_zen` `minimax-m3.1-flash-free` | optional (Abo-Key bis 2026-11-15) |
+| `minimax` | `https://api.minimax.io/v1` (Plan C-1) | `trading-bot-minimax-bot` / `api_key` | `max_tokens` | `True` | `{}` | **nicht abgerufen** → §15.7 Nr. 21 | `opencode_zen` `minimax-m3.1-flash-free` | nur mit einem **Pay-per-use-Key**. Ob der Abo-/Coding-Plan-Key für Bot-Nutzung zulässig ist, ist eine **Nikinger-Entscheidung** (§15.7 Nr. 27). T31 sieht das nicht, weil die URL unverdächtig ist |
 | `openai` | `https://api.openai.com/v1` | `trading-bot-openai-bot` / `api_key` | **`max_completion_tokens`** | **`False`** | `{}` | platform.openai.com 403 für WebFetch; belegt über Microsoft-Foundry-Doku „GPT-5 … use `max_completion_tokens` … don't support temperature" → §15.7 Nr. 22 | — (kein Gratis-Modell) | wenn Key |
 | `deepseek` | `https://api.deepseek.com` | `trading-bot-deepseek-bot` / `api_key` | `max_tokens` | `True` (im Thinking-Modus wirkungslos) | `{}` — **thinking default an** | api-docs.deepseek.com/api/create-chat-completion: `json_object` ja, `thinking.type`, `reasoning_content` | `opencode_zen` `deepseek-v4.1-flash-free` | wenn Key |
 | `qwen` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` | `trading-bot-qwen-bot` / `api_key` | `max_tokens` | `True` | `{}` — Qwen3.5+ **thinking default an**, `enable_thinking` nur via Body | alibabacloud …/compatibility-of-openai-with-dashscope zeigt **workspace-spezifische** URLs `https://{WorkspaceId}.<region>.maas.aliyuncs.com/compatible-mode/v1` → §15.7 Nr. 23 | — | wenn Key **und** URL aus der Konsole |
@@ -1548,7 +1549,7 @@ Zeilen = Stand HEAD `6dff4bd` (2026-10-19), selbst gelesen. **Der Verbatim-Strin
    def check_provider(name: str, spec: ProviderSpec) -> None:
        """Raise ValueError if ``spec`` cannot work. Pure; called by check_llm_profile per active provider."""
        # kind ∈ {"anthropic","openai_compat"}; for openai_compat: base_url starts with "https://",
-       # contains no "/coding/" (§14.1 — moves the §14 rule here), api_key_service + api_key_username
+       # contains no "coding" anywhere (case-insensitive; T31 — tightens the §14 /coding/ rule), api_key_service + api_key_username
        # non-empty, max_tokens_field in _MAX_TOKENS_FIELDS. Message names provider + field + value.
 
 
@@ -1560,8 +1561,8 @@ Zeilen = Stand HEAD `6dff4bd` (2026-10-19), selbst gelesen. **Der Verbatim-Strin
    ```
 5. `check_llm_profile`: die §14-`/coding/`-Prüfung **wohnt** jetzt in `check_provider`; `check_llm_profile` ruft `check_provider(p, PROVIDERS[p])` für jeden Provider des Profils (vor den vier Regeln aus C-1). Der §14-Test `test_check_rejects_coding_plan_endpoint` bleibt unverändert grün (er ruft `check_llm_profile`).
 6. **Tests P8 (+3)** in `tests/test_llm_profiles.py`:
-   - `test_check_provider_rejects_http_missing_key_and_bad_field` — drei `pytest.raises(ValueError)`-Blöcke: `base_url="http://…"`, `api_key_service=None`, `max_tokens_field="max_output_tokens"`.
-   - `test_every_shipped_provider_is_well_formed` — `for n, s in PROVIDERS.items(): check_provider(n, s)`; plus `assert set(PROVIDERS) == {"anthropic","zai","minimax","openai","deepseek","qwen","kimi","openrouter","opencode_zen"}`.
+   - `test_check_provider_rejects_http_missing_key_bad_field_and_coding_host` — vier `pytest.raises(ValueError)`-Blöcke: `base_url="http://…"`, `api_key_service=None`, `max_tokens_field="max_output_tokens"` und `base_url="https://coding-intl.dashscope.aliyuncs.com/v1"` (T31: Host statt Pfad).
+   - `test_every_shipped_provider_is_well_formed` — `for n, s in PROVIDERS.items(): check_provider(n, s)`; plus `assert set(PROVIDERS) >= {"anthropic","zai","minimax","openai","deepseek","qwen","kimi","openrouter","opencode_zen"}`. Obermenge, nicht Gleichheit: ein neuer Eintrag bleibt ein reiner Daten-Commit ohne Test-Edit.
    - `test_client_kwargs_covers_every_quirk_field` — `assert set(client_kwargs(PROVIDERS["openai"])) == {f.name for f in fields(ProviderSpec)} - {"kind"}`.
 
 #### C-3 (+) — `research/llm_openai_compat.py` (P4)
@@ -1597,7 +1598,7 @@ Zusätzlich zu C-3 Punkt 1–3 (und §14):
                payload["temperature"] = self.temperature
            payload["response_format"] = {"type": "json_object"}
    ```
-   Der C-3-(a)-400-Fallback entfernt danach nur `response_format` (`{k: v for k, v in payload.items() if k != "response_format"}`).
+   Der C-3-(a)-400-Fallback entfernt danach nur `response_format` (`{k: v for k, v in payload.items() if k != "response_format"}`). **Pflicht:** seine `log.info`-Zeile enthält den ersten Fehlertext (`"HTTP 400 with response_format — retrying once without it; first fault: %s", exc`; `str(exc)` trägt `body[:300]`, Z. 103). Sonst sieht der Operator nur den zweiten Fehler (§15.6).
 6. **Bestehenden Test anpassen (erwartet, kein Bug):** `tests/test_llm_openai_compat.py:176` `test_bad_request_400_raises_immediately_no_retry` wird durch C-3 (a) **rot**, aber nur an `assert len(calls) == 1`: der Fallback sendet ein zweites Mal, `responses.pop(0)` auf der leeren Liste wirft `IndexError`, der als `LLMResponseError` gewrappt wird — `pytest.raises` bleibt also grün und täuscht. Neu: **zwei** `_FakeResponse(400, text="bad request")`, `assert len(calls) == 2`, `assert "response_format" in calls[0]["json"]` und `assert "response_format" not in calls[1]["json"]`. Umbenennen in `test_bad_request_400_retries_once_without_response_format_then_raises`. Netto ±0 Tests.
 7. **Tests P4 (+5)** in `tests/test_llm_openai_compat.py` (Muster `_client` Z. 44 + `_fake_post` Z. 49 + `_happy_body` Z. 37):
    - `test_default_quirks_payload_is_unchanged` — `assert list(calls[0]["json"]) == ["model", "messages", "max_tokens", "temperature", "response_format"]`.
@@ -1651,6 +1652,7 @@ Danach §14.4 (GLM-Familie, Pay-per-use) **mit `--provider zai`** statt der drei
 
 | Symptom | Erster Verdächtiger | Zweiter |
 |---|---|---|
+| Log zeigt den `response_format`-Retry, danach ein anderer 400 | **Quirk-Felder des Eintrags** (falsches `max_tokens_field`, unerwünschtes `temperature`, fremder `extra_body`-Schlüssel). Ursache steht im **ersten** Fehlertext der Retry-Zeile | erst danach: Provider kann wirklich kein `json_object` |
 | `test_bad_request_400_…` rot nur an `len(calls)`, `pytest.raises` grün | **erwartet** durch C-3 (a): Test nach §15.4 C-3 Nr. 6 umbauen — **nicht** den Fallback „reparieren" | — |
 | Smoke `HTTP 400 … max_tokens` / „unsupported parameter" bei `openai` | Eintrag nutzt `max_tokens` statt `max_completion_tokens` | Modell ist **kein** Reasoning-Modell und will `temperature` → eigener Eintrag (T26), nicht Quirk am Modell |
 | Smoke `finish_reason=length` mit leerem `content`, Tokens hoch | Denk-Modus default an (DeepSeek/GLM/Qwen3.5+): Reasoning frisst `max_tokens` | `extra_body={"thinking": {"type": "disabled"}}` (DeepSeek/GLM) bzw. `{"enable_thinking": False}` (Qwen) — Datenänderung am Eintrag, Nikinger-Entscheidung |
@@ -1658,7 +1660,7 @@ Danach §14.4 (GLM-Familie, Pay-per-use) **mit `--provider zai`** statt der drei
 | `ValueError: extra_body must not set client-owned keys` beim Start | gewollt (T28) — Eintrag versucht `stream`/`max_tokens` per Body zu setzen | — |
 | Smoke `401` bei `opencode_zen` | Key aus `auth.json` statt eigenem API-Key, oder Gratis-Modell nicht per API freigegeben | §15.7 Nr. 25 |
 | Smoke `ModuleNotFoundError: scheduler` | Skript mit System-Python statt venv-Python gestartet | — |
-| `test_every_shipped_provider_is_well_formed` rot nach Qwen-URL-Commit | Workspace-URL ohne `https://` oder mit `/coding/` (Alibaba-Coding-Plan `coding-intl.dashscope…` ist **auch** ein Coding-Endpoint) | — |
+| `test_every_shipped_provider_is_well_formed` rot nach Qwen-URL-Commit | Workspace-URL ohne `https://` oder mit „coding" (Alibaba-Coding-Plan `coding-intl.dashscope…` / `coding.dashscope…` — **gewollt** gefangen, T31) | — |
 
 ### 15.7 Ergänzung §9 (bei Ausführung verifizieren — vollständig; was hier nicht steht, ist selbst geprüft)
 
@@ -1668,6 +1670,7 @@ Danach §14.4 (GLM-Familie, Pay-per-use) **mit `--provider zai`** statt der drei
 24. **Kimi `temperature`**: Doku schweigt; ältere Thinking-Modelle verlangten eine feste Temperatur. Bei `HTTP 400 … temperature` → `send_temperature=False` am Eintrag.
 25. **OpenCode Zen per API**: ob ein eigener Zen-API-Key außerhalb von OpenCode erlaubt ist (Nutzungsbedingungen der Gratis-Modelle) und ob `base_url` `…/inference/openai/v1` ohne weiteren Pfad stimmt (Katalogfeld `api`, nicht Doku). Nikinger prüft vor Stufe 1.
 26. **z.ai Gratis-Modell** `glm-4.7-flash` auf `/paas/v4`: Katalog sagt Preis 0; ob es mit einem Pay-per-use-Key ohne Guthaben antwortet, zeigt der Smoke.
+27. **MiniMax-Key für den Bot** (Nikinger): ist der Abo-/Coding-Plan-Key per OpenAI-Compat-`/v1` für Bot-Nutzung zulässig, oder braucht der Bot einen Pay-per-use-Key? Bis zur Antwort gibt es **keinen** Stufe-2-Smoke für `minimax`.
 
 ### 15.8 Was §15 **nicht** tut
 
