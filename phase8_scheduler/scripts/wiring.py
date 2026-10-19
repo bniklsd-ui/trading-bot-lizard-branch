@@ -100,6 +100,34 @@ def _sampler_due(now: datetime, config: SchedulerConfig) -> bool:
     open_h, open_m = (int(p) for p in config.window_open.split(":"))
     return local >= local.replace(hour=open_h, minute=open_m, second=0, microsecond=0) + timedelta(minutes=40)
 
+
+def _realized_pnl_today(conn: Any, session_date: str) -> float:
+    """Today's P&L for the daily-loss breaker — booked P&L **plus the worst case of every OPEN row**.
+
+    Phase 17 B-6 (T9): a broker-closed trade stays ``status='OPEN'`` with ``profit_loss`` NULL until
+    IG settles (1 h 06 – 1 h 54 measured), which left the breaker blind to a fresh stop-out. Each
+    OPEN row now counts as ``-initial_risk`` (the planned stop loss). An OPEN row without
+    ``initial_risk`` cannot be bounded → raise; ``AutoConfirm`` treats a raising reader as
+    fail-closed (blocks + logs critical).
+
+    Filter ``(profit_loss IS NOT NULL OR status='OPEN')`` excludes rows that lost settlement
+    AND are CLOSED without a recorded close (i.e. the very narrow pre-2026 historical
+    artefact of an orphaned CLOSED row with NULL ``profit_loss``) — they contribute neither
+    booking nor risk; including them would swell the SUM only via the ``-initial_risk``
+    branch, but they have ``status != 'OPEN'`` so they wouldn't, this clause is just an
+    explicit join-condition for the COUNT.
+    """
+    row = conn.execute(
+        "SELECT COALESCE(SUM(CASE WHEN status='OPEN' THEN -initial_risk ELSE profit_loss END), 0.0), "
+        "COALESCE(SUM(status='OPEN' AND initial_risk IS NULL), 0) "
+        "FROM trade_outcomes WHERE session_date = ? AND (profit_loss IS NOT NULL OR status='OPEN')",
+        (session_date,),
+    ).fetchone()
+    if row is not None and row[1]:
+        raise RuntimeError("OPEN trade without initial_risk — the breaker cannot bound today's loss")
+    return float(row[0]) if row is not None else 0.0
+
+
 # --- Runtime data locations (gitignored) ------------------------------------
 # scripts/wiring.py -> scripts/ -> phase8_scheduler/ -> repo root
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -1064,13 +1092,8 @@ def build_scheduler(
     budget = TokenBudget(config, str(_USAGE_LOG), now_fn=_now)
 
     def realized_pnl_today(session_date: str) -> float:
-        """Today's realized P&L from the DB (the daily-loss breaker's source — Contract E)."""
-        row = db.conn.execute(
-            "SELECT COALESCE(SUM(profit_loss), 0.0) FROM trade_outcomes "
-            "WHERE session_date = ? AND profit_loss IS NOT NULL",
-            (session_date,),
-        ).fetchone()
-        return float(row[0]) if row is not None else 0.0
+        """Today's P&L for the daily-loss breaker — wrapped DB reader (Contract E + Phase 17 B-6 worst case)."""
+        return _realized_pnl_today(db.conn, session_date)
 
     auto_confirm = AutoConfirm(config, state_store, config.kill_path, budget, realized_pnl_today)
 
