@@ -82,6 +82,24 @@ def _utc_iso(dt: datetime) -> str:
     dt = dt.astimezone(timezone.utc)
     return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
 
+
+def _sampler_due(now: datetime, config: SchedulerConfig) -> bool:
+    """Phase 17 B-2: sample only inside the trading window and ≥ 40 min after the open.
+
+    Returns False on weekends / before ``window_open + 40min`` / after ``window_close``
+    so the :class:`~data_foundation.heartbeat.DivergenceSampler` does not burn an
+    IG-Bar-Call before the yF-Recorder has caught up (p10/max lag 20.3 min measured
+    2026-10-16, plus yF-Bars and IG-Bars in the same comparison slice). Reuses the
+    :class:`~scheduler.clock.Clock` phase classification so the gate stays in lockstep
+    with the daemon's own open/close semantics — no second source of truth.
+    """
+    from scheduler.clock import Phase
+    if Clock(config, now_fn=lambda: now).classify(now) is not Phase.WINDOW:
+        return False
+    local = now.astimezone(ZoneInfo(config.tz))
+    open_h, open_m = (int(p) for p in config.window_open.split(":"))
+    return local >= local.replace(hour=open_h, minute=open_m, second=0, microsecond=0) + timedelta(minutes=40)
+
 # --- Runtime data locations (gitignored) ------------------------------------
 # scripts/wiring.py -> scripts/ -> phase8_scheduler/ -> repo root
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -1092,7 +1110,7 @@ def build_scheduler(
                 len(report.no_intraday), len(report.mismatch), len(report.unverified),
             )
 
-            if divergence_sampler is not None:
+            if divergence_sampler is not None and _sampler_due(_now(), config):
                 # Same pass, same store connection (Plan §6 Step 6: "aufgerufen aus dem
                 # bestehenden universe_refresher-Slot im selben Pass") — no new runner seam.
                 # DivergenceSampler throttles itself to once/epic/day internally, so this
