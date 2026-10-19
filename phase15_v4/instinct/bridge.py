@@ -19,10 +19,13 @@ Lifecycle (Plan §6 D2.4):
   CLOSE; takes the lessons + rewards snapshot from the DB, asks the extractor,
   inserts proposed rows, validates each, updates status. Wrapped in a single
   try/except — never propagates to the trade path.
-- :meth:`InstinctBridge.promote()` — called once at scheduler start **and**
-  after each close; iterates ``status='validated'`` rows, applies
-  ``promote_eligible``, sets ``status='promoted'``. Returns the new promoted
-  instinct ids (caller logs them).
+- :meth:`InstinctBridge.promote()` — called once at scheduler start; iterates
+  ``status='validated'`` rows, applies ``promote_eligible``, sets
+  ``status='promoted'``. Returns the new promoted instinct ids (caller logs
+  them). **T18 (Phase 17):** a promotion takes effect from the next restart —
+  the executor reads ``exec_cfg`` once at construction, so a promotion run
+  from ``after_trade_closed`` only shows up in ``longterm_rules`` after the
+  next ``run_scheduler``-Start.
 - :meth:`InstinctBridge.load_rules()` — returns the ``compile_rules`` tuple
   for ``ExecutionConfig.longterm_rules``. Empty tuple when no rows are
   promoted (AK9-Erbe — VETO 5 stays an identity function).
@@ -88,11 +91,14 @@ class InstinctBridge:
                 20, Plan §6 D2.4). ``None`` for "no limit".
             rewards_n: how many recent reward rows to feed the extractor
                 (default 20).
-            trades_n: reserved — how many closed trades the validator should
-                consider for evidence/contradiction counting. Today
-                Phase-15-Validator ignores it (uses ``count_closed_trades()``
-                directly); kept for the Phase-15.5 follow-up where the
-                Validator may want a sliding window.
+            trades_n: how many closed trades the validator should consider for
+                evidence/contradiction counting. The validator receives them
+                via ``self.db.get_recent_trades(n=trades_n)`` on every
+                ``after_trade_closed`` call and counts which of the instinct's
+                ``evidence_trade_ids`` / ``contradictions_trade_ids`` resolve to
+                real ``trade_outcomes.id`` rows in that window. Default ``500``
+                (Plan §6 B-3, D3 Nahtfehler 1 — previously reserved / never
+                read, the validator silently fell back to ``[]``).
         """
         self.db = db
         self.extractor = extractor
@@ -130,6 +136,10 @@ class InstinctBridge:
         """
         lessons = self.db.get_recent_lessons(n=self.lessons_n)
         rewards = self.db.get_recent_rewards(n=self.rewards_n)
+        # Phase 17 B-3 (D3 Nahtfehler 1): pass the trades to the validator so it
+        # can count evidence vs. contradictions against real ``trade_outcomes``
+        # rows. ``trades_n`` is no longer reserved — it's the validator's view.
+        trades = self.db.get_recent_trades(n=self.trades_n)
         result = self.extractor.extract(lessons=lessons, rewards=rewards)
         if not getattr(result, "ok", False):
             logger.info(
@@ -143,9 +153,13 @@ class InstinctBridge:
                 row = self._instinct_to_row(instinct)
                 row_id = self.db.insert_instinct(row)
                 # Validator: deterministic, code-only (no LLM, Hard Rule 3).
-                decision = self.validator.validate(instinct)
-                new_status = decision.value if hasattr(decision, "value") else str(decision)
-                self.db.update_instinct_status(int(row_id), new_status)
+                # Phase 17 B-3 (D3 Nahtfehler 2): ``InstinctValidation`` is the
+                # frozen dataclass with ``.decision`` (not the old test-only
+                # ``._D.value`` shim). Reading ``.value`` here would silently
+                # fall back to ``str(decision)`` and break every per-instinct
+                # update once the validator struct shape changes.
+                decision = self.validator.validate(instinct, trades)
+                self.db.update_instinct_status(int(row_id), decision.decision)
             except Exception as exc:  # noqa: BLE001 - per-instinct resilience
                 logger.critical(
                     "instinct.bridge: per-instinct failure for trade_id=%s: %s",
@@ -156,16 +170,25 @@ class InstinctBridge:
     def _instinct_to_row(instinct: Instinct) -> dict:
         """Convert an :class:`Instinct` to a DB-insert row dict.
 
-        Maps the dataclass onto the ``_INSTINCT_COLUMNS` schema. The
-        JSON-serialized tuple fields use a plain ``list`` — Phase 2's
-        ``Database.insert_instinct`` accepts both lists and JSON strings.
+        Maps the dataclass onto the :data:`phase2_persistence.persistence.db
+        ._INSTINCT_COLUMNS` whitelist (10 columns: ``trigger`` /
+        ``domain`` / ``confidence`` / ``evidence_trade_ids_json`` /
+        ``contradictions_trade_ids_json`` / ``status`` / ``created_utc`` /
+        ``validated_utc`` / ``promoted_utc`` / ``archived_utc``). The two
+        ``*_trade_ids`` list fields use the ``_json``-suffixed column names —
+        :meth:`phase2_persistence.persistence.db.Database.insert_instinct`
+        auto-serialises them via its ``json_fields=`` whitelist.
+
+        Phase 17 B-3 (D3 Nahtfehler 3): keys previously lacked ``_json`` and
+        were silently dropped by the column whitelist, leaving the columns
+        ``NULL`` on every insert (29/29 rows in the live DB pre-fix).
         """
         return {
             "trigger": instinct.trigger,
             "domain": instinct.domain,
             "confidence": instinct.confidence,
-            "evidence_trade_ids": list(instinct.evidence_trade_ids),
-            "contradictions_trade_ids": list(instinct.contradictions_trade_ids),
+            "evidence_trade_ids_json": list(instinct.evidence_trade_ids),
+            "contradictions_trade_ids_json": list(instinct.contradictions_trade_ids),
             "status": instinct.status,
         }
 
@@ -174,10 +197,15 @@ class InstinctBridge:
     def promote(self) -> list[int]:
         """Promote validated rows whose evidence gate is open.
 
-        Called once at scheduler start **and** after each close. Iterates
+        Called **once at scheduler start** (Plan §6 B-3 / T18): iterating
         ``status='validated'`` rows, asks ``promote_eligible`` (P10/P12 gate)
         which combines ``enable_instinct_promotion`` + ``n_closed >=
         instinct_n_min``, and sets ``status='promoted'`` on the winners.
+
+        **T18:** a promotion takes effect from the next restart — the
+        executor reads ``exec_cfg`` once at construction, so even though the
+        close-seam re-calls ``promote()`` every cycle, the resulting
+        ``longterm_rules`` are not picked up until the next scheduler start.
 
         Returns the list of newly promoted instinct ids (caller may log them).
         Empty list when the gate stays closed (today: every cycle until

@@ -28,12 +28,13 @@ if _REPO_ROOT not in sys.path:
 
 from instinct.bridge import InstinctBridge  # noqa: E402
 from instinct.models import InstinctConfig  # noqa: E402
+from instinct.validator import InstinctValidation  # noqa: E402
 
 
 class _FakeDB:
     """Minimal DB fake for bridge tests.
 
-    Tracks inserts + status updates + returns canned lessons/rewards/count.
+    Tracks inserts + status updates + returns canned lessons/rewards/trades/count.
     Each method is parameterisable so tests can drive different scenarios
     (empty DB, extractor failure, n-closed-below-gate, etc.).
     """
@@ -43,6 +44,7 @@ class _FakeDB:
         *,
         lessons: list | None = None,
         rewards: list | None = None,
+        trades: list | None = None,
         n_closed: int = 0,
         validated_rows: list | None = None,
         promoted_rows: list | None = None,
@@ -50,6 +52,7 @@ class _FakeDB:
     ) -> None:
         self.lessons = lessons or []
         self.rewards = rewards or []
+        self.trades = trades if trades is not None else []
         self.n_closed = n_closed
         self._validated = validated_rows or []
         self._promoted = promoted_rows or []
@@ -57,6 +60,11 @@ class _FakeDB:
         self.status_updates: list[tuple[int, str]] = []
         self.insert_raises = insert_raises
         self._next_id = 100
+        # Phase 17 B-3 (D3 Nahtfehler 1 — regression): the bridge must call
+        # ``get_recent_trades`` with the configured ``trades_n`` so a future
+        # schema change to ``db.py`` (different default) cannot silently
+        # starve the validator. Tests can assert the recorded ``n`` value.
+        self.trade_calls: list[int] = []
 
     # -- read methods ----------------------------------------------------
     def get_recent_lessons(self, n: int = 20) -> list[dict]:
@@ -64,6 +72,13 @@ class _FakeDB:
 
     def get_recent_rewards(self, n: int = 20) -> list[dict]:
         return list(self.rewards)
+
+    def get_recent_trades(self, n: int = 500) -> list[dict]:
+        # Phase 17 B-3 (D3 Nahtfehler 1): must echo the requested window
+        # size so the test can assert the bridge passes the configured
+        # ``trades_n`` through.
+        self.trade_calls.append(n)
+        return list(self.trades)
 
     def count_closed_trades(self) -> int:
         return self.n_closed
@@ -119,18 +134,26 @@ class _FakeExtractor:
 
 
 class _FakeValidator:
-    """Fake ``InstinctValidator`` — returns ``validated`` for every instinct."""
+    """Fake ``InstinctValidator`` — returns ``validated`` for every instinct.
+
+    Phase 17 B-3 (D3 Nahtfehler 2 — regression): the bridge now reads the real
+    ``InstinctValidation``-Dataclass ``.decision`` attribute. This fake returns
+    the same shape so a future validator struct change must propagate here
+    too — never silently regress to ``._D.value``.
+    """
 
     def __init__(self, decision_value: str = "validated") -> None:
         self._decision = decision_value
-        self.calls: list = []
+        self.calls: list[tuple[Any, list[dict]]] = []
 
-    def validate(self, instinct):
-        self.calls.append(instinct)
-        class _D:
-            def __init__(self, value: str) -> None:
-                self.value = value
-        return _D(self._decision)
+    def validate(self, instinct, trades) -> InstinctValidation:
+        self.calls.append((instinct, list(trades)))
+        return InstinctValidation(
+            decision=self._decision,
+            evidence_count=0,
+            contradiction_count=0,
+            reason="",
+        )
 
 
 # -- after_trade_closed: best-effort + never raises ------------------------
@@ -296,3 +319,147 @@ def test_load_rules_never_raises_on_failure() -> None:
         db=_BrokenDB(), extractor=_FakeExtractor(), validator=_FakeValidator(), cfg=InstinctConfig()
     )
     assert bridge.load_rules() == ()
+
+
+# -- Phase 17 B-3 (D3 Nahtfehler 1 — trades param to validator) ------------
+
+
+def test_after_trade_closed_passes_db_trades_to_validator() -> None:
+    """Bridge must call ``db.get_recent_trades(n=trades_n)`` and feed the
+    result to ``validator.validate(instinct, trades)``.
+
+    Pins Plan §6 B-3 Nahtfehler 1: previously the validator received no
+    ``trades`` argument (the ``trades_n`` parameter was reserved / never read),
+    so evidence-vs-contradiction counting silently fell back to an empty real-
+    id set and every instinct could never be validated.
+    """
+    from instinct.models import Instinct
+
+    canned_trades = [
+        {"id": 11, "epic": "IX.D.DAX.IFMM.IP", "pnl": -50.0},
+        {"id": 12, "epic": "IX.D.DAX.IFMM.IP", "pnl": -25.0},
+        {"id": 13, "epic": "IX.D.DAX.IFMM.IP", "pnl": +10.0},
+    ]
+    db = _FakeDB(trades=canned_trades)
+    instinct = Instinct(
+        trigger="avoid BUY", domain="entry", status="proposed",
+        evidence_trade_ids=(11, 12), contradictions_trade_ids=(),
+    )
+    extractor = _FakeExtractor(ok=True, instincts=[instinct])
+    validator = _FakeValidator(decision_value="validated")
+    bridge = InstinctBridge(
+        db=db, extractor=extractor, validator=validator,
+        cfg=InstinctConfig(), trades_n=500,
+    )
+
+    bridge.after_trade_closed(trade_id=13)
+
+    # Bridge asked the DB for ``trades_n`` rows, and the DB echo confirms it.
+    assert db.trade_calls == [500]
+    # Validator saw both the instinct AND the trade list in the same call.
+    assert len(validator.calls) == 1
+    seen_instinct, seen_trades = validator.calls[0]
+    assert seen_instinct is instinct
+    assert seen_trades == canned_trades
+    # And the row was advanced to 'validated' (not 'proposed' left behind).
+    assert db.status_updates == [(101, "validated")]
+
+
+def test_bridge_contract_real_database_and_validator(tmp_path) -> None:
+    """End-to-end contract: real ``persistence.Database`` + real
+    ``InstinctValidator`` + the Bridge — one test catches all three
+    D3-Nahtfehler at once (Plan §6 B-3).
+
+    Setup: real migrations-applied SQLite, three ``CLOSED``-status trades
+    inserted via ``Database.insert_trade``, a fake extractor that returns
+    one Instinct whose ``evidence_trade_ids`` points at trades 1+2+3 and
+    whose domain is ``entry``. Then ``bridge.after_trade_closed(3)``.
+
+    Expectation (catches all three Nahtfehler):
+    1. The row inserted lands in ``instincts`` (validator contract honoured).
+    2. ``status == 'validated'`` and ``validated_utc`` is set (validator was
+       actually consulted with trades, evidence_count=3 >= MIN_EVIDENCE).
+    3. ``evidence_trade_ids_json`` is **not** NULL — it's the JSON serialisation
+       of ``[1, 2, 3]`` (key suffix ``_json``, not the pre-fix ``evidence_trade_ids``).
+
+    If any of the three Nahtfehler returns, at least one of these assertions
+    fails loudly:
+    - Nahtfehler 1 (trades not passed): evidence_count would be 0 < MIN_EVIDENCE,
+      validator would return ``'proposed'``, status update would be a no-op
+      (update_instinct_status on a 'proposed' row still touches ``status``).
+    - Nahtfehler 2 (``.value`` instead of ``.decision``): ``decision.value``
+      raises ``AttributeError`` because ``InstinctValidation`` only exposes
+      ``.decision``, so the per-instinct ``except`` swallows the failure and
+      no status transition happens → ``status == 'proposed'``.
+    - Nahtfehler 3 (keys without ``_json``): the ``_INSTINCT_COLUMNS`` whitelist
+      silently drops the data → ``evidence_trade_ids_json IS NULL``.
+    """
+    import json
+
+    from persistence.db import Database
+
+    from instinct.models import Instinct
+    from instinct.validator import InstinctValidator
+
+    db = Database(str(tmp_path / "bridge_contract.sqlite"))
+    try:
+        db.run_migrations()
+        # Three CLOSED trades — the validator's real-id set.
+        for tid, deal_id in [(1, "DI1"), (2, "DI2"), (3, "DI3")]:
+            db.insert_trade({
+                "deal_id": deal_id,
+                "epic": "IX.D.DAX.IFMM.IP",
+                "direction": "BUY",
+                "size": 1.0,
+                "open_level": 18000.0,
+                "currency": "EUR",
+                "open_ts": "2026-08-19T09:00:00.000Z",
+                "session_date": "2026-08-19",
+                "status": "CLOSED",
+                "close_ts": "2026-08-19T11:00:00.000Z",
+                "close_level": 18005.0,
+                "profit_loss": -50.0,
+            })
+
+        # Fake extractor — emits one instinct pointing at trades 1, 2, 3.
+        class _ContractExtractor:
+            def extract(self, *, lessons, rewards):
+                return _FakeInstinctExtractionResult(
+                    ok=True,
+                    instincts=[Instinct(
+                        trigger="avoid BUY", domain="entry", status="proposed",
+                        evidence_trade_ids=(1, 2, 3), contradictions_trade_ids=(),
+                    )],
+                )
+
+        # Real validator (catches Nahtfehler 1 — only validates when
+        # evidence_count >= MIN_EVIDENCE, which requires trades to be passed).
+        bridge = InstinctBridge(
+            db=db,
+            extractor=_ContractExtractor(),
+            validator=InstinctValidator(),  # min_evidence default = 3
+            cfg=InstinctConfig(),
+            trades_n=500,
+        )
+        bridge.after_trade_closed(trade_id=3)
+
+        rows = db.list_instincts()
+        assert len(rows) == 1, f"expected 1 instinct row, got {len(rows)}"
+        row = rows[0]
+        # Nahtfehler 3 (key suffix): the column is non-NULL and parses to [1,2,3].
+        assert row["evidence_trade_ids_json"] is not None, (
+            "evidence_trade_ids_json is NULL — key suffix still wrong (D3 #3)"
+        )
+        assert json.loads(row["evidence_trade_ids_json"]) == [1, 2, 3]
+        assert row["contradictions_trade_ids_json"] is not None
+        assert json.loads(row["contradictions_trade_ids_json"]) == []
+        # Nahtfehler 1+2: validator was called with trades and returned the
+        # real ``.decision`` attribute → status is 'validated', validated_utc
+        # stamped by ``Database.update_instinct_status``.
+        assert row["status"] == "validated", (
+            f"expected 'validated', got {row['status']!r} — "
+            "validator was not called (D3 #1) or .value fallback used (D3 #2)"
+        )
+        assert row["validated_utc"], "validated_utc was not stamped"
+    finally:
+        db.close()
