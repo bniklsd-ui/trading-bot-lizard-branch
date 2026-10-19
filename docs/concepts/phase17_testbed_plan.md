@@ -1515,7 +1515,7 @@ Die P8-Schwellen der einzelnen Steps in §6 ab C-1 verschieben sich um +1.
 |---|---|---|---|---|---|---|---|---|
 | `anthropic` | — (SDK) | `tradingbot` (unverändert) | — | — | — | live seit P4 | — | ✅ |
 | `zai` | `https://api.z.ai/api/paas/v4` (§14) | `trading-bot-zai-bot` / `api_key` | `max_tokens` | `True` (Range 0–1, 0,2 ok) | `{}` — **thinking default an** | docs.z.ai/api-reference/llm/chat-completion: `json_object` ja, `thinking.type` enabled/disabled | — | §14.4 + Gratis `glm-4.7-flash` |
-| `minimax` | `https://api.minimax.io/v1` (Plan C-1) | `trading-bot-minimax-bot` / `api_key` | `max_tokens` | `True` | `{}` | **nicht abgerufen** → §15.7 Nr. 21 | `opencode_zen` `minimax-m3.1-flash-free` | nur mit einem **Pay-per-use-Key**. Ob der Abo-/Coding-Plan-Key für Bot-Nutzung zulässig ist, ist eine **Nikinger-Entscheidung** (§15.7 Nr. 27). T31 sieht das nicht, weil die URL unverdächtig ist |
+| `minimax` | `https://api.minimax.io/v1` (Plan C-1) | `trading-bot-minimax-bot` / `api_key` | `max_tokens` | `True` | `{}` | **nicht abgerufen** → §15.7 Nr. 21 | `opencode_zen` `minimax-m3.1-flash-free` | ✅ mit dem Abo-Key in `trading-bot-minimax-bot` (Nikinger 2026-10-19, §15.7 Nr. 27; gültig bis 2026-11-15) |
 | `openai` | `https://api.openai.com/v1` | `trading-bot-openai-bot` / `api_key` | **`max_completion_tokens`** | **`False`** | `{}` | platform.openai.com 403 für WebFetch; belegt über Microsoft-Foundry-Doku „GPT-5 … use `max_completion_tokens` … don't support temperature" → §15.7 Nr. 22 | — (kein Gratis-Modell) | wenn Key |
 | `deepseek` | `https://api.deepseek.com` | `trading-bot-deepseek-bot` / `api_key` | `max_tokens` | `True` (im Thinking-Modus wirkungslos) | `{}` — **thinking default an** | api-docs.deepseek.com/api/create-chat-completion: `json_object` ja, `thinking.type`, `reasoning_content` | `opencode_zen` `deepseek-v4.1-flash-free` | wenn Key |
 | `qwen` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` | `trading-bot-qwen-bot` / `api_key` | `max_tokens` | `True` | `{}` — Qwen3.5+ **thinking default an**, `enable_thinking` nur via Body | alibabacloud …/compatibility-of-openai-with-dashscope zeigt **workspace-spezifische** URLs `https://{WorkspaceId}.<region>.maas.aliyuncs.com/compatible-mode/v1` → §15.7 Nr. 23 | — | wenn Key **und** URL aus der Konsole |
@@ -1627,7 +1627,7 @@ Zusätzlich zu C-3 Punkt 1–3 (und §14):
 **Stufe 1 — Familien-Smoke, Gratis-Modelle (Kosten 0 €; IDs = Katalog 2026-10-19, vor dem Lauf in `~/.cache/opencode/models.json` gegenprüfen — Gratis-IDs rotieren):**
 ```bash
 S=phase4_research/scripts/openrouter_smoke.py; PY=phase1_broker_wrapper/.venv/bin/python
-for m in deepseek-v4.1-flash-free minimax-m3.1-flash-free glm-4.7-free; do
+for m in deepseek-v4.1-flash-free minimax-m3.1-flash-free glm-5.3-flash-free; do   # glm: Katalog 2026-10-19 sagt glm-4.7-free, Zen-Doku nennt GLM-5.3-Flash Free — die vorhandene ID nehmen
   $PY $S --provider opencode_zen --model "$m" --max-tokens 4096 --timeout-s 90 --show-raw; done
 $PY $S --provider openrouter --model minimax/minimax-m3.1-flash:free --max-tokens 4096 --timeout-s 90 --show-raw
 $PY $S --provider zai --model glm-4.7-flash --max-tokens 4096 --timeout-s 90 --show-raw   # z.ai Gratis-Modell, nativer Endpoint
@@ -1668,9 +1668,9 @@ Danach §14.4 (GLM-Familie, Pay-per-use) **mit `--provider zai`** statt der drei
 22. **OpenAI**: `platform.openai.com` lieferte WebFetch **403**. Beleg nur indirekt (Microsoft-Foundry-Reasoning-Doku). Ob `json_object` auf der GPT-5-Linie mit Chat Completions geht → Stufe-2-Smoke.
 23. **Qwen `base_url`**: die Doku zeigt 2026-10-19 nur noch workspace-spezifische Hosts; ob `dashscope-intl.aliyuncs.com/compatible-mode/v1` noch antwortet, ist ungeprüft. Ob `json_object` bei Denk-Modus-Modellen geht: Doku schweigt.
 24. **Kimi `temperature`**: Doku schweigt; ältere Thinking-Modelle verlangten eine feste Temperatur. Bei `HTTP 400 … temperature` → `send_temperature=False` am Eintrag.
-25. **OpenCode Zen per API**: ob ein eigener Zen-API-Key außerhalb von OpenCode erlaubt ist (Nutzungsbedingungen der Gratis-Modelle) und ob `base_url` `…/inference/openai/v1` ohne weiteren Pfad stimmt (Katalogfeld `api`, nicht Doku). Nikinger prüft vor Stufe 1.
+25. ✅ **Geklärt 2026-10-19 (Doku [opencode.ai/docs/zen](https://opencode.ai/docs/zen/)):** Der Zen-API-Key ist ausdrücklich für direkte Aufrufe außerhalb von OpenCode gedacht („for applications calling the endpoints directly"). Endpoint `https://opencode.ai/inference/openai/v1/chat/completions` bestätigt. Datenpolitik der Gratis-Modelle: **GLM-5.3-Flash Free** und **DeepSeek V4.1 Flash Free** = zero retention, kein Training; MiMo/Exo u. a. = Daten können zur Modellverbesserung genutzt werden. Der Smoke-Prompt ist synthetisch (`_smoke_context`, keine Konto-/Positionsdaten), also unkritisch. Laut Doku-Liste heißt das GLM-Gratis-Modell evtl. `glm-5.3-flash-free` statt `glm-4.7-free` → ID vor dem Lauf im Katalog prüfen
 26. **z.ai Gratis-Modell** `glm-4.7-flash` auf `/paas/v4`: Katalog sagt Preis 0; ob es mit einem Pay-per-use-Key ohne Guthaben antwortet, zeigt der Smoke.
-27. **MiniMax-Key für den Bot** (Nikinger): ist der Abo-/Coding-Plan-Key per OpenAI-Compat-`/v1` für Bot-Nutzung zulässig, oder braucht der Bot einen Pay-per-use-Key? Bis zur Antwort gibt es **keinen** Stufe-2-Smoke für `minimax`.
+27. ✅ **Entschieden 2026-10-19 (Nikinger):** Der MiniMax-Abo-Key ist vorhanden und funktioniert. Er wird für den Bot in den **eigenen** Namespace `trading-bot-minimax-bot` / `api_key` geseedet (gleicher Wert, getrennter Eintrag; der Dev-Key `trading-bot-minimax` bleibt unberührt, T6-Isolationsmuster). Das deckt sich mit dem ursprünglichen T6 („Das Abo-Kontingent deckt API-Nutzung"). Stufe-2-Smoke `minimax` ist damit freigegeben. **Ablauf:** der MiniMax-Endpoint gilt bis **2026-11-15** (§14). Danach muss jedes Profil, das `minimax` nutzt, zurückgeflippt werden
 
 ### 15.8 Was §15 **nicht** tut
 
