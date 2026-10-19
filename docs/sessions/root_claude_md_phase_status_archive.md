@@ -393,3 +393,104 @@ nicht profit-validiert** (2026-06-09)
   SDK, `PRICE`-Feed) — CONOK/SUBOK + Live-Ticks bestätigt am 2026-05-21; Polling-Client
   bleibt als Fallback → Notes: `phase1_broker_wrapper/lightstreamer_integration_notes.md`
 - IG Europe GmbH Live-Account noch ausstehend (vor Production-Go-Live kritisch)
+
+---
+
+## Doku-Hygiene 2026-10-19 (Phase-17 A-3): Banner-Blöcke aus root `CLAUDE.md` rotiert
+
+> Im Zuge des Phase-17 A-3 Code↔.md-Sweeps (Plan §A-3) wurden vier Banner-Blöcke **wortgleich, unverändert** aus root `CLAUDE.md` in dieses Archiv rotiert. Auditability-Regel: selbe Disziplin wie der ursprüngliche 2026-07-03-Push (📦 Doku-Hygiene-Block oben) und die `SESSIONS_ARCHIVE.md`-Rotation in jeder Phasen-`CLAUDE.md`. Root `CLAUDE.md` trägt jetzt eine kurze Verweis-Zeile (`> ⟳ Doc-Rotation 2026-10-19 (Phase-17 A-3): ...`) auf diesen Archiv-Abschnitt statt der vollen Banner-Texte; die Tabelle der Phasenköpfe ist auf eine Zeile pro Phase gekürzt (siehe Plan §A-3: AK = root `CLAUDE.md` < 25 000 B).
+
+### Banner 1: Phase 16 (Freischaltung) ERÖFFNET (alt, 2026-09-05, Fable-5.1-Plan-Session)
+
+```
+> **🔄 2026-09-05 — Phase 16 (Freischaltung) ERÖFFNET (Plan-Session, Fable 5.1).** Plan
+> [`docs/concepts/phase16_activation_plan.md`](./docs/concepts/phase16_activation_plan.md),
+> Phasenkopf [`phase16_activation/CLAUDE.md`](./phase16_activation/CLAUDE.md). Neun selbst
+> gemessene Löcher, drei davon legen den Bot heute lahm: **100 % Research-Abstain seit 08-31**
+> (Trade-Historie ohne Zeitfenster), **Token-Budget täglich um 15:48 leer**, **Live-DB Schema v7 —
+> Migrations 008/009 nie angewendet** (kein Produktions-Caller von `run_migrations()`; die
+> „automatisch beim Restart"-Aussage im Absatz darunter ist **falsch**, Korrektur folgt in Plan
+> Step A-3). Blöcke A Haushalt · B Substrat · C Research-Loop · D Freischaltung (alle vier Arme
+> Default ON, Bridge, B3) · E vorregistrierter 2-Wochen-Autonomie-Test. Cross-Phase frei:
+> P1/2/3/4/5/7/8/9/15 (P3 seit Runde 2). Exec-Modell: OpenCode / MiniMax M3.
+```
+
+### Banner 2: Phase 15 (V4) ABGESCHLOSSEN (2026-09-05, Session #13, MiniMax-M3-Exec)
+
+```
+> **✅ 2026-09-05 — Phase 15 (V4) ABGESCHLOSSEN (Session #13, MiniMax-M3-Exec).** Phase 15 (V4) ist
+> seit Session #13 mit Closeout-Handover abgeschlossen ([`phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md`](./phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md),
+> Bild [`docs/architecture/phase15_closeout.svg`](./docs/architecture/phase15_closeout.svg)).
+> Alle 4 Blöcke ✅: A (Haushalt) endgültig (A-1..A-7 + P15-F) · B (Reward-Kalibrierung)
+> **live-validiert** (Score 78,72 → 50,00 live 2026-09-03, AK5+AK6+AK13 grün) · C (Instinct-ECC)
+> code-complete (C1 Migration 009 + C2 5 Module + C3 VETO 5 + C4 12 Tests, AK7+AK8+AK9 grün, heute
+> bit-identical via leere `longterm_rules`) · D (Erbstücke) endgültig (D-1..D-3 + Folgefix
+> Variante C). Σ **1843 grün repo-weit** (selbst nachgemessen 2026-09-05). **18 Commits gepusht**
+> (Sessions #1-#9), **6 Commits lokal ahead** (Sessions #10-#13, Push-Freigabe steht aus). **Offen
+> (alle nicht-Phase-15-Blocker, delegiert an Folge-Sessions):** (1) **Promotion-Bridge** — die
+> Pipeline `list_instincts('validated')` → `promote_eligible` → `config.longterm_rules` existiert
+> nicht (Plan §10 out-of-scope); (2) **Ledger-Restore** — 250 fälschlich gebuchte Rescue-Punkte
+> aus dem 2026-09-03-Pfad-A-Scharfschaltungs-Bug-Lauf (`DELETE FROM source_spend WHERE
+> kind='rescue'`, Nikinger-Aktion); (3) **Gate P7/A6** — Phase-12-Reconcile-Timing-Live-Verify
+> wartet auf nächsten OPEN-Trade + 24 h (Backoff replay-verifiziert Mini-Session 26); (4)
+> **Live-DB Migration 008+009** — **nicht automatisch**: kein Produktions-Caller von
+> `run_migrations()` (korrigiert 2026-09-05, Phase-16-Plan §3 L3); Phase 16 B1 verdrahtet
+> den Aufruf **nicht** im Daemon, sondern als **Schema-Floor** im Preflight (B1) +
+> einmaligen Operator-Apply mit Backup (B2). Schema heute v7.
+```
+
+### Banner 3: Korrekturhinweis 2026-09-08 (Phase 16 Exec-Session #23, Doc-Drift-Repair)
+
+```
+> 🟡 **Korrekturhinweis 2026-09-08 (Phase 16 Exec-Session #23, Doc-Drift-Repair):** drei
+> Aussagen in den Phase-15-Offen-Items (Ledger-Restore 250 Punkte, Schema v7, 6 Commits
+> pending Push) sind heute **positiv überholt** — Code/Repo/Git sind weiter als diese
+> Status-Prosa. Belegt am 2026-09-08, in einer Mini-Session speziell zur Drift-Reparatur
+> zusammengeführt (Working-style-Regel: *„Tested code > concept doc > README/status
+> prose"*). Details siehe Phase-15-Closeout-Handover-Korrekturhinweis 2026-09-08
+> (gleicher Tag, mit Quellen) + Phase-16-Session-#23-Block im aktiven Phasenkopf.
+>
+> - **D1 — Schema heute v9, nicht v7.** `SELECT MAX(version) FROM _schema_version` = 9.
+>   `data/trading_bot.sqlite.instincts`-Tabelle existiert (0 Rows, `n_closed=8 <
+>   instinct_n_min=50`). Backup `data/trading_bot.sqlite.bak-20260905-pre-mig009` (3,3 MB,
+>   2026-09-05 20:28) ist die Pre-Migration-Rückfall-Option. Operator-Apply lief in
+>   Phase-16-Session #3 (2026-09-05, Block B2). Die Phase-16-A-3-Korrektur (eine Zeile
+>   höher) bleibt korrekt — es gibt **keinen** automatischen Apply im Daemon, der Apply
+>   lief als Operator-Aktion.
+> - **D2 — Ledger-Restore 250 Punkte erledigt.** `SELECT COUNT(*), SUM(points) FROM
+>   source_spend WHERE kind='rescue'` = `0|0` (war `5|250`). Operator-Aktion ausgeführt
+>   zwischen Phase-15-Closeout und 2026-09-08.
+> - **D3 — Push-Freigabe 6 Commits erteilt.** `git rev-list --left-right --count
+>   origin/main...HEAD` = `0 0`, `origin/main = 20a10c1` = HEAD, working tree clean.
+>   Alle 6 Commits der Phase-16-Session #22 wurden vom Nikinger gepusht.
+>
+> **Bilanz:** Phase 15 bleibt ✅ abgeschlossen. Promotion-Bridge (Phase 16 D2 in Commit
+> `bfab841` + Hotfixes #1–#3 in Sessions #14–#16) und Gate P7/A6 (Phase-12-Reconcile-
+> Timing, wartet auf nächsten OPEN-Trade) sind die einzigen verbleibenden Phase-15-Folge-
+> Punkte. Working-Style-Regel: *„On conflict, trust the code, fix the doc immediately,
+> and leave a dated note in the doc that it was corrected against code"* — exakt das
+> wurde hier umgesetzt; Phase-15-Handover + Phase-15-Phasenkopf + Phase-16-Phasenkopf
+> tragen jetzt analoge datierte 🟡-Vermerke.
+```
+
+### Banner 4: Phase 13 + Phase 14 ABGESCHLOSSEN (2026-08-31, Sessions 18 + 23)
+
+```
+> ✅ **2026-08-31 — Phase 13 + Phase 14 ABGESCHLOSSEN (Sessions 18 + 23).** Phase 13
+> (Live-Datenfundament): Code-complete (Blöcke A + B + C) + Beweiswoche ausgewertet
+> (Mini-Session 23, 14-Tage-source_delta-Diagnose, B1/B2/B3) + Pfad-C-Entscheidung
+> (Mini-Session 24, IG = S4-GapRescue-Pfad Default AUS, by-design) + Befund-Inversion
+> (kein Recorder-Mapping-Bug, Architektur-konform). Phase 14 (Discovery-Then-Deterministic):
+> Code-complete (Blöcke 0/A/B/C/D) + Akzeptanz A1–A8 alle grün seit Session 9
+> (2026-08-22) + D5-Handover komplett freigegeben (Mini-Session 24, Pfad-C-Entscheidung) +
+> 4 Mini-Pläne P14-C/D/E/F abgeschlossen (Doc-Rotation-Hook `--strict` als Default,
+> ARM-Pfad absolut, Daemon-Signal-Cap, Recorder-Sleep-Cap). **Beide Phasen haben formale
+> Closeout-Handover-Dateien** (Phase-13: [`phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md`](./phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md),
+> Session 18; Phase-14: [`phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md`](./phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md),
+> Session 23). **Nächster Track = Phase 15 (V4: Council / Handover / Reward-Reform /
+> Force-Trigger / Instinct-ECC)** — Material jetzt vollständig (7+ V4-Kandidaten),
+> eigenständige Plan-Session. **Aktiver Live-Effekt:** Phase-7-Backoff (Mini-Session 26,
+> 4 von 4 Backoff-Tests A2–A5 grün, Pre-Test bestätigt) wartet auf nächsten OPEN-Trade
+> (heute 0 OPEN) für A6-Live-Verify (≤ 5 CRITICALs in 24 h statt 6+ in 52 min).
+```
+

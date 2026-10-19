@@ -1,13 +1,13 @@
 ---
 status: live
-purpose: Phase 9–15 build plan + compact summary of closed phases 1–8 (links to ROADMAP_ARCHIVE.md)
+purpose: Phase 15–17 build plan + compact summary of phases 1–14 (links to ROADMAP_ARCHIVE.md)
 read-when: planning a phase transition or checking what an active phase covers — closed phases live in ROADMAP_ARCHIVE.md
 detail: L2
 up: CLAUDE.md
 down:
   - docs/concepts/          # one snapshot concept/plan per phase
   - ROADMAP_ARCHIVE.md      # 📦 Phases 1–8 verbatim archive (closed, A-5 2026-08-31)
-updated: 2026-09-05
+updated: 2026-10-19 (A-3 sweep — Phasen 9–14 nach ROADMAP_ARCHIVE.md rotiert + 6 Summary-Zeilen ergänzt + neuer Phase-17-Abschnitt; ROADMAP.md < 40 000 B)
 ---
 # Roadmap
 
@@ -31,13 +31,9 @@ testable and stable. No skipping ahead.
 
 ---
 
-## Abgeschlossene Phasen (1–8) → [ROADMAP_ARCHIVE.md](./ROADMAP_ARCHIVE.md)
+## Phasen 1–14 → [ROADMAP_ARCHIVE.md](./ROADMAP_ARCHIVE.md) (archiviert; 9 formal offen, 11 deferred)
 
-Alle Phasen 1–8 sind seit 2026-07-03 abgeschlossen + live-verifiziert. Die detaillierten
-Per-Phase-Beschreibungen (Goal, Done-When, Mission, Status, Hotfix-Tracks, Concept-Links,
-v1.5/v1.6/v1.7-Arc) sind **verbatim** in [`ROADMAP_ARCHIVE.md`](./ROADMAP_ARCHIVE.md)
-archiviert (Rotation 2026-08-31, Phase-15 A-5; Auditability-Regel: wortgleich, unverändert
-— selbe Regel wie bei `docs/sessions/root_claude_md_phase_status_archive.md`).
+Die Phasen 1–14 sind seit 2026-08-31 (Phase-15-A-5, für Phasen 1–8) bzw. 2026-10-19 (Phase-17-A-3, für Phasen 9–14) im Archiv-Pfad der `ROADMAP.md` zusammengefasst. **Phase 9** ist **formell noch offen** (Code produktiv seit 2026-07-06, kein formaler Closeout — Nikinger-Entscheidung §10 des Phase-17-Plans); **Phase 11** ist 🛑 **DEFERRED** (Notbremse 2026-08-11, Datenfundament hat Vorrang). Die detaillierten Per-Phase-Beschreibungen (Goal, Done-When, Mission, Status, Hotfix-Tracks, Concept-Links, v1.5/v1.6/v1.7-Arc) sind **verbatim** in [`ROADMAP_ARCHIVE.md`](./ROADMAP_ARCHIVE.md) archiviert (Rotation 2026-10-19 für Phasen 9–14, 2026-08-31 für Phasen 1–8; Auditability-Regel: wortgleich, unverändert — selbe Regel wie bei `docs/sessions/root_claude_md_phase_status_archive.md`).
 
 | Phase | Goal (Kurzform) | Stand |
 |---|---|---|
@@ -49,386 +45,15 @@ archiviert (Rotation 2026-08-31, Phase-15 A-5; Auditability-Regel: wortgleich, u
 | 6 — Bull/Bear/Judge Debate | Adversarial early-stop debate; AI nur Bull/Bear + Judge | ✅ live-verifiziert (2026-06-16) |
 | 7 — Reward/Brain | Prozess-bewusster Score + Lessons + observe-only Confidence | ✅ live-verifiziert (2026-06-26, gepusht) |
 | 8 — Scheduler | Autonome Demo-Trade-Generierung + Safety-Breaker | ✅ live-verifiziert (2026-07-03) — zwei autonome Trades + ein auslösender Safety-Breaker (Token-Budget) |
+| 9 — V2: Foundation | Autonome Epic-Research (DB-Picks) + Daten-Input-Zuverlässigkeit | 🔄 in Arbeit seit 2026-07-07 — Code produktiv, formeller Closeout ausstehend (Nikinger) |
+| 10 — V3: Persistenz-Reform + No-Trade-Lessons | Migration 005, `abstain_lessons/`, Paper-Trades | ✅ abgeschlossen Closeout 2026-08-25 (Σ 1698, 25 phase10_v3-Commits auf main) |
+| 11 — V3-Fortsetzung: Funnel-/Mess-Fixes | Aus der zweiten Datenwoche-Review | 🛑 DEFERRED (Notbremse 2026-08-11) — drei Datenwochen an drei Infrastruktur-Ausfällen gescheitert |
+| 12 — Datenfundament | Registry + BarService + Bar-Archiv + Recorder | ✅ abgeschlossen Closeout 2026-08-25 (Σ 1698, 143 Tests; P12.5 CLOSED + GESCHEITERT) |
+| 13 — Live-Datenfundament | 4-stufige Beschaffung (LS → yF → Fremdquelle → IG-Rettung) | ✅ abgeschlossen Closeout 2026-08-31 Session 18 (Σ 1703, 74 Tests) |
+| 14 — Discovery-Then-Deterministic | `instrument_source_availability` + autonomer Daemon | ✅ abgeschlossen Closeout 2026-08-31 Session 23 (Σ 1703, 61 Tests, D5 freigegeben) |
 
-**Volle Phase-Beschreibungen:** [`ROADMAP_ARCHIVE.md`](./ROADMAP_ARCHIVE.md) (~22 KB, alle
-Done-When-Checkboxen, Missions, Hotfix-Tracks, Concept-Links verbatim).
+**Volle Phase-Beschreibungen:** [`ROADMAP_ARCHIVE.md`](./ROADMAP_ARCHIVE.md).
 
----
-
-## Phase 9 — V2: Foundation (Autonome Epic-Research + Daten-Input-Zuverlässigkeit)
-
-> **Status: in Arbeit (Stand 2026-07-07; gekürzt 2026-09-05, Phase-16-Plan-Session — Wortlaut
-> bis dahin in `git log -p ROADMAP.md`).** Steps 1–6 + 7a gebaut (7b ohne Fix-Target);
-> Live-Baseline-Lauf seit 2026-07-06, Tag 1 end-to-end bewiesen, erster DB-Universum-Pick (CAC).
-> Offen: V2-Baseline-Auswertung (echter `open→close`-Trade unter V2 + Variety-These) — seit
-> 2026-07-02 acht autonome Trades (id 4–11 CLOSED, davon 4 seit 08-25) und damit faktisch erbracht; `--enable-ig-bars`
-> durch Phase-12 `enable_bar_service` abgelöst. Handover:
-> [`phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md`](./phase9_universe/PHASE9_V2_LIVE_RESULTS_HANDOVER.md) ·
-> Plan: [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md) ·
-> Phase-Head: [`phase9_universe/CLAUDE.md`](./phase9_universe/CLAUDE.md).
-
-**Goal:** die zwei strukturellen Lücken schließen, die den gesamten v1.5→v1.7-Hotfix-Arc
-getrieben haben — bevor weitere sophisticated-AI-Arbeit (die alte Phase 9, jetzt Phase 15/V4)
-auf einem unzuverlässigen Datenfundament aufbaut.
-
-> **Korrektur (2026-07-08, M1-Housekeeping):** die Checkliste unten stand noch auf `[ ]`,
-> obwohl der Status-Block oben + `phase9_universe/CLAUDE.md`s Kontrakt-Tabelle Steps 1–6 + 7a
-> längst als ✅ führen — gegen den Code verifiziert (`universe/{discovery,pricing,promotion,
-> store,models}.py` existieren, `phase2_persistence/migrations/004_phase9_instrument_universe.sql`
-> existiert). Getestetes Verhalten schlägt Doku-Prosa (Working-style-Regel); Boxen unten korrigiert.
-
-### 9a — Autonome Epic-Research (discover → validate → promote)
-- [x] `discovery.py` — Seed-Suchbegriff-Sweep + IG `search_markets` + Code-Filter (EUR, Index-CFD,
-  TRADEABLE, Kassa-Variante, min size) — kein LLM
-- [x] `pricing.py` — deterministischer `point_value`-Resolver (IG-Felder + Namens-/lot_size-Kreuzcheck)
-- [x] `promotion.py` — Statusmaschine `discovered → verified → active` voll autonom auf Demo;
-  Auto-Demotion (`active → quarantined`) bei wiederholten IG-Verify-Fails
-- [x] Migration 004 (`instrument_universe`) + `UniverseStore`; `EXTENDED_UNIVERSE` wird einmaliger
-  Seed (`source="curated"`)
-- [x] P4 liest das aktive DB-Universum; P8-Runner bekommt eine Universe-Refresh-Naht
-
-### 9b — Daten-Input-Zuverlässigkeit
-- [x] `BarProvider`-Kette IG→yFinance + yFinance-Härtung (Backoff, Circuit-Breaker)
-- [x] Deterministischer Divergenz-Check (IG-Bar-Close vs. yFinance-Last), gated nichts
-- [x] Lightstreamer-Multi-Epic-Diagnose (7a, live 2026-07-06) — **NEGATIV-Befund**, kein Bug,
-  kein Fix-Target (7b unblocked-aber-leer)
-- [ ] ~~`LiveQuoteCache` in den P4-Research-Kontext verdrahtet~~ — *gegenstandslos (korrigiert
-  2026-09-05, Phase 16 A-3): `LiveQuoteCache` existiert nicht im Repo (0 Treffer);
-  der Bedarf ist durch Phase-12-`BarService.get_window` + Phase-13 LS-Tick-Aggregation
-  strukturell abgelöst*
-
-**Leitplanke:** kein neues AI im Daten-/Universum-Layer (Discovery-/Promotion-Kriterien sind
-100 % code-evaluiert); VETOs/Gates unangetastet; demo-only fail-closed.
-
-**Done when:** mindestens ein net-new Epic durchläuft `discovered → verified → active` ohne
-manuellen Code-Edit und erscheint im nächsten Research-Zyklus; ein Safety-Breaker feuert live
-(carried-over 5b aus dem v1.5-Plan); STXE/CAC/IBEX-`point_value` wird per Code bestätigt oder
-ehrlich quarantänisiert.
-
-**Directory:** `phase9_universe/` *(pkg `universe`)*
-**Plan:** [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md)
-
----
-
-## Phase 10 — V3: Persistenz-Reform + No-Trade-Lessons + (optionales) UI
-
-> **Status: ✅ abgeschlossen (Closeout 2026-08-25) — Block A ✅ live auf main seit WE 1
-> (2026-07-11, Montag-Restart-Beweis 2026-07-14) + Block B ✅ live auf main seit WE 2
-> (2026-07-17) + Bugfix-Block 2026-07-25/31/08-08 + H1 (1 Woche gelaufen) + H4-a.**
-> **Council-Paper-Call ✅ gebaut, default `False`, bis auf weiteres in mind Phase 15**
-> (Nikinger 2026-08-25). Phase-11-Inhalte (WI-2/W2, H3/H5/H7, B3-Margin-Headroom) bleiben
-> offen und gehören in den Datenfundament-Track (Phase 12/13/14) — dort dokumentiert,
-> nicht hier. Ausführungsreifer Plan lag
-> vor: [`docs/concepts/phase10_v3_plan.md`](./docs/concepts/phase10_v3_plan.md) (Decisions
-> V3-D1…D10, Steps 0–11); Kickoff-Kontext:
-> [`docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md`](./docs/concepts/PHASE10_V3_KICKOFF_HANDOVER.md).
-> Phase head: [`phase10_v3/CLAUDE.md`](./phase10_v3/CLAUDE.md). Block C (UI) ist explizit
-> **nicht** Teil dieses Plans (geparkt, Plan §13) — Abschnitt 10c unten bleibt daher offen.
-> ⚠ **2026-07-17 Doku-Fix (code = source of truth):** die 10a/10b-Bullets unten waren seit der
-> ursprünglichen Phase-9-Formulierung nicht mehr aktualisiert worden — as-built ist stärker
-> (echte `abstain_records`-Taxonomie mit 12 Reasons statt nur der 3 genannten, + eine
-> Both-Sides-Shadow-Paper-Pipeline, die im ursprünglichen Text gar nicht vorkam). Bullets unten
-> auf den echten Baustand geflippt.
-
-**Goal:** die aktuellen SQLite-V2-Erweiterungen bauen + „warum tradet der Bot nicht" zu einem
-lernbaren Signal machen, nicht nur einem verworfenen Reason-Code.
-
-### 10a — SQLite V2 Extensions
-- [x] `+ market_regime_snapshots` — Migration 005 (epic-scoped, DROP+CREATE über den
-  FK-inkompatiblen P2-Platzhalter), Writer live seit Block B (`market_context/writer.py`);
-  observe-only `regime_tag`, degradiert auf `data_source="quote_only"` ohne Bars
-- [x] `+ decision_context` — Migration 005, Writer live seit Block B; Bull/Bear-Summary aus
-  `DebateOutcome.transcript`, Outcome ∈ `{TRADE, NO_TRADE, ABORT}`
-- [ ] `+ lesson_embeddings` (vector store, semantic similarity) — optional/später, V4+
-
-### 10b — No-Trade (Abstain) Lessons
-- [x] Eigene `abstain_records`-Tabelle + 12-Reason-Taxonomie (`AbstainReason`,
-  `classify_abstain`) — geht über die ursprünglich skizzierten 3 P8-`research_tick`-Reasons
-  hinaus (Migration 005, live seit Block A, 318+ reale Zeilen Stand 2026-07-17)
-- [x] `reflect_abstain()` (P10, Haiku, best-effort, Tages-Cap) auf `REASON_DEBATE_ABSTAIN`
-  erweitert (nicht `reward.brain.reflect()` selbst — eigene, schlankere P10-Reflect-Funktion,
-  gleiches Reuse-Muster wie P7); Lessons-Rückspeisung in den P4-Prompt liegt **gebaut, aber
-  dunkel** (S6, `include_abstain_lessons=False`, V3-D3 — Aktivierung ist ein separater
-  Operator-Schritt nach Lesson-Review, nicht Teil von V3)
-- [x] **Zusätzlich (nicht ursprünglich geplant):** Both-Sides-Shadow-Paper-Pipeline
-  (`PaperEngine`/`PaperTradeTracker`) — beantwortet "war der Abstain richtig?" für
-  `REASON_DEBATE_ABSTAIN`-Fälle deterministisch, ohne Order/Broker-Touch. Council-Paper-Call
-  (LLM-Forced-Pick-Variante, `PaperDebateCaller` + additiver Judge-Prompt-Sibling in
-  `phase6_debate/`) **✅ gebaut (2026-07-17, Folge-Session)**, hinter Flag
-  `enable_paper_debate` (default `False`) — Nikinger flippt, wann gewünscht.
-
-### 10c — UI-Erweiterungen (optional, niedrigere Priorität als 10a/10b)
-- [ ] Aufbauend auf dem v1.6-Observability-Log + dem v1.7-DB-gespeisten Status
-
-**Done when:** Abstain-Zyklen erzeugen genauso Lessons wie geschlossene Trades; `decision_context`/
-`market_regime_snapshots` sind befüllt statt leer. **Erreicht (2026-07-17)** — live Rows folgen
-mit dem nächsten Scheduler-Restart (Nikinger).
-
-**📕 Closeout 2026-08-25:** Phase 10 ist abgeschlossen. Council-Paper-Call-Implementation
-bleibt im Code (default `False`) als Eingangs-Schnittstelle für Phase 15 (V4 — Council für
-Live-Trades + Handover + Reward-Reform). Vollständiger Handover:
-[`phase10_v3/PHASE10_CLOSEOUT_HANDOVER.md`](./phase10_v3/PHASE10_CLOSEOUT_HANDOVER.md),
-Bild: [`docs/architecture/phase10_v3.svg`](./docs/architecture/phase10_v3.svg).
-
-**Directory:** [`phase10_v3/`](./phase10_v3/)
-
----
-
-## Phase 11 — V3-Fortsetzung: Funnel-/Mess-Fixes *(aus der zweiten Datenwoche-Review)*
-
-> **Status: 🛑 DEFERRED seit 2026-08-11 (Notbremse, Nikinger-Entscheidung).** B1/B2/B4/B5 sowie
-> H1 und H4-a sind gebaut und liegen auf `main`; **WI-2/W2 — die eine Frage, für die es diese
-> Phase gibt — bleibt unbeantwortet.** Drei Datenwochen sind an drei unterschiedlichen
-> Infrastruktur-Ausfällen gescheitert, nie an der Messung. Die gemeinsame Wurzel ist wichtiger
-> als diese Phase: das **Datenfundament**. Nichts wird zurückgerollt; „deferred" heißt keine
-> weitere H-Serie, kein Paper-Trade-Ausbau, kein H1-Scharfschalten, bis das Fundament steht.
-> Vollständige Begründung, Durability-Anforderungen (A–G) und offene Entscheidungen:
-> [`phase10_v3/PHASE11_DEFERRAL_HANDOVER.md`](./phase10_v3/PHASE11_DEFERRAL_HANDOVER.md),
-> Bild: [`docs/architecture/data_foundation.svg`](./docs/architecture/data_foundation.svg).
-> **Nummerierung final (Nikinger-Entscheidung 2026-08-11):** „Phase 12 = Datenfundament, V4 →
-> Phase 13" (Handover §4.1, ausgeführt in [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md) D2).
-> Der neue Datenfundament-Track lebt als eigene Phase 12 direkt unter dieser (s. u.); V4 ist
-> jetzt **Phase 13** (weiter unten), unverändert im Inhalt, zusätzlich gegatet auf ein
-> bestandenes Phase-12-PASS (dieselbe Logik wie diese Notbremse: keine weitere
-> AI-Sophistication-Arbeit auf einem unzuverlässigen Datenfundament).
->
-> ⟳ **Korrektur (2026-08-18, Nikinger-Entscheidung):** nach dem Scheitern von P12.5 ist
-> **Phase 13 = Live-Datenfundament** (der strukturelle Schnitt + vierstufige Beschaffung,
-> s. u.); **V4 rutscht auf Phase 14**. Jede „Phase 13 (V4)"-Nennung in älteren Zeilen meint
-> jetzt Phase 14.
->
-> ⟳ **Korrektur (2026-08-22, Nikinger-Entscheidung):** die "discovery-then-deterministic"-
-> Architektur aus Block C des Phase-13-Re-Plans wird **eigene Phase 14** (s. u.); V4 rutscht
-> entsprechend auf **Phase 15**. Jede „Phase 14 (V4)"-Nennung in älteren Zeilen meint jetzt
-> **Phase 15**. Plan für die Live-Daten-Beschaffung:
-> [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md).
->
-> Numbering claimed 2026-08-01 (Nikinger-Entscheidung)
-> — vorher stand hier "Phase 11 = V4"; V4 ist jetzt **Phase 13** (unten), unverändert im Inhalt.
-> Diese Phase ist **keine** neue AI-Sophistication-Arbeit, sondern das Fix-/Diagnostik-Ergebnis
-> der zweiten V3-Datenwoche: [`phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`](./phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md)
-> §4 (Befunde B1-B5) + §5 (Hypothesen H1-H7). **Directory:** lebt vorerst weiter in
-> [`phase10_v3/`](./phase10_v3/) (`abstain_lessons/`, `market_context/`) — keine physische
-> Verzeichnis-Verschiebung in dieser Session, das ist eine eigene, größere Entscheidung.
-
-**Goal:** die Research-Funnel-/Mess-Probleme beheben, die die zweite V3-Datenwoche aufgedeckt hat
-(366 Zyklen → 1 Kandidat → 0 Trades), bevor an der Richtungslogik selbst weitergearbeitet wird.
-
-### 11a — Bugs aus der Datenwoche-2-Review
-- [x] **B1** `point_value`-Drift (40× Oversizing auf AEX) — P8-Sizing-Quelle + P5-Fail-closed-Guard
-  gefixt (2026-08-01)
-- [x] **B2** Reward-Score-Skala (`debate_confidence` 0-100 statt [0,1]) — Skala gefixt
-  (2026-08-01); Residuum (**H3**, `clean_exit_bonus` auf Stop-outs) bewusst offen gelassen
-- [x] **B5** Paper-/Abstain-Lesson-Prompt/Validator-Zeichengrenzen-Drift — gefixt (2026-08-01)
-- [x] **B4 / H6** leeres Mess-Substrat (`abstain_records.detail`/`spread_pct` nie befüllt) —
-  gefixt (2026-08-01): `detail` wird jetzt aus dem Executor durchgereicht (+ die
-  `Research.last_no_pick_reasoning`-Anreicherung für den dominanten `research_empty`-Fall in der
-  P8-Wiring), `spread_pct` an allen drei `_notify_context`-Call-Sites verdrahtet
-- [ ] **B3** Leverage-Cap ohne Margin-Headroom — **NICHT gefixt, Design + Prep dokumentiert**
-  für eine eigene, größere Session (P1-Adapter-Feld + P5-Gate-4-Änderung, cross-phase; braucht
-  zuerst einen Live-Demo-Call gegen `/markets/{epic}`, um IGs echte Margin-Felder zu bestätigen).
-  Details: `phase5_execution/CLAUDE.md` B3-Block.
-
-### 11b — H1-H7 (offene Hypothesen, Reihenfolge H2→H1→H6, danach datengetrieben H7/H4/H3/H5)
-- [x] **H2** (B1-Anteil) — gefixt, s. 11a. B3-Anteil bleibt offen.
-- [x] **H6** — gefixt, s. 11a (B4).
-- [ ] **H1** *(größter Hebel, nächste eigene Session)* — Shadow-Pairs zeitgesteuert statt an
-  `REASON_DEBATE_ABSTAIN` gekoppelt (neuer Scheduler-Tick + schlanker `PaperEngine`-Einstieg,
-  ~130 Paare/Tag, IG-Allowance-Budget einplanen). Beantwortet WI-2 (Sub-Noise-Geometrie-Frage,
-  **H7**) an einem Tag statt in Wochen.
-- [ ] **H3** — Reward-Loop-Residuum (`clean_exit_bonus` auf Stop-outs) — Designfrage, nach B2.
-- [ ] **H4** — Lesson-Sackgasse aufbrechen (Relevanz-Decay, Doppelzählung Lessons/`recent_trades`
-  beenden, Lessons skopieren).
-- [ ] **H5** — Nachmittag zurückkaufen (Prompt-Caching für Research, `LLMClient(cache_system=True)`
-  existiert bereits, wird von Research nicht genutzt).
-- [ ] **H7** — Geometrie-Rahmenfrage (30/45-Punkte-DAX-Stops gewinnbar?) — datengetrieben, wartet
-  auf H1s Ergebnis.
-
-**Done when:** B1-B5 entschieden (gefixt oder bewusst dokumentiert-deferred, ✅ erreicht
-2026-08-01) UND mindestens H1 gebaut + WI-2 beantwortet.
-
-**Directory:** [`phase10_v3/`](./phase10_v3/) *(vorerst — kein Verzeichnis-Split in dieser Session)*
-
----
-
-## Phase 12 — Datenfundament (Registry + BarService + Bar-Archiv + Recorder)
-
-> **Status: ✅ abgeschlossen (Closeout 2026-08-25) — Steps 0–8.5 auf `main`, 143 Tests grün
-> (Stand 2026-08-25), 18 Phase-12-Commits auf `origin/main`.** **Die strukturelle Antwort
-> auf das P12.5-Scheitern steht in Phase 13+14** (Nikinger 2026-08-25): der Auflöse-Pfad
-> kauft nie wieder Daten — Phase 13 Block A trennte Beschaffung und Verbrauch, Phase 14
-> macht Quellen zur Registry-Zeile. **Phase-12-Beweiswoche wird nicht wieder aufgenommen**;
-> die Phase-13-Beweiswoche läuft seit Mo 2026-08-25 separat, gegen die Phase-13-Architektur.
-> P12.5 wurde 2026-08-18 formal CLOSED + GESCHEITERT — die fünf Code-Edits (U1/U2/U3/U5 +
-> Entscheidung B) bleiben **unabhängig korrekt im Repo**. Notbremse aus Phase 11 (oben):
-> die gemeinsame Wurzel war strukturell, nicht messbar — durch Phase 13+14 abgelöst.
-> Closeout-Handover: [`phase12_data_foundation/PHASE12_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_CLOSEOUT_HANDOVER.md),
-> Bild: [`docs/architecture/phase12_closeout.svg`](./docs/architecture/phase12_closeout.svg).
-> As-Built-Analyse: [`PHASE12_5_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md),
-> Sofort-Befund: [`PHASE12_5_FAILURE_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_FAILURE_HANDOVER.md).
-> Plan: [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md).
->
-> **Tag-1-Live-Auswertung (2026-08-17):** die Kette Resolver → Registry → `measurable_universe()`
-> → Recorder/BarService → `bars.sqlite` läuft end-to-end im Echtbetrieb (5 `ok`-Epics, 3 typisiert
-> `no_intraday_source`, 1891 Bars an einem Tag, IG-Verbrauch erstmals gemessen: 136/10 000 Punkte).
-> **Gemessen wurde trotzdem nichts:** der Messarm `enable_shadow_schedule` ist Default `False` und
-> im laufenden Prozess nicht gesetzt ⇒ 0 Paper-Zeilen — dieselbe Fehlerklasse wie `enable_ig_bars`,
-> diesmal aber an Tag 1 bemerkt. Stand, Befunde und Entscheidungen A–D:
-> [`phase12_data_foundation/PHASE12_PREPROOF_HANDOVER.md`](./phase12_data_foundation/PHASE12_PREPROOF_HANDOVER.md),
-> Bild dazu: [`docs/architecture/phase12_preproof.svg`](./docs/architecture/phase12_preproof.svg).
->
-> **P12.5 (Messarm-Fixes) — formal CLOSED, GESCHEITERT (2026-08-18):** Steps 1–3 fixten U1/U2/U3/
-> U5 + Entscheidung B, alle live gegen echte Daten bewiesen korrekt (`pairs_opened: 90`,
-> `pairs_resolved: 66`, `resolution_source` erstmals real befüllt). Aber der scharf gestellte
-> Messarm exponierte einen fünften, vorher nie aufgerufenen Pfad: `BarService.get_window` fordert
-> bei jedem Coverage-Miss das **komplette** Fenster neu an (≈301 IG-Punkte/Top-up) statt nur die
-> Lücke — 4731/10 000 Wochenpunkte in ~4 Stunden verbrannt, Requirement F (Soll < 1500/Woche) am
-> ersten Tag gerissen. Nikinger-Intervention: Scheduler gestoppt, P12.5 ohne weitere Bauschritte
-> geschlossen. Sofort-Befund des Interventionstags:
-> [`phase12_data_foundation/PHASE12_5_FAILURE_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_FAILURE_HANDOVER.md).
->
-> **Closeout-Analyse (2026-08-18, nachgemessen — korrigiert die obige Root-Cause-Erzählung):**
-> Von **1782 bei IG gekauften 1-Min-Bars trugen 1638 (92 %) Zeitstempel, die bereits als
-> yFinance-Bar im Archiv lagen** — gekauft wurde für 4515 Punkte fast nur, was ohnehin schon da war.
-> Ursache ist nicht U3 (die `and`-Bedingung kurzschließt links, U3s Schwelle wurde nie erreicht),
-> sondern `_covers_tail`s Anspruch auf eine ≤ 1 Minute alte Bar gegen yFinances ~15 Minuten
-> Eigenverzug: der teure Zweig war der Normalfall, latent seit Step 4, scharf erst durch das
-> Einschalten des Messarms. **Empfehlung daher kein weiterer Patch, sondern ein struktureller
-> Schnitt** (Auflöse-Pfad kauft nie wieder Daten; die Frage wechselt von „reicht das Archiv bis
-> jetzt?" zu „deckt es das Fenster dieses Trades bis `time_stop_utc`?"). Offene Entscheidungen
-> (Weg / Label / Wiederanlauf) und der volle As-Built-Stand:
-> [`phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md),
-> Bild: [`docs/architecture/phase12_5_failure.svg`](./docs/architecture/phase12_5_failure.svg).
-
-**Goal:** eine echte Beweis-Messwoche läuft durch, ohne dass Infrastruktur die Messung tötet.
-Instrument-Registry wird die eine Wahrheit (abgeleitetes, code-verifiziertes Symbol-Mapping statt
-Deklaration), ein `BarService` wird der eine Bar-Pfad für alle Konsumenten, jede gefetchte Bar
-landet in einem eigenen Archiv (`data/bars.sqlite`), ein Recorder-Prozess (yFinance-only) schreibt
-kontinuierlich unabhängig vom Bot-Zustand, und ein Mess-Heartbeat lässt einen Ausfalltag am selben
-Tag auffallen statt erst Wochen später.
-
-**Done when:** siehe Plan §7 (PASS-Kriterien A–G + Kern). WI-2/W2-Auswertung selbst bleibt
-Phase-11-Wiederaufnahme, nicht Teil dieser Phase.
-
-**Directory:** [`phase12_data_foundation/`](./phase12_data_foundation/)
-
----
-
-## Phase 13 — Live-Datenfundament *(eröffnet 2026-08-18 nach dem Scheitern von P12.5, abgeschlossen 2026-08-31)*
-
-> **Status: ✅ abgeschlossen (Closeout 2026-08-31, Session 18).** Blöcke A + B + C code-complete (Stand 2026-08-22) + Beweiswoche ausgewertet (Mini-Session 23, 2026-08-31) + Pfad-C-Entscheidung (Mini-Session 24, 2026-08-31) + Befund-Inversion. 74 Phase-13-Tests grün, 53 `phase13:`-Commits auf `origin/main`, Σ 1703 grün repo-weit.
-> **Plan:** [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md)
-> (gelockte Entscheidungen L1–L17 + L18 Pfad-C-Erweiterung, Blöcke A/B/C, §9-Drift-Liste).
-> **Block-C-Closeout + Phase-14-Handoff (2026-08-22):**
-> [`docs/concepts/phase13_c_block_c_replan.md`](./docs/concepts/phase13_c_block_c_replan.md).
-> **Beweiswoche-Findings (2026-08-31, Mini-Session 23) + Pfad-C-Nachtrag (§8, Mini-Session 24):**
-> [`phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md`](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md) — 14-Tage-Fenster source_delta-Diagnose, drei empirische Befunde (B1 IG-Bars-Lücke 2/13 Tage **by-design**, B2 53.6 % Divergenzrate **Stichprobe Operator-Run-Tag**, B3 `last_verified_utc` semantisch korrekt unter Pfad C); Befund-Inversion: **kein Recorder-Mapping-Bug** — Phase-13-Architektur sieht strukturell keine kontinuierliche `source='ig'`-Beschaffung vor.
-> **Closeout-Handover (2026-08-31, Session 18):**
-> [`phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md`](../phase13_live_data/PHASE13_CLOSEOUT_HANDOVER.md) — Pattern-Vergleich zu Phase-12-CLOSEOUT (§0 BLUF + 5-Zeilen-Bilanz, L1–L18, F1/F2/F3 + B1/B2/B3, Pfad-C-Entscheidung, §9 Konsistenz-Regeln inkl. IG-Default-AUS, §10 Don'ts).
-> **Vorgeschichte:** [`phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_5_CLOSEOUT_HANDOVER.md) und [`phase12_data_foundation/PHASE12_CLOSEOUT_HANDOVER.md`](./phase12_data_foundation/PHASE12_CLOSEOUT_HANDOVER.md) (Pattern-Vorbild).
-
-**Goal:** Beschaffung und Verbrauch von Kursdaten endgültig trennen. Kein Konsumentenpfad löst
-je einen externen Fetch aus; Beschaffung ist ein vierstufiges, nach Kosten/Latenz gestaffeltes
-System in *ein* Archiv (S1 LS-Kerzen → S2 yF-Recorder → S3 Fremdquelle → S4 budgetierte
-IG-Rettung, Default AUS). Die Abdeckungsfrage gilt dem **ganzen** Trade-Fenster statt dem
-Schwanz. Drei nachgemessene Befunde tragen die Phase (Plan §4): tote IG-Historie mit `ok=True`,
-ein dagegen blinder Divergenz-Sampler, und eine **erfundene** `TIME_STOP`-Auflösung bei einer
-Lücke mitten im Fenster. Drei empirische Beweiswoche-Befunde (B1/B2/B3) bestätigen + invertieren
-(kein Recorder-Mapping-Bug, sondern Architektur-konform).
-
-**Block-Stand 2026-08-31 (final):**
-
-- **Block A** (Schnitt + `assess_window` + Tracker-Guard + Stale-Assertion + Sampler-Reparatur
-  + Registry-Hygiene) — ✅ committed, `git log` zeigt 13+ Commits zwischen A0 und A7+A7.5.
-- **Block B** (Lightstreamer + TickAggregator-Fallback + Scheduler-Lebenszyklus +
-  Token-Rotation) — ✅ committed, B0=NO → L6-Fallback aktiv. B0-Probe-Ergebnis im
-  `phase13_live_data/CLAUDE.md` Kopf.
-- **Block C** (Capital.com Pfad B + `GapRescue` S4 + `source_delta.py`) — ✅ **PARTIAL by
-  design**: Pfad B live-verifiziert 2026-08-22 (962 `source='capital'`-Bars, DAX + CAC);
-  Spain 35 (IBEX) wartet auf Phase 14 (Dukascopy wird dort eine Quell-Registry-Zeile, kein
-  Backfill-Code mehr). Vollständiger Block-C-Stand im Re-Plan-Handover.
-- **Beweiswoche** (Plan §7 P1–P9) — ✅ **gelaufen 2026-08-25 → 2026-08-31**, Mini-Session 23
-  wertet aus, Mini-Session 24 entscheidet Pfad C (IG = S4-GapRescue, Default AUS, L18).
-
-**Done-Kriterium:** erfüllt. Beweiswoche gelaufen + Pfad-C-Entscheidung getroffen +
-Befund-Inversion dokumentiert. Erste Akzeptanzbedingung (strukturelle Kostenzusicherung
-statt Zählwert) bleibt gelockt — `test_get_window_never_fetches` ist der Beleg.
-
-**Directory:** [`phase13_live_data/`](../phase13_live_data/) (Kopf + Modul-Tabelle in
-`phase13_live_data/CLAUDE.md`).
-
----
-
-## Phase 14 — Discovery-Then-Deterministic *(eröffnet 2026-08-22 aus dem Session-13-Architektur-Insight, abgeschlossen 2026-08-31)*
-
-> **Status: ✅ abgeschlossen (Closeout 2026-08-31, Session 23).** Blöcke 0 + A + B + C code-complete + Block-D-Doku-Updates ✅ (Stand 2026-08-31, Mini-Sessions 21+22+23+24) + D5-Handover **komplett freigegeben** (Mini-Session 24, Pfad-C-Entscheidung 2026-08-31). **Phase-13-CLOSE-OUT (Commit `0ff55d2`) hat die D5-Handover-Voraussetzung freigegeben.** 61 Phase-14-Tests grün, 54 `phase14:`-Commits auf `origin/main`, 38 Zeilen in `instrument_source_availability`, Σ 1703 grün repo-weit.
-> **Plan:** [`docs/concepts/phase14_discovery_plan.md`](./docs/concepts/phase14_discovery_plan.md)
-> (D1–D20 gelockt, Blöcke 0/A/B/C/D mit Verbatim-Ankern, Akzeptanz A1–A8, Drift-Liste §9,
-> §11 Post-Execution-Korrekturnotizen).
-> **Closeout-Handover (2026-08-31, Session 23):** [`phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md`](../phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md) — Pattern-Vergleich zu Phase-12/13 (§0 BLUF + 5-Zeilen-Bilanz, D1–D20 mit D19 = IG-Default-AUS + D20 = Brücke zur Phase 15, A1–A8-Akzeptanz mit Beleg, §9 13 Konsistenz-Regeln, §10 Don'ts).
-> **Phasenkopf:** [`phase14_discovery/CLAUDE.md`](../phase14_discovery/CLAUDE.md)
-> (Modul-Tabelle jetzt mit `Tests`-Spalte + Σ-Sweep-Tabelle + Phase-14-Closeout-Row, Session-23-Block).
-> **Concept-Skizze:** [`docs/concepts/phase14_discovery_concept.md`](./docs/concepts/phase14_discovery_concept.md)
-> (drei Bausteine: Quell-Profil + Kreuzungs-Tabelle + Konsumenten-Umstellung; sieben offene
-> Fragen für die Plan-Session — vom Plan Q1–Q7 beantwortet).
-> **Block-C-Handoff:** [`docs/concepts/phase13_c_block_c_replan.md`](./docs/concepts/phase13_c_block_c_replan.md)
-> §3 + §5 (warum die Architektur eine eigene Phase rechtfertigt; was Phase 14 implizit
-> absorbiert: hardcoded `EPIC_MAP`, Path C Dukascopy).
-> **Spezial-Pläne (alle abgeschlossen, D5-Beweis erbracht):**
->   - [`phase14_discovery/PHASE14_C_DAEMON_CWD_BUG_PLAN.md`](../phase14_discovery/PHASE14_C_DAEMON_CWD_BUG_PLAN.md) (P14-C, Discovery-Daemon-CWD-Path-Bug, Mini-Session 17, 2026-08-26) — ARM-Pfad absolut
->   - [`phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md`](../phase14_discovery/PHASE14_D_DAEMON_SIGNAL_CAP_PLAN.md) (P14-D, Discovery-Daemon-Signal-Response-Bug, Mini-Session 18, 2026-08-26 + §10 Korrekturnotiz 2026-08-31) — `signal_check_interval_s`-Cap
->   - [`phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md`](../phase14_discovery/PHASE14_E_RECORDER_LOOP_PLAN.md) (P14-E, Recorder-Sleep-Cap + Restart-Loop-Hunt, Mini-Session 20, 2026-08-28 + §2 D3-Korrekturnotiz) — Cross-Phase-Phase-12
->   - [`phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md`](../phase14_discovery/PHASE14_F_DOC_ROTATION_HOOK_STEP2_PLAN.md) (P14-F, Doc-Rotation-Hook Step 2, Mini-Session 22+24, 2026-08-31) — `--strict` als Default nach D5-Beweis
->
-> **Akzeptanz A1–A8 (Plan §7), Stand 2026-08-22 nach Session 9, A1–A8 alle grün (unverändert):**
-> A1 (Discovery 0 IG-Punkte strukturell), A2 (`grep EPIC_MAP phase13_live_data/*.py` leer),
-> A3 (`measurable_universe()`-Identität), A4 (yF-Projektion), A5 (Daemon unscharf = nichts),
-> A6 (UI warnt + scharf per Datei), A7 (`source_delta.py` Drei-Fälle-Trennung), A8 (Sweep
-> 1659→1698→1703).
->
-> **Block-D ✅ (Mini-Session 21, 2026-08-31) + P14-F ✅ (Mini-Session 22+24):**
-> Block-D Hygiene-Edits als 4 Commits + P14-F Doc-Rotation-Hook Step 2 als 5 Commits
-> (`94e0c35`/`d32e93a`/`8fe439c`/`8db5a1c`/`c4f7d9c`).
->
-> **D5-Handover-Status 2026-08-31 (Mini-Session 23 + 24):** **komplett freigegeben** —
-> architektonisch (Mini-Session 23: Tabelle + Discovery + Source-Delta arbeiten wie designed)
-> + operativ (Mini-Session 24: Pfad-C-Entscheidung, IG = S4-GapRescue Default AUS, by-design,
-> Phase-13-Recorder-Mapping-Initiative entfällt als architektur-konform — siehe
-> [Findings-Notiz §8.1](../phase13_live_data/PHASE13_BEWEISWOCHE_FINDINGS_2026-08-31.md)).
-> **Phase-13-CLOSE-OUT (Commit `0ff55d2`) hat die formale Phase-14-D5-Handover-Voraussetzung
-> freigegeben** — Phase 14 ist abgeschlossen.
-
-**Goal:** jede Quelle (IG, yFinance, LS, Capital.com, später Dukascopy) **exponiert selbst**,
-was sie liefern kann. Eine DB-Tabelle (`instrument_source_availability`) hält die Kreuzung
-zwischen IG-Tradeable-Epics und verfügbaren Quellen. Konsumenten lesen die Tabelle, nicht den
-Code. Hinzufügen einer Quelle ist eine Konfiguration, kein Code-Deploy.
-
-**Why this is its own phase (Nikinger 2026-08-22):** die "discovery-then-deterministic"-
-Architektur ist umfangreich genug (neues Schema, neue Schnittstelle pro Quelle, drei
-Konsumenten-Migrationen, ToS-Tracking via `notes`-Spalte, Profile-Cache-TTL), dass sie den
-Block-C-Closure sprengen würde. Phase 14 ist die **Brücke** zwischen dem
-Datenfundament (Phase 13) und der AI-Sophistication (Phase 15): V4 setzt voraus, dass die
-Daten-Infrastruktur **konfigurierbar** ist, nicht nur vorhanden.
-
-**Scope-Skizze** (Concept, kein Plan):
-
-- Quell-Profil-Schnittstelle (`SourceProfile` + `Source.discover()`), implementiert für
-  Capital.com, yFinance, IG; LS bleibt Sonderfall (kein Discovery-API, Profil statisch).
-- Phase-2-Migration `007_instrument_source_availability.sql` (Nummer in Plan-Session zu
-  bestätigen).
-- `run_capital_backfill` liest die Tabelle statt `EPIC_MAP`; `BarArchive.window(sources=…)`
-  wird tabellenbewusst statt rang-bewusst; `source_delta.py` P6 trennt „nicht abrufbar" von
-  „abrufbar und divergiert".
-- Path C Dukascopy wird eine Quell-Registry-Zeile, **kein** Code-Touch in `live_data/`.
-
-**Done-Kriterium** (Concept, zu schärfen in der Plan-Session): eine neue Quelle (Dukascopy
-als Test-Kandidat) ist mit ≤ 50 Zeilen Commit angebunden, ohne dass ein Konsument
-angefasst wird. `grep -rn "EPIC_MAP" phase13_live_data/ --include=*.py` ist leer.
-*(`--include=*.py` ist Absicht: Phasenkopf, Session-Archiv und Closeout-Handover nennen
-`EPIC_MAP` in ihrer Chronik und werden nicht editiert — 📕/📦-Konvention. Präzisiert
-2026-08-22 im Phase-14-Plan §7/A2.)*
-
-**Directory:** noch nicht angelegt — entsteht in der Plan-Session.
 
 ---
 
@@ -536,3 +161,23 @@ Steps 0–10) · [`docs/concepts/meta_phase_unabhaengigkeit_konzept.md`](./docs/
 - **No AI for code-doable work** — every reach for AI must be justified
 - **Atomic git commits** with clear messages; **Commit ⇒ Note-Update**
 - **Phase isolation** — cross-phase imports only through defined contracts / Protocols
+
+---
+
+## Phase 17 — Prüfstand *(eröffnet 2026-10-17, Plan-Session Opus 5.5)*
+
+> **Status: 🔄 in execution seit 2026-10-17.** Plan [`docs/concepts/phase17_testbed_plan.md`](./concepts/phase17_testbed_plan.md) (T1–T24, D1–D13, Blöcke A–E, AK1–AK21, §8 Fehlgriffe, §9 Verify, §14 OpenCode-GLM-Nachtrag 2026-10-18). Phasenkopf [`phase17_testbed/CLAUDE.md`](../phase17_testbed/CLAUDE.md).
+
+**Goal:** *„keine neuen Features — tiefe Härtung des Bestehenden. Jeder vorhandene Arm liefert nachweisbar, was er liefern soll; jeder bekannte Mess- und Geldpfad-Defekt ist zu; das LLM ist pro Rolle austauschbar (Research zuerst auf GLM über die z.ai-API mit Pay-per-use, Plan §14); Report + Vorregistrierung v5 als Fundament für die ausgiebigen Tests."* Repariert 4 Phase-16-PASS-Blocker + 3 neu gemessene stille Totalausfälle (Plan §3 D1–D13).
+
+- [ ] **A Haushalt** — Step-0-Ritual, Σ-Baseline 1964, Code↔.md-Sweep, Push
+- [ ] **B Mess- und Geldpfad-Defekte** — IG-Zeitstempel (`snapshotTimeUTC`), Divergenz-Sampler (reale Vergleichsbasis), Promotion-Bridge (3 Nahtfehler + Contract-Test mit echter DB), Abschneiden sichtbar (T20), Monitor-Re-Adoption nach Restart, Breaker Worst-Case (`−initial_risk` für offene Zeilen, NULL fail-closed), Abstain-Naht (`record_id`-Rückgabe), Paper-Logstufen (Rauschen runter), Stop-Timeout (T10), Discovery-Beleg (append-only)
+- [ ] **C LLM-Austausch** — `scheduler/llm_profiles.py` (NEU, stdlib-only) + `_build_llm` (eine Bau-Funktion für alle 6+1 Client-Konstruktionen) + `OpenAI-Compat`-Härtung + Preiszeilen GLM-Familie + Key-Skript-Hardening + Familien-Smoke → **Flip 1** (`research_glm` nach Demo-Smoke); **Flip 2** (`all_glm`) gegated durch Nikinger-Go nach Shakedown
+- [ ] **D Token-Budget** — Budget-Ausnahme an allen drei Zählstellen (`budget_exempt_models`); Messen + Entscheidung K6-Einheit (Nikinger)
+- [ ] **E Test-Fundament** — Report v5 (in-place Erweiterung `--prereg v5`, v4 verdikt-identisch) + Shakedown-Vorregistrierung + Deploy-Sequenz + **2-Tage-Shakedown** (PASS-Reporter mit `--expect-llm-profile research_glm`) + Prereg v5 (10 Handelstage) + Closeout (Handover + SVG + Memory)
+- Subphasen-TBD: nichts vorgesehen (Phase-17 ist Atom-Einheit, kein F/R/LLM-Schirm wie Phase 16)
+- 🟡 *Nachtrag 2026-10-18 (Plan §14, Nikinger):* Executor-Test GLM in OpenCode (Claude Code bleibt Anthropic-only; Review-Gate vor E-3 = AK22, durch Claude-Code-Session, Schwerpunkte B-5/B-6/C-4/B-3/B-2). Bot-Provider = z.ai Pay-per-use, **nie** der Coding-Plan-Endpoint (`check_llm_profile` lehnt `/coding/` ab). Fleet-Integration (§14.8) läuft getrennt über eurofyx-fleet — diese Exec-Session fasst `~/.config/opencode/`, `auth.json`, `opencode.service` **nicht** an. Aktuell fährt MiniMax-M3-Fallback, weil GLM in OpenCode in einem anderen Projekt als nicht fähig genug getestet wurde (Nikinger 2026-10-19).
+
+**Done-when:** AK19 (Shakedown-Prereg vor E-3-Start committet + Shakedown PASS) + AK20 (Prereg v5 committet, Profil + K6-Einheit gepinnt) — setzt AK1–AK18 voraus + AK21 (Closeout-Handover + Phasenkopf mit genau einem Session-Block + `check_doc_rotation.py --strict` exit 0).
+
+**Directory:** [`phase17_testbed/`](../phase17_testbed/)

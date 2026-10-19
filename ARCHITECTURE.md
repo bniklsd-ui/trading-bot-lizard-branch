@@ -6,7 +6,7 @@ detail: L2
 up: CLAUDE.md
 down:
   - docs/architecture/tradingbot_v2_architecture.svg
-updated: 2026-07-06
+updated: 2026-10-19 (A-3 sweep — Phase 10/12/13/14/15/16 status flipped ✅ + Phase 11 🛑 + Phase 9 🔄 bleibt + neue Phase-16/-17-Zeilen)
 ---
 # Architecture
 
@@ -257,10 +257,12 @@ Per-phase concept + implementation:
 - Phase 6 — [`docs/concepts/phase6_debate_concept.md`](./docs/concepts/phase6_debate_concept.md) · [`phase6_debate/`](./phase6_debate/)
 - Phase 7 — [`docs/concepts/phase7_reward_concept.md`](./docs/concepts/phase7_reward_concept.md) · [`phase7_reward/`](./phase7_reward/)
 - Phase 8 — [`docs/concepts/phase8_scheduler_concept.md`](./docs/concepts/phase8_scheduler_concept.md) · [`phase8_scheduler/`](./phase8_scheduler/) · hotfix history: [`phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.5_HOTFIX_HANDOVER.md) · [`phase8_scheduler/PHASE8_V1.6_HANDOVER.md`](./phase8_scheduler/PHASE8_V1.6_HANDOVER.md) · closeout + V2/V3/V4 proposal: [`phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md`](./phase8_scheduler/PHASE8_CLOSEOUT_HANDOVER.md) · session journal: [`phase8_scheduler/CLAUDE.md`](./phase8_scheduler/CLAUDE.md)
-- Phase 9 (V2 — Foundation, in Arbeit) — [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md) · [`phase9_universe/`](./phase9_universe/)
-- Phase 10 (V3 — Persistence Reform + No-Trade Lessons + UI, geplant) — no concept doc yet
-- Phase 11 (V3-Fortsetzung — Funnel-/Mess-Fixes aus Datenwoche-2-Review, 🛑 deferred 2026-08-11) — no concept doc, lives in `phase10_v3/`; see [`phase10_v3/PHASE11_DEFERRAL_HANDOVER.md`](./phase10_v3/PHASE11_DEFERRAL_HANDOVER.md)
-- Phase 12 (Datenfundament — Registry + BarService + Bar-Archiv + Recorder, 🆕 geöffnet 2026-08-11) — [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md) · [`phase12_data_foundation/`](./phase12_data_foundation/)
-- Phase 13 (Live-Datenfundament — 4-stage acquisition, LS live stage, consumers never fetch; opened 2026-08-18) — [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md)
-- Phase 14 (Discovery — `instrument_source_availability` table + autonomous daemon, opened 2026-08-22) — [`docs/concepts/phase14_discovery_plan.md`](./docs/concepts/phase14_discovery_plan.md) · [`phase14_discovery/`](./phase14_discovery/)
-- Phase 15 (V4 — Sophisticated/Optional, deferred) — no concept doc yet
+- Phase 9 (V2 — Foundation, 🔄 in Arbeit seit 2026-07-07 — Code produktiv, formeller Closeout ausstehend) — [`docs/concepts/phase9_v2_foundation_plan(1).md`](./docs/concepts/phase9_v2_foundation_plan(1).md) · [`phase9_universe/`](./phase9_universe/)
+- Phase 10 (V3 — Persistence Reform + No-Trade Lessons + Paper-Trades, ✅ abgeschlossen Closeout 2026-08-25) — [`docs/concepts/phase10_v3_plan.md`](./docs/concepts/phase10_v3_plan.md) · [`phase10_v3/`](./phase10_v3/)
+- Phase 11 (V3-Fortsetzung — Funnel-/Mess-Fixes aus Datenwoche-2-Review, 🛑 DEFERRED 2026-08-11, Datenfundament-Track hat Vorrang) — no concept doc, lives in `phase10_v3/`; see [`phase10_v3/PHASE11_DEFERRAL_HANDOVER.md`](./phase10_v3/PHASE11_DEFERRAL_HANDOVER.md)
+- Phase 12 (Datenfundament — Registry + BarService + Bar-Archiv + Recorder, ✅ abgeschlossen Closeout 2026-08-25) — [`docs/concepts/phase12_data_foundation_plan.md`](./docs/concepts/phase12_data_foundation_plan.md) · [`phase12_data_foundation/`](./phase12_data_foundation/)
+- Phase 13 (Live-Datenfundament — 4-stage acquisition, LS live stage, consumers never fetch, ✅ abgeschlossen Closeout 2026-08-31 Session 18) — [`docs/concepts/phase13_live_data_plan.md`](./docs/concepts/phase13_live_data_plan.md) · [`phase13_live_data/`](./phase13_live_data/)
+- Phase 14 (Discovery — `instrument_source_availability` table + autonomous daemon, ✅ abgeschlossen Closeout 2026-08-31 Session 23, D5 freigegeben 2026-08-31 Mini-Session 24) — [`docs/concepts/phase14_discovery_plan.md`](./docs/concepts/phase14_discovery_plan.md) · [`phase14_discovery/`](./phase14_discovery/)
+- Phase 15 (V4 — Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock, ✅ abgeschlossen Closeout 2026-09-05 Session #13) — [`docs/concepts/phase15_v4_plan.md`](./docs/concepts/phase15_v4_plan.md) · [`phase15_v4/`](./phase15_v4/)
+- Phase 16 (Freischaltung — alle Löcher zu, alle Arme scharf, 2-Wochen-Autonomie-Test, ✅ abgeschlossen mit Teilbilanz Closeout 2026-10-16 Session #38) — [`docs/concepts/phase16_activation_plan.md`](./docs/concepts/phase16_activation_plan.md) · [`phase16_activation/`](./phase16_activation/)
+- Phase 17 (Prüfstand — Mess-/Geldpfad-Defekte zu, LLM pro Rolle austauschbar, Report + Prereg v5, 🔄 in execution seit 2026-10-17 Plan-Session, §14-Nachtrag 2026-10-18) — [`docs/concepts/phase17_testbed_plan.md`](./docs/concepts/phase17_testbed_plan.md) · [`phase17_testbed/`](./phase17_testbed/)

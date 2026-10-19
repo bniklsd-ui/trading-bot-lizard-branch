@@ -37,7 +37,8 @@ Primary broker: IG Markets (EUR account). Multi-broker abstraction in place.
 | 13    | Live-Datenfundament (4-stufige Beschaffung, Lightstreamer live, Konsumenten fetchen nie) | ✅ **abgeschlossen (Closeout 2026-08-31, Session 18)** — Code-complete + Beweiswoche ausgewertet + Pfad-C-Entscheidung + Befund-Inversion ⁹ |
 | 14    | Discovery-Then-Deterministic (Quellen-Registry + Discovery-Daemon) | ✅ **abgeschlossen (Closeout 2026-08-31, Session 23)** — Akzeptanz A1–A8 grün; D5-Handover komplett freigegeben ¹⁰ |
 | 15    | V4: Reward-Kalibrierung · Instinct-ECC · Quellen-Vertrauens-Lock | ✅ **abgeschlossen (Closeout 2026-09-05, Session #13)** — 4 Blöcke A/B/C/D alle ✅; Σ 1843 grün; Live-Apply Score 78,72 → 50,00 ¹¹ |
-| 16    | Freischaltung (alle Löcher zu, alle Arme scharf, 2-Wochen-Autonomie-Test) | 🔄 **in execution seit 2026-09-05** — Plan execution-ready; Block A läuft (A-0..A-2 ✅) |
+| 16    | Freischaltung (alle Löcher zu, alle Arme scharf, 2-Wochen-Autonomie-Test) | ✅ **abgeschlossen mit Teilbilanz (Closeout 2026-10-16)** — 6/9 Löcher live zu, AK15 nicht erreicht; 4 PASS-Blocker delegiert an Phase 17 ¹² |
+| 17    | Prüfstand (Mess-/Geldpfad-Defekte zu, LLM pro Rolle austauschbar, Report + Prereg v5) | 🔄 **in execution seit 2026-10-17** — Plan-Session abgeschlossen 2026-10-17 + §14-Nachtrag 2026-10-18 ¹³ |
 
 > **Repo-weit Σ:** **1843 grün** (Stand 2026-09-05, Phase-16-A-2-Verifikation).
 > **Detaillierter Plan:** [`ROADMAP.md`](./ROADMAP.md) (Phasen 9–15 + Cross-Cutting)
@@ -164,6 +165,10 @@ vorhergesagt und als Phase-11 **H3** geparkt. **Block B ist H3.**
 selben Commit). Plan:
 [`docs/concepts/phase15_v4_plan.md`](./docs/concepts/phase15_v4_plan.md),
 Phasenkopf: [`phase15_v4/CLAUDE.md`](./phase15_v4/CLAUDE.md).
+
+¹² **Phase 16 (Freischaltung) ✅ abgeschlossen mit Teilbilanz (Closeout 2026-10-16, Session #38).** Handover [`phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md`](./phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md), Bild [`docs/architecture/phase16_activation.svg`](./docs/architecture/phase16_activation.svg). 6 von 9 Löchern live zu (L7 per Code + Live-Probe), Bot handelt wieder (17 Trades seit 2026-09-28), systemd-Autostart live bewiesen, Backoff-Fix live (Buchungsverzug 24 h → 1–2 h). **Nicht erreicht:** AK15 — kein vorregistrierter Autonomie-Lauf PASS (v3 FAIL K1/K5/K6, v4 FAIL K6). **Vier PASS-Blocker delegiert an Phase 17:** K6 Token-Budget (Rebrechen an Debatte-Volltagen), Promotion-Bridge live tot (`bridge.py:146` ruft `validate()` ohne `trades`), Monitor-Orphan nach Restart, Breaker-Blindfenster bis IG-Settlement. **E6 entschieden:** Gate P7/A6 gilt als erfüllt (deal-bezogen max 2 CRITICALs je Trade, Quell-Definition A6 erfüllt). **Σ 1964 grün** (16 Suites einzeln) — Basis für Phase 17.
+
+¹³ **Phase 17 (Prüfstand) 🔄 in execution seit 2026-10-17.** Plan-Session 2026-10-17 (Opus 5.5) geliefert + am 2026-10-18 mit §14-Nachtrag erweitert (Executor-Test GLM in OpenCode, Bot-Provider = z.ai Pay-per-use statt MiniMax M3; §14.8 Executor-Integration über eurofyx-fleet, getrennt vom Plan). **Mission:** *„keine neuen Features — tiefe Härtung des Bestehenden, jeder vorhandene Arm liefert nachweisbar, jeder Mess- und Geldpfad-Defekt ist zu, das LLM ist pro Rolle austauschbar. Report + Prereg v5 als Fundament für die ausgiebigen Tests."* Repariert 4 Phase-16-PASS-Blocker + 3 neu gemessene stille Totalausfälle: IG-REST-Bars +2 h in der Zukunft (`ig_adapter.py:909`), Divergenz-Sampler 233/233 `no_comparator`, `decision_context.abstain_record_id` 3 669/3 669 NULL. Plan: [`docs/concepts/phase17_testbed_plan.md`](./docs/concepts/phase17_testbed_plan.md) (T1–T24, D1–D13, Blöcke A–E, AK1–AK21, §8 Fehlgriffe, §9 Verify), Phasenkopf: [`phase17_testbed/CLAUDE.md`](./phase17_testbed/CLAUDE.md). Exec-Session läuft im MiniMax-M3-Fallback, weil GLM in OpenCode in einem anderen Projekt als nicht fähig genug getestet wurde (Nikinger 2026-10-19).
 
 ---
 
