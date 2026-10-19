@@ -124,3 +124,41 @@ def test_bridge_promote_and_load_rules_run_for_real(no_keyring: None) -> None:
     assert ("list_instincts", "validated") in db.calls
     assert ("count_closed_trades",) in db.calls
     assert ("list_instincts", "promoted") in db.calls
+
+
+def test_extractor_has_own_client_with_instinct_limits(no_keyring: None) -> None:
+    """Phase 17 B-3 (D3): the InstinctExtractor must own a **separate** LLM
+    client with its own ``max_tokens`` / ``timeout_s``, distinct from the
+    Brain's client.
+
+    Without this, the instinct payload (a structured array of ``Instinct``
+    objects) gets clipped by the Brain's tighter ``lesson_max_tokens`` and
+    hangs on the Brain's shorter ``lesson_timeout_s`` — both wrong for the
+    task. The two clients share the same model + key + token meter, so a
+    future change to ``build_scheduler`` accidentally routing both through
+    one client must fail loudly here.
+
+    Pins (``phase8_scheduler/scripts/wiring.py``): the module-level
+    constants ``_INSTINCT_EXTRACTOR_MAX_TOKENS = 2048`` and
+    ``_INSTINCT_EXTRACTOR_TIMEOUT_S = 60.0`` are the values ``_build_reward_sink``
+    reads when it builds the Extractor's client.
+    """
+    sink, bridge = _build_reward_sink(object(), _FakeDB())
+
+    # Brain stores its LLM under ``self._llm`` (brain.py:184); the Extractor
+    # mirrors that attribute name (extractor.py:262). Reading both confirms
+    # they are distinct instances while the per-call limits match the
+    # module-level constants.
+    brain_llm = sink.brain._llm
+    instinct_llm = bridge.extractor._llm
+
+    assert instinct_llm is not brain_llm, (
+        "Bridge.Extractor and Sink.Brain must not share an LLM client — "
+        "D3 calls for separate per-call max_tokens / timeout_s"
+    )
+    assert instinct_llm.max_tokens == 2048
+    assert instinct_llm.timeout_s == 60.0
+    # Both clients stay on the same model + key + token meter (the whole
+    # point of separation is the per-call knob values, not the model).
+    assert instinct_llm.model == brain_llm.model
+    assert instinct_llm.token_meter_path == brain_llm.token_meter_path

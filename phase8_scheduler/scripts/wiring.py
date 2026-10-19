@@ -384,15 +384,35 @@ def _make_debate_runner(broker: Any) -> Callable[[dict[str, Any]], Any]:
     return debate_runner
 
 
+# Phase 17 B-3 (D3): the InstinctExtractor (Phase 15) gets its own LLM client,
+# distinct from the Brain's (Phase 7 lesson) client. Phase-17-Plan §6 B-3 step 5
+# pins the per-call limits here so the wiring function stays declarative. Block
+# C will move the actual ``LLMClient(...)`` construction into ``_build_llm``;
+# until then ``_build_reward_sink`` builds the client inline using these
+# constants. ``_INSTINCT_EXTRACTOR_MAX_TOKENS = 2048`` (4× the Brain's default
+# ``lesson_max_tokens``; instinct payloads are structured arrays and routinely
+# exceed 512 tokens); ``_INSTINCT_EXTRACTOR_TIMEOUT_S = 60.0`` (the Brain's
+# ``lesson_timeout_s`` is shorter — the Brain call is single-shot lesson text,
+# the Extractor call is a heavier structured output).
+_INSTINCT_EXTRACTOR_MAX_TOKENS: int = 2048
+_INSTINCT_EXTRACTOR_TIMEOUT_S: float = 60.0
+
+
 def _build_reward_sink(broker: Any, db: Any) -> tuple[Any, Any]:
     """Build the Phase-7 :class:`RewardSink` + the Phase-16 Promotion-Bridge.
 
     Phase 16 D2.6 (Plan §6 D2.6): the wiring returns a ``tuple[RewardSink,
     InstinctBridge]``. The bridge hooks the RewardSink's new ``instinct_hook``
-    (D2.5) to drive extract → validate → promote → compile. The single Haiku
-    client serves both ``Brain`` (Phase 7 lessons) and
-    ``SingleShotInstinctExtractor`` (Phase 15 instincts) — same model, same
-    token-meter, same credentials flow.
+    (D2.5) to drive extract → validate → promote → compile.
+
+    Phase 17 B-3 (D3): the InstinctExtractor gets its **own** LLM client with
+    separate ``max_tokens`` / ``timeout_s`` limits (see module-level
+    constants ``_INSTINCT_EXTRACTOR_MAX_TOKENS`` / ``_INSTINCT_EXTRACTOR_TIMEOUT_S``)
+    — the Brain client (Phase 7 lesson extraction) and the Extractor client
+    (Phase 15 instinct extraction) share the same model + key + token meter,
+    but each gets the per-call knob values that fit its task. In Block C the
+    Extractor client is built via ``_build_llm``; until then this function
+    constructs it inline (same pattern as the Brain client below).
 
     The broker is read **only** for ``get_trade_history`` (P&L / reconcile),
     never order/close (Decision J). The Anthropic key is read here; the SDK
@@ -414,8 +434,25 @@ def _build_reward_sink(broker: Any, db: Any) -> tuple[Any, Any]:
         token_meter_path=str(_USAGE_LOG),
         config=ResearchConfig(),
     )
+    # Phase 17 B-3 (D3): separate LLM client for the InstinctExtractor.
+    # The Brain's ``lesson_max_tokens`` is sized for short lesson sentences;
+    # the Extractor emits a structured array of ``Instinct`` objects whose
+    # serialised payload easily exceeds that floor (concurrency with many
+    # lessons/rewards + nested evidence lists). Same ``model`` + same key +
+    # same token-meter — only the per-call limits differ. C-4 will move the
+    # construction into ``_build_llm``; until then this inline pair
+    # matches the Brain client 1:1 except for ``max_tokens`` / ``timeout_s``.
+    instinct_llm = LLMClient(
+        model=cfg.lesson_model,
+        api_key=get_credential("anthropic_api_key"),
+        max_tokens=_INSTINCT_EXTRACTOR_MAX_TOKENS,
+        temperature=cfg.lesson_temperature,
+        timeout_s=_INSTINCT_EXTRACTOR_TIMEOUT_S,
+        token_meter_path=str(_USAGE_LOG),
+        config=ResearchConfig(),
+    )
     instinct_cfg = InstinctConfig()
-    instinct_extractor = SingleShotInstinctExtractor(llm_client=llm)
+    instinct_extractor = SingleShotInstinctExtractor(llm_client=instinct_llm)
     instinct_validator = InstinctValidator()
     bridge = InstinctBridge(
         db=db,
@@ -957,12 +994,14 @@ def build_scheduler(
     )
     debate_runner = _make_debate_runner(broker)
     reward_sink, instinct_bridge = _build_reward_sink(broker, db)
-    # Phase 16 D2.6: load any already-promoted instincts into ``longterm_rules``
-    # BEFORE the executor runs (Plan §6 D2.6). Empty tuple today — AK9-Erbe
-    # (``longterm_rules == ()`` ⇒ ``test_pre_trade_check_veto5_empty_rules_is_identity``
-    # stays green). On every close the bridge re-runs ``promote()`` + ``load_rules()``,
-    # but a promotion only takes effect after the next ``restart-services.sh restart``
-    # (the executor reads ``exec_cfg`` once at construction).
+    # Phase 16 D2.6 + Phase 17 B-3 (T18): load any already-promoted instincts
+    # into ``longterm_rules`` BEFORE the executor runs (Plan §6 D2.6). Empty
+    # tuple today — AK9-Erbe (``longterm_rules == ()`` ⇒
+    # ``test_pre_trade_check_veto5_empty_rules_is_identity`` stays green).
+    # A promotion takes effect from the next restart — the executor reads
+    # ``exec_cfg`` once at construction, so even though ``after_trade_closed``
+    # re-runs ``promote()`` every cycle, the resulting ``longterm_rules`` are
+    # not picked up by the running executor (see ``bridge.py:promote()``).
     instinct_bridge.promote()
     initial_longterm_rules = instinct_bridge.load_rules()
     exec_cfg = dataclasses.replace(exec_cfg, longterm_rules=initial_longterm_rules)
