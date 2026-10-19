@@ -7,6 +7,46 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-10-19 (Exec-Session #5 ENDE — Block B-5 Monitor-Re-Adoption, 1 Commit in P5+P8, Σ 1978 + 5 P5 + 2 P8 = **1985** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung)
+
+> **Auftrag:** Nikinger 2026-10-19 (später Session): „Mini Plan is written, go on please." → Exec-Session #5 setzt die explizite **Next**-Priorität aus Exec-Session #4 + die §15-Plan-Session-Festlegung „als Nächstes B-5" um: **B-5 Monitor-Re-Adoption (D5, T8, P5 + P8)** per Plan §6 B-5 verbatim (T13: Code in P5 + P8 ✓, beide Phasen für Cross-Phase-Edits freigegeben).
+>
+> **Executor-Modus:** MiniMax-M3-Fallback (Plan §14.2) — unverändert. `~/.config/opencode/`, `auth.json`, `opencode.service` weiterhin unangefasst.
+
+### Completed — diese Exec-Session (1 Commit)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | `154f460` | P5 + P8 | **P5 `execution/monitor.py`**: kw-only-Param `entry_at: datetime \| None = None` hinter `sleep_fn` (default = bit-identisch zum Status quo); `entry = entry_at if entry_at is not None else now_fn()` (Default-Pfad nutzt weiterhin `now_fn()`); Docstring ergänzt um die T8-Semantik. **P5 `execution/executor.py`**: Import `from execution.monitor import _position_present, monitor_position` (Z. 59); neue Methode `resume_open_position() -> ExecutionResult \| None` zwischen `_notify_closed` (Ende Z. 433) und dem Phase-10-Seam-Kommentar (Z. 435); iteriert `exec_state.open_references()`, filtert auf `status='OPEN'` + `deal_id`, fragt `broker.get_open_positions()`, überspringt am Broker verschwundene Refs, baut `OrderPlan` aus dem Record (`currency=self.config.default_currency`), parst `recorded_at` (UTC ISO) als `entry_at`; `monitor_position(... entry_at=entry_at)`; `ExecutionAbort` → `self._abort(...)`; `self._notify_closed(result)`. **P8 `scheduler/runner.py`**: `_ExecutorLike` Protocol-Docstring (Z. 155–160) um „Optionally ``resume_open_position() -> ExecutionResult \| None`` (Phase 17 B-5) — read via ``getattr``" ergänzt; WINDOW-Zweig (Z. 386–388) **direkt danach**: `resume = getattr(self._executor, "resume_open_position", None); resumed = resume() if callable(resume) else None; if resumed is not None: state = self._state_store.record_cycle(state, resumed); self._clock.sleep(self._cycle_interval_s); return`. |
+| 1b | (gleicher Commit) | P5 + P8 | **+5 P5-Tests**: `test_monitor_entry_at_applies_max_hold_from_recorded_open`, `test_resume_monitors_present_open_record_from_recorded_at`, `test_resume_returns_none_when_position_missing_at_broker`, `test_resume_skips_pending_without_deal_id`, `test_resume_closes_immediately_when_max_hold_elapsed`. **+2 P8-Tests**: `test_window_without_resume_method_is_unchanged`, `test_window_runs_resumed_position_instead_of_research`. **Σ-Steigerung:** P5 190 → **195** (+5), P8 264 → **266** (+2), Σ 1978 → **1985** (+7). |
+
+### Next (geplante Folgesessions, in Priorität)
+- **B-6 Breaker Worst-Case (D6, T9, P8).** `scripts/wiring.py`: neue Modul-Funktion `_realized_pnl_today(conn, session_date) -> float`; Closure Z. 1009–1016 ersetzt Rumpf + erweitert Docstring. +3 P8-Tests in neuer Datei `tests/test_wiring_breaker.py`. Plan-AK P8 ≥ **269**, Σ-Ziel nach B-6 ≥ **1988**.
+- **B-7, B-8, B-9, B-10** in Plan §6.
+- **Block C (LLM-Austausch)** wartet auf OpenCode + z.ai-Fleet-„bereit"-Meldung.
+
+### Open questions / blockers
+- **Scheduler ist gestoppt** (`is-active=failed`). Identisch zu Session #1/#2/#3/#4 — keine Änderung.
+- **Promotion-Bridge-Backfill 29 NULL-Zeilen**: unverändert offen (Session #3).
+- **Fleet §14.8 (OpenCode + z.ai)** weiterhin offen.
+- **B-5-Live-Beweis** (E-4-Probe) noch ausstehend.
+- **TZ-Wahrheit der `recorded_at`-Deserialisierung** (find-now-during-tests): `fromisoformat(recorded_at.replace("Z", "+00:00"))` liefert immer eine tz-aware UTC-datetime; Tests via `_tz_aware_now()`-Helper kompatibel gehalten.
+
+### Session-end-Hinweis
+- **Plan-AK-Stand:** Σ 1985. Plan-AK-Block-B Sweep Σ ≥ 1992 noch **7 Tests entfernt** (B-6..B-10 = +7 exakt).
+- B-5 lokal ahead (`154f460`), wartet auf Nikinger-Push.
+- **Schlüssel-Erkenntnisse:**
+  - B-5 schließt den ersten der vier Phase-16-PASS-Blocker (Monitor-Orphan). Die anderen drei: Token-Budget (K6 — D-Block), Promotion-Bridge (B-3 repariert), Breaker-Blindfenster (B-6 als nächstes).
+  - `getattr(self._executor, "resume_open_position", None)` ist die einzige **strukturelle** Bit-Identität.
+  - `_seed_open_reference` schreibt via `_read`/`_write` direkt in den Store (`# noqa: SLF001`).
+
+### Next start (für die Folgesession, kalt einsteigen ohne Neu-Lesen)
+
+**B-6 Breaker Worst-Case (D6, T9, P8).** Anker: `scripts/wiring.py` Top-Level **neue** Funktion `_realized_pnl_today(conn: Any, session_date: str) -> float` (T9-SQL mit `CASE WHEN status='OPEN' THEN -initial_risk ELSE profit_loss END`, NULL-`initial_risk`-Check wirft `RuntimeError`); Closure Z. 1009–1016 (Anker `def realized_pnl_today(session_date: str) -> float:`) → Rumpf `return _realized_pnl_today(db.conn, session_date)` + Docstring „(Contract E + Phase 17 B-6 worst case)". Neue Datei `phase8_scheduler/tests/test_wiring_breaker.py` mit +3 Tests gegen echte `persistence.Database(":memory:")` + `run_migrations()`: `test_booked_pnl_only_when_no_open_rows`, `test_open_row_counts_as_minus_initial_risk`, `test_open_row_without_initial_risk_raises`. Plan-AK P8 ≥ **269**.
+Block-B Σ-Ziel ≥ 1992 noch 7 Tests entfernt nach B-6 (B-6 = +3, Σ 1988).
+
+---
+
 ## Session stopped — 2026-10-19 (Plan-Session §15 Provider-Plastizität, Opus 5.5 in Claude Code — nur Doku, kein Code; Σ 1978 re-gemessen)
 
 > **Auftrag:** Nikinger 2026-10-19 — Miniplan aus den MiniMax-Working-Notes `provider_plasticity/` (Q1–Q8). Ergebnis:

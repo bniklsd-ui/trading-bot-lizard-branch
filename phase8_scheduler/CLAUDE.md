@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase8_scheduler_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985)
+updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988)
 ---
 # CLAUDE.md — Phase 8: Scheduler (`phase8_scheduler/`)
 
@@ -355,6 +355,56 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 >   Command-Datei- und Backoff-Pfad bit-identisch.
 > - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 B-5 T13: Code in P5 + P8
 >   freigegeben; `phase17_testbed/CLAUDE.md` Session-#5-Block). Commit `154f460`.
+>   Push = Nikinger.
+
+> 🔁 **Phase-17 (Prüfstand) B-6 edit (2026-10-19, Exec-Session #6 — additiv, code = source of truth):**
+> `scripts/wiring.py` hat den **Tagesverlust-Breaker auf Worst-Case** umgestellt
+> (Phase-17-Block-B Sweep, D6, T9). **Additiv**, Phase-8 bleibt für Bestands-Wire-ups
+> bit-identisch (Reader-Aufruf-Seite unverändert, nur der Body ist „böser"):
+> - **Neue** Top-Level-Funktion `_realized_pnl_today(conn: Any, session_date: str) -> float`,
+>   einsortiert **direkt nach** dem B-2-Helper `_sampler_due` (B-Block-Helper-Section
+>   bleibt zusammen). SQL: `SELECT COALESCE(SUM(CASE WHEN status='OPEN' THEN
+>   -initial_risk ELSE profit_loss END), 0.0), COALESCE(SUM(status='OPEN' AND
+>   initial_risk IS NULL), 0) FROM trade_outcomes WHERE session_date = ? AND
+>   (profit_loss IS NOT NULL OR status='OPEN')`. Erste Spalte = die Worst-Case-
+>   Tages-PnL (jeder OPEN mit `-initial_risk` gebunden, jeder CLOSED mit dem realen
+>   `profit_loss`). Zweite Spalte zählt OPEN-Rows mit `initial_risk IS NULL`; ein
+>   Wert `> 0` löst `raise RuntimeError("OPEN trade without initial_risk — the
+>   breaker cannot bound today's loss")` aus (fail-closed Contract E — `AutoConfirm`
+>   blockt + loggt critical). Filter Klausel schließt CLOSED-mit-NULL-`profit_loss`
+>   (historisch-arTEFakthafte Orphans) ohne Verlust aus: sie matchen weder OPEN-
+>   noch booked-CASE-Zweig.
+> - Closure `realized_pnl_today(session_date)` (Z. 1066–1067 nach aktuellem Stand)
+>   wird zum 2-Zeilen-Wrapper `return _realized_pnl_today(db.conn, session_date)`;
+>   Docstring erweitert um „(Contract E + Phase 17 B-6 worst case)". Caller
+>   `AutoConfirm(config, state_store, config.kill_path, budget, realized_pnl_today)`
+>   bleibt funktional unverändert — der Übergabewert ist dieselbe `float`, nur
+>   andere Quelle. Verhalten ändert sich **nur** für den OPEN-Worst-Case-Pfad
+>   (= exakt T9 erwünschter Effekt) und für den OPEN-NULL-`initial_risk`-Fail-Case
+>   (= exakt T9 gewünscht, pre-B-6 still missed).
+> - **+3 P8-Tests** (P8 266 → **269**, Σ-Baseline **1985** → **1988**): neue Datei
+>   `phase8_scheduler/tests/test_wiring_breaker.py` mit `:memory:`-DB +
+>   `run_migrations()` pro Test (sqlite3 in-memory, eine Connection über das
+>   Test-Lifetime — kein `tmp_path` nötig). `test_booked_pnl_only_when_no_open_rows`
+>   pinnt den **Booking-Pfad bit-identisch zu pre-B-6** für den Fall ohne OPEN
+>   (= wichtigste Regression, sonst hätte die Änderung den täglichen Buchungs-Trade
+>   verfälscht). `test_open_row_counts_as_minus_initial_risk` zeigt genau den
+>   T9-Misser, den pre-B-6 ein OPEN ohne bound risk verdeckt hätte. `test_open_row_without_initial_risk_raises`
+>   exakt das Gegenteil — der ungebundene OPEN fail-closed vor dem SUM. Helper
+>   `_seed_closed_trade` / `_seed_open_trade` decken das minimale Schema ab
+>   (`currency='EUR'` NOT NULL, `status` per Insert-Default oder explizitem UPDATE).
+> - **Drift-Konsolidierung (Anker):** Plan §6 B-6 spricht von Closure Z. 1009–1016,
+>   der heute Z. 1066–1067 ist — ~$+57$ Zeilen, weil zwischen Plan-Snapshot
+>   2026-10-17 und Session #6 B-3/B-5-Commits in P15/P8 zwischen Plan-Anker und
+>   Closure gewachsen sind. **Kleiner Drift**, semantisch unverändert (grep +
+>   visuell verifiziert in der Session). Folge-Sessions die den Plan-Anker nutzen,
+>   müssen ihn re-verifizieren (gleiche Konvention wie B-7 Z. 758–760 heute).
+> - Kein Eingriff in `AutoConfirm`-Konstruktion, in TokenBudget, Reconcile,
+>   Research-Tick, Kill-Switch, Backoff, Preflight, Shutdown — alle Pfade
+>   bit-identisch.
+> - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 B-6 T13: Code in P8
+>   ✓, keine Cross-Phase-Edits nötig — alle Module im selben P8-Baum;
+>   `phase17_testbed/CLAUDE.md` Session-#6-Block). Commit `a0b2fb5`.
 >   Push = Nikinger.
 
 ---

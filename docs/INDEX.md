@@ -5,7 +5,7 @@ read-when: locating any doc, or deciding whether a file is worth reading at all
 detail: L0
 up: ../CLAUDE.md
 down: every project doc (that is the point)
-updated: 2026-10-19 (Exec-Session #5 ENDE — Phase 17 B-5 ✅ (Session #5, 1 Commit `154f460` in P5+P8, Σ 1978 + 5 P5 + 2 P8 = **1985** grün); Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Exec-Session #4 ANSCHLUSS — 5 Einträge in Active phases für `provider_plasticity/` Working-Notes-Set (README + 01 Decision-Proposal T25–T28 + 02 Current-State + 03 Opus-Brief + 04 Open Questions Q1–Q8); kein Plan, Material für kommende Opus-Miniplan-Session)
+updated: 2026-10-19 (Exec-Session #6 ENDE — Phase 17 B-6 ✅ (Session #6, 1 Commit `a0b2fb5` in P8, Σ 1985 + 3 P8-Tests = **1988** grün); Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Exec-Session #5 ENDE — Phase 17 B-5 ✅ (Session #5, 1 Commit `154f460` in P5+P8, Σ 1978 + 5 P5 + 2 P8 = **1985** grün); Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Exec-Session #4 ANSCHLUSS — 5 Einträge in Active phases für `provider_plasticity/` Working-Notes-Set (README + 01 Decision-Proposal T25–T28 + 02 Current-State + 03 Opus-Brief + 04 Open Questions Q1–Q8); kein Plan, Material für kommende Opus-Miniplan-Session)
 ---
 # Doc Index (L0)
 
