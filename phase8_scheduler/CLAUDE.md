@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase8_scheduler_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-11
+updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985)
 ---
 # CLAUDE.md — Phase 8: Scheduler (`phase8_scheduler/`)
 
@@ -314,6 +314,48 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 > Session 12/13. Same convention wie 2026-07-25 (`scripts/wiring.py` hat keine
 > pytest-Datei — verifiziert via `py_compile` + Integration-Smoke + full regression
 > **P8 248 unverändert**, keine getesteten Module angefasst).
+
+> 🔁 **Phase-17 (Prüfstand) B-5 edit (2026-10-19, Exec-Session #5 — additiv, code = source of truth):**
+> `scheduler/runner.py` hat den **WINDOW-Zweig um die Monitor-Re-Adoption** erweitert
+> (Phase-17-Block-B Sweep, D5, T8). **Additiv**, Phase-8 bleibt für Bestands-Wire-ups
+> bit-identisch:
+> - `_ExecutorLike` Protocol-Docstring (Z. 155–160) um „Optionally
+>   ``resume_open_position() -> ExecutionResult | None`` (Phase 17 B-5) — read via
+>   ``getattr``, so a fake without it keeps the runner bit-identical" ergänzt; der Protocol
+>   hat jetzt **beide** Methoden-Signaturen (`run` + `resume_open_position`), aber die
+>   Bestands-Fakes (`_FakeExecutor`, das echte Phase-5-`Executor`-Objekt) sind
+>   unverändert — die strukturelle Bit-Identität kommt **erst durch das
+>   ``getattr(self._executor, "resume_open_position", None)``-Pattern** (siehe nächster
+>   Punkt).
+> - WINDOW-Zweig (Z. 386–388: `elif phase is Phase.WINDOW`, `self._warm_session()`,
+>   `self._maybe_reconcile(state, now)`) bekommt **direkt danach** einen 5-Zeilen-Block:
+>   ```python
+>   # Phase 17 B-5: a position left open by a restart is monitored first (T8).
+>   resume = getattr(self._executor, "resume_open_position", None)
+>   resumed = resume() if callable(resume) else None
+>   if resumed is not None:
+>       state = self._state_store.record_cycle(state, resumed)
+>       self._clock.sleep(self._cycle_interval_s)
+>       return
+>   ```
+>   Diese 5 Zeilen sitzen **vor** `_maybe_refresh_universe`, `_maybe_run_shadow_pairs`,
+>   `auto_confirm.can_open`, `research_tick.ensure_candidates` und `executor.run()`
+>   — sobald ein Re-Adopt einen reale Position zurückgibt, **überspringt** der
+>   WINDOW-Zweig alle nachgelagerten Operationen (kein Research, kein Run); sonst
+>   fällt er durch zum bestehenden Verhalten.
+> - **+2 P8-Tests** (P8 264 → **266**, Σ-Baseline **1978** → **1985**): neue
+>   `_FakeResumableExecutor`-Klasse (mit `resume_open_position()`) +
+>   `test_window_without_resume_method_is_unchanged` (pinnt das `getattr(...,
+>   None)`-Pattern; alle Fakes ohne die Methode bleiben unverändert grün) +
+>   `test_window_runs_resumed_position_instead_of_research` (ein resumed-Ergebnis
+>   → `executor.run_calls == 0`, `research_tick.calls == 0`, `trades_today == 1` mit
+>   `realized_pnl_today` propagierend).
+> - Kein Eingriff in `_run_phase` PRE_OPEN/POST_WINDOW/IDLE-Pfade, kein Eingriff in
+>   `preflight`/`shutdown`/`request_stop`/Backoff; Scheduler-Loop-Top + Kill-Switch-,
+>   Command-Datei- und Backoff-Pfad bit-identisch.
+> - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 B-5 T13: Code in P5 + P8
+>   freigegeben; `phase17_testbed/CLAUDE.md` Session-#5-Block). Commit `154f460`.
+>   Push = Nikinger.
 
 ---
 

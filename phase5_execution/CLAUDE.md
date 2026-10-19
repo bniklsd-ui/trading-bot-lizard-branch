@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase5_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-17
+updated: 2026-07-17 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985)
 ---
 # CLAUDE.md — Phase 5: Execution (`phase5_execution/`)
 
@@ -270,6 +270,49 @@ Hand-off „Candidate → Gates → Order" so bauen, dass P6 die Richtungs-/Size
 >   - Bleibt Teil von **H2** (Sizing-Wahrheitskette) im Phase-11-Scope (s.
 >     `phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md` §4 B3, §5 H2) — B1 (dieser Session) war der
 >     kleine, sofort fixbare Teil; B3 ist der größere, cross-phase Teil.
+
+> 🔁 **Phase-17 (Prüfstand) B-5 edit (2026-10-19, Exec-Session #5 — additiv, code = source of truth):**
+> `execution/monitor.py` + `execution/executor.py` haben den **Monitor-Re-Adoption-Pfad** für
+> Restart-überdauernde offene Trades bekommen (Phase-17-Block-B Sweep, D5, T8). **Additiv**,
+> Phase-5 bleibt für Bestands-Aufrufer bit-identisch:
+> - `monitor_position(..., *, entry_at: datetime \| None = None)`: neuer **kw-only** Param nach
+>   `sleep_fn` mit Docstring-Erklärung. Im Rumpf `entry = entry_at if entry_at is not None else
+>   now_fn()` — der **Default `None` ⇒ `entry = now_fn()`** ist exakt das pre-B-5-Verhalten
+>   (heute erster Poll = Entry-Anker), die 6 Bestands-Monitor-Tests bleiben **grün ohne
+>   Änderung**.
+> - `execution/executor.py`: Import `from execution.monitor import _position_present,
+>   monitor_position` (Z. 59) erweitert; neue Methode
+>   `Executor.resume_open_position() -> ExecutionResult \| None` **zwischen** `_notify_closed`
+>   (Z. 433) und dem Phase-10-Seam-Kommentar (Z. 435) — iteriert
+>   `exec_state.open_references()`, filtert auf `status='OPEN'` + `deal_id`, fragt
+>   `broker.get_open_positions()`, springt bei nicht-ok read mit Logger-Warning zurück,
+>   überspringt am Broker verschwundene Refs (reconcile_startups missing-Set), baut
+>   `OrderPlan` aus dem Record (`currency=self.config.default_currency`), parst `recorded_at`
+>   (UTC ISO) als `entry_at`; `monitor_position(... entry_at=entry_at)`; `ExecutionAbort` →
+>   `self._abort(...)`; `self._notify_closed(result)` damit der Phase-7-Close-Seam den
+>   Re-Adopt-Pfad mit dem real-Close-Fall identisch abrechnet.
+> - Kein Eingriff in den `run()`-Pfad (Gates / VETOs / Sizing / Confirm / Place / Monitor
+>   inline unverändert), keine Änderung an `monitor_position`-Body jenseits der
+>   `entry_at`-Verwendung, kein neues Attribut im `Executor`-Konstruktor — die Re-Adoption
+>   hängt ausschließlich an einer **neuen Methode**, die `run()` nie aufruft (nur der P8
+>   Scheduler-Runner ruft sie auf).
+> - **+5 P5-Tests** (P5 190 → **195**, Σ-Baseline **1978** → **1985**): `test_monitor.py` +1
+>   (`test_entry_at_applies_max_hold_from_recorded_open`); `test_executor.py` +4
+>   (`test_resume_monitors_present_open_record_from_recorded_at`,
+>   `test_resume_returns_none_when_position_missing_at_broker`,
+>   `test_resume_skips_pending_without_deal_id`,
+>   `test_resume_closes_immediately_when_max_hold_elapsed`). Test-Helper `_seed_open_reference`
+>   schreibt via `_read`/`_write` direkt in den Store (private API, `# noqa: SLF001`), weil die
+>   öffentliche `record_pending`/`mark_open` `recorded_at` immer auf `_utcnow()` setzt — die
+>   Tests brauchen eine andere Recorded-At für den Elapsed-Check. `_tz_aware_now`-Helper für
+>   die `now_fn`, weil `fromisoformat(recorded_at.replace("Z", "+00:00"))` immer eine
+>   tz-aware UTC-datetime liefert (Live-Code kompatibel; naive-`now_fn`-Tests würden
+>   `TypeError` werfen).
+> - **Live-Beweis** (E-4-Probe der Shakedown-Phase) noch ausstehend — die Methode selbst ist
+>   grün, aber dass sie nach einem echten Restart einen AEX-Orphan tatsächlich vom
+>   `recorded_at` an weitermonitoren würde, kommt erst in der Shakedown-Phase.
+> - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 B-5 T13: Code in P5, P8 freigegeben;
+>   `phase17_testbed/CLAUDE.md` Session-#5-Block). Commit `154f460`. Push = Nikinger.
 
 ## Datei-/Modul-Übersicht (Soll, Konzept §"Modul-Plan")
 ```

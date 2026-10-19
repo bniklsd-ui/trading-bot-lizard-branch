@@ -7,6 +7,33 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-10-19 (Plan-Session §15 Provider-Plastizität, Opus 5.5 in Claude Code — nur Doku, kein Code; Σ 1978 re-gemessen)
+
+> **Auftrag:** Nikinger 2026-10-19 — Miniplan aus den MiniMax-Working-Notes `provider_plasticity/` (Q1–Q8). Ergebnis:
+> **Plan §15** (In-place-Änderung von Block C). Die Exec-Reihenfolge ändert sich **nicht**: als Nächstes B-5.
+
+### Completed
+- `docs/concepts/phase17_testbed_plan.md`: §15 angehängt (15.1 Antworten Q1–Q8 · 15.2 T25–T30 · 15.3 Quirk-Tabelle 9 Provider, doku-belegt 2026-10-19 · 15.4 Änderungen an C-1/C-3/C-4/C-6/C-7 mit Ankern · 15.5 Σ-Ziele · 15.6 §8-Fehlgriffe · 15.7 Verify Nr. 21–26 · 15.8 Nicht-Ziele); Banner + Header-Card.
+- `provider_plasticity/01–04`: datierte Vermerke (Q1–Q8 entschieden; Zeilen-Drift in 02 korrigiert; T25–T28 → Plan T25–T30).
+- Step-0-Ritual (No-Op, gleich A-1): `turbo` 20 Treffer, alle eingefrorener Legacy-Name `turbo_candidates.json`; `EPIC_MAP` nur in Kommentaren (P14). Σ-Baseline **1978**, 16/16 grün (P4 167, P8 264).
+- Befund für C-3: der 400-Fallback macht `test_bad_request_400_raises_immediately_no_retry` an `len(calls)` rot, während `pytest.raises` grün bleibt — Umbau steht in §15.4 C-3 Nr. 6.
+
+### Next
+- Unverändert **B-5** (Next start unten, wortgleich aus Exec-Session #4). Block C erst danach: **§14, dann §15** lesen.
+- Nikinger vor C-7 Stufe 1: OpenCode-Zen-API-Key (eigener, nicht `auth.json`) + Nutzungsbedingungen der Gratis-Modelle prüfen (§15.7 Nr. 25).
+
+### Open questions / blockers
+- Unverändert aus Exec-Session #4 (rotiert nach `SESSIONS_ARCHIVE.md`): Scheduler gestoppt bis E-3, IG-Bar-Löschung in E-3, Bridge-Backfill 29 NULL-Zeilen, Fleet §14.8.
+- Plan-§15 lokal committet, **Push = Nikinger**.
+
+### Next start (für die Folgesession, kalt einsteigen ohne Neu-Lesen)
+
+**B-5 Monitor-Re-Adoption (D5, T8, P5 + P8).** Anker: `phase5_execution/execution/monitor.py:71` (`sleep_fn=…` Ende → kw-only `entry_at=…, default None`), `:90` (`entry = now_fn()` → `entry = entry_at if entry_at is not None else now_fn()`); `phase5_execution/execution/executor.py:59` (Import) + neue Methode **vor** Z. 435 (`# -- Phase-10 (V3) abstain-lessons seam`) → `resume_open_position()` (T8-Wortlaut im Plan §6 B-5 verbatim). P8 `scheduler/runner.py:154` (`_ExecutorLike` Protocol-Docstring um „Optionally ``resume_open_position() -> ExecutionResult | None``" erweitern) + WINDOW-Zweig **direkt nach** Z. 386–388 mit `getattr(self._executor, "resume_open_position", None)`-Schutz. +5 P5-Tests (`test_monitor_entry_at_applies_max_hold_from_recorded_open`, `test_resume_monitors_present_open_record_from_recorded_at`, `test_resume_returns_none_when_position_missing_at_broker`, `test_resume_skips_pending_without_deal_id`, `test_resume_closes_immediately_when_max_hold_elapsed`) + 2 P8-Tests (`test_window_runs_resumed_position_instead_of_research`, `test_window_without_resume_method_is_unchanged`).
+Block-B Σ-Ziel ≥ 1992 noch 14 Tests entfernt nach B-5 (B-5 = +7, Σ 1985).
+Scheduler bleibt gestoppt (B-0). Push = Nikinger. Block C wartet auf OpenCode-Fleet-„bereit"-Meldung.
+
+---
+
 ## Session stopped — 2026-10-19 (Exec-Session #4 ENDE — Block B-4 Abschneiden sichtbar, 1 Commit in P4, Σ 1974 + 4 P4-Tests = **1978** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung)
 
 > **Auftrag:** Nikinger 2026-10-19 (später Session): „Lets go on with the next step!" → Exec-Session #4 setzt die explizite **Next**-Priorität aus Session #3 um: **B-4 Abschneiden sichtbar (D4, P4)** per Plan §6 B-4 verbatim (T13: Code in P4 ✓, Cross-Phase nicht nötig — beide Edits im selben P4-Modulbaum).
