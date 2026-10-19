@@ -96,6 +96,55 @@ def test_malformed_json_retries_once_then_raises(monkeypatch) -> None:
     assert len(calls) == 2  # one retry, per Decision 8
 
 
+def test_length_truncation_raises_without_retry(monkeypatch) -> None:
+    """Phase 17 B-4 (T20): finish_reason=length + unparseable JSON is non-transient.
+
+    Same retry semantics as the Anthropic client's stop_reason=max_tokens path —
+    a retry at the same ``max_tokens`` truncates again identically. Exactly one
+    network call. ``last_finish_reason`` is surfaced for downstream readers.
+    """
+    body = {
+        "choices": [
+            {
+                "message": {"content": "not json at all"},
+                "finish_reason": "length",
+            }
+        ],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+    }
+    calls: list = []
+    monkeypatch.setattr(
+        requests, "post", _fake_post(calls, [_FakeResponse(200, body)])
+    )
+    client = _client(monkeypatch)
+
+    with pytest.raises(LLMResponseError, match="finish_reason=length"):
+        client.ask_candidate("sys", "usr", SCHEMA)
+
+    assert len(calls) == 1  # no retry on truncation + parse failure
+    assert client.last_finish_reason == "length"
+
+
+def test_meters_even_when_parse_fails(monkeypatch, tmp_path) -> None:
+    """Phase 17 B-4 (T20): meter runs BEFORE the parse — K6 sees every billed response.
+
+    Two retried attempts both fail to parse (no finish_reason hint, transient
+    per Decision 8). The meter records two responses regardless of the parse
+    failures — pre-B-4 this would have logged 0 and silently under-counted K6.
+    """
+    body = {"choices": [{"message": {"content": "not json at all"}}], "usage": {}}
+    calls: list = []
+    monkeypatch.setattr(requests, "post", _fake_post(calls, [_FakeResponse(200, body)] * 2))
+    log_path = tmp_path / "llm_usage.json"
+    client = _client(monkeypatch, token_meter_path=str(log_path))
+
+    with pytest.raises(LLMResponseError):
+        client.ask_candidate("sys", "usr", SCHEMA)
+
+    records = json.loads(log_path.read_text())
+    assert len(records) == 2  # one per failed attempt, NOT 0 (pre-B-4 bug)
+
+
 def test_rate_limit_429_retries_once_then_raises(monkeypatch) -> None:
     calls: list = []
     monkeypatch.setattr(

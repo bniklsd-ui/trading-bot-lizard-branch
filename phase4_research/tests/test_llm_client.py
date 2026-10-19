@@ -88,6 +88,52 @@ def test_malformed_json_retries_once_then_raises() -> None:
     assert len(fake.calls) == 2
 
 
+def test_truncated_unparseable_raises_without_retry() -> None:
+    """Phase 17 B-4 (T20): stop_reason=max_tokens + unparseable JSON is non-transient.
+
+    A retry at the same ``max_tokens`` would truncate again identically, so
+    ``ask_candidate`` must not waste a turn on it. Exactly one raw call.
+    """
+    from types import SimpleNamespace
+
+    truncated = SimpleNamespace(
+        content=[SimpleNamespace(text="not json at all", type="text")],
+        usage=_FakeUsage(),
+        stop_reason="max_tokens",
+    )
+    client = _client()
+    fake = FakeRawCall([truncated])
+    client._raw_call = fake  # type: ignore[method-assign]
+
+    with pytest.raises(LLMResponseError, match="stop_reason=max_tokens"):
+        client.ask_candidate("sys", "usr", SCHEMA)
+
+    assert len(fake.calls) == 1  # no retry on truncation + parse failure
+
+
+def test_meters_even_when_parse_fails(tmp_path) -> None:
+    """Phase 17 B-4 (T20): meter runs BEFORE the parse, so K6 sees every billed response.
+
+    Two retried attempts both fail to parse (no stop_reason hint, so they are
+    transient and ``ask_candidate`` retries once). The meter must have two records,
+    regardless of the parse failures — pre-B-4 this run would have logged 0 records
+    and silently under-counted K6.
+    """
+    fake = FakeRawCall([
+        make_text_message("not json at all"),
+        make_text_message("still not json"),
+    ])
+    log_path = tmp_path / "llm_usage.json"
+    client = _client(token_meter_path=str(log_path))
+    client._raw_call = fake  # type: ignore[method-assign]
+
+    with pytest.raises(LLMResponseError):
+        client.ask_candidate("sys", "usr", SCHEMA)
+
+    records = json.loads(log_path.read_text())
+    assert len(records) == 2  # one per failed attempt, NOT 0 (pre-B-4 bug)
+
+
 def test_transient_error_retries_then_succeeds(good_raw) -> None:
     client = _client()
     fake = FakeRawCall([

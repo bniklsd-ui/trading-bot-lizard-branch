@@ -158,6 +158,10 @@ class OpenAICompatLLMClient:
         # Captured per successful call, mirroring LLMClient.last_usage — lets a
         # reusing caller read per-turn token usage without changing ask_candidate.
         self.last_usage: dict[str, Any] | None = None
+        # OpenAI-compat truncation signal — "stop" (complete) or "length" (truncated
+        # at max_tokens). Surfaced per call so the parse-failure branch can decide
+        # whether a retry would just truncate again (Phase 17 B-4, T20).
+        self.last_finish_reason: str | None = None
         self._api_key: str | None = None  # lazily fetched from the keyring, cached
 
     # ------------------------------------------------------------------ #
@@ -240,7 +244,13 @@ class OpenAICompatLLMClient:
     # Internals                                                          #
     # ------------------------------------------------------------------ #
     def _attempt(self, system: str, user: str, json_schema: dict) -> dict:
-        """One full attempt: build the request, parse the response, meter usage."""
+        """One full attempt: build the request, parse the response, meter usage.
+
+        Since Phase 17 B-4 (T20): metering runs **before** parsing so a response
+        that fails to parse is still billed toward K6; truncation (``finish_reason ==
+        "length"``) on top of a parse failure is surfaced as a non-transient
+        :class:`LLMResponseError` — the retry path cannot fix a token-budget-cutoff.
+        """
         schema_instruction = (
             "Respond with a single JSON object matching exactly this JSON Schema "
             f"— no prose, no markdown fence:\n{json.dumps(json_schema)}"
@@ -256,18 +266,12 @@ class OpenAICompatLLMClient:
             "response_format": {"type": "json_object"},
         }
         body = self._raw_call(payload)
-        text = _strip_fences(body["choices"][0]["message"]["content"])
-        try:
-            raw = json.loads(text)
-        except json.JSONDecodeError:
-            # No decode-time schema constraint here (see module docstring), so a
-            # prose-wrapped reply is the *expected* case to recover from, not an
-            # edge case — same recovery ``llm_client``'s schema-free fallback uses.
-            snippet = _extract_json_object(text)
-            if snippet is None:
-                raise
-            raw = json.loads(snippet)
+        choice = body["choices"][0]
+        # Truncation surfaced here so the parse-failure branch below can short-circuit
+        # to a non-transient LLMResponseError (Phase 17 B-4, T20).
+        self.last_finish_reason: str | None = choice.get("finish_reason")
 
+        # Meter first: a response that fails to parse was still billed (Phase 17 B-4).
         usage = body.get("usage") or {}
         # OpenAI-compat field names (prompt_tokens/completion_tokens) mapped onto
         # the Anthropic-shaped attribute names token_meter.record duck-types on;
@@ -284,4 +288,23 @@ class OpenAICompatLLMClient:
             )
         except Exception as exc:  # pragma: no cover - defensive, mirrors llm_client
             log.warning("token_meter.record failed: %s", exc)
+
+        text = _strip_fences(choice["message"]["content"])
+        try:
+            raw = json.loads(text)
+        except json.JSONDecodeError:
+            # Truncation + unparseable JSON → non-transient LLMResponseError, no retry
+            # (T20). The same prompt at the same ``max_tokens`` will truncate again.
+            if self.last_finish_reason == "length":
+                raise LLMResponseError(
+                    f"LLM output truncated (finish_reason=length, "
+                    f"max_tokens={self.max_tokens}, model={self.model})"
+                ) from None
+            # No decode-time schema constraint here (see module docstring), so a
+            # prose-wrapped reply is the *expected* case to recover from, not an
+            # edge case — same recovery ``llm_client``'s schema-free fallback uses.
+            snippet = _extract_json_object(text)
+            if snippet is None:
+                raise
+            raw = json.loads(snippet)
         return raw

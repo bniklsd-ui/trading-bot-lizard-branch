@@ -397,20 +397,9 @@ class LLMClient:
             else:
                 raise
 
-        text = _strip_fences(_extract_text(message))
-        try:
-            raw = json.loads(text)
-        except json.JSONDecodeError:
-            # The schema-free fallback may wrap the JSON in prose; recover the first
-            # balanced object before giving up. A miss re-raises unchanged → still a
-            # parse failure, still eligible for the single retry (Decision 8).
-            snippet = _extract_json_object(text) if used_fallback else None
-            if snippet is None:
-                raise
-            raw = json.loads(snippet)
-        # Best-effort metering — never let a meter problem break the pick. The
-        # returned record is captured on ``self.last_usage`` so a reusing caller
-        # (the Phase-6 debate budget) can read per-turn token usage.
+        # Meter first: a response that fails to parse was still billed (Phase 17 B-4).
+        # Done before _strip_fences/_extract_text so a parse failure does not silently
+        # skip token accounting and K6 / the daily cap under-count (Plan §3 D4, T20).
         try:
             self.last_usage = token_meter.record(
                 getattr(message, "usage", None),
@@ -420,4 +409,25 @@ class LLMClient:
             )
         except Exception as exc:  # pragma: no cover - defensive
             log.warning("token_meter.record failed: %s", exc)
+
+        text = _strip_fences(_extract_text(message))
+        try:
+            raw = json.loads(text)
+        except json.JSONDecodeError:
+            # Truncation + unparseable JSON → non-transient LLMResponseError, no retry
+            # (T20). The same prompt at the same ``max_tokens`` will truncate again.
+            # A parseable truncated body stays valid (the caller may inspect the
+            # ``self.last_usage`` token counts to detect it independently).
+            if getattr(message, "stop_reason", None) == "max_tokens":
+                raise LLMResponseError(
+                    f"LLM output truncated (stop_reason=max_tokens, "
+                    f"max_tokens={self.max_tokens}, model={self.model})"
+                ) from None
+            # The schema-free fallback may wrap the JSON in prose; recover the first
+            # balanced object before giving up. A miss re-raises unchanged → still a
+            # parse failure, still eligible for the single retry (Decision 8).
+            snippet = _extract_json_object(text) if used_fallback else None
+            if snippet is None:
+                raise
+            raw = json.loads(snippet)
         return raw
