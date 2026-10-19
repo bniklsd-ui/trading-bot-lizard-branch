@@ -154,3 +154,13 @@ echo "root | $($PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1)"
 - **Plan-AK-Stand nach dieser Session:** Session #1 ✅ AK1-AK4 + Session #2 ✅ neu: AK-Block-B Sweep **+6** (P12 +4 + P8 +2 = Plan-Ziel exakt erreicht). B-2 ist Plan-AK für Phase-12-Step-6 (Divergenz-Sampler, D2). Σ 1971 — Block-B Sweep-Ziel ≥ 1992 ist noch **21 Tests entfernt** (B-3..B-10 verbleibend).
 - **K11-Anker (Shakedown):** das neue `divergence_ok`-Event ist genau die Append-Only-Quelle für K11 (`evaluate_k11(health_jsonl, from_day, to_day)`: jeder Handelstag ≥ 1 Event `divergence_ok`/`quote_divergence`). Ohne B-2 wäre K11 strukturell unerreichbar — die alte Rechnung produzierte entweder `quote_divergence` (falsche Horizonte ⇒ falsche-positive) oder `divergence_no_comparator` (still, nicht „vergleichbar").
 - B-2 lokal ahead, wartet auf Nikinger-Push.
+
+### Next start (für die Folgesession, kalt einsteigen ohne Neu-Lesen)
+
+**B-3 Promotion-Bridge (D3, P15 + P8).** Anker: `phase15_v4/instinct/bridge.py:131-132`, `:146-148`, `:167-168`, Docstrings `:22-25` + `:177`. Drei Nahtfehler:
+1. `validate()` bekommt kein `trades` (Parameter `trades_n=500` reserviert, Docstring Z. 91–95 → #541 ergänzen).
+2. `decision.decision` statt `decision.value` (Plan §6 B-3 §2).
+3. `evidence_trade_ids_json` / `contradictions_trade_ids_json` (Keys mit `_json`) → aktuell NULL-INSERTs auf 29/29 Zeilen.
++ Contract-Test mit echter `persistence.Database` (Stub reichte nicht), +2 P15-Tests + 1 P8-Test. Eigener Extractor-Client (`max_tokens=2048`, `timeout_s=60`).
+Block-B Σ-Ziel ≥ 1992 noch 21 Tests entfernt nach B-3 (B-3 = +3, Σ 1974).
+Scheduler bleibt gestoppt (B-0). Push = Nikinger. Block C wartet auf OpenCode-Fleet-„bereit"-Meldung.
