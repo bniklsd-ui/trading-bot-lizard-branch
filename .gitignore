@@ -154,6 +154,13 @@ data/state/discovery_state.json
 # §6 E2 + §7 AK14). Operational artifact, not source.
 data/reports/
 
+# Phase 17 (Scheduler-Hold, 2026-10-25): operator-sticky marker that keeps the
+# deliberately stopped scheduler (Plan §6 B-0) from being enabled/started by
+# scripts/install_units.sh and scripts/restart-services.sh. Same runtime-state
+# category as data/state/KILL above — otherwise it is one `git add -A` away from
+# being committed as source.
+data/state/SCHEDULER_HELD
+
 # --- Logs ---
 *.log
 logs/

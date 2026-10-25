@@ -18,6 +18,8 @@
 #   not a tool.
 # - Never touch data/state/KILL (operator's sticky decision).
 # - Never touch data/state/DISCOVERY_ARMED (operator+UI workflow, not ours).
+# - Never start the scheduler while data/state/SCHEDULER_HELD exists (Phase 17
+#   B-0 — the scheduler is deliberately stopped until E-3; stopping still works).
 # - Never start a daemon if its PID-file says one is alive: the daemon-side
 #   guards (data_foundation.run, source_registry.run) refuse to double-start
 #   for a reason, and we'd just race them.
@@ -47,6 +49,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 STATE_DIR="${REPO_ROOT}/data/state"
+
+# Scheduler-Hold (Phase 17 B-0, 2026-10-25): while data/state/SCHEDULER_HELD
+# exists, the scheduler is deliberately stopped (Plan §6 B-0 — only the
+# scheduler holds an IG session, Plan T22) and this helper must NOT start it
+# again. The hold blocks *starting* only — stopping still works, so the
+# operator can always shut it down. TRADINGBOT_HOLD_FILE exists so the tests
+# can point the marker at a tmp path instead of the live data/state dir.
+HOLD_FILE="${TRADINGBOT_HOLD_FILE:-${REPO_ROOT}/data/state/SCHEDULER_HELD}"
+HELD_SERVICE="phase8_scheduler/scripts/run_scheduler.sh"
+
+# True while the scheduler-hold marker exists (operator-sticky, like KILL).
+hold_active() { [[ -f "$HOLD_FILE" ]]; }
 
 # Restart-hygiene (Phase-14 Session-10 NEXT-Block, shared boilerplate with
 # the per-service wrappers): prepend the canonical venv's bin/ to PATH so this
@@ -133,8 +147,11 @@ cmd_status() {
         fi
     done
     # Surface the operator-sticky files we never touch.
-    [[ -f "${STATE_DIR}/KILL" ]] && printf "[restart-services]   NOTE   KILL file present (operator-controlled, untouched): %s\n" "${STATE_DIR}/KILL" >&2
+    [[ -f "${STATE_DIR}/KILL" ]] && printf "[restart-services]   NOTE   KILL file present (operator-controlled, untouched): ${STATE_DIR}/KILL\n" >&2
     [[ -f "${STATE_DIR}/DISCOVERY_ARMED" ]] && printf "[restart-services]   NOTE   DISCOVERY_ARMED present (operator+UI-controlled, untouched)\n" >&2
+    if hold_active; then
+        printf "[restart-services]   NOTE   SCHEDULER_HOLD present: scheduler is deliberately stopped (Phase 17 B-0) — start/restart skips it. Marker: %s\n" "${HOLD_FILE}" >&2
+    fi
     return $((1 - any))   # 0 if any alive, 1 if all dead
 }
 
@@ -191,6 +208,12 @@ start_one() {
     local svc="$1"
     local pattern="${PGREP_PATTERN[$svc]}"
     local script="${REPO_ROOT}/${svc}"
+    # Scheduler-Hold: never start the deliberately stopped scheduler (Phase 17
+    # B-0). The hold blocks starting only — stop_one still stops it.
+    if [[ "$svc" == "$HELD_SERVICE" ]] && hold_active; then
+        log "start: HOLD — ${svc} is deliberately stopped (Phase 17 B-0, marker: ${HOLD_FILE}) — skipping"
+        return 0
+    fi
     if [[ ! -x "$script" ]]; then
         log "start: wrapper not executable: $script — skipping"
         return 0
