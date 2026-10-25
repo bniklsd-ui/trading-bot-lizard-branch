@@ -10,7 +10,7 @@ down:
   - ../phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md     # 📕 Vorgänger-Handover (§4 PASS-Blocker, §5 E1–E8)
   - ../phase16_activation/scripts/autonomy_report.py       # Report-Skript, Block E erweitert es in place (--prereg v5)
   - ./SESSIONS_ARCHIVE.md                                  # rotierte Session-Blöcke (L3, newest-first)
-updated: 2026-10-19 (Exec-Session #6 ENDE — B-6 Breaker Worst-Case, 1 Commit in P8, Σ 1985 + 3 P8-Tests = **1988** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Exec-Session #5 ENDE — B-5 Monitor-Re-Adoption, 1 Commit in P5+P8, Σ 1978 + 5 P5 + 2 P8 = **1985** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Plan-Session §15 Provider-Plastizität — Forward-Agenda C2 → Plan §15, Σ-Ziele C/D/E-1 +9, Σ 1978 re-gemessen) | 2026-10-19 (Exec-Session #4 ANSCHLUSS — `provider_plasticity/` Working-Notes-Set angelegt (kein Plan, Input für Opus-Miniplan-Session; 5 INDEX-Einträge); Nikinger-Entscheidungen Q1–Q8 ausstehend) | 2026-10-19 (Exec-Session #4 ENDE — B-4 Abschneiden sichtbar, 1 Commit in P4, Σ 1974 + 4 P4-Tests = **1978** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Exec-Session #3 ENDE — B-3 Promotion-Bridge Nahtfehler, 2 Commits in P15+P8, Σ 1971 + 2 P15 + 1 P8 = **1974** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Exec-Session #2 ENDE — B-2 Divergenz-Sampler Reparatur, Σ 1965 + 4 P12-Tests + 2 P8-Tests = **1971** grün) | 2026-10-19 (Exec-Session #1 ENDE — A-0+A-1+A-2 + A-3 + B-0 + B-1, Σ 1965) | 2026-10-18 (Plan-§14-Nachtrag) | 2026-10-17 (Plan-Session, Opus 5.5)
+updated: 2026-10-25 (Exec-Session #7 ENDE — Scheduler-Hold: systemd-Autostart aus + getrackter Repo-Guard `data/state/SCHEDULER_HELD`, +12 root-Tests, Σ **2000**) | 2026-10-19 (Exec-Session #6 ENDE — B-6 Breaker Worst-Case, 1 Commit in P8, Σ 1985 + 3 P8-Tests = **1988** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Exec-Session #5 ENDE — B-5 Monitor-Re-Adoption, 1 Commit in P5+P8, Σ 1978 + 5 P5 + 2 P8 = **1985** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Plan-Session §15 Provider-Plastizität — Forward-Agenda C2 → Plan §15, Σ-Ziele C/D/E-1 +9, Σ 1978 re-gemessen) | 2026-10-19 (Exec-Session #4 ANSCHLUSS — `provider_plasticity/` Working-Notes-Set angelegt (kein Plan, Input für Opus-Miniplan-Session; 5 INDEX-Einträge); Nikinger-Entscheidungen Q1–Q8 ausstehend) | 2026-10-19 (Exec-Session #4 ENDE — B-4 Abschneiden sichtbar, 1 Commit in P4, Σ 1974 + 4 P4-Tests = **1978** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Exec-Session #3 ENDE — B-3 Promotion-Bridge Nahtfehler, 2 Commits in P15+P8, Σ 1971 + 2 P15 + 1 P8 = **1974** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung) | 2026-10-19 (Exec-Session #2 ENDE — B-2 Divergenz-Sampler Reparatur, Σ 1965 + 4 P12-Tests + 2 P8-Tests = **1971** grün) | 2026-10-19 (Exec-Session #1 ENDE — A-0+A-1+A-2 + A-3 + B-0 + B-1, Σ 1965) | 2026-10-18 (Plan-§14-Nachtrag) | 2026-10-17 (Plan-Session, Opus 5.5)
 ---
 
 # CLAUDE.md — Phase 17: Prüfstand (`phase17_testbed/`)
@@ -54,6 +54,15 @@ ps aux | grep "scheduler.run" | grep -v grep             # Gegenprobe: leer
 
 - Recorder, Discovery und WebUI halten keine IG-Session und laufen weiter (Plan T22).
 - Den Neustart macht nur **E-3**, die Deploy-Sequenz im Plan.
+- **Scheduler-HOLD (B-0, seit 2026-10-25, Exec-Session #7):** der Scheduler ist über den
+  Stopp hinaus **autostart-fest abgesichert** — systemd `disabled` + Marker
+  `data/state/SCHEDULER_HELD` (operator-sticky, Muster `KILL`/`DISCOVERY_ARMED`). Beide
+  Repo-Türen respektieren den Marker: `scripts/install_units.sh` enabled die Scheduler-Unit
+  bei Hold **nicht**, `scripts/restart-services.sh` startet sie bei Hold **nicht**.
+  Zustandsprüfung: `bash scripts/install_units.sh --check` (exit 0 = alles wie erwartet;
+  Drift → exit 1). Nicht von Hand `enable`/`start` ohne Freigabe.
+  Freigabe (E-3): `bash scripts/install_units.sh --release-hold` → `bash scripts/install_units.sh`
+  → `systemctl --user start tradingbot-scheduler.service`.
 
 ## Test-Sweep (jede Suite getrennt; Σ = 16 Suites, meta_m1 nicht in Σ)
 
@@ -77,6 +86,7 @@ echo "root | $($PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1)"
 | Nach Exec-Session #6 (B-6, 2026-10-19) | **1988** | +3 P8 |
 | Ziel nach Block B / C / D / E-1 | ≥ 1992 / ≥ 2025 / ≥ 2028 / ≥ 2035 | Plan §6 + §14 (+1) + §15 (+9, P4 +5 · P8 +4) |
 | Re-Messung Exec-Session #6 (2026-10-19) | **1988** | unverändert, 16/16 grün |
+| Nach Exec-Session #7 (Scheduler-Hold, 2026-10-25) | **2000** | +12 root-Tests (root 121 → 133), 16/16 grün |
 
 ## Phase-17-Status
 
@@ -91,6 +101,7 @@ echo "root | $($PY -m pytest tests/ -q -p no:cacheprovider 2>&1 | tail -1)"
 | B-5 Monitor-Re-Adoption (D5, T8) | ✅ (Session #5) |
 | B-6 Breaker Worst-Case (D6, T9) | ✅ (Session #6) |
 | B-7 … B-10 | ⏳ |
+| Scheduler-Hold (B-0 → E-3) | ✅ aktiv (2026-10-25): systemd `disabled` + `data/state/SCHEDULER_HELD`, beide Repo-Türen (Installer, Restart-Helper) respektieren den Marker — **Freigabe erst in E-3** (`bash scripts/install_units.sh --release-hold`) |
 | C LLM-Austausch | ⏳ — **zuerst Plan §14, dann §15** (Provider-Plastizität, in place) |
 | D Token-Budget | ⏳ |
 | E Test-Fundament | ⏳ |
@@ -119,79 +130,58 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 
 ---
 
-## Session stopped — 2026-10-19 (Exec-Session #6 ENDE — Block B-6 Breaker Worst-Case, 1 Commit in P8, Σ 1985 + 3 P8-Tests = **1988** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung)
+## Session stopped — 2026-10-25 (Exec-Session #7 ENDE — Scheduler-Hold: systemd-Autostart aus + getrackter Repo-Guard `data/state/SCHEDULER_HELD`, +12 root-Tests, Σ 1988 + 12 = **2000** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe: Marker-Variante + lokale Commits, Push = Nikinger)
 
-> **Auftrag:** Nikinger 2026-10-19 (später Session): „Go on as in the next block recommended." → Exec-Session #6 setzt die explizite **Next**-Priorität aus Exec-Session #5 um: **B-6 Breaker Worst-Case (D6, T9, P8)** per Plan §6 B-6 verbatim (T13: Code in P8 ✓, keine Cross-Phase-Edits nötig — alle Module im selben P8-Baum). **Drift-Hinweis:** Plan-Anker Z. 1009–1016 (Closure) ist heute Z. 1066–1073 — ~$+57$ Zeilen nach unten gewandert (B-3/B-5 Commits in P15 + P8 dazwischen). **Kleiner Drift**, semantisch unverändert, in dieser Session am Exec-Ort verifiziert.
+> **Auftrag:** Nikinger 2026-10-25 (über die eurfleet-Fleet-Session weitergeleitet): „Hold off on running 201 — its restart list includes tradingbot-scheduler, and since it's also enabled, a likely reboot would re-start it against your 21.10 decision. … You or the bot session should separately run `systemctl --user disable tradingbot-scheduler` on 201, since that unit's state isn't mine to touch. … 201 then gets patched normally on 31.10." → Diese Exec-Session macht die **Bot-Seite**: (1) Host-Disable (systemd-Autostart aus), (2) getrackter Repo-Guard, damit der 31.10-Update-Run den Fix nicht zurücknimmt. Die Fleet-Seite (Restart-Liste `inventory/hosts.yml`, `--check`) liegt in der eurfleet-Session, nicht hier.
 >
-> **Executor-Modus:** MiniMax-M3-Fallback (Plan §14.2) — unverändert. `~/.config/opencode/`, `auth.json`, `opencode.service` weiterhin unangefasst.
+> **Kontext:** Die Phase-17-Entscheidung B-0 (Plan §6) hält den Scheduler **absichtlich** gestoppt (Plan T22: nur der Scheduler hält eine IG-Session) — von B-0 bis E-3. Das Repo kannte diese Entscheidung bisher nur als *Prozesszustand* (`systemctl --user stop`), nicht als *Installationszustand*: die Unit war weiterhin `enabled`. Jeder Reboot (VM-Host-Ereignis, Plan T10) hätte den gestoppten Scheduler wieder gestartet.
+>
+> **Executor-Modus:** MiniMax-M3 (OpenCode) — kein z.ai-Modell heute. `~/.config/opencode/`, `auth.json`, `opencode.service` unangefasst.
 
-### Completed — diese Exec-Session (1 Commit)
+### Completed — diese Exec-Session (2 Commits)
 
 | # | Commit | Phase | Inhalt |
 |---|---|---|---|
-| 1 | `a0b2fb5` | P8 | **`scripts/wiring.py`** Top-Level neue Funktion `_realized_pnl_today(conn: Any, session_date: str) -> float` direkt **nach** dem B-2-Helper `_sampler_due` einsortiert (B-Block-Helper-Section wächst). SQL mit `CASE WHEN status='OPEN' THEN -initial_risk ELSE profit_loss END` für die Bindung der T9-Worst-Case-Semantik: jeder OPEN-Trade (profit_loss NULL während IG-Settlement-Lücke, gemessen 1 h 06 – 1 h 54 in Phase-16-Closeout §4) zählt mit `-initial_risk` als sein Worst-Case-Verlust, gebuchte CLOSED-PnLs kommen unverändert durch. Zweiter Wert im `SELECT` ist `COALESCE(SUM(status='OPEN' AND initial_risk IS NULL), 0)` und löst eine `RuntimeError("OPEN trade without initial_risk — the breaker cannot bound today's loss")` aus, sobald ≥ 1 OPEN-Row ohne `initial_risk` (fail-closed Contract E — `AutoConfirm` blockt + loggt critical). Filter `WHERE session_date = ? AND (profit_loss IS NOT NULL OR status='OPEN')` schließt geCLOSE-te Rows mit NULL-PnL vom Buchungs-SUM aus, ohne sie zu verlieren (sie matchen weder den OPEN- noch den booked-CASE-Zweig). Closure `realized_pnl_today(session_date)` (jetzt Z. 1066) wird zum Drei-Zeilen-Wrapper `return _realized_pnl_today(db.conn, session_date)`; Docstring erweitert um „(Contract E + Phase 17 B-6 worst case)". **Kein Eingriff** in `AutoConfirm`-Konstruktion, `realized_pnl_today`-Aufruf, Kill-Path, Config oder die anderen `_build_*`-Helper. |
-| 1b | (gleicher Commit) | P8 | **Neue Datei `phase8_scheduler/tests/test_wiring_breaker.py`** (Muster `test_wiring_reward_sink.py`/`test_wiring_sampler_gate.py`): `@pytest.fixture db` baut eine echte `persistence.Database(":memory:")` + `run_migrations()` (sqlite3 in-memory, eine Connection über Test-Lifetime — kein `tmp_path` nötig, `:memory:` hat im `Database`-Konstruktor keine Sonderbehandlung). Helper `_seed_closed_trade` (profit_loss + UPDATE status='CLOSED') + `_seed_open_trade` (default `status='OPEN'` aus dem DB-Insert, `initial_risk` parametrisch inkl. None). **+3 Tests**: `test_booked_pnl_only_when_no_open_rows` (3 winner/loser CLOSED → SUM == +160.0, keine OPEN-Rows → Booking-Pfad unverändert ggü. pre-B-6); `test_open_row_counts_as_minus_initial_risk` (1 CLOSED +50, 1 OPEN mit `initial_risk=30` → Return == 20.0, der OPEN-Trade bindet 30 gegen den Gewinn); `test_open_row_without_initial_risk_raises` (1 CLOSED +15, 1 OPEN ohne `initial_risk` → `pytest.raises(RuntimeError, match="OPEN trade without initial_risk")`). **Σ-Steigerung:** P8 266 → **269** (+3 ✓ Plan-AK exakt), Σ 1985 → **1988** (+3). Keine Regressionen in den übrigen 15 Suites. |
+| 1 | `51ba156` | root (`scripts/`) | **Host-Hold + Repo-Guard.** (a) `systemctl --user disable tradingbot-scheduler.service` auf 201 (Host-Zustand: vorher `enabled` → jetzt `disabled`, `is-active` bleibt `inactive`; recorder/discovery/webui unangeführt `enabled` + `active`). (b) **`scripts/install_units.sh`**: Hold-Marker `data/state/SCHEDULER_HELD` (operator-sticky, Muster `KILL` / `DISCOVERY_ARMED`, **untracked** — `data/` ist Host-Zustand; der *Guard* ist der getrackte Teil). Bei Hold wird `tradingbot-scheduler.service` **nicht** enabled — vorher lief am Script-Ende `systemctl --user enable "${UNITS[@]}"` (Z. 76), d. h. der nächste Installer-Lauf (31.10-Update-Run) hätte den Scheduler wieder autostart-fähig gemacht. Neue Modi: `--check` (report-only, Drift → exit 1), `--hold` (Marker anlegen + Unit deaktivieren), `--release-hold` (Marker weg). (c) **`scripts/restart-services.sh`**: `start`/`restart` überspringen den Scheduler bei Hold (`start_one`), `status` meldet den Hold als NOTE; `stop` bleibt unberührt (Hold blockiert nur das *Starten*). Beide Skripte lesen den Marker über `${TRADINGBOT_HOLD_FILE:-${REPO_ROOT}/data/state/SCHEDULER_HELD}` (Test-Override, Default = Live-Pfad). `.gitignore` bekommt den Marker als Runtime-State-Eintrag (Muster `data/state/KILL`). |
+| 2 | (dieser Commit) | root (`tests/`) + P17-Doku | **+12 root-Tests** in `tests/test_scheduler_hold.py` (pytest, subprocess auf die Bash-Helfer, **fake `systemctl`** im PATH, tmp `HOME`, tmp-Marker → **kein** Touch des Live-`data/state`). **Σ-Steigerung:** root 121 → **133** (+12), Σ 1988 → **2000** (+12). Keine Regressionen in den übrigen 15 Suites (16/16 grün, Sweep nach dem Phasen-Kopf-Kommando). Doku: dieser Block + Rotation von Session #6 nach `SESSIONS_ARCHIVE.md` + Σ-Tabelle + Bot-Ritual + Status-Zeile. |
 
-### Test-Detail (B-6, neu hinzugekommen)
+### Gemessen (Host 201, `trading-bot-VMware-Virtual-Platform`)
 
-P8 (`tests/test_wiring_breaker.py`):
-- `db`-Fixture baut `:memory:` + `run_migrations()` — ein **Migrations**-Aufruf pro Test, weil in-memory DBs connection-scoped leben und der `Database`-Konstruktor keine `dispose()`-Methode anbietet. Bei `:memory:` heißt das: jede Test-Fixture lebt für genau den Test.
-- `_seed_closed_trade` setzt `currency='EUR'` (NOT NULL aus Migration 001), wechselt dann `status='CLOSED'` per `conn.execute("UPDATE trade_outcomes SET status = 'CLOSED' WHERE id = ?", (row_id,))` — der `insert_trade`-Default ist `'OPEN'`, das UPDATE überschreibt sauber ohne die Phase-7-`update_trade_close`-Validierung (Hold-Duration nicht geprüft, weil `open_ts` und `close_ts` weggelassen werden würden, um den Test fokussiert zu halten).
-- `_seed_open_trade` setzt `initial_risk` **nur wenn nicht None** — sonst bleibt die Spalte NULL und ist genau die failure-mode, die das Test 3 prüft. Die DB-Spalte ist NOT NULL nur für manche Felder; `initial_risk` ist seit Migration 002 (Phase 7) als REAL-ohne-NOT-NULL erlaubt.
-- `test_booked_pnl_only_when_no_open_rows`: 3 CLOSED mit `profit_loss=120/80/-40` → **SUM == +160.0**. **Sentinel:** das `CASE WHEN status='OPEN'` greift **nie**, die `ELSE profit_loss`-Branch für **alle 3** Rows; `COALESCE(SUM(...), 0.0)` ist Standard, `COALESCE(SUM(status='OPEN' AND initial_risk IS NULL), 0)` ist 0 — der `if row[1]`-Check schweigt, Return == `float(row[0])` == 160.0. **Pre-B-6** hätte derselbe Aufruf (alter Closure-Rumpf) `+160.0` returniert — der Test pinnt „Booking-Pfad bit-identisch" und ist die wichtigste Regression.
-- `test_open_row_counts_as_minus_initial_risk`: 1 CLOSED +50 + 1 OPEN mit `initial_risk=30` → **Return == +20.0**. **CAS-Walk:** der OPEN-Trade landet mit `-30` im SUM, der CLOSED mit `+50`, beide addiert via `CASE`. Der `_NULL_OPEN` Count ist 0 (OPEN-Row hat ja `initial_risk=30`), Raise schweigt. Diese eine Zahl demonstriert den **Breaker-Misser** der pre-B-6-Situation: derselbe Trade-Bestand hätte dem Breaker pre-B-6 nur `+50` gezeigt (= buchstäblich falsche Trading-Freigabe, obwohl der OPEN mit `initial_risk=30` schon auf dem Weg zur Stop-Loss-Kurs ist). Bug-Fix: K1 (Breaker) sieht das OPEN jetzt mit.
-- `test_open_row_without_initial_risk_raises`: 1 CLOSED +15 + 1 OPEN-Trade ohne `initial_risk` → **`pytest.raises(RuntimeError, match="OPEN trade without initial_risk")`**. **Die Reihenfolge im SQL ist wichtig:** der Bug ist, dass die `-initial_risk`-CASE-Branch in SQL zu `-NULL` = NULL wird (kein Fehler, SQL SUM ignoriert NULLs) → der SUM liefert **nur +15** als untere Schranke, der Breaker wäre „happy" mit +15, obwohl der OPEN-Unbound echtes Risiko verbergen kann. Deshalb der **zweite** Selekt-Wert mit der Fail-Check: jede NULL-initial_risk-OPEN-Row löst `raise` aus, **bevor** `return float(row[0])` läuft. Der Test ist exakt das — er beweist nicht, dass der SQL-Wert 0 ist, sondern dass die Raise früher kommt. Fail-Cascading-Pfad ist: `AutoConfirm.can_open(state)` ruft `realized_pnl_today` → Reader raises → `AutoConfirm` loggt `critical` + returnt `(False, ...)` → Scheduler skippt den Trade → OPEN-Position muss per Operator-Reconciliation (`scripts/reconcile.py` / `reconcile_open_trades`) gelöst werden, bevor der nächste Cycle grün wird.
-- `match="OPEN trade without initial_risk"` pinnt die genaue Errormessage, damit eine spätere Refactoring den **`RuntimeError`**-Typ und den Anlass stabil hält. Der genaue Wortlaut ist nicht durch einen Konsumenten erzwungen, gehört aber zu den Log-Lines, an denen ein Operator später unterscheiden kann, ob ein OPEN ohne initial_risk → Bug (Code füllt `initial_risk` nicht) oder Feature (Phase-8-Reconciler war langsam).
+| | vorher | nachher |
+|---|---|---|
+| `is-enabled tradingbot-scheduler.service` | `enabled` | **`disabled`** |
+| `is-active tradingbot-scheduler.service` | `inactive` | `inactive` (unverändert) |
+| recorder / discovery / webui | enabled + active | enabled + active (unverändert) |
+| `bash scripts/install_units.sh --check` | (n/a) | exit 0 — „hold ACTIVE", Scheduler `installed=current enabled=disabled expected=disabled` |
+| `bash scripts/restart-services.sh status` | 3 alive, Scheduler dead | 3 alive, Scheduler dead + NOTE „SCHEDULER_HOLD present" |
+| `data/state/KILL` | nicht vorhanden | nicht vorhanden (unberührt) |
+
+### Die zwei Türen (Befund — warum Host-Disable allein nicht reicht)
+
+1. **`scripts/install_units.sh:76`** — `systemctl --user enable "${UNITS[@]}"`: der getrackte Installer aktiviert **alle vier** Units. Der Fleet-Update-Run läuft über diesen Installer → Scheduler wieder `enabled` → der *nächste* Reboot startet ihn. Deshalb muss der Hold ein getrackter Guard sein, kein Host-Flag.
+2. **`scripts/restart-services.sh`** — der repo-eigene Restart-Helfer startet den Scheduler per `nohup` (systemd-unabhängig). Ein `restart` im Update-Flow hätte den gestoppten Scheduler ebenfalls gestartet.
+
+Beide Türen sind jetzt durch **einen** Marker geschlossen. Die Tests pinnen beide — inklusive Negativ-Beweis: ohne Marker startet `restart-services.sh start` den Scheduler wieder (der Hold ist die einzige Differenz, kein Zufalls-Effekt).
 
 ### Next (geplante Folgesessions, in Priorität)
-- **B-7 Abstain-Naht (D7, P8).** `scripts/wiring.py`: zwei Edits — (1) `AbstainSink.on_no_trade(cycle_outcome)` Methode (Plan-Anker Z. 758–760, **vor Antritt re-verifizieren**) bekommt Rückgabe `-> Any:`, `inner.on_no_trade(cycle_outcome)` → `record_id = inner.on_no_trade(cycle_outcome)`, am Ende `return record_id`; Docstring-Satz „locked contract" → „passes the sink's record_id through — the executor links it into decision_context.abstain_record_id (3 669/3 669 NULL before Phase 17 B-7)"; (2) Reihenfolge Z. 993–995 umdrehen (Anreicherung **vor** Klassifikation, sodass `llm_unavailable`-Flag rechtzeitig an der Klassifikation ankommt). +2 P8-Tests in neuer Datei `tests/test_wiring_abstain_seam.py`. Plan-AK P8 ≥ **271**, Σ ≥ **1990**.
-- **B-8, B-9, B-10** in Plan §6.
-- **Block C (LLM-Austausch)** wartet auf OpenCode + z.ai-Fleet-„bereit"-Meldung (Plan §14.8). Heute nicht blockierend (MiniMax-Fallback läuft).
-- **Datenreparatur der 3 730 alten `source='ig'`-Bars** (Plan T14) folgt erst in **E-3** zusammen mit dem Scheduler-Restart; bis dahin bleibt der DB-Zustand mit den +2-h-Bars stehen.
 
-### B-6 Σ-Steigerung (2026-10-19, Plan §6 Kommandoform)
-
-| Suite | grün (nach B-5) | grün (nach B-6) | Δ |
-|---|---:|---:|---:|
-| P1 broker_wrapper | 98 | 98 | — |
-| P2 persistence | 82 | 82 | — |
-| P3 external_data | 108 | 108 | — |
-| P4 research | 167 | 167 | — |
-| P5 execution | 195 | 195 | — |
-| P6 debate | 76 | 76 | — |
-| P7 reward | 170 | 170 | — |
-| **P8 scheduler** | 266 | **269** | **+3** |
-| P9 universe | 95 | 95 | — |
-| P10 v3 | 165 | 165 | — |
-| P12 data_foundation | 153 | 153 | — |
-| P13 live_data | 85 | 85 | — |
-| P14 discovery | 61 | 61 | — |
-| P15 v4 | 128 | 128 | — |
-| P16 activation | 15 | 15 | — |
-| root `tests/` | 121 | 121 | — |
-| **Σ 16 Suites** | **1985** | **1988** | **+3** |
-| meta_m1 (informativ, nicht in Σ) | 28 | 28 | — |
+- **B-7 Abstain-Naht (D7, P8)** — unverändert der nächste Block; Anker im archivierten Session-#6-Block („Next start"). Plan-AK P8 ≥ **271**, Σ-Ziel Block B ≥ 1992.
+- **E-3-Vorbereitung (Pflicht-Schritt, noch offen):** der Hold muss **vor** E-3 freigegeben werden, sonst bleibt die Scheduler-Unit `disabled` (der R5-Autostart-Beweis fehlt danach). Freigabe: `bash scripts/install_units.sh --release-hold` → danach `bash scripts/install_units.sh` (enabled alle vier) → `systemctl --user start tradingbot-scheduler.service …` (Plan §6 E-3). Der E-3-Block im Plan (`docs/concepts/phase17_testbed_plan.md`) ist `status: snapshot` (L3) und wurde **nicht** editiert — der Release-Schritt steht dort noch nicht; er ist hier dokumentiert und gehört in den E-3-Lauf.
+- **Fleet-Abstimmung (eurfleet-Session):** deren Repo (Restart-Liste) ist theirs — der Bot-Anteil ist hier erledigt. 201 wird am **31.10.** wie geplant gepatcht; der Reboot darf den Scheduler nicht starten (Autostart `disabled` + Guard).
 
 ### Open questions / blockers
-- **Scheduler ist gestoppt** (`is-active=failed`). Vor E-3 muss er wieder hochfahren — der Recorder muss dann mit dem Klonen-Bar-Löschen (Plan T14, `DELETE FROM bars WHERE source='ig'`) zusammen laufen, weil sonst `bars.sqlite is locked` (Plan §8 Fehlgriff). Bis zum E-3 wird die alte IG-Historie (3 730 Bars mit `ts_utc` +2h in der Zukunft) NICHT angerührt; das ist **gewollt** und **kein Datenverlust**, weil der Fix in `ig_adapter.py:909` wirkt und neue Bars korrekt schreibt. **Identisch zu Session #1/#2/#3/#4/#5 — keine Änderung.**
-- **Promotion-Bridge-Backfill für die 29 NULL-Zeilen**: unverändert offen (Session #3).
-- **Fleet §14.8 (OpenCode + z.ai)** weiterhin offen. Heute nicht blockierend.
-- **B-5-Live-Beweis** (E-4-Probe) noch ausstehend — `resume_open_position()` selbst ist grün, Live-Beweis kommt in der Shakedown-Phase.
-- **B-6-Live-Beweis** ebenfalls noch ausstehend — die `_realized_pnl_today`-Worst-Case-SUM ist im grünen Test abgesichert, aber der **cascade-pfad in `AutoConfirm`** (raise ⇒ `(False, ...)` + critical log + Trade-Block) wird im Test indirekt über den `pytest.raises` garantiert; live muss der nächste OPEN-mit-`initial_risk NULL` (oder überhaupt ohne `initial_risk`-Befüllung) zeigen, dass der Breaker den Cycle blockiert und der Operator die Reconciliation triggert. Bis dahin ist das **strukturelle Garantie**, kein empirischer.
 
-### Session-end-Hinweis (für die Exec-Session selbst)
-- **Plan-AK-Stand nach dieser Session:** Session #1 ✅ AK1-AK4 + Session #2 ✅ +6 + Session #3 ✅ +3 + Session #4 ✅ +4 + Session #5 ✅ +7 + **Session #6 ✅ +3** = Σ 1988. Plan-AK-Block-B Sweep Σ ≥ 1992 noch **4 Tests entfernt** (B-7..B-10 verbleibend: B-7 +2, B-8 +1, B-9 +0 (Unit-Test läuft in E-3), B-10 +1 = +4 exakt).
-- B-6 lokal ahead (`a0b2fb5` = 1 Commit nach `origin/main = 9d8eb96`), wartet auf Nikinger-Push.
-- **Drift-Konsolidierung (Anker):** zwischen Plan-Stand 2026-10-17 und Session #6 sind die Plan-Anker für B-6, B-7, B-10 um ~$+20$ bis $+57$ Zeilen gewandert (Commits in P8/P15 zwischen Plan-Snapshot und Exec #6). **Nicht substantiell**, aber jede Exec-Session die in der nächsten Zeit einen Anker aufsucht, muss ihn re-verifizieren — diese Session hat es für B-6 getan (`grep -n realized_pnl_today` → Z. 1066 statt 1009), hat den Drift protokolliert und die Edits am realen Ort ausgeführt. Wenn die Drift-Differenz für B-7 noch größer ist (z. B. >+60 Zeilen), sollte eine Folge-Session den Plan-Snapshot updaten statt nur den Drift zu protokollieren.
-- **Strukturelle Beobachtung:** B-6 setzt einen `RuntimeError`-Throw-Pfad in die `realized_pnl_today`-Reader-Funktion. **`AutoConfirm`** muss diese Exception **fail-closed** behandeln — der bestehende `AutoConfirm.can_open`-Code-Pfad enthält keine `try/except` um den Reader-Aufruf, sondern erwartet, dass der Reader einen Wert returniert. Wenn das aktuelle `AutoConfirm` nicht try/catcht und die Exception hochpropagiert, krasht der Cycle (Backoff greift nach `max_consecutive_failures=3` → Kill-Switch). **Heute kein empirischer Bug-Check gemacht** — das ist Konzept-Audit gegen den Code-Stand. Wenn der Live-`AutoConfirm` try/catcht, ist alles gut; wenn nicht, ist das ein Folge-Fix (P8) im Block-B oder eine Phase-17-Folge-Session. **B-6 ist kein Defekt, B-6 ist die Missing-Guard gegen den nächsten OPEN-without-initial_risk.** Die RuntimeError-Kaskade selbst ist Plan-Wortlaut — wenn der Code sie anders abfangen will, ist sie immer noch da, nur am anderen Caller.
-- B-6 schließt den **dritten der vier Phase-16-PASS-Blocker** (Breaker-Blindfenster: Buchungsverzug 1 h 06 – 1 h 54 ließ den Breaker einen Fresh-Stop-out nicht sehen — Phase-16-Closeout §4). Verbleibend: **Token-Budget (K6)** als Block-D (Phase-17 §6 D-1/D-2 Planreferenz). Promotion-Bridge ist B-3-repariert; Monitor-Orphan ist B-5-repariert; jetzt Breaker-Blindfenster B-6-repariert.
-- **Test-Isolation:** `test_wiring_breaker.py` baut pro Test eine neue `:memory:`-Database. Das ist kostenneutral (in-memory, keine Disk-IO) und garantit Isolation; das `_seed_open_trade` mit `initial_risk=None` ist die einzige **`assert pytest.raises(RuntimeError)`** im Block-B-Sweep bislang — alle anderen Tests dieser Phase sind Positivfälle.
+- **Scheduler ist gestoppt** (`is-active=inactive`, jetzt zusätzlich `disabled`). **Neu gegenüber Session #1–#6:** der Zustand ist jetzt *auch* rebootfest. Alle übrigen Punkte (Datenreparatur der 3 730 alten `ig`-Bars, Promotion-Bridge-Backfill 29 NULL-Zeilen, Fleet §14.8 OpenCode + z.ai, B-5-/B-6-Live-Beweis) — **keine Änderung**.
+- **Hold-Marker ist untracked** (`data/state/` → pro Host). Ein zweiter Host braucht den Marker ebenfalls, wenn der Scheduler dort gestoppt bleiben soll.
+- **Kein Eingriff in Phase-16-Doku:** `phase16_activation/PHASE16_E3_RUNBOOK_v4.md` §3 beschreibt die Deploy-Sequenz ohne Hold — ein Cross-Phase-Edit wäre außerhalb Phase 17. Der Release-Schritt steht hier (Phase-17-Kopf); der Nikinger entscheidet, ob P16 nachgezogen wird.
+- **Plan nicht angefasst:** `docs/concepts/phase17_testbed_plan.md` (`status: snapshot`) bleibt unverändert (Anti-Pattern „📕 dated snapshot edit"). E-3-Release-Schritt deshalb ausschließlich hier dokumentiert.
 
-### Next start (für die Folgesession, kalt einsteigen ohne Neu-Lesen)
+### Session-end-Hinweis
 
-**B-7 Abstain-Naht (D7, P8).** Anker (vor Antritt re-verifizieren — Drift-Konsolidierung oben): `scripts/wiring.py` Z. 758–760 (`def on_no_trade(self, cycle_outcome: Any) -> None:` → `-> Any:`, `inner.on_no_trade(cycle_outcome)` → `record_id = inner.on_no_trade(cycle_outcome)`, `return record_id` am Ende) + Docstring Z. 747–753 (Satz „locked AbstainSink.on_no_trade(cycle_outcome) -> None contract" → „passes the sink's record_id through — the executor links it into decision_context.abstain_record_id (3 669/3 669 NULL before Phase 17 B-7)") + Z. 993–995 Reihenfolge umdrehen (Anreicherung vor Klassifikation, damit `llm_unavailable`-Flag rechtzeitig ankommt). Neue Datei `phase8_scheduler/tests/test_wiring_abstain_seam.py` mit +2 Tests (`test_observed_sink_returns_inner_record_id`, `test_enriched_outer_wrapper_feeds_observed_classification`). Plan-AK P8 ≥ **271**. **Live ab Tag 1** `abstain_record_id IS NOT NULL` für jede neue NO_TRADE-Zeile (E-3) — der harte K1-Beweis, dass die Naht nicht wieder verworfen wird.
-Block-B Σ-Ziel ≥ 1992 noch 4 Tests entfernt nach B-7 (B-7 = +2, Σ 1990).
-Scheduler bleibt gestoppt (B-0). Push = Nikinger. Block C wartet auf OpenCode-Fleet-„bereit"-Meldung.
+- **Σ 2000** (16 Suites, Sweep-Kommando aus dem Phase-Kopf; root 121 → 133). meta_m1 informativ, nicht in Σ.
+- **Commits:** 2 (Code + Guard / Tests + Doku). Push = Nikinger (Phase-17-Konvention).
+- **Kern-Erkenntnis:** „Dienst gestoppt" war im Repo bis heute ein *Prozess*-zustand, kein *Installations*-zustand. Jede Tür, die den Scheduler automatisch starten kann (systemd-Autostart, Installer-`enable`, Restart-Helper), muss die Entscheidung kennen — sie kennt jetzt ein gemeinsames, operator-sticky Markerdatum.
+
 
 ---
 
