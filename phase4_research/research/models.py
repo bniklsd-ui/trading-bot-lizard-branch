@@ -537,6 +537,14 @@ _DEFAULT_PRICING_USD_PER_MTOK: dict[str, tuple[float, float]] = {
     "claude-sonnet-4-6": (3.0, 15.0),
     "claude-opus-4-8": (5.0, 25.0),
     "claude-haiku-4-5-20251001": (1.0, 5.0),
+    # Phase 17 C-3 (§14.1): the GLM family — real USD per Mtok (input, output),
+    # source: models.dev catalog, provider "zai", Stand 2026-10-18. The bot's
+    # GLM model is budget-*exempt* (T7) but not cost-free, so it carries a real
+    # price line: the € figure is what D-2 decides on after the shakedown.
+    # Before the C-7 flip, check these against the z.ai price page.
+    "glm-5.3": (1.4, 4.4),
+    "glm-5.2": (1.4, 4.4),
+    "glm-5.3-flash": (0.15, 0.5),
 }
 
 

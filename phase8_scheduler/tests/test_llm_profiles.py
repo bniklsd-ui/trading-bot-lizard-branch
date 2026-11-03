@@ -268,3 +268,40 @@ def test_client_kwargs_covers_every_quirk_field() -> None:
     mapped = set(client_kwargs(PROVIDERS["openai"]))
     expected = {f.name for f in fields(ProviderSpec)} - {"kind"}
     assert mapped == expected
+
+
+def test_check_accepts_shipped_profiles() -> None:
+    """The shipped profiles pass the check against the **real** configuration —
+    the real price table (``research.models``), the real default models of the
+    three phases and the real exempt list (``SchedulerConfig``).
+
+    Added with C-3: the GLM price lines only exist from that commit on, and a
+    commit may not leave a red test behind. The default models are the ones
+    ``build_scheduler`` hands to ``check_llm_profile`` (C-4) — the same source
+    of truth, so a profile that passes here is a profile the daemon accepts.
+    """
+    from debate.models import DebateConfig
+    from research.models import ResearchConfig
+    from reward.models import RewardConfig
+    from scheduler.config import SchedulerConfig
+
+    cfg = SchedulerConfig()
+    research_cfg = ResearchConfig()
+    debate_cfg = DebateConfig()
+    reward_cfg = RewardConfig()
+    default_models = {
+        "research": research_cfg.model,
+        "debate": debate_cfg.model_judge,
+        "paper_debate": debate_cfg.model_judge,
+        "lesson": reward_cfg.lesson_model,
+        "instinct": reward_cfg.lesson_model,
+        "reflect": reward_cfg.lesson_model,
+    }
+
+    for profile in ("anthropic", "research_glm", "all_glm"):
+        check_llm_profile(
+            profile,
+            pricing=research_cfg.pricing_usd_per_mtok,
+            default_models=default_models,
+            exempt_models=cfg.budget_exempt_models,
+        )

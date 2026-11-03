@@ -1,11 +1,16 @@
-"""Cold, dormant fallback LLM client — OpenAI-compatible API (OpenRouter default).
+"""OpenAI-compatible client — wired via ``phase8_scheduler/scheduler/llm_profiles.py``.
 
-**Not wired into any live path.** M1 Step 10 (P4/P6 cold fallback): a tested,
-provider-agnostic drop-in for :class:`research.llm_client.LLMClient`, kept
-additive so a real Anthropic outage has a working alternative — see
-``meta_m1_harness/CLAUDE.md`` for why this exists. Nothing in ``scripts/wiring.py``
-or ``research.py`` imports this module; it is exercised only by its own tests and
-the operator-run smoke script (``scripts/openrouter_smoke.py``).
+Since Phase 17 this client is **live**: the scheduler's routing table
+(``scheduler/llm_profiles.py``) maps a role to a provider, and every
+non-Anthropic provider is served by this class (T25: exactly two client classes —
+``LLMClient`` for Anthropic-native, this one for everything else). The single
+construction site is ``phase8_scheduler/scripts/wiring.py::_build_llm``; the
+provider's endpoint, keyring namespace and request quirks come from its
+:class:`~scheduler.llm_profiles.ProviderSpec` via ``client_kwargs(spec)``.
+
+The operator smoke (``scripts/openrouter_smoke.py``) uses **the same**
+construction (``--provider <name>``), so a smoke proves the very payload the bot
+would send.
 
 ## Interface parity
 
@@ -18,34 +23,21 @@ matters to a caller: ``ask_candidate(system, user, json_schema) -> dict`` (the
 config-level error (4xx auth/bad-request, missing key) raises immediately, no
 retry wasted.
 
-## Switch instructions (the only wiring change this would ever need)
+## Provider quirks (Phase 17 §15 T27/T28)
 
-``scripts/wiring.py``'s ``build_research()`` currently constructs::
+Three documented differences between OpenAI-compatible endpoints are **fields on
+the client**, not branches in the code:
 
-    llm = LLMClient(
-        model=config.model,
-        api_key=get_credential("anthropic_api_key"),
-        max_tokens=config.max_tokens,
-        temperature=config.temperature,
-        timeout_s=config.timeout_s,
-        token_meter_path=str(_USAGE_LOG),
-        config=config,
-    )
+* ``max_tokens_field`` — ``"max_tokens"`` (default) or ``"max_completion_tokens"``
+  (the OpenAI GPT-5 line),
+* ``send_temperature`` — some reasoning models reject the field outright,
+* ``extra_body`` — non-standard body fields (e.g. ``{"thinking": {...}}``).
 
-To fall back to this adapter, that one call site becomes::
-
-    llm = OpenAICompatLLMClient(
-        model="<an OpenRouter model id — pick from the current catalog>",
-        max_tokens=config.max_tokens,
-        temperature=config.temperature,
-        token_meter_path=str(_USAGE_LOG),
-        config=config,
-    )
-
-No other line in ``wiring.py`` or ``research.py`` changes — credentials are
-resolved internally from a **separate** keyring service (``openrouter`` by
-default, never the live bot's ``tradingbot`` service), matching the isolation
-pattern the M1 bake-off key already established.
+The defaults reproduce the pre-§15 payload **byte for byte**. ``extra_body`` is
+merged **first** (client-owned keys always win) and may not contain a
+client-owned key — that is rejected right here, in the constructor, because the
+constructor is the one choke point the bot (``_build_llm``) and the smoke script
+share.
 
 ## Structured Outputs — no equivalent, so it's a prompt instruction instead
 
@@ -55,19 +47,29 @@ enforcement equivalent to Anthropic Structured Outputs. This adapter requests
 serialises ``json_schema`` into the system prompt as an explicit instruction —
 weaker than decode-time enforcement, so the fence-strip / prose-recovery parse
 path (reused from ``llm_client``, same tiny pure helpers) matters more here, not
-less. ``enable_thinking`` / ``cache_system`` are accepted-but-ignored kwargs
-purely so a caller that constructs with the full ``LLMClient`` kwarg set (e.g.
-Phase 6's debate) doesn't need a conditional — no OpenAI-compat equivalent
-exists for either, so they are documented no-ops, never silently doing
-something different than the name implies.
+less. If an endpoint rejects ``response_format`` with HTTP 400, the request is
+sent **once more without that field** (same fallback as
+``LLMClient._attempt:388-398``) — it does not consume the transient retry.
+
+Reasoning models (GLM, DeepSeek, Qwen 3.5+) may emit a ``<think>…</think>``
+block before the JSON. The block is stripped before parsing; an **unterminated**
+block is a hard, non-retryable error (the same prompt at the same token limit
+would truncate again).
+
+``enable_thinking`` / ``cache_system`` are accepted-but-ignored kwargs purely so
+a caller that constructs with the full ``LLMClient`` kwarg set (e.g. Phase 6's
+debate) doesn't need a conditional — no OpenAI-compat equivalent exists for
+either, so they are documented no-ops, never silently doing something different
+than the name implies.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Mapping
 
 import keyring
 import requests
@@ -80,6 +82,42 @@ log = logging.getLogger(__name__)
 
 _DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 _KEYRING_USERNAME = "api_key"
+
+#: Payload keys the client owns — ``extra_body`` may not set any of them (§15 T28).
+_RESERVED_PAYLOAD_KEYS = frozenset(
+    {
+        "model",
+        "messages",
+        "max_tokens",
+        "max_completion_tokens",
+        "temperature",
+        "response_format",
+        "stream",
+    }
+)
+
+#: The token-limit field names a client may send (§15 T27).
+_MAX_TOKENS_FIELDS = ("max_tokens", "max_completion_tokens")
+
+_THINK_BLOCK_RE = re.compile(r"(?s)<think>.*?</think>")
+
+
+def _strip_think(text: str) -> str:
+    """Remove complete ``<think>…</think>`` blocks from a reasoning model's reply.
+
+    Reasoning models (GLM, DeepSeek, Qwen) put their reasoning into a ``<think>``
+    block before the JSON answer. The block is *not* part of the JSON, so it must
+    go before parsing. An **unterminated** block (the model was cut off) leaves
+    the marker in the text — the caller turns that into a hard error instead of
+    parsing garbage.
+
+    Args:
+        text: the raw assistant text.
+
+    Returns:
+        The text without complete think blocks, stripped.
+    """
+    return _THINK_BLOCK_RE.sub("", text).strip()
 
 
 def _is_transient(exc: BaseException) -> bool:
@@ -117,6 +155,7 @@ class OpenAICompatLLMClient:
         *,
         base_url: str = _DEFAULT_BASE_URL,
         api_key_service: str = "openrouter",
+        api_key_username: str = _KEYRING_USERNAME,
         timeout_s: float = 60.0,
         max_tokens: int = 1024,
         temperature: float = 0.2,
@@ -124,37 +163,63 @@ class OpenAICompatLLMClient:
         config: ResearchConfig | None = None,
         enable_thinking: bool = False,  # no-op — see module docstring
         cache_system: bool = False,  # no-op — see module docstring
+        max_tokens_field: str = "max_tokens",
+        send_temperature: bool = True,
+        extra_body: Mapping[str, Any] | None = None,
     ) -> None:
         """Configure the client (no network call here, no keyring read here).
 
         Args:
-            model: OpenRouter (or any OpenAI-compatible provider) model id.
+            model: the provider's model id (e.g. ``"glm-5.3"``).
             base_url: API base; ``/chat/completions`` is appended.
             api_key_service: OS keyring **service** name the API key is stored
-                under (**username** is always fixed as ``"api_key"``). Default
-                ``"openrouter"`` — a dedicated namespace, never the live bot's
-                ``tradingbot`` service (same isolation pattern as the M1
-                bake-off key). Seed it once via
-                ``keyring.set_password("openrouter", "api_key", "<key>")``, e.g.
-                through ``scripts/openrouter_smoke.py --store-key``.
+                under. Default ``"openrouter"`` — a dedicated namespace, never
+                the live bot's ``tradingbot`` service (same isolation pattern as
+                the M1 bake-off key). The bot's own providers use their own
+                namespaces (``trading-bot-zai-bot``, ``trading-bot-minimax-bot``,
+                …) — see ``scheduler/llm_profiles.py``.
+            api_key_username: OS keyring **username** under that service.
             timeout_s / max_tokens / temperature: transport + decoding knobs.
             token_meter_path: forwarded to ``token_meter.record`` — ``None``
                 disables the file write (the meter still computes the record).
             config: pricing source for the meter; defaults to
-                ``ResearchConfig()``. An unrecognised OpenRouter model id in
+                ``ResearchConfig()``. An unrecognised model id in
                 ``config.pricing_usd_per_mtok`` logs cost as 0.0 (the meter's own
                 documented graceful-unknown-model behaviour) — never a crash.
             enable_thinking / cache_system: accepted, always ignored — no
                 OpenAI-compat equivalent (see module docstring).
+            max_tokens_field: which payload key carries the token limit —
+                ``"max_tokens"`` (default) or ``"max_completion_tokens"``.
+            send_temperature: whether the payload may carry ``temperature``.
+            extra_body: non-standard body fields merged into the payload (e.g.
+                ``{"thinking": {"type": "disabled"}}``).
+
+        Raises:
+            ValueError: ``max_tokens_field`` is unknown, or ``extra_body`` tries
+                to set a client-owned key (§15 T28) — the constructor is the one
+                choke point the bot and the smoke script share, so a broken
+                provider entry fails here and not on the first live call.
         """
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.api_key_service = api_key_service
+        self.api_key_username = api_key_username
         self.timeout_s = timeout_s
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.token_meter_path = token_meter_path
         self.config = config if config is not None else ResearchConfig()
+        # §15 T27/T28: provider quirks, validated here — the one choke point the bot and the smoke share.
+        if max_tokens_field not in _MAX_TOKENS_FIELDS:
+            raise ValueError(
+                f"max_tokens_field must be max_tokens|max_completion_tokens, got {max_tokens_field!r}"
+            )
+        reserved = set(extra_body or {}) & _RESERVED_PAYLOAD_KEYS
+        if reserved:
+            raise ValueError(f"extra_body must not set client-owned keys: {sorted(reserved)}")
+        self.max_tokens_field = max_tokens_field
+        self.send_temperature = send_temperature
+        self.extra_body: dict[str, Any] = dict(extra_body or {})
         # Captured per successful call, mirroring LLMClient.last_usage — lets a
         # reusing caller read per-turn token usage without changing ask_candidate.
         self.last_usage: dict[str, Any] | None = None
@@ -162,6 +227,10 @@ class OpenAICompatLLMClient:
         # at max_tokens). Surfaced per call so the parse-failure branch can decide
         # whether a retry would just truncate again (Phase 17 B-4, T20).
         self.last_finish_reason: str | None = None
+        # The raw assistant text of the last reply — the operator smoke prints the
+        # first 400 characters of it (``--show-raw``) so a failed parse can be
+        # judged by eye (Phase 17 C-6).
+        self.last_raw_text: str = ""
         self._api_key: str | None = None  # lazily fetched from the keyring, cached
 
     # ------------------------------------------------------------------ #
@@ -171,11 +240,11 @@ class OpenAICompatLLMClient:
         """Fetch+cache the API key from the OS keyring. Never a file, never env."""
         if self._api_key is not None:
             return self._api_key
-        value = keyring.get_password(self.api_key_service, _KEYRING_USERNAME)
+        value = keyring.get_password(self.api_key_service, self.api_key_username)
         if not value:
             raise LLMResponseError(
                 f"no API key in the OS keyring (service={self.api_key_service!r}, "
-                f"username={_KEYRING_USERNAME!r}) — seed it via "
+                f"username={self.api_key_username!r}) — seed it via "
                 "keyring.set_password(...) or scripts/openrouter_smoke.py --store-key"
             )
         self._api_key = value
@@ -236,9 +305,13 @@ class OpenAICompatLLMClient:
                         "ask_candidate transient fault (attempt %d): %s", attempt, exc
                     )
                     continue
-                raise LLMResponseError(f"OpenRouter call failed: {exc!r}") from exc
+                raise LLMResponseError(
+                    f"OpenAI-compat call failed (base_url={self.base_url}): {exc!r}"
+                ) from exc
 
-        raise LLMResponseError(f"OpenRouter call failed after retry: {last_exc!r}")
+        raise LLMResponseError(
+            f"OpenAI-compat call failed (base_url={self.base_url}) after retry: {last_exc!r}"
+        )
 
     # ------------------------------------------------------------------ #
     # Internals                                                          #
@@ -250,22 +323,46 @@ class OpenAICompatLLMClient:
         that fails to parse is still billed toward K6; truncation (``finish_reason ==
         "length"``) on top of a parse failure is surfaced as a non-transient
         :class:`LLMResponseError` — the retry path cannot fix a token-budget-cutoff.
+
+        Two provider-specific guards live here (Plan §6 C-3):
+        * an HTTP 400 on a request that carried ``response_format`` is retried
+          **once without that field** (same fallback as ``LLMClient._attempt``) —
+          it does not consume the transient retry;
+        * a reasoning model's ``<think>…</think>`` block is stripped before
+          parsing; an unterminated block is a hard error (no retry).
         """
         schema_instruction = (
             "Respond with a single JSON object matching exactly this JSON Schema "
             f"— no prose, no markdown fence:\n{json.dumps(json_schema)}"
         )
-        payload = {
+        payload: dict[str, Any] = {
+            **self.extra_body,  # first: client-owned keys below always win (T28; reserved keys rejected in __init__)
             "model": self.model,
             "messages": [
                 {"role": "system", "content": f"{system}\n\n{schema_instruction}"},
                 {"role": "user", "content": user},
             ],
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "response_format": {"type": "json_object"},
+            self.max_tokens_field: self.max_tokens,
         }
-        body = self._raw_call(payload)
+        if self.send_temperature:
+            payload["temperature"] = self.temperature
+        payload["response_format"] = {"type": "json_object"}
+        try:
+            body = self._raw_call(payload)
+        except _HTTPStatusFault as exc:
+            # C-3 (a): the endpoint cannot honour response_format — send the request
+            # once more without that field. Not a transient fault, so it does not
+            # consume the single retry. The FIRST error text is logged, otherwise
+            # the operator only sees the second (Plan §15.6).
+            if exc.status_code == 400 and "response_format" in payload:
+                log.info(
+                    "HTTP 400 with response_format — retrying once without it; first fault: %s",
+                    exc,
+                )
+                payload = {k: v for k, v in payload.items() if k != "response_format"}
+                body = self._raw_call(payload)
+            else:
+                raise
         choice = body["choices"][0]
         # Truncation surfaced here so the parse-failure branch below can short-circuit
         # to a non-transient LLMResponseError (Phase 17 B-4, T20).
@@ -289,7 +386,19 @@ class OpenAICompatLLMClient:
         except Exception as exc:  # pragma: no cover - defensive, mirrors llm_client
             log.warning("token_meter.record failed: %s", exc)
 
-        text = _strip_fences(choice["message"]["content"])
+        raw_text = choice["message"].get("content") or ""
+        self.last_raw_text = raw_text
+        # Reasoning models (GLM/DeepSeek/Qwen) put their reasoning into a <think>
+        # block — it is not JSON and must go before parsing (C-3 (b)).
+        text = _strip_think(raw_text)
+        if "<think>" in text:
+            # Unterminated block ⇒ the reply was cut off. Non-retryable: the same
+            # prompt at the same token limit truncates again.
+            raise LLMResponseError(
+                f"unterminated <think> block (finish_reason={self.last_finish_reason}, "
+                f"max_tokens={self.max_tokens}, model={self.model})"
+            )
+        text = _strip_fences(text)
         try:
             raw = json.loads(text)
         except json.JSONDecodeError:
