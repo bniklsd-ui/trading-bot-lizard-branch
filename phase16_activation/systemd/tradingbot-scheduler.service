@@ -30,6 +30,8 @@ StandardError=append:/home/trading-bot/trading-bot/data/state/run_scheduler.log
 Restart=on-failure
 RestartSec=30
 SuccessExitStatus=143
+# Phase 17 B-9: SIGTERM is honoured after the running cycle sleep (≤ 300 s) — 90 s default killed every stop (09-23, 09-30, 10-11).
+TimeoutStopSec=360
 
 [Install]
 WantedBy=graphical-session.target
