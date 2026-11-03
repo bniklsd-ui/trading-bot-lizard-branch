@@ -195,3 +195,21 @@ def test_full_override_roundtrips() -> None:
 def test_exported_from_package_root() -> None:
     """``from scheduler import SchedulerConfig`` is the same object as the submodule's."""
     assert ExportedSchedulerConfig is SchedulerConfig
+
+
+def test_llm_profile_defaults_are_anthropic_with_the_glm_model_exempt() -> None:
+    """Phase 17 C-2 (T5/T17): the LLM routing profile is a **code default**, not a CLI
+    flag — the systemd unit passes no flags, so only a code default survives a
+    restart. Until the C-7 flip the bot stays on Anthropic (``llm_profile ==
+    "anthropic"``), and the GLM model is budget-exempt (its calls do not count
+    against ``daily_token_budget``; Nikinger 2026-10-17: „für alle GLM-Calls
+    unlimited, danach messen und entscheiden").
+
+    The exempt model id is a literal in three places (``llm_profiles._GLM.model``,
+    the price line in ``research/models.py``, this list) — ``check_llm_profile``
+    names the forgotten one at startup, so this test pins only the pair.
+    """
+    cfg = SchedulerConfig()
+
+    assert cfg.llm_profile == "anthropic"
+    assert cfg.budget_exempt_models == ("glm-5.3",)
