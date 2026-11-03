@@ -7,6 +7,72 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-03 (Exec-Session #8 ENDE — **Block B abgeschlossen**: B-7 Abstain-Naht + B-8 Paper-Logstufen + B-9 Stop-Timeout + B-10 Discovery-Beleg; 4 Code-Commits, Σ 2000 + 4 = **2004** grün; Scheduler `disabled`+`inactive` (Hold) + 3 Units laufen weiter)
+
+> **Auftrag:** Nikinger 2026-11-03 (Web-Chat): Phase 17 fortsetzen — „Start by reading the .md files … A good start is the /concept folder", „The phase is separated into steps, and the progress is noted … keep it recent". Der **Plan war detailliert genug** (Plan §6 B-7…B-10 mit Verbatim-Ankern, AKs und Testnamen) → **atomar abgearbeitet, kein Re-Planen**. Reihenfolge: Plan-§-Reihenfolge B-7 → B-8 → B-9 → B-10, ein Commit pro Block (Konvention der Exec-Sessions #2–#6).
+> **Executor-Modus:** MiniMax-M3 (OpenCode) — kein z.ai-Modell heute. `~/.config/opencode/`, `auth.json`, `opencode.service` unangefasst (Plan §14.8).
+> **Bot-Ritual (vorab geprüft):** Scheduler war bereits `disabled` + `inactive` (Hold-Marker `data/state/SCHEDULER_HELD`, aus Session #7), `install_units.sh --check` exit 0. Recorder/Discovery/WebUI `enabled` + `active` — **unangefasst** (nur der Discovery-*Code* geändert, kein Neustart → Bot-Ritual „Neustart macht nur E-3").
+> **Cross-Phase-Freigabe:** alle vier Blöcke liegen in der T13-Liste (P8, P10, P16, P14) — keine Nachfrage nötig.
+
+### Completed — diese Exec-Session (4 Code-Commits + 1 Docs-Commit)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | `5d02e7c` | P8 | **B-7 — Abstain-Naht (D7).** `scripts/wiring.py`: (a) `_observed_abstain_sink` reicht den `record_id` des inneren Sinks durch (`-> Any`, `record_id = inner.on_no_trade(...)`, `return record_id` **nach** dem try/except — ein Observability-Fehler darf den Wert nicht wieder verschlucken); Docstring-Satz „locked `AbstainSink.on_no_trade(cycle_outcome) -> None` contract" ersetzt. (b) **Reihenfolge im Composition Root umgedreht**: `_observed_abstain_sink(_enrich_abstain_detail(sink, research), path)` → `_enrich_abstain_detail(_observed_abstain_sink(sink, path), research)` — die Anreicherung liegt jetzt **vor** der Klassifikation des `abstain_recorded`-Events (vorher sah nur die Persistierung den angereicherten Zyklus). Das ist die Reihenfolge, die ab **C-5** das `llm_unavailable`-Flag rechtzeitig in die Klassifikation bringt. **+2 P8-Tests** (neu `phase8_scheduler/tests/test_wiring_abstain_seam.py`): `test_observed_sink_returns_inner_record_id`, `test_enriched_outer_wrapper_feeds_observed_classification` (Classifier-Spy: **pinnt die Reihenfolge**, nicht nur den Rückgabewert — mit der Alt-Reihenfolge sieht der Classifier `generic` statt `ENRICHED-PROSE`). Negativ-Beweis: beide Tests mit dem pre-B-7-`wiring.py` rot (stash). **P8 269 → 271** ✓ Plan-AK (≥ 271). |
+| 2 | `02faf44` | P10 | **B-8 — Paper-Logstufen (D8, T11/E4).** `abstain_lessons/paper.py`: vier Stellen von `critical` → `warning` (Ausfälle **externer** Abhängigkeiten): `PaperDebateCaller.request_pick failed` (Z. 323), `PaperEngine.on_debate_abstain failed` (Z. 390), `PaperEngine.open_scheduled_pairs failed for %s` (Z. 471), `PaperTradeTracker reflect failed for record %s` (Z. 709). Jede mit dem Plan-Kommentar „# Phase 17 B-8 (E4): external-dependency failure (quote/LLM) — WARNING; an LLM outage is reported once by research_tick (LLM_UNAVAILABLE)." **Unverändert `critical`** (lokale Fehler = Bug-Indikatoren): `PaperTradeTracker bar fetch failed` (Z. 569) und `PaperTradeTracker resolve failed` (Z. 691). **+1 P10-Test** (`test_get_price_failure_logs_warning_not_critical`, caplog): Gegenprobe mit pre-B-8-Code rot. **P10 165 → 166** ✓ Plan-AK (≥ 166). |
+| 3 | `f221f3c` | P16-Unit | **B-9 — Stop-Timeout (D13, T10).** `phase16_activation/systemd/tradingbot-scheduler.service`: `TimeoutStopSec=360` unter `SuccessExitStatus=143`, mit Plan-Kommentar („SIGTERM is honoured after the running cycle sleep (≤ 300 s) — 90 s default killed every stop (09-23, 09-30, 10-11)"). Vorher: systemd-Default 90 s → **jeder** Stop endete in SIGKILL, ohne dass `shutdown()` (finaler Reconcile + `broker.disconnect()`) je lief. Akzeptanz: `bash scripts/install_units.sh --verify` → exit 0 (`systemd-analyze --user verify: ok`). |
+| 4 | `4eefbda` | P14 | **B-10 — Discovery-Beleg (D12).** `source_registry/run.py::run_once`: an **allen drei** Rückgabestellen (unarmed · armed+nichts-stale · realer Zyklus) eine INFO-Zeile direkt vor dem `return`: `"discovery cycle %s: armed=%s stale=%d rows_written=%d errors=%d"` — der Zeitstempel steckt **im Text** (`basicConfig` ohne `asctime`), eine Zeile pro Zyklus (≈ 1/Stdunde, `interval_s=3600`); die zwei `logger.debug(...)`-Zeilen bleiben. Davor gab es **keinen** append-only Beleg (nur `discovery_state.json`, in place, und eine unsichtbare debug-Zeile). Dazu `scripts/run_discovery.sh`: Starttext „(unarmed ⇒ noop)" → „(noop unless ARMED)" (das K1-Muster `\[run_discovery\] starting daemon` bleibt treffend). **+1 P14-Test** (`test_run_once_logs_discovery_cycle_line_with_ts`, caplog, alle drei Pfade): Gegenprobe mit pre-B-10-Code rot. **P14 61 → 62** ✓ Plan-AK (≥ 62). |
+| 5 | (dieser Commit) | P17-Doku | **Doku-Propagierung:** dieser Block + Rotation von Session #7 → `SESSIONS_ARCHIVE.md` + Σ-Tabelle + Block-Status + Executor-Evaluations-Zeile + Bot-Ritual-Hinweis + die vier getroffenen Phasenköpfe (P8/P10/P14/P16) mit additivem „Phase-17-Edit"-Block (Muster B-5/B-6) + `docs/INDEX.md`. |
+
+### Gemessen (Host 201, `trading-bot-VMware-Virtual-Platform`)
+
+| | vorher | nachher |
+|---|---|---|
+| `is-enabled tradingbot-scheduler.service` | `disabled` | `disabled` (unverändert) |
+| `is-active tradingbot-scheduler.service` | `inactive` | `inactive` (unverändert) |
+| recorder / discovery / webui | enabled + active | enabled + active (unverändert) |
+| `bash scripts/install_units.sh --check` | exit 0 | exit 0 (siehe „B-9-Host-Notiz" unten) |
+| `bash scripts/install_units.sh --verify` | exit 0 | exit 0 (`systemd-analyze --user verify: ok`) |
+| `data/state/SCHEDULER_HELD` | vorhanden | vorhanden (unberührt) |
+| `data/state/KILL` | nicht vorhanden | nicht vorhanden (unberührt) |
+| Σ-Sweep (16 Suiten + root) | 2000 | **2004** (16/16 grün) |
+
+**B-9-Host-Notiz (bewusster Schritt, außerhalb des Commits):** die getrackte Unit wurde über den **getrackten Installer** auf 201 installiert (`bash scripts/install_units.sh` → Datei-Kopie + `daemon-reload`), **bevor** `--check` sonst dauerhaft rot gelaufen wäre (`installed=differs` → DRIFT, exit 1, weil die installierte Kopie die neue `TimeoutStopSec`-Zeile noch nicht hatte). Der **Hold blieb unangetastet**: die Scheduler-Unit bleibt `disabled` + `inactive`; gestartet wird weiterhin **erst in E-3**. Die drei anderen Units blieben `enabled` + `active` (der Installer hat sie nur idempotent re-enabled, **nicht** gestartet).
+
+### Plan-AK-Stand nach dieser Session
+
+- **Block B ist vollständig abgeschlossen** (B-0 … B-10): Exec-Session #1 (A-0…A-2, A-3, B-0, B-1) · #2 (B-2) · #3 (B-3) · #4 (B-4) · #5 (B-5) · #6 (B-6) · #7 (Scheduler-Hold) · **#8 (B-7, B-8, B-9, B-10)**.
+- **Plan-AK Block-B-Sweep:** Σ ≥ 1992 → **2004** ✓ (Plan-Ziel übertroffen; +4 exakt wie im Plan vorgesehen: B-7 +2 P8 · B-8 +1 P10 · B-9 +0 (Unit-Test läuft in E-3) · B-10 +1 P14).
+- **Σ 2000 → 2004** (P8 269→271 · P10 165→166 · P14 61→62; alle übrigen 13 Suiten + root unverändert grün).
+
+### Drift-Konsolidierung (Anker)
+
+- **B-7:** Plan-Anker Z. 758–760 → heute Z. 841–856 (≈ **+83 Zeilen**), Docstring Z. 747–753 → Z. 830–843, Reihenfolge Z. 993–995 → Z. 1094–1108. **Größer als die +60-Zeilen-Schwelle**, die der Session-#6-Block als „Plan-Snapshot updaten statt nur Drift protokollieren" markiert hat. **Entscheidung dieser Session:** der Plan ist ein **📕 dated snapshot** (`status: snapshot`) und wird **nicht** editiert (Anti-Pattern „📕 dated snapshot edit", T24: nur angehängter datierter Vermerk); der Drift ist hier vollständig dokumentiert und die Edits liefen am **realen Ort** (Verbatim-Anker, nicht Zeilennummer). *Für die Nikinger-Entscheidung offen:* Plan-Snapshot-Neuauflage (Datum + Zeilen) vor Block C.
+- **B-8 / B-9 / B-10:** **kein Drift** — alle Anker exakt wie im Plan (P10 `paper.py:321/386/465/701`, P16-Unit `SuccessExitStatus=143`, P14 `run.py` 3× `return result` + `run_discovery.sh:46`).
+
+### Next (geplante Folgesessions, in Priorität)
+
+- **Block C — LLM-Austausch** (Plan §14 zuerst, dann §15): C-1 `scheduler/llm_profiles.py` (NEU, stdlib-only) → C-2 `SchedulerConfig.llm_profile` → C-3 OpenAI-Compat-Härtung + Preiszeile → C-4 **eine** Bau-Funktion für alle 7 Clients + Profil-Check + Preflight + Startzeile → C-5 `LLM_UNAVAILABLE` (eigene Abstain-Klasse, D9) → C-6 Key-Skript + Smoke-Skript → **C-7 Familien-Smoke (Nikinger, 3 Calls Pay-per-use < 0,01 $)** → C-8 „Flip 2" (**gegated**, nur mit Nikinger-Go nach dem Shakedown). Σ-Ziel Block C ≥ **2025**. **B-7 ist die Vorbedingung für C-5** — das `llm_unavailable`-Flag erreicht die Klassifikation jetzt rechtzeitig.
+- **E-3-Vorbereitung (Pflicht-Schritt, noch offen):** der Hold muss **vor** E-3 freigegeben werden, sonst bleibt die Scheduler-Unit `disabled` (der R5-Autostart-Beweis fehlt danach). Freigabe: `bash scripts/install_units.sh --release-hold` → `bash scripts/install_units.sh` (enabled alle vier) → `systemctl --user start tradingbot-scheduler.service …` (Plan §6 E-3). Der E-3-Block im Plan (`docs/concepts/phase17_testbed_plan.md`) ist `status: snapshot` (L3) und wurde **nicht** editiert — der Release-Schritt steht hier (Phase-17-Kopf) und gehört in den E-3-Lauf.
+- **Datenreparatur der 3 730 alten `ig`-Bars** (Plan T14: löschen statt verschieben) — folgt in **E-3** zusammen mit dem Scheduler-Restart; bis dahin bleibt der DB-Zustand mit den +2-h-Bars stehen.
+- **Live-Beweis B-5/B-6** (Monitor-Re-Adoption, Breaker-Worst-Case) kommt erst mit E-3/E-4 (Handelstag).
+- **Fleet-Abstimmung (eurfleet-Session):** deren Repo (Restart-Liste) ist theirs — der Bot-Anteil ist hier erledigt. 201 wird am **31.10.** wie geplant gepatcht; der Reboot darf den Scheduler nicht starten (Autostart `disabled` + Guard).
+
+### Open questions / blockers
+
+- **Scheduler ist gestoppt** (`is-active=inactive`, `is-enabled=disabled`). Alle übrigen Punkte (Datenreparatur der 3 730 alten `ig`-Bars, Promotion-Bridge-Backfill 29 NULL-Zeilen, Fleet §14.8 OpenCode + z.ai, B-5-/B-6-Live-Beweis) — **keine Änderung** gegenüber Session #1–#7.
+- **Plan-Snapshot-Drift > +60 Zeilen (B-7-Anker):** im Phasenkopf dokumentiert, **nicht** im Plan gefixt (📕-Konvention). Braucht eine Nikinger-Entscheidung, ob der Plan vor Block C neu aufgelegt wird.
+- **Hold-Marker ist untracked** (`data/state/` → pro Host). Ein zweiter Host braucht den Marker ebenfalls, wenn der Scheduler dort gestoppt bleiben soll.
+- **Kein Eingriff in Phase-16-Doku:** `phase16_activation/PHASE16_E3_RUNBOOK_v4.md` §3 beschreibt die Deploy-Sequenz ohne Hold — ein Cross-Phase-Edit wäre außerhalb Phase 17. Der Release-Schritt steht hier (Phase-17-Kopf); der Nikinger entscheidet, ob P16 nachgezogen wird.
+- **B-10 wirkt erst ab dem nächsten Discovery-Neustart** (E-3) — der laufende Daemon nutzt noch den alten Code.
+- **Review-Gate vor E-3 (AK22)** ist weiterhin ⏳ (Claude-Code-Session, Anthropic; Schwerpunkte B-5, B-6, C-4, B-3, B-2 — B-7/B-8/B-9/B-10 kommen hinzu).
+
+### Session-end-Hinweis
+
+- **Σ 2004** (16 Suiten + root, Sweep-Kommando aus dem Phase-Kopf). meta_m1 informativ, nicht in Σ.
+- **Commits:** 5 (4 Code-Blöcke + 1 Doku). Push = Nikinger (Phase-17-Konvention).
+- **Kern-Erkenntnis:** *Block B ist keine Sammlung kosmetischer Fixes, sondern die Voraussetzung dafür, dass die ausgiebigen Tests nach Phase 17 überhaupt etwas messen.* B-7 stellt die **Verlinkung** zwischen Abstain-Lesson und `decision_context` her (3 669/3 669 NULL → ab Tag 1 nach E-3 `abstain_record_id IS NOT NULL`), B-8 senkt das K5-Rauschen an der Quelle (statt das Kriterium zu lockern), B-9 verhindert, dass jeder Stop per SIGKILL endet (ohne `shutdown()`-Reconcile), B-10 macht den Discovery-Daemon überhaupt erst aus einer append-only Quelle belegbar.
+
 ## Session stopped — 2026-10-25 (Exec-Session #7 ENDE — Scheduler-Hold: systemd-Autostart aus + getrackter Repo-Guard `data/state/SCHEDULER_HELD`, +12 root-Tests, Σ 1988 + 12 = **2000** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe: Marker-Variante + lokale Commits, Push = Nikinger)
 
 > **Auftrag:** Nikinger 2026-10-25 (über die eurfleet-Fleet-Session weitergeleitet): „Hold off on running 201 — its restart list includes tradingbot-scheduler, and since it's also enabled, a likely reboot would re-start it against your 21.10 decision. … You or the bot session should separately run `systemctl --user disable tradingbot-scheduler` on 201, since that unit's state isn't mine to touch. … 201 then gets patched normally on 31.10." → Diese Exec-Session macht die **Bot-Seite**: (1) Host-Disable (systemd-Autostart aus), (2) getrackter Repo-Guard, damit der 31.10-Update-Run den Fix nicht zurücknimmt. Die Fleet-Seite (Restart-Liste `inventory/hosts.yml`, `--check`) liegt in der eurfleet-Session, nicht hier.

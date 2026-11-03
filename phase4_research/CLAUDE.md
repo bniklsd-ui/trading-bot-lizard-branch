@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase4_research_plan_konzept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-06
+updated: 2026-07-06 | 2026-11-03 (Phase-17 C-3/C-5/C-6 cross-phase edit, additiv, Σ 2041)
 ---
 # research — Claude Code context (Phase 4)
 
@@ -163,6 +163,44 @@ is kicked off in the browser concept session, not here.
 > unbuilt/unseeded/unreachable Phase-9 DB on any given checkout still falls back to
 > `EXTENDED_UNIVERSE` — **bit-identical to pre-Phase-9 behaviour** in that case. +6 P4 tests
 > (**135 → 141**). Detail: `phase9_universe/CLAUDE.md` → `## Session stopped` (Step 5).
+
+> 🔁 **Phase-17 (Prüfstand) Block C edit (2026-11-03, Exec-Session #9 — additiv, code = source of truth):**
+> Der OpenAI-kompatible Client ist vom „kalten Fallback" zum **produktiven Client** geworden
+> (Plan §6 C-3, §14, §15 T25–T28). Phase 4 selbst bleibt unverändert im Kern — der einzige
+> AI-Schritt (`ask_candidate`) und die Validierung sind unangetastet:
+> - **`research/llm_openai_compat.py`**: `api_key_username` ist jetzt ein Konstruktor-Argument
+>   (vorher fest `"api_key"`) — jeder Provider bekommt seinen eigenen Keyring-Namespace
+>   (service + username). Die **drei Provider-Quirks** (`max_tokens_field` ·
+>   `send_temperature` · `extra_body`) sind Konstruktor-Argumente mit **Validierung im
+>   Konstruktor** (der eine Engpass, den Bot und der Operator-Smoke teilen): unbekanntes
+>   Feld → `ValueError`; `extra_body` mit einem client-eigenen Schlüssel (`model, messages,
+>   max_tokens, max_completion_tokens, temperature, response_format, stream`) → `ValueError`.
+>   Die Defaults erzeugen den **bytegleichen** Payload wie vor §15 (Schlüssel-Reihenfolge
+>   `model, messages, max_tokens, temperature, response_format`). Neu: **400-Fallback** (ein
+>   HTTP 400 auf einem Request **mit** `response_format` wird einmal **ohne** das Feld
+>   wiederholt — kein transienter Retry; der **erste** Fehlertext steht im Log), **`<think>`-
+>   Strip** (Denk-Modelle: ein unterminierter Block ist ein harter, nicht-retrybarer Fehler),
+>   Fehlermeldungen „OpenAI-compat call failed (base_url=…)" und `last_raw_text` (Rohantwort
+>   für `--show-raw`).
+> - **`research/models.py`**: **Preiszeilen der GLM-Familie** (§14.1, echte USD/Mtok):
+>   `glm-5.3` (1.4, 4.4) · `glm-5.2` (1.4, 4.4) · `glm-5.3-flash` (0.15, 0.5). Das Bot-GLM-Modell
+>   ist budgetfrei (T7), aber nicht kostenlos — D-2 entscheidet danach über € vs. Token.
+> - **`research/research.py`**: neues Attribut `last_llm_error` (C-5, D9) — gesetzt bei einem
+>   `LLMResponseError`, am Cycle-Anfang zurückgesetzt. „display/observability only — gates
+>   nothing (root rule 3)": der Zyklus abstained genau wie vorher, aber Phase 8 kann jetzt
+>   „LLM ausgefallen" von „Modell hat abgehalten" unterscheiden.
+> - **`scripts/openrouter_smoke.py`**: `--provider <name>` (Endpoint + Keyring + Quirks aus
+>   dem Provider-Register des Bots — der Smoke sendet **exakt** den Bot-Payload) sowie
+>   `--base-url`/`--key-service`/`--key-username`/`--max-tokens`/`--timeout-s`/`--show-raw`;
+>   Ausgabe mit `provider=`, `finish_reason=`, `latency_s=`.
+> - **Tests P4 167 → 177** (+10): 5 Quirk-Tests · 3 Reasoning-/Fallback-Tests ·
+>   `test_custom_api_key_username_is_used` · `test_llm_error_sets_last_llm_error_and_run_resets_it`
+>   · `test_check_accepts_shipped_profiles` (in P8). Der Bestandstest
+>   „400 raises immediately no retry" wurde plan-konform umgebaut (der 400-Fallback sendet
+>   zweimal) — Plan §15.4 Nr. 6.
+> - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 C-3/C-5/C-6, T13: Code in P4 ✓).
+>   `phase17_testbed/CLAUDE.md` Session-#9-Block. Commits `4190802` · `edeeab8` · `6d1f69d`.
+>   Push = Nikinger.
 
 ## The AI boundary (read first)
 **Only one thing here is AI:** the single `llm_client.ask_candidate` call ("which

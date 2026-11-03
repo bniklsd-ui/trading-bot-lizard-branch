@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase8_scheduler_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004)
+updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041)
 ---
 # CLAUDE.md — Phase 8: Scheduler (`phase8_scheduler/`)
 
@@ -96,7 +96,7 @@ immer → Variety + Clamp/Floor + echte Lessons). **Token-Budget by-default scha
 |---|---|---|
 | `pyproject.toml` · `requirements.txt` · `README.md` · `CLAUDE.md` | Scaffold + Packaging (Step 2) | ✅ |
 | `scheduler/__init__.py` | Paket-Marker (Exports wachsen pro Modul) | ✅ (leer) |
-| `scheduler/config.py` | `SchedulerConfig` (frozen) — alle Tunables an einem Ort | ✅ (Modul 1, 10 Tests) |
+| `scheduler/config.py` | `SchedulerConfig` (frozen) — alle Tunables an einem Ort; **+ `llm_profile` + `budget_exempt_models`** (Phase 17 C-2) | ✅ (Modul 1, 10 Tests) |
 | `scheduler/exceptions.py` | `SchedulerError`/`PreflightError`/… | ✅ (Modul 2, 6 Tests) |
 | `scheduler/clock.py` | `now_fn`/`sleep_fn` injizierbar; Phasen-Klassifikation (config-Fenster + Weekday; `is_market_open` lazy via `market_is_open`) | ✅ (Modul 3, 19 Tests) |
 | `scheduler/state.py` | `SchedulerState` ↔ `scheduler_state.json` (atomic); Tages-Rollover (Europe/Berlin) + `record_cycle` (Contract E) | ✅ (Modul 4, 18 Tests) |
@@ -105,15 +105,16 @@ immer → Variety + Clamp/Floor + echte Lessons). **Token-Budget by-default scha
 | `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ✅ (Modul 6, 18 Tests) |
 | `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ✅ (9 Tests) |
 | `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ✅ (Modul 7, 13 Tests) |
-| `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker) | ✅ (Modul 8, 14 Tests) |
+| `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker); **+ `REASON_LLM_UNAVAILABLE` + Fehler-Streak** (Phase 17 C-5) | ✅ (Modul 8, 14 Tests) |
 | `scheduler/observability.py` | v1.6 Step 0 — per-Zyklus JSONL-Diagnose-Log (`record_cycle`/`iter_records`), Sicherheitsnetz für Rückfälle | ✅ (v1.6, 9 Tests) |
 | `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ✅ (7 Tests) |
 | `scheduler/runner.py` | die Loop / Daemon-Orchestrator + Preflight + Shutdown + `request_stop()` + optionaler `universe_refresher` (Phase 9/V2, Default `None` = bit-identisch); POST_WINDOW-Sleep seit 2026-07-11 gecappt (s. `## Session stopped — 2026-07-11`) | ✅ (Modul 10, 24 Tests — 18 + 6 v2) |
 | `scheduler/run.py` | `python -m scheduler.run` Entry (in-package, lazy `scripts.wiring`, SIGTERM/SIGINT → `request_stop`) | ✅ (Modul 11, 6 Tests) |
-| `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures + `universe_refresher`-Closure (Phase 9/V2) | ✅ (Modul 11, operator-run) |
+| `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures + `universe_refresher`-Closure (Phase 9/V2); **+ `_build_llm` (eine Bau-Funktion für alle Clients) + `_debate_config` + `_check_llm_profile`** (Phase 17 C-4) | ✅ (Modul 11, operator-run) |
+| `scheduler/llm_profiles.py` | **NEU (Phase 17 C-1)** — Provider-Register: 9 `PROVIDERS` (Daten), `RoleSpec`, `LLM_PROFILES`, `role_spec`/`check_provider`/`client_kwargs`/`check_llm_profile` (rein, stdlib-only, importiert nichts cross-phase) | ✅ (C-1, 11 Tests) |
 | `scripts/run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Operator-Tools (Start-Script · offline Sim-Tag mit Fakes · echter unbeaufsichtigter IG-Demo-Zyklus) | ✅ (Modul 11, operator-run) |
 | `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes. **+ Token-Meter-Card** (`/api/token_usage`) **+ Last-Cycle-Reasoning** (`/api/last_cycle` zeigt jetzt Research-Pick + Bull/Bear/Judge-Transkript) — s. `## UI-Erweiterung — 2026-06-29`. **v1.7 (2026-07-02): `/api/status`s `trades_today`/`realized_pnl_today` DB-gespeist** (nicht mehr der lagging `scheduler_state.json`-Snapshot) — s. `## Session stopped — 2026-07-02 (v1.7: /api/status DB-gespeist)` | ✅ (Modul 12, 20 Tests) |
-| `tests/*` | gemockt, kein Netz/LLM/echter sleep (**271**, Schwerpunkt `test_runner` + `test_safety` + `test_webui` + `test_wiring_*`) | ✅ |
+| `tests/*` | gemockt, kein Netz/LLM/echter sleep (**294**, Schwerpunkt `test_runner` + `test_safety` + `test_webui` + `test_wiring_*` + `test_llm_profiles`) | ✅ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine
 Datei = eine Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging →
@@ -436,6 +437,58 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 >   Kill-Switch — nur die Wiring-Reihenfolge und ein Rückgabewert.
 > - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 B-7 T13: Code in P8 ✓).
 >   `phase17_testbed/CLAUDE.md` Session-#8-Block. Commit `5d02e7c`.
+>   Push = Nikinger.
+
+> 🔁 **Phase-17 (Prüfstand) Block C edit (2026-11-03, Exec-Session #9 — additiv, code = source of truth):**
+> Der LLM-Anbieter ist jetzt **austauschbar** — ein Config-Wert statt sieben Code-Stellen.
+> **Additiv**, Phase-8 bleibt für Bestands-Wire-ups bit-identisch (Default-Profil
+> `anthropic` ⇒ dieselben Clients wie vor C-4):
+> - **NEU `scheduler/llm_profiles.py`** (C-1, stdlib-only, importiert nichts cross-phase):
+>   `ProviderSpec` (kind · base_url · Keyring-Namespace + **drei Request-Quirks**:
+>   `max_tokens_field` · `send_temperature` · `extra_body` — provider-, **nie**
+>   modellbezogen, weil Phase 6 `client.model` je Debatten-Rolle überschreibt),
+>   **neun** `PROVIDERS` als reine Daten (anthropic · zai · minimax · openai · deepseek ·
+>   qwen · kimi · openrouter · opencode_zen), `RoleSpec`, `LLM_PROFILES`
+>   (`anthropic` · `research_glm` · `all_glm`), `role_spec()` (KeyError-frei),
+>   `check_provider()` (https · **kein „coding" im Host** — der Bot darf nie auf einen
+>   Coding-Plan-Endpoint zeigen · Keyring-Namespace · Quirks-Feld),
+>   `client_kwargs()` (**eine** ProviderSpec→Client-Abbildung, benutzt von `_build_llm`
+>   **und** vom Operator-Smoke) und `check_llm_profile()` (vier Fehlerklassen).
+> - **NEU `_build_llm(role, llm_profile, …)`** (C-4): die **einzige** Stelle, die einen
+>   LLM-Client baut. Anthropic-Provider → `LLMClient` (Key aus `research.credentials`),
+>   sonst → `OpenAICompatLLMClient` mit `**client_kwargs(provider)`. Die sieben früheren
+>   Inline-`LLMClient(...)`-Aufrufe sind ersetzt — AK: `rg "\bLLMClient\(" wiring.py`
+>   und `rg "OpenAICompatLLMClient\("` → je **genau 1** Treffer (beide in `_build_llm`).
+> - **NEU `_debate_config(llm_profile)`** (C-4): Phase 6 überschreibt `client.model`
+>   **je Rolle** aus der `DebateConfig` — ein Profil, das die Debatte umzieht, muss
+>   Bull/Bear/Judge **umbenennen**, sonst ruft die Debatte Anthropic-Modelle auf dem
+>   fremden Provider.
+> - **NEU `_check_llm_profile(config)`** (C-4): läuft in `build_scheduler` **vor** jedem
+>   Bau — unbekanntes Profil, claude-ID auf fremdem Provider, Modell ohne Preiszeile,
+>   Modell ohne Budget-Ausnahme ⇒ `ValueError` beim Start statt im ersten LLM-Call des
+>   Handelstags.
+> - **Preflight Punkt 4** (C-4): jeder Nicht-Anthropic-Provider des aktiven Profils
+>   braucht seinen Key im OS-Keyring — sonst startet der Daemon fröhlich und scheitert
+>   um 09:00. Die Fehlermeldung nennt den exakten Seed-Befehl.
+> - **Start-Zeile** (C-4): `starting scheduler daemon (…, llm_profile=…)` — der Report
+>   (E-1) liest das Profil daraus.
+> - **`SchedulerConfig`** (C-2): `llm_profile: str = "anthropic"` +
+>   `budget_exempt_models: tuple[str, ...] = ("glm-5.3",)`. Code-Defaults, keine Flags
+>   (die systemd-Unit übergibt keine → nur ein Code-Default ist restart-fest).
+> - **`research_tick`** (C-5): `REASON_LLM_UNAVAILABLE` + Fehler-Streak — drei
+>   aufeinanderfolgende LLM-Fehler loggen **genau einmal** `critical`; ein Pick
+>   setzt den Streak zurück. D9: ein LLM-Ausfall ist damit von einem Modell-Abstain
+>   unterscheidbar.
+> - **`_enrich_abstain_detail`** (C-5): setzt das `llm_unavailable`-Flag **vor** der
+>   Klassifikation — die Reihenfolge, die B-7 geschaffen hat.
+> - **Tests P8 271 → 294** (+23): `test_llm_profiles.py` (11) · `test_config.py` (+1) ·
+>   `test_llm_profiles.py::test_check_accepts_shipped_profiles` (+1) ·
+>   `test_wiring_llm_routing.py` (7) · `test_research_tick.py` (+3).
+> - **Noch nicht aktiv:** `llm_profile` steht auf `"anthropic"` — der Bot spricht noch
+>   **nicht** mit GLM. Der Flip (C-7-Smoke → C-8) ist Operator-Arbeit.
+> - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 C-1…C-6, T13: Code in P8 ✓).
+>   `phase17_testbed/CLAUDE.md` Session-#9-Block. Commits `698e9ea` (C-1) · `145e80e`
+>   (C-2) · `4190802` (C-3) · `1a61229` (C-4) · `edeeab8` (C-5) · `6d1f69d` (C-6).
 >   Push = Nikinger.
 
 ---

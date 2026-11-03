@@ -96,16 +96,18 @@ phase10_v3/
 │                                                (quote_only-Degrade), writer.py
 │                                                (MarketContextWriter + ContextRecorder)
 ├── scripts/                                    ✅ abstain_report.py (+ WE-2 `--paper`-Sektion)
-└── tests/                                      ✅ **166** Tests (frisch gemessen 2026-11-03;
+└── tests/                                      ✅ **168** Tests (frisch gemessen 2026-11-03;
                                                  Stand der Head-Doku 147 war stale — Korrektur
                                                  147 → 165 ist Teil des Closeout-Commits,
-                                                 165 → 166 (Phase-17 B-8) am 2026-11-03.
+                                                 165 → 166 (Phase-17 B-8) und 166 → 168
+                                                 (Phase-17 C-5) am 2026-11-03.
                                                  Zusammensetzung: 125 bis WE 2/Council
                                                  + B4/H6 + H1 + 5 Tracker-Guards
                                                  + 4 Lesson-Salvage 08-08
                                                  + 14 nachgelagerte Bugfix-Targets
                                                  + 1 Phase-17-B-8-Logstufen-Test
-                                                 = 166 grün)
+                                                 + 2 Phase-17-C-5-Tests
+                                                 = 168 grün)
 ```
 
 **Bugfix-Block (zusammengefasst für die Audit-Kette):**
@@ -131,6 +133,18 @@ phase10_v3/
   **+1 Test** (`test_get_price_failure_logs_warning_not_critical`, caplog) → P10 165 → **166**
   (Σ 2000 → **2004**). Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 B-8, T13: Code in
   P10 ✓). Commit `02faf44`.
+- 2026-11-03 — **Phase-17 C-5 (D9, T11/E7): `REASON_LLM_UNAVAILABLE`.** Ein LLM-**Ausfall**
+  (unreachable / abgeschnitten / Provider-Ausfall) war bis jetzt von einem normalen
+  „Modell hat abgehalten" **ununterscheidbar** — beide landeten auf `REASON_NO_CANDIDATES`.
+  Neu: `AbstainReason.REASON_LLM_UNAVAILABLE` (**13** Gründe statt 12 — Docstring und
+  `tests/test_models.py` angepasst). Der Classifier (`classifier.py`) nutzt ihn im
+  `research_empty`-Zweig, wenn `cycle_outcome["llm_unavailable"] is True`; die **Stage**
+  bleibt `RESEARCH_EMPTY` (der Fehler passierte im Research-Call — nur der *Grund*
+  unterscheidet sich). Das Flag setzt die P8-Wiring (`_enrich_abstain_detail`) **vor** der
+  Klassifikation. **Keine Migration** nötig: `abstain_records.reason` hat keinen CHECK
+  (Migration 005 geprüft). **+2 P10-Tests** (1 Klassifizier-Test + 1 Fall in der
+  parametrisierten Tabelle) → P10 166 → **168** (Σ 2004 → **2041**).
+  Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 C-5, T13: Code in P10 ✓). Commit `edeeab8`.
 
 **Phase-15-Erbschaften (Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC):**
 die P10-Paper-Council-Implementation (Phase 14 wurde nie gebraucht) bleibt im Code als
