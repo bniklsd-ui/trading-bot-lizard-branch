@@ -204,11 +204,13 @@ def main(argv: list[str] | None = None) -> int:
     _install_signal_handlers(runner)
 
     logger.info(
-        "starting scheduler daemon (account=%s, max_trades=%d, daily_loss_cap=%s, cycle=%dmin).",
+        "starting scheduler daemon (account=%s, max_trades=%d, daily_loss_cap=%s, cycle=%dmin, "
+        "llm_profile=%s).",
         config.account,
         config.max_trades_per_day,
         config.daily_loss_cap,
         config.cycle_interval_min,
+        config.llm_profile,
     )
     try:
         runner.run()

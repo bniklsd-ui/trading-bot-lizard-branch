@@ -57,7 +57,8 @@ class _FakeDB:
 
 @pytest.fixture
 def no_keyring(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Stub ``reward.credentials`` in ``sys.modules`` before the lazy import runs.
+    """Stub ``reward.credentials`` **and** ``research.credentials`` in ``sys.modules``
+    before the lazy import runs.
 
     ``_build_reward_sink`` does ``from reward.credentials import get_credential`` inside the
     function body, and that consults ``sys.modules`` first — so the stub wins and the real
@@ -65,10 +66,19 @@ def no_keyring(monkeypatch: pytest.MonkeyPatch) -> None:
     tests must not import it; this keeps that promise. ``monkeypatch.setitem`` is mandatory,
     not style: a leaked ``sys.modules`` entry would poison the other 256 Phase-8 tests running
     in the same process.
+
+    Phase 17 C-4: the Anthropic credential now comes from ``_build_llm`` →
+    ``research.credentials.get_credential`` — so **that** module must be stubbed too,
+    otherwise the test would read the real OS keyring (Plan §8).
     """
     monkeypatch.setitem(
         sys.modules,
         "reward.credentials",
+        types.SimpleNamespace(get_credential=lambda *a, **k: "fake-key-not-a-secret"),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "research.credentials",
         types.SimpleNamespace(get_credential=lambda *a, **k: "fake-key-not-a-secret"),
     )
 

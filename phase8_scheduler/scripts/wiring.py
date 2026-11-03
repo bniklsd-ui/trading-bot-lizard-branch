@@ -321,8 +321,167 @@ def _build_market_data(mapper: Any, cache: Any, bar_service: Any, *, enable_bar_
     return MarketDataFetcher(mapper, cache, bar_provider=bar_service)
 
 
+def _build_llm(
+    role: str,
+    llm_profile: str,
+    *,
+    default_model: str,
+    max_tokens: int,
+    temperature: float,
+    timeout_s: float,
+    research_config: Any = None,
+    cache_system: bool = False,
+) -> Any:
+    """The **one** place where an LLM client is constructed (Plan §6 C-4, T16).
+
+    Every LLM arm of the bot (research, debate, lesson, instinct, reflect,
+    paper-debate) goes through this function, so "which provider serves this role"
+    is decided in exactly one place: :mod:`scheduler.llm_profiles`.
+
+    Resolution order per role: the profile's :class:`RoleSpec` wins over the
+    phase config (``model``/``max_tokens``/``timeout_s`` = ``None`` ⇒ the phase
+    config's own value). With the ``"anthropic"`` profile the result is
+    **bit-identical** to the seven inline ``LLMClient(...)`` calls this function
+    replaced — same model, same key, same limits, same meter path, same config.
+
+    Args:
+        role: one of ``scheduler.llm_profiles.LLM_ROLES``.
+        llm_profile: the active routing profile (e.g. ``"anthropic"``,
+            ``"research_glm"``).
+        default_model: the model id the phase config would use (used when the
+            profile does not override it).
+        max_tokens / temperature / timeout_s: the phase config's values.
+        research_config: the pricing/meter config to hand to the client
+            (``None`` ⇒ a fresh ``ResearchConfig()``).
+        cache_system: Anthropic prompt caching (a documented no-op on the
+            OpenAI-compatible client).
+
+    Returns:
+        A ``research.llm_client.LLMClient`` for an Anthropic provider, else a
+        ``research.llm_openai_compat.OpenAICompatLLMClient``.
+    """
+    from research.models import ResearchConfig
+    from scheduler.llm_profiles import PROVIDERS, client_kwargs, role_spec
+
+    spec = role_spec(llm_profile, role)
+    provider = PROVIDERS[spec.provider]
+    model = spec.model or default_model
+    tokens = spec.max_tokens if spec.max_tokens is not None else max_tokens
+    timeout = spec.timeout_s if spec.timeout_s is not None else timeout_s
+    config = research_config if research_config is not None else ResearchConfig()
+
+    if provider.kind == "anthropic":
+        from research.credentials import get_credential
+        from research.llm_client import LLMClient
+
+        return LLMClient(
+            model=model,
+            api_key=get_credential("anthropic_api_key"),
+            max_tokens=tokens,
+            temperature=temperature,
+            timeout_s=timeout,
+            token_meter_path=str(_USAGE_LOG),
+            config=config,
+            cache_system=cache_system,
+        )
+
+    from research.llm_openai_compat import OpenAICompatLLMClient
+
+    return OpenAICompatLLMClient(
+        model,
+        **client_kwargs(provider),
+        timeout_s=timeout,
+        max_tokens=tokens,
+        temperature=temperature,
+        token_meter_path=str(_USAGE_LOG),
+        config=config,
+        cache_system=cache_system,
+    )
+
+
+def _debate_config(llm_profile: str) -> Any:
+    """The Phase-6 :class:`DebateConfig` for the active profile (Plan §6 C-4).
+
+    Phase 6's ``ask_agent`` overwrites ``client.model`` **per role** from this
+    config (``model_bull`` / ``model_bear`` / ``model_judge``) — so a profile
+    that moves the debate to another provider must also rename the three roles
+    here, otherwise the debate would keep calling the Anthropic models on the
+    new provider. With the ``"anthropic"`` profile nothing is renamed and the
+    config is the plain default.
+
+    Args:
+        llm_profile: the active routing profile.
+
+    Returns:
+        The default ``DebateConfig`` or a copy with the roles renamed.
+    """
+    from debate.models import DebateConfig
+    from scheduler.llm_profiles import role_spec
+
+    cfg = DebateConfig()
+    spec = role_spec(llm_profile, "debate")
+    if not spec.model:
+        return cfg
+    updates: dict[str, Any] = {
+        "model_bull": spec.model,
+        "model_bear": spec.model,
+        "model_judge": spec.model,
+    }
+    if spec.max_tokens is not None:
+        updates["max_tokens_agent"] = spec.max_tokens
+        updates["max_tokens_judge"] = spec.max_tokens
+    return dataclasses.replace(cfg, **updates)
+
+
+def _check_llm_profile(config: SchedulerConfig) -> None:
+    """Validate the active LLM routing profile against the live configuration.
+
+    Plan §6 C-4, point 4: the check runs in ``build_scheduler`` (the composition
+    root) — **before** any client is built — so a wrong profile/model/price/
+    exempt combination fails at startup instead of in the first LLM call of the
+    trading day. The default models are the ones the phase configs use, i.e.
+    exactly the values the builders would use if the profile did not override
+    them.
+
+    Args:
+        config: the scheduler config carrying ``llm_profile`` and
+            ``budget_exempt_models``.
+
+    Raises:
+        ValueError: the profile is inconsistent (see
+            :func:`scheduler.llm_profiles.check_llm_profile`).
+    """
+    from debate.models import DebateConfig
+    from research.models import ResearchConfig
+    from reward.models import RewardConfig
+    from scheduler.llm_profiles import check_llm_profile
+
+    research_cfg = ResearchConfig()
+    debate_cfg = DebateConfig()
+    reward_cfg = RewardConfig()
+    check_llm_profile(
+        config.llm_profile,
+        pricing=research_cfg.pricing_usd_per_mtok,
+        default_models={
+            "research": research_cfg.model,
+            "debate": debate_cfg.model_judge,
+            "paper_debate": debate_cfg.model_judge,
+            "lesson": reward_cfg.lesson_model,
+            "instinct": reward_cfg.lesson_model,
+            "reflect": reward_cfg.lesson_model,
+        },
+        exempt_models=config.budget_exempt_models,
+    )
+
+
 def _build_research(
-    broker: Any, db: Any, state: Any, bar_service: Any, *, enable_bar_service: bool = True
+    broker: Any,
+    db: Any,
+    state: Any,
+    bar_service: Any,
+    *,
+    enable_bar_service: bool = True,
+    llm_profile: str = "anthropic",
 ) -> Any:
     """Build the real Phase-4 :class:`Research` over the shared broker/db/state (Contract G).
 
@@ -338,11 +497,12 @@ def _build_research(
     now comes from the ``instrument_universe`` DB table (:func:`_build_universe_from_db`),
     falling back to ``EXTENDED_UNIVERSE`` if that table is empty/unreachable — an
     unbuilt/unseeded Phase 9 on a given checkout behaves exactly like before (bit-identical).
+
+    Phase 17 C-4: the LLM client is built by :func:`_build_llm` — ``llm_profile``
+    decides the provider (the default keeps the Anthropic client bit-identical).
     """
     from external_data import FileCache, TickerMapper
     from research import Research, ResearchConfig
-    from research.credentials import get_credential
-    from research.llm_client import LLMClient
 
     config = ResearchConfig(universe=_build_universe_from_db())
     mapper = TickerMapper()
@@ -356,45 +516,48 @@ def _build_research(
     market_data = _build_market_data(
         mapper, FileCache(str(_CACHE_DIR)), bar_service, enable_bar_service=enable_bar_service
     )
-    llm = LLMClient(
-        model=config.model,
-        api_key=get_credential("anthropic_api_key"),
+    llm = _build_llm(
+        "research",
+        llm_profile,
+        default_model=config.model,
         max_tokens=config.max_tokens,
         temperature=config.temperature,
         timeout_s=config.timeout_s,
-        token_meter_path=str(_USAGE_LOG),
-        config=config,
+        research_config=config,
     )
     return Research(broker, db, state, market_data, llm, config)
 
 
-def _make_debate_runner(broker: Any) -> Callable[[dict[str, Any]], Any]:
+def _make_debate_runner(
+    broker: Any, *, llm_profile: str = "anthropic"
+) -> Callable[[dict[str, Any]], Any]:
     """Build the Phase-6 ``debate_runner`` (Bull/Bear/Judge) over the shared broker.
 
     Replica of Phase-6 ``scripts.wiring.make_debate_runner`` built from the ``debate`` package: the
     closure constructs the :class:`Debate` once (lazily, on first use) with the reused Phase-4
     ``LLMClient`` (``cache_system=True``) and the Module-7 audit bound to ``debate_log.json``, then
     reuses it. One debate per executor cycle; the executor reads the outcome duck-typed.
+
+    Phase 17 C-4: the client comes from :func:`_build_llm` and the model names from
+    :func:`_debate_config` (Phase 6 rewrites ``client.model`` per role from that config).
     """
-    from debate import Debate, DebateConfig
+    from debate import Debate
     from debate.audit import write_debate
-    from debate.credentials import get_credential
-    from research.llm_client import LLMClient
     from research.models import ResearchConfig
 
     holder: dict[str, Any] = {}
 
     def _build() -> Any:
-        cfg = DebateConfig()
+        cfg = _debate_config(llm_profile)
         research_config = ResearchConfig()
-        llm = LLMClient(
-            model=cfg.model_judge,
-            api_key=get_credential("anthropic_api_key"),
+        llm = _build_llm(
+            "debate",
+            llm_profile,
+            default_model=cfg.model_judge,
             max_tokens=cfg.max_tokens_judge,
             temperature=cfg.temperature_judge,
             timeout_s=research_config.timeout_s,
-            token_meter_path=str(_USAGE_LOG),
-            config=research_config,
+            research_config=research_config,
             cache_system=True,
         )
 
@@ -414,10 +577,10 @@ def _make_debate_runner(broker: Any) -> Callable[[dict[str, Any]], Any]:
 
 # Phase 17 B-3 (D3): the InstinctExtractor (Phase 15) gets its own LLM client,
 # distinct from the Brain's (Phase 7 lesson) client. Phase-17-Plan §6 B-3 step 5
-# pins the per-call limits here so the wiring function stays declarative. Block
-# C will move the actual ``LLMClient(...)`` construction into ``_build_llm``;
-# until then ``_build_reward_sink`` builds the client inline using these
-# constants. ``_INSTINCT_EXTRACTOR_MAX_TOKENS = 2048`` (4× the Brain's default
+# pins the per-call limits here so the wiring function stays declarative. Since
+# Phase 17 C-4 both clients are built by ``_build_llm`` — these constants are the
+# only difference between them (same model, same key, same token meter).
+# ``_INSTINCT_EXTRACTOR_MAX_TOKENS = 2048`` (4× the Brain's default
 # ``lesson_max_tokens``; instinct payloads are structured arrays and routinely
 # exceed 512 tokens); ``_INSTINCT_EXTRACTOR_TIMEOUT_S = 60.0`` (the Brain's
 # ``lesson_timeout_s`` is shorter — the Brain call is single-shot lesson text,
@@ -426,7 +589,9 @@ _INSTINCT_EXTRACTOR_MAX_TOKENS: int = 2048
 _INSTINCT_EXTRACTOR_TIMEOUT_S: float = 60.0
 
 
-def _build_reward_sink(broker: Any, db: Any) -> tuple[Any, Any]:
+def _build_reward_sink(
+    broker: Any, db: Any, *, llm_profile: str = "anthropic"
+) -> tuple[Any, Any]:
     """Build the Phase-7 :class:`RewardSink` + the Phase-16 Promotion-Bridge.
 
     Phase 16 D2.6 (Plan §6 D2.6): the wiring returns a ``tuple[RewardSink,
@@ -438,46 +603,40 @@ def _build_reward_sink(broker: Any, db: Any) -> tuple[Any, Any]:
     constants ``_INSTINCT_EXTRACTOR_MAX_TOKENS`` / ``_INSTINCT_EXTRACTOR_TIMEOUT_S``)
     — the Brain client (Phase 7 lesson extraction) and the Extractor client
     (Phase 15 instinct extraction) share the same model + key + token meter,
-    but each gets the per-call knob values that fit its task. In Block C the
-    Extractor client is built via ``_build_llm``; until then this function
-    constructs it inline (same pattern as the Brain client below).
+    but each gets the per-call knob values that fit its task. Phase 17 C-4:
+    both clients now come from :func:`_build_llm` (the per-call limits stay the
+    only difference between them).
 
     The broker is read **only** for ``get_trade_history`` (P&L / reconcile),
     never order/close (Decision J). The Anthropic key is read here; the SDK
     is lazy.
     """
     from instinct import InstinctBridge, InstinctConfig, InstinctValidator, SingleShotInstinctExtractor
-    from research.llm_client import LLMClient
-    from research.models import ResearchConfig
     from reward import Brain, RewardConfig, RewardSink, Scorer
-    from reward.credentials import get_credential
 
     cfg = RewardConfig()
-    llm = LLMClient(
-        model=cfg.lesson_model,
-        api_key=get_credential("anthropic_api_key"),
+    llm = _build_llm(
+        "lesson",
+        llm_profile,
+        default_model=cfg.lesson_model,
         max_tokens=cfg.lesson_max_tokens,
         temperature=cfg.lesson_temperature,
         timeout_s=cfg.lesson_timeout_s,
-        token_meter_path=str(_USAGE_LOG),
-        config=ResearchConfig(),
     )
     # Phase 17 B-3 (D3): separate LLM client for the InstinctExtractor.
     # The Brain's ``lesson_max_tokens`` is sized for short lesson sentences;
     # the Extractor emits a structured array of ``Instinct`` objects whose
     # serialised payload easily exceeds that floor (concurrency with many
     # lessons/rewards + nested evidence lists). Same ``model`` + same key +
-    # same token-meter — only the per-call limits differ. C-4 will move the
-    # construction into ``_build_llm``; until then this inline pair
-    # matches the Brain client 1:1 except for ``max_tokens`` / ``timeout_s``.
-    instinct_llm = LLMClient(
-        model=cfg.lesson_model,
-        api_key=get_credential("anthropic_api_key"),
+    # same token-meter — only the per-call limits differ (C-4 builds both via
+    # ``_build_llm``; the limits are the only difference between them).
+    instinct_llm = _build_llm(
+        "instinct",
+        llm_profile,
+        default_model=cfg.lesson_model,
         max_tokens=_INSTINCT_EXTRACTOR_MAX_TOKENS,
         temperature=cfg.lesson_temperature,
         timeout_s=_INSTINCT_EXTRACTOR_TIMEOUT_S,
-        token_meter_path=str(_USAGE_LOG),
-        config=ResearchConfig(),
     )
     instinct_cfg = InstinctConfig()
     instinct_extractor = SingleShotInstinctExtractor(llm_client=instinct_llm)
@@ -544,20 +703,16 @@ def _build_abstain_sink(config: SchedulerConfig, paper_engine: Any = None) -> An
 
     llm = None
     if config.enable_abstain_reflect:
-        from research.llm_client import LLMClient
-        from research.models import ResearchConfig
         from reward import RewardConfig
-        from reward.credentials import get_credential
 
         cfg = RewardConfig()
-        client = LLMClient(
-            model=cfg.lesson_model,
-            api_key=get_credential("anthropic_api_key"),
+        client = _build_llm(
+            "reflect",
+            config.llm_profile,
+            default_model=cfg.lesson_model,
             max_tokens=cfg.lesson_max_tokens,
             temperature=cfg.lesson_temperature,
             timeout_s=cfg.lesson_timeout_s,
-            token_meter_path=str(_USAGE_LOG),
-            config=ResearchConfig(),
         )
         llm = _AbstainLLMAdapter(client)
 
@@ -602,19 +757,15 @@ def _build_paper_engine(config: SchedulerConfig, broker: Any, exec_cfg: Any) -> 
         from abstain_lessons.paper import PaperDebateCaller
         from debate.models import DebateConfig
         from debate.prompts import build_paper_pick_prompt
-        from research.llm_client import LLMClient
-        from research.models import ResearchConfig
-        from reward.credentials import get_credential
 
-        dcfg = DebateConfig()
-        client = LLMClient(
-            model=dcfg.model_judge,
-            api_key=get_credential("anthropic_api_key"),
+        dcfg = _debate_config(config.llm_profile)
+        client = _build_llm(
+            "paper_debate",
+            config.llm_profile,
+            default_model=dcfg.model_judge,
             max_tokens=dcfg.max_tokens_judge,
             temperature=dcfg.temperature_judge,
             timeout_s=dcfg.wall_clock_timeout_s,
-            token_meter_path=str(_USAGE_LOG),
-            config=ResearchConfig(),
         )
         debate_caller = PaperDebateCaller(client, build_paper_pick_prompt)
 
@@ -759,20 +910,16 @@ def _build_paper_tracker(config: SchedulerConfig, exec_cfg: Any, bar_service: An
 
     llm = None
     if config.enable_abstain_reflect:
-        from research.llm_client import LLMClient
-        from research.models import ResearchConfig
         from reward import RewardConfig
-        from reward.credentials import get_credential
 
         cfg = RewardConfig()
-        client = LLMClient(
-            model=cfg.lesson_model,
-            api_key=get_credential("anthropic_api_key"),
+        client = _build_llm(
+            "reflect",
+            config.llm_profile,
+            default_model=cfg.lesson_model,
             max_tokens=cfg.lesson_max_tokens,
             temperature=cfg.lesson_temperature,
             timeout_s=cfg.lesson_timeout_s,
-            token_meter_path=str(_USAGE_LOG),
-            config=ResearchConfig(),
         )
         llm = _AbstainLLMAdapter(client)
 
@@ -1031,11 +1178,22 @@ def build_scheduler(
             sample_ig, bar_archive, health_sink=_sampler_health_sink, now_fn=_now
         )
 
+    # Phase 17 C-4: the routing profile is checked **before** anything is built —
+    # an unknown profile, a claude id on a foreign provider, a model without a
+    # price line or a missing budget exemption must fail loudly at startup, not
+    # in the first LLM call of the trading day.
+    _check_llm_profile(config)
+
     research = _build_research(
-        broker, db, state, bar_service, enable_bar_service=config.enable_bar_service
+        broker,
+        db,
+        state,
+        bar_service,
+        enable_bar_service=config.enable_bar_service,
+        llm_profile=config.llm_profile,
     )
-    debate_runner = _make_debate_runner(broker)
-    reward_sink, instinct_bridge = _build_reward_sink(broker, db)
+    debate_runner = _make_debate_runner(broker, llm_profile=config.llm_profile)
+    reward_sink, instinct_bridge = _build_reward_sink(broker, db, llm_profile=config.llm_profile)
     # Phase 16 D2.6 + Phase 17 B-3 (T18): load any already-promoted instincts
     # into ``longterm_rules`` BEFORE the executor runs (Plan §6 D2.6). Empty
     # tuple today — AK9-Erbe (``longterm_rules == ()`` ⇒
@@ -1301,6 +1459,26 @@ def build_scheduler(
         #    verify-not-mutate discipline as the migration 002 check above. See the module-level
         #    ``assert_schema_floor`` for the operator-actionable error message.
         assert_schema_floor(db.conn)
+        # 4) Phase 17 C-4: every non-Anthropic provider of the active profile must have its key
+        #    in the OS keyring. Without it the daemon would start happily and fail on the first
+        #    LLM call of the trading day (09:00) — the keyring check above only covers the IG
+        #    demo credentials. The error names the exact seed command.
+        import keyring as _keyring
+        from scheduler.llm_profiles import LLM_ROLES, PROVIDERS, role_spec
+
+        for _role in LLM_ROLES:
+            _spec = role_spec(config.llm_profile, _role)
+            _provider = PROVIDERS[_spec.provider]
+            if _provider.kind == "anthropic":
+                continue
+            if not _keyring.get_password(_provider.api_key_service, _provider.api_key_username):
+                raise RuntimeError(
+                    f"no API key for provider {_spec.provider!r} in the OS keyring "
+                    f"(service={_provider.api_key_service!r}, "
+                    f"username={_provider.api_key_username!r}) — seed it via: "
+                    f"python scripts/store_minimax_key.py --service "
+                    f"{_provider.api_key_service} --username {_provider.api_key_username}"
+                )
 
     # Phase 13 §6 B0/B3: build the live-bar recorder when the operator has
     # armed ``enable_bar_stream``. Default ``None`` keeps pre-B3 behaviour
