@@ -537,11 +537,15 @@ _DEFAULT_PRICING_USD_PER_MTOK: dict[str, tuple[float, float]] = {
     "claude-sonnet-4-6": (3.0, 15.0),
     "claude-opus-4-8": (5.0, 25.0),
     "claude-haiku-4-5-20251001": (1.0, 5.0),
-    # Phase 17 C-3 (§14.1): the GLM family — real USD per Mtok (input, output),
-    # source: models.dev catalog, provider "zai", Stand 2026-10-18. The bot's
-    # GLM model is budget-*exempt* (T7) but not cost-free, so it carries a real
-    # price line: the € figure is what D-2 decides on after the shakedown.
-    # Before the C-7 flip, check these against the z.ai price page.
+    # Phase 17 M-1 (2026-11-03): the MiniMax model the bot uses — **Abo/M Plan**, so
+    # the marginal cost is 0 (Plan §6 T7) and the meter logs 0 €. The pay-per-use
+    # prices of the same model are $0.30 in / $1.20 out per Mtok (≤512k input tokens;
+    # MiniMax pricing page, 2026-11-03) — swap these two numbers if the bot ever
+    # moves from the Abo key to a pay-per-use key.
+    "MiniMax-M3": (0.0, 0.0),
+    # Reserve (kein aktives Profil seit 2026-11-03): die GLM-Familie — echte USD per
+    # Mtok (input, output), source models.dev catalog, provider "zai", Stand
+    # 2026-10-18. A z.ai flip needs these three lines back (price + exempt list).
     "glm-5.3": (1.4, 4.4),
     "glm-5.2": (1.4, 4.4),
     "glm-5.3-flash": (0.15, 0.5),

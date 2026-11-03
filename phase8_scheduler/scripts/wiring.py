@@ -347,7 +347,7 @@ def _build_llm(
     Args:
         role: one of ``scheduler.llm_profiles.LLM_ROLES``.
         llm_profile: the active routing profile (e.g. ``"anthropic"``,
-            ``"research_glm"``).
+            ``"research_m3"``).
         default_model: the model id the phase config would use (used when the
             profile does not override it).
         max_tokens / temperature / timeout_s: the phase config's values.

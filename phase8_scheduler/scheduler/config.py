@@ -140,15 +140,14 @@ class SchedulerConfig:
     daily_token_budget: int | None = 300_000  # Phase 16 C3 (2026-09-05): raised from 200k — exhausted daily at ~15:48; None ⇒ explicitly disabled (WARNING in budget.py)
 
     # Phase 17 C-2 (T5/T17): LLM routing profile (scheduler/llm_profiles.py). A code default is the
-    # only restart-proof switch (systemd ExecStart passes no flags). Flip 1 → "research_glm" in its
-    # own commit after the demo smoke (C-7); Flip 2 → "all_glm" only on a Nikinger go (C-8).
+    # only restart-proof switch (systemd ExecStart passes no flags). Flip 1 → "research_m3" in its
+    # own commit after the demo smoke (C-7); Flip 2 → "all_m3" only on a Nikinger go (C-8).
     llm_profile: str = "anthropic"
-    # Phase 17 D-1/C-2 (T7): calls of these models do NOT count against daily_token_budget (z.ai
-    # pay-per-use — Nikinger 2026-10-17: "für alle GLM-Calls unlimited, danach messen und
-    # entscheiden"). The model id is a literal in three places (llm_profiles._GLM.model, the price
-    # line in research/models.py, and this list) — check_llm_profile names the forgotten one at
-    # startup.
-    budget_exempt_models: tuple[str, ...] = ("glm-5.3",)
+    # Phase 17 D-1/C-2 (T7): calls of these models do NOT count against daily_token_budget (MiniMax
+    # Abo/M Plan ⇒ Grenzkosten 0; Nikinger 2026-11-03). The model id is a literal in three places
+    # (llm_profiles._M3.model, the price line in research/models.py, and this list) —
+    # check_llm_profile names the forgotten one at startup.
+    budget_exempt_models: tuple[str, ...] = ("MiniMax-M3",)
 
     # --- reconcile ---
     reconcile_interval_min: int = 15

@@ -170,7 +170,7 @@ class OpenAICompatLLMClient:
         """Configure the client (no network call here, no keyring read here).
 
         Args:
-            model: the provider's model id (e.g. ``"glm-5.3"``).
+            model: the provider's model id (e.g. ``"MiniMax-M3"``).
             base_url: API base; ``/chat/completions`` is appended.
             api_key_service: OS keyring **service** name the API key is stored
                 under. Default ``"openrouter"`` — a dedicated namespace, never

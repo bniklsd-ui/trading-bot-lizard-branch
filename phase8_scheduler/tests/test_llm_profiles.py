@@ -4,8 +4,8 @@ Pure data + pure functions: no network, no keyring, no broker, no LLM. The file
 under test is the **single place** that decides which provider serves which role
 (Plan §6 C-1, §14, §15 T25–T31), so these tests pin:
 
-* the shipped profiles (anthropic = unchanged, ``research_glm`` = only research
-  moves, ``all_glm`` = every role moves);
+* the shipped profiles (anthropic = unchanged, ``research_m3`` = only research
+  moves, ``all_m3`` = every role moves);
 * the four failure classes of ``check_llm_profile`` (unknown profile, claude on
   a foreign provider, missing price line, missing budget exemption) plus the
   coding-plan ban;
@@ -36,7 +36,7 @@ from scheduler.llm_profiles import (
 _PRICING = {
     "claude-sonnet-4-6": (3.0, 15.0),
     "claude-haiku-4-5-20251001": (1.0, 5.0),
-    "glm-5.3": (1.4, 4.4),
+    "MiniMax-M3": (0.0, 0.0),
 }
 _DEFAULTS = {
     "research": "claude-sonnet-4-6",
@@ -46,7 +46,7 @@ _DEFAULTS = {
     "reflect": "claude-haiku-4-5-20251001",
     "paper_debate": "claude-sonnet-4-6",
 }
-_EXEMPT = ("glm-5.3",)
+_EXEMPT = ("MiniMax-M3",)
 
 
 # --------------------------------------------------------------------------- #
@@ -66,25 +66,46 @@ def test_anthropic_profile_keeps_phase_defaults() -> None:
         assert spec.timeout_s is None
 
 
-def test_research_glm_routes_only_research_to_zai() -> None:
-    """Flip 1 (``research_glm``): only the research role moves to the z.ai/GLM
+def test_research_m3_routes_only_research_to_minimax() -> None:
+    """Flip 1 (``research_m3``): only the research role moves to the MiniMax
     provider — every other role stays on Anthropic (T5: one profile = one
     variable; a mixed state would make later model comparisons unreadable)."""
-    research = role_spec("research_glm", "research")
-    assert research.provider == "zai"
-    assert research.model == "glm-5.3"
+    research = role_spec("research_m3", "research")
+    assert research.provider == "minimax"
+    assert research.model == "MiniMax-M3"
     for role in LLM_ROLES:
         if role == "research":
             continue
-        assert role_spec("research_glm", role).provider == "anthropic", role
+        assert role_spec("research_m3", role).provider == "anthropic", role
 
 
-def test_all_glm_routes_every_role_to_zai() -> None:
-    """Flip 2 (``all_glm``): every role moves to the same provider + model."""
+def test_all_m3_routes_every_role_to_minimax() -> None:
+    """Flip 2 (``all_m3``): every role moves to the same provider + model."""
     for role in LLM_ROLES:
-        spec = role_spec("all_glm", role)
-        assert spec.provider == "zai", role
-        assert spec.model == "glm-5.3", role
+        spec = role_spec("all_m3", role)
+        assert spec.provider == "minimax", role
+        assert spec.model == "MiniMax-M3", role
+
+
+def test_minimax_entry_carries_the_documented_quirks() -> None:
+    """The MiniMax entry's quirks are **documented** (MiniMax API docs, 2026-11-03):
+    the token limit travels in ``max_completion_tokens`` (the field the docs
+    recommend for new integrations; ``max_tokens`` is the legacy name) and
+    ``temperature`` is *ignored*, not rejected — so it may stay in the payload.
+
+    ``thinking`` is **not** a quirk field here: it is default-ON for MiniMax-M3
+    and the profile sets a generous ``max_tokens`` instead (reasoning tokens count
+    against the limit). ``MiniMax-M3.1-Flash`` cannot disable thinking at all
+    (HTTP 400) — that model would need its own provider entry.
+    """
+    spec = PROVIDERS["minimax"]
+
+    assert spec.base_url == "https://api.minimax.io/v1"
+    assert spec.api_key_service == "trading-bot-minimax-bot"
+    assert spec.api_key_username == "api_key"
+    assert spec.max_tokens_field == "max_completion_tokens"
+    assert spec.send_temperature is True
+    assert spec.extra_body == {}
 
 
 # --------------------------------------------------------------------------- #
@@ -146,7 +167,7 @@ def test_check_rejects_non_exempt_foreign_model() -> None:
     is what catches the forgotten one (T7)."""
     LLM_PROFILES["_t_not_exempt"] = {
         **{role: RoleSpec(provider="anthropic") for role in LLM_ROLES},
-        "research": RoleSpec(provider="zai", model="glm-5.3"),
+        "research": RoleSpec(provider="minimax", model="MiniMax-M3"),
     }
     try:
         with pytest.raises(ValueError, match="budget_exempt_models"):
@@ -166,7 +187,7 @@ def test_check_rejects_coding_plan_endpoint() -> None:
     lead to throttling, lockout and (from the third time) a ban."""
     LLM_PROFILES["_t_coding"] = {
         **{role: RoleSpec(provider="anthropic") for role in LLM_ROLES},
-        "research": RoleSpec(provider="_t_coding_provider", model="glm-5.3"),
+        "research": RoleSpec(provider="_t_coding_provider", model="MiniMax-M3"),
     }
     PROVIDERS["_t_coding_provider"] = ProviderSpec(
         kind="openai_compat",
@@ -275,7 +296,7 @@ def test_check_accepts_shipped_profiles() -> None:
     the real price table (``research.models``), the real default models of the
     three phases and the real exempt list (``SchedulerConfig``).
 
-    Added with C-3: the GLM price lines only exist from that commit on, and a
+    Added with C-3: the price lines only exist from that commit on, and a
     commit may not leave a red test behind. The default models are the ones
     ``build_scheduler`` hands to ``check_llm_profile`` (C-4) — the same source
     of truth, so a profile that passes here is a profile the daemon accepts.
@@ -298,7 +319,7 @@ def test_check_accepts_shipped_profiles() -> None:
         "reflect": reward_cfg.lesson_model,
     }
 
-    for profile in ("anthropic", "research_glm", "all_glm"):
+    for profile in ("anthropic", "research_m3", "all_m3"):
         check_llm_profile(
             profile,
             pricing=research_cfg.pricing_usd_per_mtok,

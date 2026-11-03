@@ -73,14 +73,15 @@ def test_build_llm_anthropic_profile_is_bit_identical_for_research(
     assert client.timeout_s == 30.0
 
 
-def test_build_llm_research_glm_returns_openai_compat_zai(no_keyring: None) -> None:
-    """With the ``research_glm`` profile the research role is served by the
-    OpenAI-compatible client on the z.ai endpoint (Plan §14)."""
+def test_build_llm_research_m3_returns_openai_compat_minimax(no_keyring: None) -> None:
+    """With the ``research_m3`` profile the research role is served by the
+    OpenAI-compatible client on the MiniMax endpoint (Plan §6 baseline, re-activated
+    2026-11-03)."""
     from research.llm_openai_compat import OpenAICompatLLMClient
 
     client = _build_llm(
         "research",
-        "research_glm",
+        "research_m3",
         default_model="claude-sonnet-4-6",
         max_tokens=1024,
         temperature=0.2,
@@ -88,12 +89,14 @@ def test_build_llm_research_glm_returns_openai_compat_zai(no_keyring: None) -> N
     )
 
     assert isinstance(client, OpenAICompatLLMClient)
-    assert client.model == "glm-5.3"
-    assert client.base_url == "https://api.z.ai/api/paas/v4"
-    assert client.api_key_service == "trading-bot-zai-bot"
+    assert client.model == "MiniMax-M3"
+    assert client.base_url == "https://api.minimax.io/v1"
+    assert client.api_key_service == "trading-bot-minimax-bot"
     assert client.api_key_username == "api_key"
+    # The provider's documented quirk reaches the client (MiniMax docs 2026-11-03).
+    assert client.max_tokens_field == "max_completion_tokens"
     # The profile's own limits win over the phase config's.
-    assert client.max_tokens == 4096
+    assert client.max_tokens == 8192
     assert client.timeout_s == 90.0
 
 
@@ -128,19 +131,19 @@ def test_build_llm_passes_provider_quirks_to_openai_compat(
     assert client.base_url == "https://api.openai.com/v1"
 
 
-def test_debate_config_all_glm_renames_all_three_roles() -> None:
+def test_debate_config_all_m3_renames_all_three_roles() -> None:
     """Phase 6's ``ask_agent`` rewrites ``client.model`` per role from the
     ``DebateConfig`` — so a profile that moves the debate must rename **all
     three** (bull/bear/judge), otherwise the debate would call Anthropic models
     on the foreign provider."""
-    cfg = _debate_config("all_glm")
+    cfg = _debate_config("all_m3")
 
-    assert cfg.model_bull == "glm-5.3"
-    assert cfg.model_bear == "glm-5.3"
-    assert cfg.model_judge == "glm-5.3"
+    assert cfg.model_bull == "MiniMax-M3"
+    assert cfg.model_bear == "MiniMax-M3"
+    assert cfg.model_judge == "MiniMax-M3"
     # The profile's token limit wins over the debate default.
-    assert cfg.max_tokens_agent == 4096
-    assert cfg.max_tokens_judge == 4096
+    assert cfg.max_tokens_agent == 8192
+    assert cfg.max_tokens_judge == 8192
 
 
 def test_debate_config_anthropic_is_default() -> None:
@@ -175,7 +178,7 @@ def test_build_llm_unknown_profile_raises_before_any_client(no_keyring: None) ->
 def test_build_llm_returns_a_client_with_the_expected_surface(no_keyring: None) -> None:
     """Both client classes must expose the surface the callers rely on:
     ``ask_candidate`` + ``.model`` + ``.max_tokens`` (Phase 5/6 read them)."""
-    for profile in ("anthropic", "research_glm"):
+    for profile in ("anthropic", "research_m3"):
         client: Any = _build_llm(
             "research",
             profile,

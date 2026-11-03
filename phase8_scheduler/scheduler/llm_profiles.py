@@ -35,7 +35,9 @@ the one choke point the bot and the smoke script share.
 ``base_url`` that contains ``"coding"`` anywhere (case-insensitive) — the z.ai
 Coding Plan endpoint (``/api/coding/paas/v4``) is for the executor harness, and
 its usage policy bans use outside officially supported tools. The bot uses the
-general z.ai API with pay-per-use (``https://api.z.ai/api/paas/v4``).
+general APIs: MiniMax (Abo/M Plan, ``https://api.minimax.io/v1`` — the active
+provider since 2026-11-03) or z.ai pay-per-use
+(``https://api.z.ai/api/paas/v4``, reserve).
 
 Live status per entry is a **comment** on the entry (``# doc <date> <url> · live: —``),
 never a data field (T30): a gateway smoke proves the *model family*, not the
@@ -108,7 +110,7 @@ class RoleSpec:
 PROVIDERS: dict[str, ProviderSpec] = {
     # --- Anthropic (native SDK) — unchanged, live since Phase 4 ------------------
     "anthropic": ProviderSpec(kind="anthropic"),
-    # --- z.ai / GLM — the bot's pay-per-use provider (Plan §14) -----------------
+    # --- z.ai / GLM — Reserve-Eintrag, kein Profil (Planwechsel 2026-11-03 → MiniMax)
     # doc 2026-10-19 docs.z.ai/api-reference/llm/chat-completion · live: —
     "zai": ProviderSpec(
         kind="openai_compat",
@@ -116,13 +118,21 @@ PROVIDERS: dict[str, ProviderSpec] = {
         api_key_service="trading-bot-zai-bot",
         api_key_username="api_key",
     ),
-    # --- MiniMax (Abo-Kontingent, gültig bis 2026-11-15) -----------------------
-    # doc 2026-10-19 (nicht abgerufen — Stufe-2-Smoke entscheidet) · live: —
+    # --- MiniMax (Abo-Kontingent M Plan, gültig bis 2026-11-15) — aktiver Bot-Provider
+    # doc 2026-11-03 platform.minimax.io/docs/api-reference/text-openai-api ·
+    #      platform.minimax.io/docs/guides/text-generation.md · live: —
+    # Quirks (Doku 2026-11-03): das Token-Limit-Feld für neue Integrationen ist
+    # ``max_completion_tokens`` (``max_tokens`` = Legacy, wird aber akzeptiert);
+    # ``temperature``/``top_p`` werden **ignoriert**, nicht abgelehnt ⇒
+    # ``send_temperature`` bleibt True. ``thinking`` ist default AN — für
+    # ``MiniMax-M3`` abschaltbar (``{"type": "disabled"}``), für
+    # ``MiniMax-M3.1-Flash`` ein 400 (Doku: „Thinking cannot be turned off").
     "minimax": ProviderSpec(
         kind="openai_compat",
         base_url="https://api.minimax.io/v1",
         api_key_service="trading-bot-minimax-bot",
         api_key_username="api_key",
+        max_tokens_field="max_completion_tokens",
     ),
     # --- OpenAI — die GPT-5-Linie will max_completion_tokens und lehnt temperature ab
     # doc 2026-10-19 platform.openai.com (403 für WebFetch; indirekter Beleg über die
@@ -180,16 +190,19 @@ PROVIDERS: dict[str, ProviderSpec] = {
 }
 
 _ANTHROPIC = RoleSpec(provider="anthropic")
-# The GLM research model. **Provisional**: Plan §14.4 — the Nikinger picks the
-# model after the C-7 family smoke; the choice lands in its own commit together
-# with ``budget_exempt_models`` (§14.1). max_tokens/timeout leave room for the
-# reasoning model's <think> block (C-3 strips it).
-_GLM = RoleSpec(provider="zai", model="glm-5.3", max_tokens=4096, timeout_s=90.0)
+# The MiniMax research model — the Plan-§6 baseline, re-activated as the bot's
+# provider on 2026-11-03 (Planwechsel z.ai → MiniMax Abo/M Plan).
+# **Provisional**: the Nikinger confirms the model after the C-7 family smoke.
+# max_tokens=8192 (not the §6 baseline 4096): MiniMax-M3 thinks by default and the
+# reasoning tokens count against the limit — a too-small limit yields
+# ``finish_reason=length`` with an **empty** content (MiniMax doc 2026-11-03; Plan
+# §15.6 failure table). timeout_s=90 leaves room for the reasoning block.
+_M3 = RoleSpec(provider="minimax", model="MiniMax-M3", max_tokens=8192, timeout_s=90.0)
 
 LLM_PROFILES: dict[str, dict[str, RoleSpec]] = {
     "anthropic": {role: _ANTHROPIC for role in LLM_ROLES},
-    "research_glm": {**{role: _ANTHROPIC for role in LLM_ROLES}, "research": _GLM},
-    "all_glm": {role: _GLM for role in LLM_ROLES},
+    "research_m3": {**{role: _ANTHROPIC for role in LLM_ROLES}, "research": _M3},
+    "all_m3": {role: _M3 for role in LLM_ROLES},
 }
 
 
@@ -314,7 +327,7 @@ def check_llm_profile(
     4. a model of a non-Anthropic provider that is **not** in ``exempt_models``.
 
     Case 4 exists because the model id is a literal in three places (this file's
-    ``_GLM.model``, the price line in ``research/models.py`` and
+    ``_M3.model``, the price line in ``research/models.py`` and
     ``SchedulerConfig.budget_exempt_models``). A rename that forgets the exempt
     list would silently put the research calls back under the daily token cap —
     this check makes that fail loudly at startup instead.
