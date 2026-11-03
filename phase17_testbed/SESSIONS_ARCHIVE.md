@@ -7,6 +7,58 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-10-25 (Exec-Session #7 ENDE — Scheduler-Hold: systemd-Autostart aus + getrackter Repo-Guard `data/state/SCHEDULER_HELD`, +12 root-Tests, Σ 1988 + 12 = **2000** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe: Marker-Variante + lokale Commits, Push = Nikinger)
+
+> **Auftrag:** Nikinger 2026-10-25 (über die eurfleet-Fleet-Session weitergeleitet): „Hold off on running 201 — its restart list includes tradingbot-scheduler, and since it's also enabled, a likely reboot would re-start it against your 21.10 decision. … You or the bot session should separately run `systemctl --user disable tradingbot-scheduler` on 201, since that unit's state isn't mine to touch. … 201 then gets patched normally on 31.10." → Diese Exec-Session macht die **Bot-Seite**: (1) Host-Disable (systemd-Autostart aus), (2) getrackter Repo-Guard, damit der 31.10-Update-Run den Fix nicht zurücknimmt. Die Fleet-Seite (Restart-Liste `inventory/hosts.yml`, `--check`) liegt in der eurfleet-Session, nicht hier.
+>
+> **Kontext:** Die Phase-17-Entscheidung B-0 (Plan §6) hält den Scheduler **absichtlich** gestoppt (Plan T22: nur der Scheduler hält eine IG-Session) — von B-0 bis E-3. Das Repo kannte diese Entscheidung bisher nur als *Prozesszustand* (`systemctl --user stop`), nicht als *Installationszustand*: die Unit war weiterhin `enabled`. Jeder Reboot (VM-Host-Ereignis, Plan T10) hätte den gestoppten Scheduler wieder gestartet.
+>
+> **Executor-Modus:** MiniMax-M3 (OpenCode) — kein z.ai-Modell heute. `~/.config/opencode/`, `auth.json`, `opencode.service` unangefasst.
+
+### Completed — diese Exec-Session (2 Commits)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | `51ba156` | root (`scripts/`) | **Host-Hold + Repo-Guard.** (a) `systemctl --user disable tradingbot-scheduler.service` auf 201 (Host-Zustand: vorher `enabled` → jetzt `disabled`, `is-active` bleibt `inactive`; recorder/discovery/webui unangeführt `enabled` + `active`). (b) **`scripts/install_units.sh`**: Hold-Marker `data/state/SCHEDULER_HELD` (operator-sticky, Muster `KILL` / `DISCOVERY_ARMED`, **untracked** — `data/` ist Host-Zustand; der *Guard* ist der getrackte Teil). Bei Hold wird `tradingbot-scheduler.service` **nicht** enabled — vorher lief am Script-Ende `systemctl --user enable "${UNITS[@]}"` (Z. 76), d. h. der nächste Installer-Lauf (31.10-Update-Run) hätte den Scheduler wieder autostart-fähig gemacht. Neue Modi: `--check` (report-only, Drift → exit 1), `--hold` (Marker anlegen + Unit deaktivieren), `--release-hold` (Marker weg). (c) **`scripts/restart-services.sh`**: `start`/`restart` überspringen den Scheduler bei Hold (`start_one`), `status` meldet den Hold als NOTE; `stop` bleibt unberührt (Hold blockiert nur das *Starten*). Beide Skripte lesen den Marker über `${TRADINGBOT_HOLD_FILE:-${REPO_ROOT}/data/state/SCHEDULER_HELD}` (Test-Override, Default = Live-Pfad). `.gitignore` bekommt den Marker als Runtime-State-Eintrag (Muster `data/state/KILL`). |
+| 2 | (dieser Commit) | root (`tests/`) + P17-Doku | **+12 root-Tests** in `tests/test_scheduler_hold.py` (pytest, subprocess auf die Bash-Helfer, **fake `systemctl`** im PATH, tmp `HOME`, tmp-Marker → **kein** Touch des Live-`data/state`). **Σ-Steigerung:** root 121 → **133** (+12), Σ 1988 → **2000** (+12). Keine Regressionen in den übrigen 15 Suites (16/16 grün, Sweep nach dem Phasen-Kopf-Kommando). Doku: dieser Block + Rotation von Session #6 nach `SESSIONS_ARCHIVE.md` + Σ-Tabelle + Bot-Ritual + Status-Zeile. |
+
+### Gemessen (Host 201, `trading-bot-VMware-Virtual-Platform`)
+
+| | vorher | nachher |
+|---|---|---|
+| `is-enabled tradingbot-scheduler.service` | `enabled` | **`disabled`** |
+| `is-active tradingbot-scheduler.service` | `inactive` | `inactive` (unverändert) |
+| recorder / discovery / webui | enabled + active | enabled + active (unverändert) |
+| `bash scripts/install_units.sh --check` | (n/a) | exit 0 — „hold ACTIVE", Scheduler `installed=current enabled=disabled expected=disabled` |
+| `bash scripts/restart-services.sh status` | 3 alive, Scheduler dead | 3 alive, Scheduler dead + NOTE „SCHEDULER_HOLD present" |
+| `data/state/KILL` | nicht vorhanden | nicht vorhanden (unberührt) |
+
+### Die zwei Türen (Befund — warum Host-Disable allein nicht reicht)
+
+1. **`scripts/install_units.sh:76`** — `systemctl --user enable "${UNITS[@]}"`: der getrackte Installer aktiviert **alle vier** Units. Der Fleet-Update-Run läuft über diesen Installer → Scheduler wieder `enabled` → der *nächste* Reboot startet ihn. Deshalb muss der Hold ein getrackter Guard sein, kein Host-Flag.
+2. **`scripts/restart-services.sh`** — der repo-eigene Restart-Helfer startet den Scheduler per `nohup` (systemd-unabhängig). Ein `restart` im Update-Flow hätte den gestoppten Scheduler ebenfalls gestartet.
+
+Beide Türen sind jetzt durch **einen** Marker geschlossen. Die Tests pinnen beide — inklusive Negativ-Beweis: ohne Marker startet `restart-services.sh start` den Scheduler wieder (der Hold ist die einzige Differenz, kein Zufalls-Effekt).
+
+### Next (geplante Folgesessions, in Priorität)
+
+- **B-7 Abstain-Naht (D7, P8)** — unverändert der nächste Block; Anker im archivierten Session-#6-Block („Next start"). Plan-AK P8 ≥ **271**, Σ-Ziel Block B ≥ 1992.
+- **E-3-Vorbereitung (Pflicht-Schritt, noch offen):** der Hold muss **vor** E-3 freigegeben werden, sonst bleibt die Scheduler-Unit `disabled` (der R5-Autostart-Beweis fehlt danach). Freigabe: `bash scripts/install_units.sh --release-hold` → danach `bash scripts/install_units.sh` (enabled alle vier) → `systemctl --user start tradingbot-scheduler.service …` (Plan §6 E-3). Der E-3-Block im Plan (`docs/concepts/phase17_testbed_plan.md`) ist `status: snapshot` (L3) und wurde **nicht** editiert — der Release-Schritt steht dort noch nicht; er ist hier dokumentiert und gehört in den E-3-Lauf.
+- **Fleet-Abstimmung (eurfleet-Session):** deren Repo (Restart-Liste) ist theirs — der Bot-Anteil ist hier erledigt. 201 wird am **31.10.** wie geplant gepatcht; der Reboot darf den Scheduler nicht starten (Autostart `disabled` + Guard).
+
+### Open questions / blockers
+
+- **Scheduler ist gestoppt** (`is-active=inactive`, jetzt zusätzlich `disabled`). **Neu gegenüber Session #1–#6:** der Zustand ist jetzt *auch* rebootfest. Alle übrigen Punkte (Datenreparatur der 3 730 alten `ig`-Bars, Promotion-Bridge-Backfill 29 NULL-Zeilen, Fleet §14.8 OpenCode + z.ai, B-5-/B-6-Live-Beweis) — **keine Änderung**.
+- **Hold-Marker ist untracked** (`data/state/` → pro Host). Ein zweiter Host braucht den Marker ebenfalls, wenn der Scheduler dort gestoppt bleiben soll.
+- **Kein Eingriff in Phase-16-Doku:** `phase16_activation/PHASE16_E3_RUNBOOK_v4.md` §3 beschreibt die Deploy-Sequenz ohne Hold — ein Cross-Phase-Edit wäre außerhalb Phase 17. Der Release-Schritt steht hier (Phase-17-Kopf); der Nikinger entscheidet, ob P16 nachgezogen wird.
+- **Plan nicht angefasst:** `docs/concepts/phase17_testbed_plan.md` (`status: snapshot`) bleibt unverändert (Anti-Pattern „📕 dated snapshot edit"). E-3-Release-Schritt deshalb ausschließlich hier dokumentiert.
+
+### Session-end-Hinweis
+
+- **Σ 2000** (16 Suites, Sweep-Kommando aus dem Phase-Kopf; root 121 → 133). meta_m1 informativ, nicht in Σ.
+- **Commits:** 2 (Code + Guard / Tests + Doku). Push = Nikinger (Phase-17-Konvention).
+- **Kern-Erkenntnis:** „Dienst gestoppt" war im Repo bis heute ein *Prozess*-zustand, kein *Installations*-zustand. Jede Tür, die den Scheduler automatisch starten kann (systemd-Autostart, Installer-`enable`, Restart-Helper), muss die Entscheidung kennen — sie kennt jetzt ein gemeinsames, operator-sticky Markerdatum.
+
 ## Session stopped — 2026-10-19 (Exec-Session #6 ENDE — Block B-6 Breaker Worst-Case, 1 Commit in P8, Σ 1985 + 3 P8-Tests = **1988** grün; Scheduler gestoppt + 3 Units laufen weiter; Nikinger-Freigabe zur Beendigung)
 
 > **Auftrag:** Nikinger 2026-10-19 (später Session): „Go on as in the next block recommended." → Exec-Session #6 setzt die explizite **Next**-Priorität aus Exec-Session #5 um: **B-6 Breaker Worst-Case (D6, T9, P8)** per Plan §6 B-6 verbatim (T13: Code in P8 ✓, keine Cross-Phase-Edits nötig — alle Module im selben P8-Baum). **Drift-Hinweis:** Plan-Anker Z. 1009–1016 (Closure) ist heute Z. 1066–1073 — ~$+57$ Zeilen nach unten gewandert (B-3/B-5 Commits in P15 + P8 dazwischen). **Kleiner Drift**, semantisch unverändert, in dieser Session am Exec-Ort verifiziert.

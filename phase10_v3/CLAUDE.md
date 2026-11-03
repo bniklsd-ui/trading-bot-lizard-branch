@@ -96,14 +96,16 @@ phase10_v3/
 │                                                (quote_only-Degrade), writer.py
 │                                                (MarketContextWriter + ContextRecorder)
 ├── scripts/                                    ✅ abstain_report.py (+ WE-2 `--paper`-Sektion)
-└── tests/                                      ✅ **165** Tests (frisch gemessen 2026-08-25;
+└── tests/                                      ✅ **166** Tests (frisch gemessen 2026-11-03;
                                                  Stand der Head-Doku 147 war stale — Korrektur
-                                                 147 → 165 ist Teil des Closeout-Commits.
+                                                 147 → 165 ist Teil des Closeout-Commits,
+                                                 165 → 166 (Phase-17 B-8) am 2026-11-03.
                                                  Zusammensetzung: 125 bis WE 2/Council
                                                  + B4/H6 + H1 + 5 Tracker-Guards
                                                  + 4 Lesson-Salvage 08-08
                                                  + 14 nachgelagerte Bugfix-Targets
-                                                 = 165 grün)
+                                                 + 1 Phase-17-B-8-Logstufen-Test
+                                                 = 166 grün)
 ```
 
 **Bugfix-Block (zusammengefasst für die Audit-Kette):**
@@ -115,6 +117,20 @@ phase10_v3/
   statischem `research.EXTENDED_UNIVERSE`; `compute_size` now fail-closed bei unmapptem Epic
 - 2026-08-08 — Allowance-Incident-Fix (Stale-Expiry + Budget-Breaker + Fetch-Cap),
   B5 Lesson-Salvage (Satzgrenzen-Trim, keine Verwerfung), H4-a Alters-Cap
+- 2026-11-03 — **Phase-17 B-8 (D8, T11/E4): Logstufen der Paper-Pfade.** Vier Stellen in
+  `abstain_lessons/paper.py` loggen Ausfälle **externer Abhängigkeiten** (Quote/LLM) jetzt
+  als `warning` statt `critical`: `PaperDebateCaller.request_pick failed` (Z. 323),
+  `PaperEngine.on_debate_abstain failed` (Z. 390), `PaperEngine.open_scheduled_pairs failed`
+  (Z. 471), `PaperTradeTracker reflect failed` (Z. 709). **Unverändert `critical`** (lokale
+  Fehler = Bug-Indikatoren): `PaperTradeTracker bar fetch failed` (Z. 569) und
+  `PaperTradeTracker resolve failed` (Z. 691). Begründung: K5 bleibt „alle CRITICALs" —
+  das Rauschen wird **an der Quelle** behoben, nicht im Kriterium (Plan T11/E4 (a):
+  „Quellen beheben, Kriterium nicht lockern"). Kontext: am 10-09 produzierte allein der
+  Reflect-Pfad 72 CRITICALs wegen eines Guthaben-Ausfalls; ein LLM-Ausfall wird künftig
+  einmalig von `research_tick` gemeldet (`LLM_UNAVAILABLE`, Plan C-5).
+  **+1 Test** (`test_get_price_failure_logs_warning_not_critical`, caplog) → P10 165 → **166**
+  (Σ 2000 → **2004**). Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 B-8, T13: Code in
+  P10 ✓). Commit `02faf44`.
 
 **Phase-15-Erbschaften (Council/Handover/Reward-Reform/Force-Trigger/Instinct-ECC):**
 die P10-Paper-Council-Implementation (Phase 14 wurde nie gebraucht) bleibt im Code als

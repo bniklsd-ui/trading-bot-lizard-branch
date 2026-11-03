@@ -143,6 +143,24 @@ Dazu kommt der Betriebs-Deckel: der Daemon tut **nichts**, solange
 | `test_run.py` | **18** | C2-Akzeptanz (Daemon unscharf/scharf/stale/werfend/probe_calls_used/ **+ 1 P14-D-Test** = CAP-on-Stop) |
 | **Σ Phase 14** | **61** | (= Σ-Sweep Stand Session 20 / 21 unverändert; Mini-Session 21 brachte **0** neue Tests) |
 
+> 🔁 **Phase-17 (Prüfstand) B-10 edit (2026-11-03, Exec-Session #8 — additiv, code = source of truth):**
+> `source_registry/run.py::run_once` schreibt an **allen drei** Rückgabestellen (unarmed ·
+> armed+nichts-stale · realer Zyklus) eine **append-only Belegzeile** auf INFO:
+> `"discovery cycle %s: armed=%s stale=%d rows_written=%d errors=%d"`. Der Zeitstempel steckt **im
+> Text**, weil das `basicConfig` des Daemons (`run.py:336`) ohne `asctime` loggt; eine Zeile pro
+> Zyklus (≈ 1/Stdunde, `interval_s=3600`). Davor gab es **keinen** append-only Beleg: nur
+> `discovery_state.json` (in place — der letzte Zyklus überschreibt den vorigen) und eine
+> `debug`-Zeile, die bei `level=logging.INFO` **unsichtbar** war (D12). Die beiden
+> `logger.debug(...)`-Zeilen bleiben unverändert.
+> `scripts/run_discovery.sh`: der Starttext „(unarmed ⇒ noop)" ist jetzt „(noop unless ARMED)" —
+> der alte Text suggerierte dauerhaft No-op, obwohl der Daemon scharf geschaltet werden kann. Das
+> K1-Muster `\[run_discovery\] starting daemon` (`autonomy_report.py:153`) bleibt treffend.
+> **+1 Test** (`test_run_once_logs_discovery_cycle_line_with_ts`, caplog, alle drei Pfade) →
+> P14 61 → **62** (Σ 2000 → **2004**). Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 B-10,
+> T13: Code in P14 ✓). Commit `4eefbda`. **Wirksamkeit:** die Zeile erscheint ab dem nächsten
+> Discovery-Neustart — der laufende Daemon (Unit `tradingbot-discovery`) wurde **nicht**
+> angefasst (Bot-Ritual: Neustart erst in E-3).
+
 Cross-Phase-Σ (relevant für Phase 14, Stand Mini-Session 21):
 
 | Phase | Tests grün | Δ zu Session 20 |

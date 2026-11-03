@@ -11,7 +11,7 @@ down:
   - ../phase7_reward/PHASE12_RECONCILIATION_TIMING_PLAN.md   # 📕 A6 hängt an Migration 008
   - ../phase5_execution/CLAUDE.md                 # B3-Block → Plan D3
   - ./SESSIONS_ARCHIVE.md                         # 📦 Session-Block-Historie (newest-first, A-0 angelegt)
-updated: 2026-10-16 (Closeout mit Teilbilanz, Session #38 — Handover + SVG; Σ 1964 gemessen). — Vorheriger Stand: 2026-10-07 (+ **LLM-Subphase Planung eröffnet (MiniMax-M3, Session #36)** [Phase-16-LLM-Subphase: Detail-Plan + Plan-Brief für Opus-Plan-Session NEU (2 Files, 525 LOC zusammen), Cross-Phase-Edits NICHT ausgeführt (Nikinger-Auftrag: in Opus' Hand); Phase-Naming: Phase 16 F / R / LLM als Subphasen unter Phase-16-Schirm (Suffix statt neue Phase-Nummer, analog F-Subphase Session #18–#32 + R-Subphase Session #33–#35); K6-Schwellwert-Entscheidung weiter offen (vertagt auf Opus-Plan-Session); Σ 1963 unverändert, 0 Commits code+test, 1 Doc-Commit dieser Session; Push der 2 Session-#35-Commits bereits erfolgt (`git rev-list --left-right --count origin/main...HEAD` = `0 0`); Session #35-Block (308 Zeilen) verbatim nach `SESSIONS_ARCHIVE.md` rotiert (3805 → 3908 Zeilen, +103); Session #36-Block (84 Zeilen) im Phasenkopf]). — Vorheriger Stand: 2026-09-30 (+ **R-Fix + Doc-Fix ausgeführt (MiniMax M3, Session #35)** [phase3 fetcher `_MAX_RETRIES` 3→5 + `_TRANSIENT_EXC_NAMES` für curl_cffi RequestsError/ConnectionError/Timeout/ChunkedEncodingError, Kommentar Phase-16 R-Fix mit Root-Cause-Datum 2026-09-29 22:55 physischer Server-Umbau; pyc-Cache gelöscht + `systemctl --user restart` aller 4 Units (neue PIDs 223277/223278/223279/223280); v3-Aktiv-Block nachträglich ausgefüllt mit echtem Start-Zeitstempel `2026-09-29T22:57:03+02:00` + Post-hoc-Dokumentation (kein AK13-Verstoß für künftige Re-Eintragungen); v3+v4 Header-Card-Pfade korrigiert (`./phase16_activation/systemd/` → `./systemd/`, `./scripts/install_units.sh` → `../scripts/install_units.sh`); INDEX-Zeilen für v3/v4 ergänzt; Σ 1960→1963 (+3 phase3-Tests); neuer Lauf Tag 1 = 2026-09-29, Tag 10 = 2026-10-13]). — Vorheriger Stand: 2026-09-22 (+ **R5 + R6 ausgeführt (Opus 5, Session #34)** [4 systemd-User-Units + `scripts/install_units.sh` installiert + enabled (nicht gestartet), Keyring aus Unit-Umgebung per `systemd-run --user` bewiesen, 3 Plan-Drifts korrigiert (graphical-session.target, StartLimit* in [Unit], StandardOutput=append:); R6 Token-Aufschlüsselung gemessen (pro Stage unmöglich — kein `stage`-Feld; Research = 94 % des Caps) + 2 Entscheidungen beim Nikinger; F6 gefixt (atomarer `llm_usage.json`-Write) + phase4-Datum-Drift (Fixture); Σ 1958→1960; R7 blockiert auf K6-/K1-Entscheidung + Reboot-Test]). — Vorheriger Stand: 2026-09-22 (+ **R0-R4 ausgeführt (Sonnet 5, Session #33)** [Drift #12/#13/#11/#9 gefixt + F8 (neues K8-Liveness-Gate) + R4-Archivierung (Log 2,37 GB→44 MB gzip, 4 055 221 `ls`-Bars archiviert + aus Live-DB gelöscht, beide DBs integrity-check ok); Σ 1948→1958; R5-R7 offen, siehe Session-Block]). — Vorheriger Stand: Tag-9-Status-Check 2026-09-21 (Opus 5, Session #32, siehe Archiv), Tag-5-Status-Check 2026-09-15 (Drifts #9/#10/#11, deferred), Exec-Session #31 Wrapper-Skript-Fix Drift #8
+updated: 2026-11-03 (Phase-17 B-9 — `TimeoutStopSec=360` in der Scheduler-Unit, Unit verifiziert + installiert, Hold unangetastet; Σ 2004). — Vorheriger Stand: 2026-10-16 (Closeout mit Teilbilanz, Session #38 — Handover + SVG; Σ 1964 gemessen). — Vorheriger Stand: 2026-10-07 (+ **LLM-Subphase Planung eröffnet (MiniMax-M3, Session #36)** [Phase-16-LLM-Subphase: Detail-Plan + Plan-Brief für Opus-Plan-Session NEU (2 Files, 525 LOC zusammen), Cross-Phase-Edits NICHT ausgeführt (Nikinger-Auftrag: in Opus' Hand); Phase-Naming: Phase 16 F / R / LLM als Subphasen unter Phase-16-Schirm (Suffix statt neue Phase-Nummer, analog F-Subphase Session #18–#32 + R-Subphase Session #33–#35); K6-Schwellwert-Entscheidung weiter offen (vertagt auf Opus-Plan-Session); Σ 1963 unverändert, 0 Commits code+test, 1 Doc-Commit dieser Session; Push der 2 Session-#35-Commits bereits erfolgt (`git rev-list --left-right --count origin/main...HEAD` = `0 0`); Session #35-Block (308 Zeilen) verbatim nach `SESSIONS_ARCHIVE.md` rotiert (3805 → 3908 Zeilen, +103); Session #36-Block (84 Zeilen) im Phasenkopf]). — Vorheriger Stand: 2026-09-30 (+ **R-Fix + Doc-Fix ausgeführt (MiniMax M3, Session #35)** [phase3 fetcher `_MAX_RETRIES` 3→5 + `_TRANSIENT_EXC_NAMES` für curl_cffi RequestsError/ConnectionError/Timeout/ChunkedEncodingError, Kommentar Phase-16 R-Fix mit Root-Cause-Datum 2026-09-29 22:55 physischer Server-Umbau; pyc-Cache gelöscht + `systemctl --user restart` aller 4 Units (neue PIDs 223277/223278/223279/223280); v3-Aktiv-Block nachträglich ausgefüllt mit echtem Start-Zeitstempel `2026-09-29T22:57:03+02:00` + Post-hoc-Dokumentation (kein AK13-Verstoß für künftige Re-Eintragungen); v3+v4 Header-Card-Pfade korrigiert (`./phase16_activation/systemd/` → `./systemd/`, `./scripts/install_units.sh` → `../scripts/install_units.sh`); INDEX-Zeilen für v3/v4 ergänzt; Σ 1960→1963 (+3 phase3-Tests); neuer Lauf Tag 1 = 2026-09-29, Tag 10 = 2026-10-13]). — Vorheriger Stand: 2026-09-22 (+ **R5 + R6 ausgeführt (Opus 5, Session #34)** [4 systemd-User-Units + `scripts/install_units.sh` installiert + enabled (nicht gestartet), Keyring aus Unit-Umgebung per `systemd-run --user` bewiesen, 3 Plan-Drifts korrigiert (graphical-session.target, StartLimit* in [Unit], StandardOutput=append:); R6 Token-Aufschlüsselung gemessen (pro Stage unmöglich — kein `stage`-Feld; Research = 94 % des Caps) + 2 Entscheidungen beim Nikinger; F6 gefixt (atomarer `llm_usage.json`-Write) + phase4-Datum-Drift (Fixture); Σ 1958→1960; R7 blockiert auf K6-/K1-Entscheidung + Reboot-Test]). — Vorheriger Stand: 2026-09-22 (+ **R0-R4 ausgeführt (Sonnet 5, Session #33)** [Drift #12/#13/#11/#9 gefixt + F8 (neues K8-Liveness-Gate) + R4-Archivierung (Log 2,37 GB→44 MB gzip, 4 055 221 `ls`-Bars archiviert + aus Live-DB gelöscht, beide DBs integrity-check ok); Σ 1948→1958; R5-R7 offen, siehe Session-Block]). — Vorheriger Stand: Tag-9-Status-Check 2026-09-21 (Opus 5, Session #32, siehe Archiv), Tag-5-Status-Check 2026-09-15 (Drifts #9/#10/#11, deferred), Exec-Session #31 Wrapper-Skript-Fix Drift #8
 
 ## Live-Beobachtungen — 2026-09-21 (Tag 9, Status-Check ohne Code-Edits)
 
@@ -204,6 +204,35 @@ wenn ein fremder Prozess dieselbe PID bekommt, verweigert der Daemon den Start m
 „already running". Heute nicht der Fall.
 
 ---
+
+## Phase-17-Nachtrag (2026-11-03, Exec-Session #8 — **B-9 Stop-Timeout in der Scheduler-Unit**)
+
+> **Kontext:** Phase 17 (Prüfstand) bearbeitet u. a. **D13** — der Stop-Timeout der
+> Scheduler-Unit. Diese Datei (die Unit-Datei) ist der Träger; die Entscheidung selbst gehört
+> in den Phase-17-Plan (§6 B-9, T10) und in den Phase-17-Kopf.
+
+- **Änderung:** `phase16_activation/systemd/tradingbot-scheduler.service` trägt jetzt
+  `TimeoutStopSec=360` (unter `SuccessExitStatus=143`), mit dem Plan-Kommentar
+  „# Phase 17 B-9: SIGTERM is honoured after the running cycle sleep (≤ 300 s) — 90 s default
+  killed every stop (09-23, 09-30, 10-11)."
+- **Warum:** ohne die Zeile endete **jeder** Stop nach dem systemd-Default von 90 s per SIGKILL,
+  weil der SIGTERM-Handler (`runner.py::request_stop`) erst nach dem laufenden Zyklus-Sleep
+  (≤ 300 s) wirkt. Ein SIGKILL überspringt `shutdown()` — der finale Reconcile
+  (`reconcile_startup`) und `broker.disconnect()` liefen nie.
+- **Akzeptanz:** `bash scripts/install_units.sh --verify` → exit 0
+  (`systemd-analyze --user verify: ok`).
+- **Host:** die getrackte Unit wurde am 2026-11-03 über `bash scripts/install_units.sh`
+  installiert (Datei-Kopie + `daemon-reload`), damit `install_units.sh --check` exit 0 bleibt
+  (sonst `installed=differs` → DRIFT). Der **Phase-17-Scheduler-Hold** blieb unangetastet:
+  die Unit bleibt `disabled` + `inactive`; der Start erfolgt **erst in E-3**.
+- **Cross-Phase-Edit im Phase-17-Plan autorisiert** (Plan §6 B-9, T13: Code in P16 ✓).
+  Commit `f221f3c`. Details: `phase17_testbed/CLAUDE.md` Session-#8-Block.
+- **Nicht angefasst:** `PHASE16_E3_RUNBOOK_v4.md` §3 (beschreibt die Deploy-Sequenz ohne Hold) —
+  ein P16-Cross-Phase-Doku-Edit liegt außerhalb Phase 17; der Nikinger entscheidet, ob P16
+  nachgezogen wird.
+
+---
+
 ## Session stopped — 2026-10-16 (Opus-5.5-Session #38, **Phase-16-Closeout mit Teilbilanz** — Handover + SVG + Statuspflege, keine Code-/Test-Edits, Σ 1964 selbst gemessen; Session #37 verbatim nach `SESSIONS_ARCHIVE.md` rotiert)
 
 > **Auftrag:** Nikinger 2026-10-16 abends: „Phase 16 ist abgeschlossen / wird zurückgestellt" — Analyse gegen As-Built, SVG, Handover, Statuspflege (Handover-Prompt `docs/HANDOVER_PROMPT.md`).

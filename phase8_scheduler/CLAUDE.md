@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase8_scheduler_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988)
+updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004)
 ---
 # CLAUDE.md — Phase 8: Scheduler (`phase8_scheduler/`)
 
@@ -113,7 +113,7 @@ immer → Variety + Clamp/Floor + echte Lessons). **Token-Budget by-default scha
 | `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures + `universe_refresher`-Closure (Phase 9/V2) | ✅ (Modul 11, operator-run) |
 | `scripts/run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Operator-Tools (Start-Script · offline Sim-Tag mit Fakes · echter unbeaufsichtigter IG-Demo-Zyklus) | ✅ (Modul 11, operator-run) |
 | `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes. **+ Token-Meter-Card** (`/api/token_usage`) **+ Last-Cycle-Reasoning** (`/api/last_cycle` zeigt jetzt Research-Pick + Bull/Bear/Judge-Transkript) — s. `## UI-Erweiterung — 2026-06-29`. **v1.7 (2026-07-02): `/api/status`s `trades_today`/`realized_pnl_today` DB-gespeist** (nicht mehr der lagging `scheduler_state.json`-Snapshot) — s. `## Session stopped — 2026-07-02 (v1.7: /api/status DB-gespeist)` | ✅ (Modul 12, 20 Tests) |
-| `tests/*` | gemockt, kein Netz/LLM/echter sleep (199, Schwerpunkt `test_runner` + `test_safety` + `test_webui`) | ✅ |
+| `tests/*` | gemockt, kein Netz/LLM/echter sleep (**271**, Schwerpunkt `test_runner` + `test_safety` + `test_webui` + `test_wiring_*`) | ✅ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine
 Datei = eine Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging →
@@ -405,6 +405,37 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 > - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 B-6 T13: Code in P8
 >   ✓, keine Cross-Phase-Edits nötig — alle Module im selben P8-Baum;
 >   `phase17_testbed/CLAUDE.md` Session-#6-Block). Commit `a0b2fb5`.
+>   Push = Nikinger.
+
+> 🔁 **Phase-17 (Prüfstand) B-7 edit (2026-11-03, Exec-Session #8 — additiv, code = source of truth):**
+> `scripts/wiring.py` hat die **Abstain-Naht** geschlossen (Phase-17-Block-B Sweep, D7). **Additiv**,
+> Phase-8 bleibt für Bestands-Wire-ups bit-identisch (nur ein Rückgabewert + die Wrapper-Reihenfolge):
+> - **`_observed_abstain_sink` (`scripts/wiring.py`, Z. 830 ff.) reicht den `record_id` des inneren
+>   Sinks durch.** Vorher war der Wrapper `-> None` und ließ `inner.on_no_trade(cycle_outcome)` auf
+>   dem Boden liegen. Der Phase-5-Executor liest genau diesen Rückgabewert als `record_id` und
+>   verlinkt ihn mit `decision_context.abstain_record_id` (`execution/executor.py:201`) — die
+>   Verlinkung war auf **3 669 von 3 669** NO_TRADE-Zeilen NULL (gemessen 2026-10-17, Plan §3 D7).
+>   Neu: `def on_no_trade(self, cycle_outcome: Any) -> Any:` → `record_id = inner.on_no_trade(...)` →
+>   `return record_id` **nach** dem `try/except` (ein Observability-Fehler darf den Wert nicht
+>   wieder verschlucken). Der Docstring-Satz „locked `AbstainSink.on_no_trade(cycle_outcome) -> None`
+>   contract" war nach dem Fix falsch und wurde ersetzt.
+> - **Reihenfolge im Composition Root (`build_scheduler`, Z. 1094 ff.) umgedreht:**
+>   vorher `_observed_abstain_sink(_enrich_abstain_detail(sink, research), path)` → jetzt
+>   `_enrich_abstain_detail(_observed_abstain_sink(sink, path), research)`. Vorher klassifizierte das
+>   `abstain_recorded`-Event den **un**-angereicherten Zyklus (nur die Persistierung sah die
+>   Anreicherung mit `research.last_no_pick_reasoning`); jetzt liegt die Anreicherung **vor** der
+>   Klassifikation — dieselbe Reihenfolge, die ab **C-5** das `llm_unavailable`-Flag rechtzeitig in
+>   die Klassifikation bringt.
+> - **+2 P8-Tests** (P8 269 → **271**, Σ 2000 → **2004**): neue Datei
+>   `phase8_scheduler/tests/test_wiring_abstain_seam.py` mit `test_observed_sink_returns_inner_record_id`
+>   und `test_enriched_outer_wrapper_feeds_observed_classification` (Classifier-Spy — pinnt die
+>   **Reihenfolge**, nicht nur den Rückgabewert: mit der Alt-Reihenfolge sieht der Classifier den
+>   generischen Gate-2-String statt des Research-Textes). Negativ-Beweis: beide Tests mit dem
+>   pre-B-7-`wiring.py` rot.
+> - Kein Eingriff in `Executor`, `AbstainLessonSink`, `AbstainStore`, `classify_abstain`, Budget oder
+>   Kill-Switch — nur die Wiring-Reihenfolge und ein Rückgabewert.
+> - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 B-7 T13: Code in P8 ✓).
+>   `phase17_testbed/CLAUDE.md` Session-#8-Block. Commit `5d02e7c`.
 >   Push = Nikinger.
 
 ---
