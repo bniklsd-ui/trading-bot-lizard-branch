@@ -152,6 +152,12 @@ class Research:
         #   last_no_pick_reasoning, which only covers the model's own prose on a valid abstain.
         self.last_context_health: dict[str, dict] = {}
         self.last_abort_detail: str | None = None
+        # Phase 17 C-5 (D9, E7): the last cycle's LLM call **failed** (unreachable,
+        # truncated output, provider outage). Display/observability only — gates
+        # nothing (root rule 3): the cycle abstains either way. It is what lets
+        # Phase 8 distinguish "the model abstained" from "the LLM was
+        # unavailable" (own abstain reason + an alarm after 3 ticks).
+        self.last_llm_error: bool = False
 
     # ------------------------------------------------------------------ #
     # Public API                                                         #
@@ -173,6 +179,9 @@ class Research:
         # v1.6 Step 0: reset the observability attrs each cycle too (see __init__ docstring).
         self.last_context_health = {}
         self.last_abort_detail = None
+        # Phase 17 C-5: a fresh cycle starts without an LLM error (the flag belongs
+        # to the *last* cycle's call).
+        self.last_llm_error = False
 
         # 1. Session-health pre-flight. Any fault → abort, no AI call.
         try:
@@ -198,6 +207,10 @@ class Research:
         try:
             raw = self.llm.ask_candidate(system, user, schema)
         except LLMResponseError as exc:
+            # Phase 17 C-5 (D9, E7): mark the failure for the observer — display/
+            # observability only, gates nothing (root rule 3). The cycle still
+            # abstains exactly as before.
+            self.last_llm_error = True
             return self._abstain(f"LLM error: {exc}")
 
         # 5b. Loop-closure (Decision I / Phase-7 Step 11): the lessons in the prompt

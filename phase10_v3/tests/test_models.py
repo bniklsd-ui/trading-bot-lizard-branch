@@ -43,8 +43,8 @@ def test_frozen_mutation_raises():
         record.lesson = "not allowed"  # type: ignore[misc]
 
 
-def test_abstain_reason_has_exactly_12_values():
-    assert len(list(AbstainReason)) == 12
+def test_abstain_reason_has_exactly_13_values():
+    assert len(list(AbstainReason)) == 13
 
 
 def test_new_defaults_and_plausible_generated_fields():

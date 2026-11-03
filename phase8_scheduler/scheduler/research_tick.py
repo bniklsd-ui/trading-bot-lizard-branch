@@ -83,6 +83,13 @@ logger = logging.getLogger("scheduler.research_tick")
 # v1 populates only the two the return contract lets us tell apart (Reconciliation H):
 REASON_LLM_ABSTAIN: str = "LLM_ABSTAIN"        # research.run() returned [] (umbrella for all v1 abstains)
 REASON_PREFLIGHT: str = "PREFLIGHT_FAIL"       # research.run() raised → fail-closed
+# Phase 17 C-5 (D9, E7): research.run() abstained because the **LLM call itself
+# failed** (unreachable / truncated output / provider outage). This is a different
+# situation than "the model abstained" — until C-5 both landed on LLM_ABSTAIN.
+REASON_LLM_UNAVAILABLE: str = "LLM_UNAVAILABLE"
+# Phase 17 C-5: how many consecutive LLM failures before the daemon raises its
+# voice once (a single failure is a blip; three in a row is an outage).
+_LLM_UNAVAILABLE_ALERT_STREAK: int = 3
 # declared for forward-compatibility / Phase 9 (RESEARCH_V3), NOT set in v1:
 REASON_EMPTY_UNIVERSE: str = "EMPTY_UNIVERSE"
 REASON_VALIDATOR_REJECT: str = "VALIDATOR_REJECT"
@@ -161,6 +168,8 @@ class ResearchTick:
     ) -> None:
         self._research = research
         self._now_fn = now_fn or (lambda: datetime.now(timezone.utc))
+        # Phase 17 C-5: consecutive LLM failures (reset by any successful pick).
+        self._llm_fail_streak = 0
 
     def ensure_candidates(self, state: SchedulerState) -> ResearchResult:
         """Run the real Phase-4 research and record the outcome onto ``state``.
@@ -210,19 +219,37 @@ class ResearchTick:
         if candidates:
             state.last_no_trade_reason = None
             state.last_no_trade_detail = None  # a pick: no abstain reason to show
+            # Phase 17 C-5: a successful cycle clears the failure streak.
+            self._llm_fail_streak = 0
             logger.info("research tick: %d candidate(s) written (PASS).", len(candidates))
             return ResearchResult(
                 picked=True, n=len(candidates), reason=None,
                 context_health=context_health, abort_detail=abort_detail,
             )
 
-        state.last_no_trade_reason = REASON_LLM_ABSTAIN
+        # Phase 17 C-5 (D9, E7): an LLM failure is its own reason. The flag comes
+        # from the Phase-4 research instance (``last_llm_error``) — defensive getattr,
+        # so a pre-C-5 fake without the attribute keeps the old behaviour.
+        if getattr(self._research, "last_llm_error", False):
+            reason = REASON_LLM_UNAVAILABLE
+            self._llm_fail_streak += 1
+            if self._llm_fail_streak == _LLM_UNAVAILABLE_ALERT_STREAK:
+                logger.critical(
+                    "research tick: LLM unavailable for %d consecutive ticks — last error: %s",
+                    self._llm_fail_streak,
+                    abort_detail,
+                )
+        else:
+            reason = REASON_LLM_ABSTAIN
+            self._llm_fail_streak = 0
+
+        state.last_no_trade_reason = reason
         # The LLM's prose abstain reason (display-only); ``None`` unless Phase-4 captured one
         # (only the genuine ``abstain=true`` path carries prose — see research.py).
         state.last_no_trade_detail = getattr(self._research, "last_no_pick_reasoning", None)
-        logger.info("research tick: abstain (no candidate, reason=%s).", REASON_LLM_ABSTAIN)
+        logger.info("research tick: abstain (no candidate, reason=%s).", reason)
         return ResearchResult(
-            picked=False, n=0, reason=REASON_LLM_ABSTAIN,
+            picked=False, n=0, reason=reason,
             context_health=context_health, abort_detail=abort_detail,
         )
 

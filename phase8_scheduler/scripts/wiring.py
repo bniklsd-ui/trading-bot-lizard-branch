@@ -971,9 +971,20 @@ def _enrich_abstain_detail(inner: Any, research: Any) -> Any:
     class _Enriched:
         def on_no_trade(self, cycle_outcome: Any) -> Any:
             if cycle_outcome.get("research_empty") is True:
-                reasoning = getattr(research, "last_no_pick_reasoning", None)
-                if reasoning:
-                    cycle_outcome = {**cycle_outcome, "detail": reasoning}
+                # Phase 17 C-5 (D9, E7): an LLM failure outranks the model's own
+                # prose — the cycle outcome carries its own flag + the error text,
+                # so the classifier can pick REASON_LLM_UNAVAILABLE (P10) instead
+                # of REASON_NO_CANDIDATES.
+                if getattr(research, "last_llm_error", False):
+                    cycle_outcome = {
+                        **cycle_outcome,
+                        "llm_unavailable": True,
+                        "detail": getattr(research, "last_abort_detail", None) or "LLM error",
+                    }
+                else:
+                    reasoning = getattr(research, "last_no_pick_reasoning", None)
+                    if reasoning:
+                        cycle_outcome = {**cycle_outcome, "detail": reasoning}
             return inner.on_no_trade(cycle_outcome)
 
     return _Enriched()

@@ -20,6 +20,12 @@ _ALL_REASONS_CASES = [
     ({"veto": "momentum"}, AbstainReason.REASON_VETO_MOMENTUM, AbstainStage.VETO),
     ({"veto": "status_window"}, AbstainReason.REASON_VETO_STATUS_WINDOW, AbstainStage.VETO),
     ({"veto": "position_conflict"}, AbstainReason.REASON_VETO_POSITION_CONFLICT, AbstainStage.VETO),
+    # Phase 17 C-5: an LLM outage keeps the research stage but gets its own reason.
+    (
+        {"research_empty": True, "llm_unavailable": True},
+        AbstainReason.REASON_LLM_UNAVAILABLE,
+        AbstainStage.RESEARCH_EMPTY,
+    ),
 ]
 
 
@@ -30,10 +36,31 @@ def test_classify_abstain_reasons(cycle_outcome, expected_reason, expected_stage
     assert record.stage is expected_stage
 
 
-def test_all_12_reasons_reachable():
+def test_all_13_reasons_reachable():
     reached = {reason for _, reason, _ in _ALL_REASONS_CASES}
     reached.add(classify_abstain({}).reason)  # REASON_UNCLASSIFIED
     assert reached == set(AbstainReason)
+
+
+def test_research_empty_with_llm_unavailable_classifies_own_reason() -> None:
+    """Phase 17 C-5 (D9, E7): ``llm_unavailable`` turns the ordinary
+    "no candidates" case into its own reason — an LLM outage must not be
+    indistinguishable from a normal no-pick (D9).
+
+    The stage stays ``RESEARCH_EMPTY`` (the failure happened in the research
+    call); only the *reason* differs.
+    """
+    record = classify_abstain(
+        {"research_empty": True, "llm_unavailable": True, "detail": "LLM error: boom"}
+    )
+
+    assert record.reason is AbstainReason.REASON_LLM_UNAVAILABLE
+    assert record.stage is AbstainStage.RESEARCH_EMPTY
+    assert record.detail == "LLM error: boom"
+
+    # Without the flag the very same outcome keeps the old reason.
+    plain = classify_abstain({"research_empty": True})
+    assert plain.reason is AbstainReason.REASON_NO_CANDIDATES
 
 
 def test_priority_error_beats_veto():

@@ -501,3 +501,26 @@ def test_run_pass_clears_stale_abort_detail_and_context_health() -> None:
 
     assert research.last_abort_detail is None
     assert "stale" not in research.last_context_health
+
+
+def test_llm_error_sets_last_llm_error_and_run_resets_it() -> None:
+    """Phase 17 C-5 (D9, E7): an LLM failure is **observable** — ``last_llm_error``
+    is set on the failing cycle and reset at the start of the next one.
+
+    Display/observability only: it gates nothing (root rule 3) — the cycle abstains
+    either way. But without it Phase 8 cannot tell "the model abstained" from
+    "the LLM was unavailable" (own abstain reason + alarm after 3 ticks).
+    """
+    llm = FakeLLM(raises=LLMResponseError("boom after retry"))
+    research, _, _, _ = _research(llm=llm)
+
+    assert research.last_llm_error is False  # fresh instance
+
+    research.run()
+    assert research.last_llm_error is True
+
+    # The next cycle starts clean again.
+    llm._raises = None
+    llm._raw = {"abstain": True, "reasoning": "nothing to pick"}
+    research.run()
+    assert research.last_llm_error is False

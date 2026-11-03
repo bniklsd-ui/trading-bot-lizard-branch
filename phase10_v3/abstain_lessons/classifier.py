@@ -62,6 +62,15 @@ def classify_abstain(cycle_outcome: Mapping[str, Any]) -> AbstainRecord:
             detail=detail,
         )
     if cycle_outcome.get("research_empty") is True:
+        # Phase 17 C-5 (D9, E7): an LLM outage is its own *reason*, not
+        # "no candidates". The stage stays RESEARCH_EMPTY (the failure happened
+        # in the research call); the flag is set by the P8 wiring's
+        # ``_enrich_abstain_detail`` (it owns the research instance).
+        if cycle_outcome.get("llm_unavailable") is True:
+            return AbstainRecord.new(
+                epic=epic, stage=AbstainStage.RESEARCH_EMPTY,
+                reason=AbstainReason.REASON_LLM_UNAVAILABLE, detail=detail,
+            )
         return AbstainRecord.new(
             epic=epic, stage=AbstainStage.RESEARCH_EMPTY,
             reason=AbstainReason.REASON_NO_CANDIDATES, detail=detail,

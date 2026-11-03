@@ -30,7 +30,7 @@ class AbstainStage(str, Enum):
 
 
 class AbstainReason(str, Enum):
-    """The 12 reasons a cycle can end in NO_TRADE (S2's classification output)."""
+    """The 13 reasons a cycle can end in NO_TRADE (S2's classification output)."""
 
     REASON_NO_CANDIDATES = "reason_no_candidates"
     REASON_GATE_TIME_WINDOW = "reason_gate_time_window"
@@ -43,6 +43,11 @@ class AbstainReason(str, Enum):
     REASON_VETO_POSITION_CONFLICT = "reason_veto_position_conflict"
     REASON_DEBATE_ABSTAIN = "reason_debate_abstain"
     REASON_ERROR_FAILCLOSED = "reason_error_failclosed"
+    # Phase 17 C-5 (D9, E7): the research call itself failed (LLM unreachable,
+    # output truncated, provider outage) — a **different** situation than "the
+    # model abstained". Until C-5 both landed on REASON_NO_CANDIDATES, which
+    # made an LLM outage indistinguishable from a normal "no pick".
+    REASON_LLM_UNAVAILABLE = "reason_llm_unavailable"
     REASON_UNCLASSIFIED = "reason_unclassified"
 
 

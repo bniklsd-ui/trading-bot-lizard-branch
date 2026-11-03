@@ -19,6 +19,7 @@ from scheduler import ResearchResult as ExportedResearchResult
 from scheduler import ResearchTick as ExportedResearchTick
 from scheduler.research_tick import (
     REASON_LLM_ABSTAIN,
+    REASON_LLM_UNAVAILABLE,
     REASON_PREFLIGHT,
     ResearchResult,
     ResearchTick,
@@ -57,6 +58,7 @@ class _FakeResearch:
         save_raises: bool = False,
         context_health: dict | None = None,
         abort_detail: str | None = None,
+        llm_error: bool | None = None,
     ) -> None:
         self._result = result if result is not None else []
         self._raises = raises
@@ -69,6 +71,10 @@ class _FakeResearch:
             self.last_context_health = context_health
         if abort_detail is not None:
             self.last_abort_detail = abort_detail
+        # Phase 17 C-5: same discipline for the LLM-error flag — absent by default so the
+        # defensive getattr path stays proven.
+        if llm_error is not None:
+            self.last_llm_error = llm_error
         if save_raises:
             def _boom(_c: list) -> None:
                 raise RuntimeError("disk full")
@@ -329,3 +335,57 @@ def test_exported_from_package_root() -> None:
     """``from scheduler import ResearchTick, ResearchResult`` are the submodule objects."""
     assert ExportedResearchTick is ResearchTick
     assert ExportedResearchResult is ResearchResult
+
+
+# --- Phase 17 C-5: LLM_UNAVAILABLE (D9, E7) ----------------------------------
+
+
+def test_llm_error_sets_llm_unavailable_reason() -> None:
+    """Phase 17 C-5: an LLM failure is **not** the same as "the model abstained".
+
+    Before C-5 both landed on ``LLM_ABSTAIN`` — an LLM outage was
+    indistinguishable from a normal no-pick. The research instance's
+    ``last_llm_error`` flag now produces its own reason.
+    """
+    research = _FakeResearch(result=[], llm_error=True, abort_detail="LLM error: boom")
+    tick = ResearchTick(research, now_fn=_fixed_now())
+    state = _state()
+
+    result = tick.ensure_candidates(state)
+
+    assert result.reason == REASON_LLM_UNAVAILABLE
+    assert state.last_no_trade_reason == REASON_LLM_UNAVAILABLE
+
+
+def test_three_consecutive_llm_errors_log_one_critical(caplog) -> None:
+    """Three LLM failures in a row raise the daemon's voice **once** — a single
+    failure is a blip, three in a row is an outage. The 4th failure must stay
+    quiet (no log spam in the state file / journal)."""
+    research = _FakeResearch(result=[], llm_error=True, abort_detail="LLM error: boom")
+    tick = ResearchTick(research, now_fn=_fixed_now())
+
+    with caplog.at_level(logging.CRITICAL):
+        for _ in range(5):
+            tick.ensure_candidates(_state())
+
+    criticals = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+    assert len(criticals) == 1, [r.getMessage() for r in criticals]
+    assert "LLM unavailable for 3 consecutive ticks" in criticals[0].getMessage()
+
+
+def test_pick_resets_llm_fail_streak() -> None:
+    """A successful cycle clears the failure streak — the alarm counts
+    *consecutive* failures, not failures in a lifetime."""
+    research = _FakeResearch(result=[], llm_error=True, abort_detail="LLM error: boom")
+    tick = ResearchTick(research, now_fn=_fixed_now())
+
+    tick.ensure_candidates(_state())
+    tick.ensure_candidates(_state())
+    assert tick._llm_fail_streak == 2
+
+    # Now the research picks again → streak cleared.
+    research._result = [_real_pick()]
+    research.last_llm_error = False
+    tick.ensure_candidates(_state())
+
+    assert tick._llm_fail_streak == 0
