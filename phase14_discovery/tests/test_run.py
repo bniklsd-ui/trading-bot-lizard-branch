@@ -327,6 +327,54 @@ def test_run_once_writes_state_file_with_documented_shape(tmp_path: Path) -> Non
     assert ".tmp" not in "".join(siblings), f"unexpected tmp file after cycle: {siblings}"
 
 
+def test_run_once_logs_discovery_cycle_line_with_ts(tmp_path: Path, caplog) -> None:
+    """Phase 17 B-10 (D12): every cycle leaves an **append-only** Beleg in the log.
+
+    Until B-10 the daemon wrote only ``discovery_state.json`` (in place, one file,
+    the last cycle overwrites the previous one) and logged the cycle at ``debug``
+    level — with ``basicConfig(stream=sys.stderr, level=logging.INFO)`` (no
+    ``asctime``) a ``debug`` line was invisible *and* carried no timestamp. There
+    was therefore no way to prove from an append-only source that the discovery
+    daemon actually ran (D12).
+
+    The new INFO line carries the timestamp **in the text** (the logger config has
+    no ``asctime``), plus armed/stale/rows/errors — one line per cycle, i.e. one
+    per hour (``interval_s=3600``). All three return paths are pinned: unarmed,
+    armed-but-nothing-stale, and the real cycle.
+    """
+    import logging
+
+    dax_row = _make_row("IX.D.DAX.IFMM.IP")
+    src = FakeSource(name_str=SOURCE_IG, rows=(dax_row,))
+
+    with caplog.at_level(logging.INFO):
+        # 1) unarmed
+        daemon, arm_path, _, _, _ = _make_daemon(tmp_path, sources=[src])
+        daemon.run_once()
+        # 2) armed, nothing stale
+        daemon, arm_path, _, _, _ = _make_daemon(tmp_path, sources=[src])
+        arm(str(arm_path), by="dashboard")
+        daemon.run_once()
+        # 3) armed + stale (the real cycle)
+        daemon, arm_path, _, _, _ = _make_daemon(
+            tmp_path,
+            sources=[src],
+            stale=[dax_row],
+            universe=[FakeUniverseRecord(epic="IX.D.DAX.IFMM.IP")],
+        )
+        arm(str(arm_path), by="dashboard")
+        daemon.run_once()
+
+    cycle_lines = [r.getMessage() for r in caplog.records if "discovery cycle" in r.getMessage()]
+    assert len(cycle_lines) == 3, f"expected one Beleg line per cycle, got {cycle_lines}"
+    for line in cycle_lines:
+        assert "discovery cycle 20" in line, f"the timestamp must be IN the text: {line!r}"
+        assert "armed=" in line, f"the Beleg must carry the armed flag: {line!r}"
+        assert "rows_written=" in line and "errors=" in line, f"incomplete Beleg line: {line!r}"
+    # The unarmed cycle says so.
+    assert any("armed=False" in line for line in cycle_lines), cycle_lines
+
+
 def test_cycle_result_is_frozen() -> None:
     """CycleResult is frozen — the state file's hash doesn't shift mid-write."""
     from source_registry.run import CycleResult

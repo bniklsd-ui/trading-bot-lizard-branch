@@ -205,6 +205,13 @@ class DiscoveryDaemon:
             result = CycleResult(ts_utc=ts_utc, armed=False, stale_count=0, rows_written=0)
             _write_state(self._state_path, result)
             logger.debug("discovery cycle skipped: not armed")
+            # Phase 17 B-10 (D12): append-only Beleg — one line per cycle, the
+            # timestamp is IN the text (basicConfig below logs without asctime).
+            logger.info(
+                "discovery cycle %s: armed=%s stale=%d rows_written=%d errors=%d",
+                result.ts_utc, result.armed, result.stale_count, result.rows_written,
+                len(result.errors),
+            )
             return result
 
         stale = self._availability_store.stale_rows(ttl_days=self._profile_ttl_days)
@@ -212,6 +219,13 @@ class DiscoveryDaemon:
             result = CycleResult(ts_utc=ts_utc, armed=True, stale_count=0, rows_written=0)
             _write_state(self._state_path, result)
             logger.debug("discovery cycle skipped: nothing stale (ttl=%d days)", self._profile_ttl_days)
+            # Phase 17 B-10 (D12): same append-only Beleg on the "nothing stale"
+            # path — a cycle that found nothing is still a cycle that ran.
+            logger.info(
+                "discovery cycle %s: armed=%s stale=%d rows_written=%d errors=%d",
+                result.ts_utc, result.armed, result.stale_count, result.rows_written,
+                len(result.errors),
+            )
             return result
 
         # Plan §6 C2 step 3: pull the epic list from the universe (active + discovered).
@@ -252,6 +266,13 @@ class DiscoveryDaemon:
             errors=tuple(errors),
         )
         _write_state(self._state_path, result)
+        # Phase 17 B-10 (D12): append-only Beleg for the real cycle (with rows /
+        # errors). The timestamp is IN the text — basicConfig logs without asctime.
+        logger.info(
+            "discovery cycle %s: armed=%s stale=%d rows_written=%d errors=%d",
+            result.ts_utc, result.armed, result.stale_count, result.rows_written,
+            len(result.errors),
+        )
         return result
 
     def run_forever(self) -> None:
