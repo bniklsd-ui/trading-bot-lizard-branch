@@ -341,7 +341,7 @@ def _build_llm(
     Resolution order per role: the profile's :class:`RoleSpec` wins over the
     phase config (``model``/``max_tokens``/``timeout_s`` = ``None`` ⇒ the phase
     config's own value). With the ``"anthropic"`` profile the result is
-    **bit-identical** to the seven inline ``LLMClient(...)`` calls this function
+    **bit-identical** to the seven inline client constructions this function
     replaced — same model, same key, same limits, same meter path, same config.
 
     Args:
