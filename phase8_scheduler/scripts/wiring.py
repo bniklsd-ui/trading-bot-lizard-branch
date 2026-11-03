@@ -814,6 +814,11 @@ def _enrich_abstain_detail(inner: Any, research: Any) -> Any:
     produced prose (a genuine LLM abstain); a preflight/exception abstain leaves Gate 2's
     generic detail in place, still better than empty. See
     ``phase10_v3/DATA_WEEK_REVIEW_2026-07-31.md`` §4 B4.
+
+    Phase 17 B-7 (D7): this wrapper is the **outer** one (built around
+    ``_observed_abstain_sink``), so the enrichment happens *before* the
+    ``abstain_recorded`` event classifies the cycle outcome. The wrapper also hands the
+    sink's ``record_id`` through unchanged (the observed wrapper passes it through).
     """
 
     class _Enriched:
@@ -832,15 +837,20 @@ def _observed_abstain_sink(inner: Any, observability_path: str) -> Any:
     event (reason, stage, epic) — the generic ``record_event`` call, not ``record_cycle``'s
     fixed schema (verified-anchors annex, ``phase10_v3/CLAUDE.md``). Classification is pure
     and cheap (stdlib-only, no I/O) so re-running it here for the log line, alongside the
-    real classify+persist inside ``inner``, is simpler than threading the record back out
-    of the locked ``AbstainSink.on_no_trade(cycle_outcome) -> None`` contract.
+    real classify+persist inside ``inner``, is simpler than a second persistence path.
+
+    Phase 17 B-7 (D7): the wrapper **passes the sink's ``record_id`` through** — the
+    executor links it into ``decision_context.abstain_record_id`` (3 669/3 669 NULL
+    before Phase 17 B-7). It used to swallow the return value of
+    ``inner.on_no_trade(cycle_outcome)``, so the link was dropped on **every** NO_TRADE
+    cycle.
     """
     from abstain_lessons.classifier import classify_abstain
     from scheduler.observability import record_event
 
     class _Observed:
-        def on_no_trade(self, cycle_outcome: Any) -> None:
-            inner.on_no_trade(cycle_outcome)
+        def on_no_trade(self, cycle_outcome: Any) -> Any:
+            record_id = inner.on_no_trade(cycle_outcome)
             try:
                 record = classify_abstain(cycle_outcome)
                 record_event(observability_path, {
@@ -851,6 +861,10 @@ def _observed_abstain_sink(inner: Any, observability_path: str) -> Any:
                 })
             except Exception as exc:  # noqa: BLE001 — observability must never break the cycle
                 logger.critical("abstain observability event failed: %s", exc)
+            # Phase 17 B-7: hand the sink's record_id back to the caller (the executor
+            # links it into decision_context.abstain_record_id). The observability
+            # failure above must not swallow it — hence the return *after* the try.
+            return record_id
 
     return _Observed()
 
@@ -1075,11 +1089,19 @@ def build_scheduler(
             paper_engine.open_scheduled_pairs(epics, deadline=deadline)
     abstain_sink = None
     if config.enable_abstain_lessons:
-        abstain_sink = _observed_abstain_sink(
-            _enrich_abstain_detail(
-                _build_abstain_sink(config, paper_engine=paper_engine), research
+        # Phase 17 B-7 (D7): the enrichment wrapper is the **outer** one — the
+        # ``abstain_recorded`` event must classify the *enriched* cycle outcome
+        # (the research model's own abstain prose), not the un-enriched one. Before
+        # B-7 the order was observed(enrich(sink)): the observed wrapper classified
+        # the raw outcome while only the persistence saw the enriched one.
+        # The same order is what carries the C-5 ``llm_unavailable`` flag into the
+        # classification in time.
+        abstain_sink = _enrich_abstain_detail(
+            _observed_abstain_sink(
+                _build_abstain_sink(config, paper_engine=paper_engine),
+                config.observability_path,
             ),
-            config.observability_path,
+            research,
         )
     context_recorder = None
     if config.enable_context_persistence:
