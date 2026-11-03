@@ -10,7 +10,7 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
+updated: 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
 ---
 
 # Phase 17 — Prüfstand: Execution-ready Plan (2026-10-17)
@@ -18,6 +18,8 @@ updated: 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträ
 > ⚠ **Nachtrag 2026-10-18 (§14, Nikinger): §14 hat Vorrang.** Der Executor ist ein offener Test mit GLM in OpenCode und Review-Gate vor E-3. Bot-Provider ist die z.ai-API mit Pay-per-use statt MiniMax M3. §14 überschreibt T4–T7, T22 und alle MiniMax-Stellen in C/D/E — **zuerst §14 lesen.**
 
 > ⚠ **Nachtrag 2026-10-19 (§15, Nikinger): Provider-Plastizität** ändert C-1/C-3/C-4/C-6/C-7 in place (Reihenfolge §14 → §15 → §6). Vor Block C **§15 lesen.**
+
+> ⚠ **Nachtrag 2026-11-03 (§16, Nikinger): Planwechsel — der Bot-Anbieter ist wieder MiniMax** (Abo/M Plan, `https://api.minimax.io/v1`, Namespace `trading-bot-minimax-bot`). §16 hat Vorrang **für den Bot**; §14 (z.ai) bleibt für den **Executor** gültig. **Frist 2026-11-15** — danach jedes `minimax`-Profil zurückflippen (Default `anthropic`). **§16 lesen.**
 
 > **Adressat:** die ausführende Session (**Sonnet 5 in Claude Code**, Nikinger-Auftrag 2026-10-17).
 > Nichts hier muss neu hergeleitet werden. Jede Zahl in §2/§3 ist in der Plan-Session selbst gegen
@@ -1678,3 +1680,75 @@ Danach §14.4 (GLM-Familie, Pay-per-use) **mit `--provider zai`** statt der drei
 - kein Streaming, keine Header, keine dritte Client-Klasse (T25/T27);
 - keine Preiszeilen außer §14 (GLM-Familie) — ein neuer **aktiver** Provider bringt seine Preiszeile im Flip-Commit mit, `check_llm_profile` erzwingt das;
 - kein Code in P6/P7/P13 (T13 unverändert); Berührt werden nur P4 (`llm_openai_compat.py`, Smoke-Skript) und P8 (`llm_profiles.py`, `wiring.py`) — beide in T13.
+
+
+---
+
+## §16 Nachtrag 2026-11-03 — Planwechsel: der Bot-Anbieter ist wieder MiniMax (Abo/M Plan)
+
+> ⚠ **Nachtrag 2026-11-03 (Nikinger): §16 hat Vorrang für den Bot-Anbieter.** §14
+> (z.ai Pay-per-use) bleibt für den **Executor** gültig (T22). Der **Bot** nutzt wieder den
+> MiniMax-Abo-Key (`https://api.minimax.io/v1`, Namespace `trading-bot-minimax-bot`).
+> §16 überschreibt T4–T7, C-1, C-3, C-7, C-8 sowie alle MiniMax-/GLM-Stellen in C/D/E —
+> **zuerst §16 lesen.**
+
+### Was sich ändert (rein daten)
+
+| Plan-Stelle | §14-Stand (2026-10-18) | §16-Stand (2026-11-03) |
+|---|---|---|
+| T4 | GLM über die z.ai-API (Pay-per-use) | **MiniMax-M3 über `https://api.minimax.io/v1`** (Abo/M Plan) |
+| T5 | Profile `research_glm` / `all_glm` | Profile **`research_m3` / `all_m3`** (die §6-Namen) |
+| T6 | Keyring `trading-bot-zai-bot` | Keyring **`trading-bot-minimax-bot`** |
+| T7 | GLM budgetfrei + echte Preiszeile (1.4/4.4) | M3 budgetfrei + Preiszeile **(0.0, 0.0)** (Abo ⇒ Grenzkosten 0); die Pay-per-use-Preise ($0.30/$1.20) stehen als Kommentar daneben |
+| C-1 | `_GLM` + `PROVIDERS["zai"]` | `_M3` + `PROVIDERS["minimax"]` (mit `max_tokens_field="max_completion_tokens"`) |
+| C-3 | GLM-Preiszeilen | `"MiniMax-M3": (0.0, 0.0)` (GLM-Zeilen bleiben als Reserve) |
+| C-7 | Familien-Smoke `--provider zai` (3 Modelle) | Familien-Smoke `--provider minimax` (2 Modelle: `MiniMax-M3`, `MiniMax-M3.1-Flash`) |
+| C-8 | `all_glm` | `all_m3` |
+| D-1, E-2, E-5 | `MiniMax-M3`, `research_m3` | `MiniMax-M3`, `research_m3` (unverändert) |
+
+### Neue Doku-Belege (MiniMax, abgerufen 2026-11-03)
+
+- **Base-URL** `https://api.minimax.io/v1` (OpenAI-kompatibel) — genau der Wert, der
+  seit C-1 als `PROVIDERS["minimax"]` im Repo stand (T25: ein Provider = ein Daten-Eintrag).
+- **Token-Limit-Feld**: `max_completion_tokens` („use this field for new integrations"),
+  `max_tokens` = Legacy (wird weiterhin akzeptiert) ⇒ Quirk `max_tokens_field`.
+- **`temperature`/`top_p`** werden **ignoriert**, nicht abgelehnt ⇒ `send_temperature`
+  bleibt `True` (kein Schädling).
+- **Denk-Modus**: default **AN**. `MiniMax-M3` akzeptiert `thinking: {"type": "disabled"}`
+  („skips thinking and answers directly"); `MiniMax-M3.1-Flash` **nicht** (400: „Thinking
+  cannot be turned off" / „requires adaptive thinking") — bei Flash ist der Hebel `effort`
+  (`low`…`max`, default `max`), das wäre ein **eigener** Provider-Eintrag (T26: Quirks sind
+  provider-, nicht modellbezogen).
+- **Reasoning-Tokens zählen gegen das Limit** ⇒ ein zu kleines `max_tokens` liefert
+  `finish_reason=length` mit **leerem** `content` (§15.6 Fehlgriffe). Deshalb
+  `_M3.max_tokens = 8192` (statt 4096) und `timeout_s = 90`.
+- **Preise**: `MiniMax-M3` ≤512k Input **$0.30/$1.20** pro Mtok · `MiniMax-M3.1-Flash`
+  **$0.15/$0.60** (Abo-Kontingent ⇒ Grenzkosten 0 ⇒ Preiszeile `(0.0, 0.0)`).
+- **Modelle**: `MiniMax-M3`, `MiniMax-M3.1-Flash` (1M Context, multimodal).
+- **`response_format: {"type": "json_object"}`**: weiterhin **nicht dokumentiert** ⇒ der
+  C-3-(a)-400-Fallback (einmal ohne `response_format`) bleibt der Schutz.
+
+### Frist
+
+**2026-11-15.** Nach dem Datum muss jedes Profil, das `minimax` nutzt, **zurückgeflippt**
+werden (sicherer Default `anthropic`) — der Preflight-Punkt 4 (C-4) findet sonst keinen Key
+und der Bot startet nicht. Dieselbe Frist gilt für den Executor (§14.2: Rückfall MiniMax →
+Claude).
+
+### Modellwahl (provisorisch, bestätigt nach dem Familien-Smoke C-7)
+
+`MiniMax-M3` — Frontier-, nicht Flash-Klasse: BrowseComp **83.5** (MiniMax nennt Opus 4.7
+mit 79.3), PostTrainBench **37.1** → **#3** overall (hinter Opus 4.7 42.4 und GPT-5.5 39.3)
+— MiniMax-Modellseite, abgerufen 2026-11-03. Der heute verwendete Bot-Researcher ist
+`claude-sonnet-4-6` (Anthropic: $3/$15, **legacy** seit 2026-11-03; aktuell Sonnet 5.5
+$2/$10). ⚠ **Kein** direkter Sonnet-4.6-Vergleich von MiniMax publiziert — die Zahlen sind
+ein Klassen-, kein Gleichstands-Beweis. Die Frage „braucht der Bot ein besseres
+Trading-LLM?" ist **vertagt** (Nikinger 2026-11-03) und gehört in den Bake-off
+(`meta_m1_harness/bakeoff/`), nicht in diesen Daten-Commit.
+
+### Umsetzung (M-1, 2026-11-03)
+
+Ein Daten-Commit (`4d57d99`): `llm_profiles.py` (Quirk + `_M3` + Profile),
+`config.py` (`budget_exempt_models`), `research/models.py` (Preiszeile) + Tests
+(P8 294 → 295). Σ 2041 → **2042**. Der Flip selbst (`llm_profile="research_m3"`) bleibt C-8
+und ist bis zum Familien-Smoke gesperrt.

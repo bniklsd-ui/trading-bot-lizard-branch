@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase4_research_plan_konzept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-06 | 2026-11-03 (Phase-17 C-3/C-5/C-6 cross-phase edit, additiv, Σ 2041)
+updated: 2026-07-06 | 2026-11-03 (Phase-17 C-3/C-5/C-6 cross-phase edit, additiv, Σ 2041) | 2026-11-03 (Phase-17 M-1 cross-phase edit — Preiszeile MiniMax-M3 (0.0/0.0), additiv, Σ 2042)
 ---
 # research — Claude Code context (Phase 4)
 
@@ -185,6 +185,10 @@ is kicked off in the browser concept session, not here.
 > - **`research/models.py`**: **Preiszeilen der GLM-Familie** (§14.1, echte USD/Mtok):
 >   `glm-5.3` (1.4, 4.4) · `glm-5.2` (1.4, 4.4) · `glm-5.3-flash` (0.15, 0.5). Das Bot-GLM-Modell
 >   ist budgetfrei (T7), aber nicht kostenlos — D-2 entscheidet danach über € vs. Token.
+>   **🔁 Planwechsel 2026-11-03 (M-1):** der Bot-Anbieter ist wieder **MiniMax** (Abo/M Plan).
+>   Die aktive Preiszeile ist **`"MiniMax-M3": (0.0, 0.0)`** (Abo ⇒ Grenzkosten 0, Plan §6 T7);
+>   die Pay-per-use-Preise desselben Modells (**$0.30 in / $1.20 out** pro Mtok, MiniMax-Pricing
+>   2026-11-03) stehen als Kommentar daneben. Die GLM-Zeilen bleiben als **Reserve**.
 > - **`research/research.py`**: neues Attribut `last_llm_error` (C-5, D9) — gesetzt bei einem
 >   `LLMResponseError`, am Cycle-Anfang zurückgesetzt. „display/observability only — gates
 >   nothing (root rule 3)": der Zyklus abstained genau wie vorher, aber Phase 8 kann jetzt

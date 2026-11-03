@@ -7,6 +7,81 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-03 (Exec-Session #9 ENDE — **Block C, Code-Teil C-1…C-6 abgeschlossen**: Provider-Register + LLM-Austausch (`_build_llm`) + `LLM_UNAVAILABLE` + Key-/Smoke-Skript; 6 Commits, Σ 2004 + 37 = **2041** grün; **C-7 wartet auf den Nikinger** — Bot-Key `trading-bot-zai-bot` fehlt im Keyring)
+
+> **Auftrag:** Nikinger 2026-11-03 (Web-Chat, zweite Session desselben Tages): „ja, pushen, und danach weiter mit dem nächsten Step" → (1) **Push** der 5 Commits aus Session #8 (`423a541..d7b6abe main -> main`, auftragsgemäß vom Nikinger freigegeben), (2) **Block C** abarbeiten — Plan §14 → §15 → §6 (die Reihenfolge, die §15 selbst festlegt). **Plan war detailliert genug** → atomar abgearbeitet, ein Commit pro Step, kein Re-Planen.
+> **Executor-Modus:** MiniMax-M3 (OpenCode) — kein z.ai-Modell heute. `~/.config/opencode/`, `auth.json`, `opencode.service` unangefasst (Plan §14.8).
+> **Bot-Ritual (vorab geprüft):** Scheduler `disabled` + `inactive` (Hold-Marker `data/state/SCHEDULER_HELD`), `install_units.sh --check` exit 0. Recorder/Discovery/WebUI `enabled` + `active` — unangefasst. **Kein Neustart, kein Live-Key, kein Netz-Call** in dieser Session (die Smokes sind Operator-Schritte).
+> **Cross-Phase-Freigabe:** C-1/C-2/C-4 (P8), C-3/C-5/C-6 (P4), C-5 (P10), C-6 (root) — alle in der T13-Liste.
+
+### Completed — diese Exec-Session (6 Code-Commits + 1 Doku-Commit)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | `698e9ea` | P8 | **C-1 — Provider-Register** `scheduler/llm_profiles.py` (NEU, stdlib-only): `ProviderSpec` (kind · base_url · Keyring-Namespace + **drei Quirks**: `max_tokens_field`, `send_temperature`, `extra_body` — T26/T27, provider- **nie** modellbezogen), `RoleSpec`, **neun** `PROVIDERS` (anthropic · zai · minimax · openai · deepseek · qwen · kimi · openrouter · opencode_zen — T25: ein Provider = ein Daten-Eintrag, keine `if provider == …`-Zeile), `LLM_PROFILES` (`anthropic` / `research_glm` / `all_glm`), `role_spec()` (KeyError-frei), `check_provider()` (kind · https · **kein „coding" im Host** (T31) · Keyring-Namespace · Quirks-Feld), `client_kwargs()` (T29: die **eine** Abbildung — Bot **und** Smoke benutzen sie), `check_llm_profile()` (4 Fehlerklassen). **+11 P8-Tests.** |
+| 2 | `145e80e` | P8 | **C-2 — Config-Defaults**: `SchedulerConfig.llm_profile = "anthropic"` + `budget_exempt_models = ("glm-5.3",)`. Code-Default statt CLI-Flag (die systemd-Unit übergibt keine Flags → nur ein Code-Default ist restart-fest). `__post_init__` unangetastet. **+1 P8-Test.** |
+| 3 | `4190802` | P4 + P8 | **C-3 — OpenAI-Compat-Härtung**: `api_key_username` als Konstruktor-Argument; die **drei Quirks** mit Validierung **im Konstruktor** (der eine Engpass, den Bot und Smoke teilen) und **bytegleichem** Default-Payload; **400-Fallback** (einmal ohne `response_format`, mit dem **ersten** Fehlertext im Log); **`<think>`-Strip** (unterminiert = harter, nicht-retrybarer Fehler); Fehlermeldungen „OpenAI-compat call failed (base_url=…)"; `last_raw_text` für `--show-raw`. Dazu die **GLM-Preiszeilen** (§14.1: `glm-5.3` 1.4/4.4 · `glm-5.2` 1.4/4.4 · `glm-5.3-flash` 0.15/0.5 USD/Mtok). **+9 P4 + 1 P8-Tests** (der Bestandstest „400 raises immediately no retry" wurde plan-konform umgebaut). |
+| 4 | `1a61229` | P8 | **C-4 — eine Bau-Funktion**: `_build_llm(role, llm_profile, …)` baut **alle** Clients (Anthropic → `LLMClient`, sonst → `OpenAICompatLLMClient` mit `**client_kwargs(provider)`); `_debate_config(llm_profile)` benennt Bull/Bear/Judge um (Phase 6 überschreibt `client.model` je Rolle!); alle **sieben** Bau-Stellen umgestellt (research · debate · lesson · instinct · reflect · paper_debate · reflect-Tracker); `_check_llm_profile()` läuft in `build_scheduler` **vor** jedem Bau; **Preflight-Punkt 4**: jeder Nicht-Anthropic-Provider braucht seinen Key im Keyring (sonst startet der Daemon fröhlich und scheitert um 09:00); die **Start-Zeile** nennt `llm_profile`. **+7 P8-Tests** (AK: `LLMClient(` → 1 Treffer, `OpenAICompatLLMClient(` → 1 Treffer). |
+| 5 | `edeeab8` | P4 + P8 + P10 | **C-5 — `LLM_UNAVAILABLE`** (D9): P4 setzt `last_llm_error`; P8 `research_tick` kennt `REASON_LLM_UNAVAILABLE` + **Fehler-Streak** (genau bei 3 ein `logger.critical`); P8-Wiring setzt das `llm_unavailable`-Flag **vor** der Klassifikation (die Reihenfolge, die B-7 geschaffen hat); P10 bekommt `REASON_LLM_UNAVAILABLE` (13 Gründe) — die Stage bleibt `RESEARCH_EMPTY`, nur der Grund unterscheidet sich; **keine Migration** (die Spalte hat keinen CHECK). **+1 P4 + 3 P8 + 2 P10-Tests.** |
+| 6 | `6d1f69d` | root + P4 | **C-6 — Operator-Skripte**: `scripts/store_minimax_key.py` ist jetzt **generisch** (`--service`/`--username`, `main(argv)`); `openrouter_smoke.py` bekommt `--base-url`/`--key-service`/`--key-username`/`--max-tokens`/`--timeout-s`/`--show-raw` **und `--provider`** (§15.4: Endpoint + Keyring + Quirks aus dem Provider-Register — der Smoke sendet exakt den Bot-Payload; `--provider` ist mit den expliziten Flags **mutually exclusive**) plus `finish_reason`/`latency_s`/`provider=` in der Ausgabe. **+2 root-Tests.** |
+| 7 | (dieser Commit) | P17-Doku | **Doku-Propagierung:** dieser Block + Rotation von Session #8 → `SESSIONS_ARCHIVE.md` + Σ-Tabelle + Block-Status + Executor-Evaluations-Zeile + die drei getroffenen Phasenköpfe (P8/P4/P10) + `docs/INDEX.md` + `ROADMAP.md` + root-`CLAUDE.md`. |
+
+### Gemessen (Host 201)
+
+| | vorher | nachher |
+|---|---|---|
+| `is-enabled` / `is-active` tradingbot-scheduler | `disabled` / `inactive` | `disabled` / `inactive` (unverändert) |
+| recorder / discovery / webui | enabled + active | enabled + active (unverändert) |
+| `bash scripts/install_units.sh --check` | exit 0 | exit 0 |
+| Keyring `trading-bot-zai-bot/api_key` | — | **nicht gesetzt** (gemessen — Voraussetzung für C-7 fehlt) |
+| Keyring `trading-bot-minimax-bot/api_key` | — | nicht gesetzt |
+| Σ-Sweep (16 Suiten + root) | 2004 | **2041** (16/16 grün) |
+
+### Plan-AK-Stand nach dieser Session
+
+- **Block C, Code-Teil (C-1…C-6): ✅ abgeschlossen.** Σ **2041** ≥ 2025 ✓ · P4 **177** ≥ 177 ✓ · P8 **294** ≥ 292 ✓ · P10 **168** ≥ 167 ✓.
+- **Plan-AK C-4:** `rg "\bLLMClient\(" phase8_scheduler/scripts/wiring.py` → **1** Treffer; `rg "OpenAICompatLLMClient\("` → **1** Treffer (beide in `_build_llm`) ✓.
+- **Abweichung (ehrlich):** C-4 lieferte **+7** P8-Tests statt der geplanten +5. Der AK ist eine Untergrenze; die zwei zusätzlichen Tests decken „unbekanntes Profil wirft **vor** jedem Client" und die Client-Oberfläche ab.
+
+### Was der Code **jetzt** kann (und was noch nicht)
+
+- **Kann:** jeder OpenAI-kompatible Provider ist **ein Daten-Eintrag** (`PROVIDERS`), mit Quirks; das Bot verdrahtet **eine** Bau-Funktion; ein Profil-Wechsel ist ein Config-Wert; ein LLM-Ausfall ist von einem Modell-Abstain **unterscheidbar**; ein fehlender Provider-Key fällt **beim Start** auf, nicht um 09:00.
+- **Kann noch nicht:** der Bot spricht **noch nicht** mit GLM — `llm_profile` steht auf `"anthropic"`. Das ist Absicht (T5/T8): **erst der C-7-Smoke, dann der Flip.**
+
+### Next (geplante Folgesessions, in Priorität)
+
+- **C-7 — Operator (Nikinger), zwei Schritte:**
+  1. **Bot-Key seeden** (Pay-per-use, eigener Namespace — **nie** der Coding-Plan-Key):
+     `python scripts/store_minimax_key.py --service trading-bot-zai-bot --username api_key`
+  2. **Familien-Smoke** (3 Calls Pay-per-use, < 0,01 $ — Plan §14.4, mit `--provider zai`):
+     ```bash
+     PY=phase1_broker_wrapper/.venv/bin/python
+     for m in glm-5.3 glm-5.3-flash glm-5.2; do
+       $PY phase4_research/scripts/openrouter_smoke.py --provider zai --model "$m" \
+         --max-tokens 4096 --timeout-s 90 --show-raw; done
+     ```
+     Je Modell PASS/FAIL, `finish_reason`, Tokens und Latenz hierher in den Phasenkopf (§14.4). **FAIL ⇒ nicht flippen** (Diagnose nach Plan §8/§15.6, dann ggf. `max_tokens`/`timeout_s` in `_GLM` anpassen — eigener Commit).
+- **Danach (nach dem Nikinger-Go):** **Modellwahl** (`_GLM.model` + `budget_exempt_models` + Preiszeile — die drei Stellen, die zusammen geändert werden müssen) → **Flip 1** (`llm_profile = "research_glm"`, eigener Commit) → **C-8 („all_glm") bleibt gegated** bis nach dem Shakedown.
+- **Block D (Token-Budget, T7/D-1):** die drei Zählstellen (P8 `budget.py` · WebUI-Karte · Report) müssen die `budget_exempt_models`-Ausnahme kennen.
+- **Block E:** Report v5 (`--prereg v5`) · Shakedown-Vorregistrierung · **E-3-Deploy** (dort wird der Scheduler-Hold freigegeben) · 2-Tage-Shakedown · Prereg v5.
+- **E-3-Vorbereitung (Pflicht-Schritt):** Hold-Freigabe `--release-hold` → Installer → `start` (sonst fehlt der R5-Autostart-Beweis).
+- **Datenreparatur der 3 730 alten `ig`-Bars** (Plan T14) — folgt in **E-3**.
+
+### Open questions / blockers
+
+- **C-7 ist blockiert, bis der Nikinger den z.ai-Bot-Key seedet** (gemessen: `trading-bot-zai-bot/api_key` **nicht** im Keyring). Ohne Key kein Smoke, ohne Smoke kein Flip — **der Bot läuft unverändert auf Anthropic**, das ist der sichere Default.
+- **`_GLM.model = "glm-5.3"` ist provisorisch** (Plan §14.4: der Nikinger wählt nach dem Familien-Smoke). Der Wechsel betrifft **drei** Stellen (`llm_profiles._GLM.model`, die Preiszeile in `research/models.py`, `SchedulerConfig.budget_exempt_models`) — `check_llm_profile` benennt die vergessene beim Start.
+- **`budget_exempt_models` enthält nur `glm-5.3`** — das **MiniMax-Abo** (`trading-bot-minimax-bot`, gültig bis 2026-11-15) hat **kein** Profil; es ist nur ein Daten-Eintrag + Smoke-Ziel (§15.3/Q1). Ein Profil darauf braucht Preiszeile + Ausnahme im Flip-Commit.
+- **MiniMax-Endpoint läuft am 2026-11-15 ab** (Plan §14.3) — nach dem Datum muss jedes Profil, das `minimax` nutzt, zurückgeflippt werden (aktuell: keins).
+- **Plan-Snapshot-Drift** (B-7-Anker, ≈ +83 Zeilen) — im Phasenkopf dokumentiert, Plan bleibt 📕-Snapshot; Neuauflage ist eine offene Nikinger-Entscheidung.
+- **Review-Gate vor E-3 (AK22)** weiterhin ⏳ (Claude-Code-Session, Anthropic; Schwerpunkte B-5…B-10, C-1…C-6, B-3, B-2).
+
+### Session-end-Hinweis
+
+- **Σ 2041** (16 Suiten + root, Sweep-Kommando aus dem Phase-Kopf). meta_m1 informativ, nicht in Σ.
+- **Commits:** 7 (6 Code-Steps + 1 Doku). Push = Nikinger (Phase-17-Konvention).
+- **Kern-Erkenntnis:** der Provider-Wechsel ist jetzt eine **Datenfrage** statt einer Codefrage — ein neuer Anbieter ist ein Commit auf `PROVIDERS` (plus Preiszeile + Ausnahme, wenn er *aktiv* wird), und `check_llm_profile` sagt beim Start, was fehlt. Die Kehrseite: die Entscheidung „welches Modell" ist bewusst **noch nicht** getroffen — sie gehört dem Nikinger nach dem gemessenen Smoke.
+
 ## Session stopped — 2026-11-03 (Exec-Session #8 ENDE — **Block B abgeschlossen**: B-7 Abstain-Naht + B-8 Paper-Logstufen + B-9 Stop-Timeout + B-10 Discovery-Beleg; 4 Code-Commits, Σ 2000 + 4 = **2004** grün; Scheduler `disabled`+`inactive` (Hold) + 3 Units laufen weiter)
 
 > **Auftrag:** Nikinger 2026-11-03 (Web-Chat): Phase 17 fortsetzen — „Start by reading the .md files … A good start is the /concept folder", „The phase is separated into steps, and the progress is noted … keep it recent". Der **Plan war detailliert genug** (Plan §6 B-7…B-10 mit Verbatim-Ankern, AKs und Testnamen) → **atomar abgearbeitet, kein Re-Planen**. Reihenfolge: Plan-§-Reihenfolge B-7 → B-8 → B-9 → B-10, ein Commit pro Block (Konvention der Exec-Sessions #2–#6).

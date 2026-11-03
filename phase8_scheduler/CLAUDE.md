@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase8_scheduler_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041)
+updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041) | 2026-11-03 (Phase-17 M-1 cross-phase edit — Bot-Provider MiniMax, additiv, Σ 2042)
 ---
 # CLAUDE.md — Phase 8: Scheduler (`phase8_scheduler/`)
 
@@ -449,7 +449,8 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 >   modellbezogen, weil Phase 6 `client.model` je Debatten-Rolle überschreibt),
 >   **neun** `PROVIDERS` als reine Daten (anthropic · zai · minimax · openai · deepseek ·
 >   qwen · kimi · openrouter · opencode_zen), `RoleSpec`, `LLM_PROFILES`
->   (`anthropic` · `research_glm` · `all_glm`), `role_spec()` (KeyError-frei),
+>   (`anthropic` · `research_glm` · `all_glm` — **seit M-1: `research_m3` · `all_m3`**),
+>   `role_spec()` (KeyError-frei),
 >   `check_provider()` (https · **kein „coding" im Host** — der Bot darf nie auf einen
 >   Coding-Plan-Endpoint zeigen · Keyring-Namespace · Quirks-Feld),
 >   `client_kwargs()` (**eine** ProviderSpec→Client-Abbildung, benutzt von `_build_llm`
@@ -473,8 +474,8 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 > - **Start-Zeile** (C-4): `starting scheduler daemon (…, llm_profile=…)` — der Report
 >   (E-1) liest das Profil daraus.
 > - **`SchedulerConfig`** (C-2): `llm_profile: str = "anthropic"` +
->   `budget_exempt_models: tuple[str, ...] = ("glm-5.3",)`. Code-Defaults, keine Flags
->   (die systemd-Unit übergibt keine → nur ein Code-Default ist restart-fest).
+>   `budget_exempt_models: tuple[str, ...] = ("glm-5.3",)` (**seit M-1: `("MiniMax-M3",)`**).
+>   Code-Defaults, keine Flags (die systemd-Unit übergibt keine → nur ein Code-Default ist restart-fest).
 > - **`research_tick`** (C-5): `REASON_LLM_UNAVAILABLE` + Fehler-Streak — drei
 >   aufeinanderfolgende LLM-Fehler loggen **genau einmal** `critical`; ein Pick
 >   setzt den Streak zurück. D9: ein LLM-Ausfall ist damit von einem Modell-Abstain
@@ -485,8 +486,35 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 >   `test_llm_profiles.py::test_check_accepts_shipped_profiles` (+1) ·
 >   `test_wiring_llm_routing.py` (7) · `test_research_tick.py` (+3).
 > - **Noch nicht aktiv:** `llm_profile` steht auf `"anthropic"` — der Bot spricht noch
->   **nicht** mit GLM. Der Flip (C-7-Smoke → C-8) ist Operator-Arbeit.
+>   **nicht** mit MiniMax/GLM. Der Flip (C-7-Smoke → C-8) ist Operator-Arbeit.
 > - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §6 C-1…C-6, T13: Code in P8 ✓).
+
+> 🔁 **Phase-17 (Prüfstand) M-1 edit (2026-11-03, Exec-Session #10 — **additiv**, code = source of truth):**
+> Der Bot-LLM-Anbieter ist **MiniMax** (Abo/M Plan) statt z.ai/GLM — der **Planwechsel**
+> des Nikinger vom 2026-11-03. **Rein daten** (8 Dateien, 1 Commit `4d57d99`); das
+> Default-Profil bleibt `"anthropic"`, Phase 8 läuft für Bestands-Wire-ups also
+> **bit-identical**:
+> - `PROVIDERS["minimax"]` bekommt den dokumentierten Quirk
+>   `max_tokens_field="max_completion_tokens"` (MiniMax-Doku 2026-11-03: das Feld für
+>   neue Integrationen; `max_tokens` = Legacy). `temperature`/`top_p` werden **ignoriert**,
+>   nicht abgelehnt ⇒ `send_temperature` bleibt `True`. `base_url`
+>   (`https://api.minimax.io/v1`) und Keyring-Namespace (`trading-bot-minimax-bot`) waren
+>   seit C-1 bereits korrekt.
+> - `_GLM` → `_M3 = RoleSpec(provider="minimax", model="MiniMax-M3", max_tokens=8192,
+>   timeout_s=90.0)`. **8192 statt 4096**, weil MiniMax-M3 default **denkt** und die
+>   Reasoning-Tokens gegen das Limit zählen (zu kleines Limit ⇒ `finish_reason=length`
+>   + **leerer** `content` — Plan §15.6 Fehlgriffe).
+> - Profile `research_m3` / `all_m3` (Plan-§6-Namen); `PROVIDERS["zai"]` bleibt als
+>   **Reserve-Daten-Eintrag** (kein Profil).
+> - `SchedulerConfig.budget_exempt_models = ("MiniMax-M3",)`; Preiszeile
+>   `"MiniMax-M3": (0.0, 0.0)` in P4 (Abo ⇒ Grenzkosten 0; die Pay-per-use-Preise
+>   $0.30/$1.20 pro Mtok stehen als Kommentar daneben).
+> - **Tests P8 294 → 295** (+1: Quirks-Pin am MiniMax-Eintrag), Profile/Modell/
+>   Base-URL/Token-Limit in P8 + P4 umgestellt. Σ 2041 → **2042** (16/16 grün).
+> - **Frist 2026-11-15:** danach muss jedes Profil, das `minimax` nutzt,
+>   zurückgeflippt werden (sicherer Default `anthropic`).
+> - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §16, T13: Code in P8 + P4 ✓).
+>   `phase17_testbed/CLAUDE.md` Session-#10-Block. Push = Nikinger.
 >   `phase17_testbed/CLAUDE.md` Session-#9-Block. Commits `698e9ea` (C-1) · `145e80e`
 >   (C-2) · `4190802` (C-3) · `1a61229` (C-4) · `edeeab8` (C-5) · `6d1f69d` (C-6).
 >   Push = Nikinger.

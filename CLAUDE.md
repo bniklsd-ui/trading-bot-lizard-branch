@@ -9,7 +9,7 @@ down:
   - ROADMAP.md
   - ARCHITECTURE.md
   - phase17_testbed/CLAUDE.md   # active phase head (🟡 korrigiert 2026-10-17: stand seit 09-05 auf phase9_universe)
-updated: 2026-10-19 (A-3 sweep — 4 Banner-Blöcke nach docs/sessions/root_claude_md_phase_status_archive.md rotiert; Tabelle Phasen 9–13 einzeilig; Phasen-17-Banner bleibt + Phasen-17-Zeile in Tabelle)
+updated: 2026-11-03 (Phase-17 Planwechsel §16 — Bot-LLM-Anbieter zurück auf MiniMax (Abo/M Plan, Frist 2026-11-15); Phase-17-Banner + Phasen-17-Zeile aktualisiert) | 2026-10-19 (A-3 sweep — 4 Banner-Blöcke nach docs/sessions/root_claude_md_phase_status_archive.md rotiert; Tabelle Phasen 9–13 einzeilig; Phasen-17-Banner bleibt + Phasen-17-Zeile in Tabelle)
 ---
 # CLAUDE.md — Project Instructions
 
@@ -98,7 +98,7 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 > - drei neu gemessene stille Totalausfälle: IG-REST-Bars +2 h in der Zukunft gestempelt; der
 >   Divergenz-Sampler hat in 233 von 233 Läufen nie verglichen; `decision_context.abstain_record_id`
 >   ist 3 669/3 669 leer;
-> - LLM pro Rolle austauschbar. Research zuerst auf GLM über die z.ai-API mit Pay-per-use (Plan §14, 2026-10-18; ersetzt MiniMax M3). Der Bot nutzt nie den Coding-Plan-Endpoint;
+> - LLM pro Rolle austauschbar. Research zuerst auf **MiniMax-M3 über die MiniMax-Abo-API** (Plan §16, 2026-11-03; **ersetzt** den z.ai-Pay-per-use-Stand aus §14 — §14 gilt weiter für den Executor). Der Bot nutzt nie einen Coding-Plan-Endpoint;
 > - Report + Shakedown → Prereg v5 als Fundament der ausgiebigen Tests.
 >
 > Exec: offener Test GLM in OpenCode (z.ai Coding Plan), Claude Code bleibt Anthropic-only mit Pflicht-Review vor dem Deploy (Plan §14). Σ-Baseline 1964. E1–E8 aus dem Phase-16-Handover sind entschieden
@@ -147,7 +147,7 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 | 14 — Discovery-Then-Deterministic (Quellen-Registry + autonomer Discovery-Daemon) | ✅ abgeschlossen Closeout 2026-08-31 Session 23 (Σ 1703, 61 Tests, D5 freigegeben). Phasenkopf: [`phase14_discovery/CLAUDE.md`](./phase14_discovery/CLAUDE.md); Handover: [`PHASE14_CLOSEOUT_HANDOVER.md`](./phase14_discovery/PHASE14_CLOSEOUT_HANDOVER.md). |
 | 15 — V4: Sophisticated/Optional (Council · Handover · Reward-Reform · Force-Trigger · Instinct-ECC) | ✅ abgeschlossen Closeout 2026-09-05 Session #13 (Σ 1843, 18+6 Commits). Phasenkopf: [`phase15_v4/CLAUDE.md`](./phase15_v4/CLAUDE.md); Handover: [`PHASE15_CLOSEOUT_HANDOVER.md`](./phase15_v4/PHASE15_CLOSEOUT_HANDOVER.md). 🟡 *2026-10-16 (Phase-16-Closeout):* Promotion-Bridge gebaut, **live tot** (`bridge.py:146`); Ledger-Restore + Migration 008/009 erledigt. |
 | 16 — Freischaltung (alle Löcher zu, alle Arme scharf, 2-Wochen-Autonomie-Test) | ✅ **abgeschlossen mit Teilbilanz (Closeout 2026-10-16, Session #38)** — 6/9 Löcher live zu + L7 per Live-Probe (L2 Token-Budget ❌, L6 Bridge gebaut aber live tot), Bot handelt wieder (17 Trades seit 09-28), systemd-Autostart live bewiesen; **AK15 nie PASS** (v3 09-30→10-13 FAIL K1/K5/K6, v4-Brücke FAIL K6). Σ 1964 grün (+121 seit 1843). Handover: [`phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md`](./phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md) · Bild: [`docs/architecture/phase16_activation.svg`](./docs/architecture/phase16_activation.svg) · Plan [`docs/concepts/phase16_activation_plan.md`](./docs/concepts/phase16_activation_plan.md) · Phasenkopf [`phase16_activation/CLAUDE.md`](./phase16_activation/CLAUDE.md). 🟡 *Korrigiert 2026-10-16:* die Zeile stand seit 09-05 auf „Exec-Session startet mit Block A Step A-0". |
-| 17 — Prüfstand (Mess- und Geldpfad-Defekte zu, LLM pro Rolle austauschbar, Report + Prereg v5) | 🔄 **eröffnet 2026-10-17 (Plan-Session, Opus 5.5)** — Blöcke **A + B ✅ abgeschlossen** (2026-11-03, Exec-Sessions #1–#8, Σ **2004** grün); **Block C im Code-Teil ✅** (C-1…C-6, Session #9, Σ **2041** grün — Provider-Register, `_build_llm`, `LLM_UNAVAILABLE`, Key-/Smoke-Skript); **offen: C-7** (Bot-Key `trading-bot-zai-bot` + Familien-Smoke, Operator) → C-8 Flip 1 · Plan [`docs/concepts/phase17_testbed_plan.md`](./docs/concepts/phase17_testbed_plan.md) · Phasenkopf [`phase17_testbed/CLAUDE.md`](./phase17_testbed/CLAUDE.md) |
+| 17 — Prüfstand (Mess- und Geldpfad-Defekte zu, LLM pro Rolle austauschbar, Report + Prereg v5) | 🔄 **eröffnet 2026-10-17 (Plan-Session, Opus 5.5)** — Blöcke **A + B ✅ abgeschlossen** (2026-11-03, Exec-Sessions #1–#8, Σ **2004** grün); **Block C im Code-Teil ✅** (C-1…C-6, Session #9, Σ **2041** grün — Provider-Register, `_build_llm`, `LLM_UNAVAILABLE`, Key-/Smoke-Skript) + **M-1 Provider-Wechsel auf MiniMax** (Session #10, Σ **2042**); **offen: C-7** (Bot-Key `trading-bot-minimax-bot` + Familien-Smoke, Operator) → C-8 Flip 1 · **Frist 2026-11-15** (Abo-Key) · Plan [`docs/concepts/phase17_testbed_plan.md`](./docs/concepts/phase17_testbed_plan.md) · Phasenkopf [`phase17_testbed/CLAUDE.md`](./phase17_testbed/CLAUDE.md) |
 
 **Meta-Strang M1 — Harness-Unabhängigkeit — ✅ CLOSED (2026-07-09):** orthogonal zur
 Nummerierung oben. Vorregistrierter Bake-off Claude Code vs. OpenCode: `gate_pass_rate`
