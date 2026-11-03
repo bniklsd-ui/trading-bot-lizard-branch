@@ -318,7 +318,9 @@ class PaperDebateCaller:
             system, user, schema = self.prompt_builder(candidate_digest)
             answer = self.llm.ask_candidate(system, user, schema)
         except Exception as exc:  # noqa: BLE001 — best-effort, never raises (J)
-            logger.critical("PaperDebateCaller.request_pick failed: %s", exc)
+            # Phase 17 B-8 (E4): external-dependency failure (quote/LLM) — WARNING;
+            # an LLM outage is reported once by research_tick (LLM_UNAVAILABLE).
+            logger.warning("PaperDebateCaller.request_pick failed: %s", exc)
             return None
         direction = answer.get("direction")
         if direction not in ("BUY", "SELL"):
@@ -383,7 +385,9 @@ class PaperEngine:
                 self.store.insert(trade)
             self._maybe_council_pick(record, quote)
         except Exception as exc:  # noqa: BLE001 — best-effort, must never crash the cycle
-            logger.critical("PaperEngine.on_debate_abstain failed: %s", exc)
+            # Phase 17 B-8 (E4): external-dependency failure (quote/LLM) — WARNING;
+            # an LLM outage is reported once by research_tick (LLM_UNAVAILABLE).
+            logger.warning("PaperEngine.on_debate_abstain failed: %s", exc)
 
     def _maybe_council_pick(self, record: AbstainRecord, quote: Mapping[str, float]) -> None:
         """§10.3: no-op unless a ``debate_caller`` is wired (default off) and the daily
@@ -462,7 +466,9 @@ class PaperEngine:
                 for trade in pair:
                     self.store.insert(trade)
             except Exception as exc:  # noqa: BLE001 — isolate one epic's failure (J)
-                logger.critical("PaperEngine.open_scheduled_pairs failed for %s: %s", epic, exc)
+                # Phase 17 B-8 (E4): external-dependency failure (quote/LLM) — WARNING;
+                # an LLM outage is reported once by research_tick (LLM_UNAVAILABLE).
+                logger.warning("PaperEngine.open_scheduled_pairs failed for %s: %s", epic, exc)
 
 
 class PaperTradeTracker:
@@ -698,6 +704,8 @@ class PaperTradeTracker:
                 for trade in pair:
                     self.store.set_lesson(trade.paper_id, lesson)
             except Exception as exc:  # noqa: BLE001 — best-effort, must never crash the tick
-                logger.critical(
+                # Phase 17 B-8 (E4): external-dependency failure (quote/LLM) — WARNING;
+                # an LLM outage is reported once by research_tick (LLM_UNAVAILABLE).
+                logger.warning(
                     "PaperTradeTracker reflect failed for record %s: %s", record_id, exc
                 )

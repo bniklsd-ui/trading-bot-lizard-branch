@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 from datetime import datetime, timezone
 
 import pytest
@@ -179,6 +180,35 @@ def test_paper_engine_never_raises_on_quote_fetch_failure():
     engine = PaperEngine(store, _raising_fetch, _Config())
     engine.on_debate_abstain({}, _record())  # must not raise
     assert store.inserted == []
+
+
+def test_get_price_failure_logs_warning_not_critical(caplog):
+    """Phase 17 B-8 (E4): a failing quote fetch is an **external-dependency** failure
+    ⇒ ``warning``, not ``critical``.
+
+    A dead broker/quote source is not a bug in this module — it is the environment
+    failing. Logged as ``critical`` it polluted the K5 budget ("max 2 deal-related
+    CRITICALs per trade"): on 2026-10-09 the reflect path alone produced 72
+    CRITICALs from a credit-line outage. ``research_tick`` reports an LLM outage
+    once (``LLM_UNAVAILABLE``, Plan C-5), so the paper paths stay quiet about it.
+    """
+    store = _RecordingStore()
+
+    def _raising_fetch(epic):
+        raise RuntimeError("boom")
+
+    engine = PaperEngine(store, _raising_fetch, _Config())
+    with caplog.at_level(logging.WARNING):
+        engine.on_debate_abstain({}, _record())
+
+    assert any(
+        r.levelno == logging.WARNING and "PaperEngine.on_debate_abstain failed" in r.message
+        for r in caplog.records
+    ), f"expected a WARNING for the failed quote fetch, got {[(r.levelname, r.message) for r in caplog.records]}"
+    assert not any(
+        r.levelno >= logging.CRITICAL and "PaperEngine.on_debate_abstain failed" in r.message
+        for r in caplog.records
+    ), "the external-dependency failure must not be logged CRITICAL"
 
 
 def test_paper_engine_count_lessons_today_delegates_to_store():
