@@ -10,7 +10,7 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-11-04 (**§20 Nachtrag — Ausführungsblock E-3** (Deploy + Day-0-Verifikation): Reihenfolge, live gemessene Sollwerte (3 770 `ig`-Bars · 29 Instincts · 0 OPEN · Allowance-Expiry **vergangen**), **7 Day-0-Checks**, K2/K11-Wann-First-Events (13:00), 7 Fehlgriffe, AK) | 2026-11-04 (**§19 Nachtrag — Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable + Inhalts-Entwurf + live geprüfte Anker + AK; **§18 ausgeführt 2026-11-04: E-1 ✅**, Commit `adc905f`, Σ **2053**) | 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
+updated: 2026-11-04 (**§21 Nachtrag — Ausführungsblock AK22** (Review-Gate vor E-3): **Harness Claude Code (Anthropic, Opus)** — §14.2 „Claude Code macht nur das Review-Gate"; 22 Code-Commits (SHA-Liste), 5 Pflicht-Schwerpunkte + 7 Ergänzungen mit konkreten Fragen, „nicht tun"-Liste, AK22-Output-Format) | 2026-11-04 (**§20 Nachtrag — Ausführungsblock E-3** (Deploy + Day-0-Verifikation): Reihenfolge, live gemessene Sollwerte (3 770 `ig`-Bars · 29 Instincts · 0 OPEN · Allowance-Expiry **vergangen**), **7 Day-0-Checks**, K2/K11-Wann-First-Events (13:00), 7 Fehlgriffe, AK) | 2026-11-04 (**§19 Nachtrag — Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable + Inhalts-Entwurf + live geprüfte Anker + AK; **§18 ausgeführt 2026-11-04: E-1 ✅**, Commit `adc905f`, Σ **2053**) | 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
 ---
 
 # Phase 17 — Prüfstand: Execution-ready Plan (2026-10-17)
@@ -2302,3 +2302,87 @@ cycle=5min, llm_profile=research_m3).` (Format: `phase8_scheduler/scheduler/run.
 - **Offen für den Nikinger:** die **Modellwahl** (M3 vs. M3.1-Flash) fällt in **E-5**; ein Wechsel
   bräuchte eine **Preiszeile** für `MiniMax-M3.1-Flash` in P4 (`research/models.py`) — die Ausnahme
   deckt die Familie bereits ab (Commit `fa02a6a`), die **Preiszeile** nicht.
+
+---
+
+## §21 Ausführungsblock AK22 — Review-Gate vor E-3 (2026-11-04)
+
+> **Der Block vor E-3.** AK22 (Plan §7): „**Review-Gate PASS ist vor dem E-3-Start im Phasenkopf
+> dokumentiert** (Session, Befunde, Fix-Commits)". Plan §14.2: „Befunde werden **vor** dem Deploy als
+> Fix-Commits erledigt. **Erst „Review PASS" gibt E-3 frei.**"
+>
+> **Harness — nicht verhandelbar:** §14.2 / T22: „**Claude Code (Anthropic) macht nur das
+> Review-Gate**". Das Review läuft in einer **Claude-Code-Session (Anthropic, Opus)** — die
+> Exec-Sessions (OpenCode + z.ai-Coding-Plan bzw. MiniMax-M3-Fallback, Sessions #9–#16) sind
+> **nicht** AK22-qualifiziert, weil das Gate definitionsgemäß ein Anthropic-Review ist.
+> **E-3 selbst** (Deploy + Day-0-Verifikation) läuft danach wie gehabt im Exec-Harness
+> (OpenCode) — dort ist der Harness frei, beim Review nicht.
+>
+> **Umfang:** alle Exec-Commits von A-0 bis D-1 (§14.2) **plus** die inzwischen dazugekommenen
+> Commits **E-1** (Report v5) und **E-2-Code** (Familien-Ausnahme) — der Phasenkopf hatte den
+> Umfang bereits erweitert.
+
+### E-21a — Der Commit-Umfang (22 Code-Commits; Doc-Commits sind nicht Review-Gegenstand)
+
+| Bereich | Commits (SHA) | Dateien |
+|---|---|---|
+| **B-1** IG-Zeitstempel | `2675129` | `phase1_broker_wrapper/broker_wrapper/adapters/ig_adapter.py` |
+| **B-2** Divergenz-Sampler | `b2e78e7` · `8d4a326` | `phase12_data_foundation/data_foundation/heartbeat.py` · `phase8_scheduler/scripts/wiring.py` |
+| **B-3** Promotion-Bridge | `7c7251d` · `3377b0a` | `phase15_v4/instinct/bridge.py` · `phase8_scheduler/scripts/wiring.py` |
+| **B-4** Abschneiden sichtbar | `138cf7b` | `phase4_research/research/llm_client.py` · `llm_openai_compat.py` |
+| **B-5** Monitor-Re-Adoption | `154f460` | `phase5_execution/execution/monitor.py` · `executor.py` · `phase8_scheduler/scheduler/runner.py` |
+| **B-6** Breaker Worst-Case | `a0b2fb5` | `phase8_scheduler/scripts/wiring.py` |
+| **B-7** Abstain-Naht | `5d02e7c` | `phase8_scheduler/scripts/wiring.py` |
+| **B-8** Paper-Logstufen | `02faf44` | `phase10_v3/abstain_lessons/paper.py` |
+| **B-9** Stop-Timeout | `f221f3c` | `phase16_activation/systemd/tradingbot-scheduler.service` |
+| **B-10** Discovery-Beleg | `4eefbda` | `phase14_discovery/source_registry/run.py` |
+| **C-1…C-6** LLM-Austausch | `698e9ea` · `145e80e` · `4190802` · `1a61229` · `edeeab8` · `6d1f69d` | `phase8_scheduler/scheduler/llm_profiles.py` · `scheduler/config.py` · `phase4_research/research/llm_openai_compat.py` · `phase8_scheduler/scripts/wiring.py` |
+| **C-8 / M-1** Flip 1 + Provider | `2ee73e6` · `4d57d99` | `phase8_scheduler/scheduler/config.py` · `phase4_research/research/models.py` |
+| **AK-Nachbesserung** | `22786d0` | `phase8_scheduler/scripts/wiring.py` (Docstring) |
+| **Scheduler-Hold** | `51ba156` · `4fd2e2e` | `scripts/install_units.sh` · `scripts/restart-services.sh` · root-`tests/` |
+| **D-1** Budget-Ausnahme | `978619e` | `phase8_scheduler/scheduler/budget.py` · `phase8_scheduler/webui/api.py` |
+| **E-1** Report v5 | `adc905f` | `phase16_activation/scripts/autonomy_report.py` |
+| **E-2** Ausnahme-Familie | `fa02a6a` | `phase8_scheduler/scheduler/config.py` |
+
+### E-21b — Die fünf Pflicht-Schwerpunkte (Plan §14.2) + die sieben Ergänzungen
+
+| # | Bereich | Die Fragen, die beantwortet sein müssen (Anker live prüfen, nicht aus dem Plan abschreiben) |
+|---|---|---|
+| **P1** | **B-5 — Order-Pfad** | Ist `resume_open_position()` **fail-closed** (kein Handeln, wenn der Reconcile fehlt)? Greift die Sofort-Close-Regel bei `recorded_at` + `max_hold` bzw. `square_off`? Nutzt der Re-Adopt den **echten** Einstieg (`execution_state.recorded_at`), nicht `now_fn()`? Bleibt der Normalpfad (`place_order` → `monitor_position`) **bit-identisch**? |
+| **P2** | **B-6 — Breaker (Hard Rule 5)** | Zählt `realized_pnl_today` jede heutige `status='OPEN'`-Zeile mit `−initial_risk`? Wirft der Closure bei einer OPEN-Zeile **ohne** `initial_risk` (fail-closed)? Blockt `AutoConfirm` dann (nicht nur loggen)? Kein stilles Verschlucken? |
+| **P3** | **C-4 — LLM-Verdähtung + Startup-Check** | Genau **eine** Client-Bau-Funktion (AK C-4: `LLMClient(` und `OpenAICompatLLMClient(` je **1** Treffer in `wiring.py`)? Ist das `anthropic`-Profil **bit-identisch** zum Vor-Block-C-Zustand? Deckt der Startup-Check alle **vier** Fehlerklassen ab (unbekanntes Profil · claude-ID auf fremdem Provider · fehlende Preiszeile · fehlende Budget-Ausnahme) — jeweils **laut** und **fail-closed**? Nennt der Keyring-Preflight den Seed-Befehl? |
+| **P4** | **B-3 — Bridge** | Ruft `validate()` mit `trades` auf (der historische Nahtfehler)? Wird `decision.decision` benutzt (nicht `.value`)? Werden die `*_json`-Keys geschrieben (Whitelist-konform)? Existiert der **Contract-Test mit echter DB** (P2)? |
+| **P5** | **B-2 — die `mismatch`-Einbahnstraße** | Vergleich im **selben** 5-min-Fenster (IG-5m gegen yF-1m — **keine** gemischten Horizonte)? Nur auf einem **abgeschlossenen** Bar ≥ 25 min alt? Throttle **erst nach** einem echten Vergleich? `mismatch`-Marke erst nach **2** echten Divergenzen? |
+| **E1** | **B-7 / B-8** | B-7: `record_id`-Durchreich + **Enrich-vor-Klassifikation** (Wrapper-Reihenfolge!). B-8: 4× `critical` → `warning` **nur** für Ausfälle **externer** Abhängigkeiten — lokale Fehler (z. B. NameError) bleiben CRITICAL. |
+| **E2** | **B-9 / B-10** | B-9: `TimeoutStopSec=360` in der Unit; `install_units.sh --check` exit 0. B-10: **append-only** Discovery-Zeile mit UTC-Timestamp **im Text** (der `basicConfig` loggt ohne asctime). |
+| **E3** | **C-1 / C-3 / C-5 / C-6** | Quirks **provider-**, nicht modellbezogen · 400-Fallback für `response_format` · `<think>`-Strip · `LLM_UNAVAILABLE` als eigene Abstain-Klasse mit 3-Ticks-Streak · **kein Key im Repo**, kein Live-Key im Test. |
+| **E4** | **E-1 — Report v5** | Sind die **v4-Verdikte identisch** (Regression: `--from 2026-09-30 --to 2026-10-13 --summary` ⇒ FAIL K1/K5/K6 · PASS K2/K3/K4/K7/K8)? Sind die v5-Evaluatoren **fail-closed** (K7 ohne Start-Zeile ⇒ FAIL, K9 ohne Zeitstempel ⇒ FAIL, K2/K11 ohne Handelstag ⇒ NA, K10 ohne CLOSE ⇒ NA)? Default `--prereg v4`? |
+| **E5** | **E-2 — Ausnahme-Familie** | Wirkt die Ausnahme an **allen** Zählstellen (`budget.py` · `webui/api.py` · `autonomy_report.py`) **und** im Startup-Check (`llm_profiles.py`)? Bleibt der Anthropic-Pfad bit-identisch? |
+| **E6** | **Scheduler-Hold** | Respektieren **beide** Repo-Türen den Marker (`install_units.sh` enabled nicht · `restart-services.sh` startet nicht)? |
+| **E7** | **F8-Frage (pro Bereich)** | Kann der jeweilige Check **grün ohne Messung** sein? (fail-closed-Kante — die Lehre aus K7/K9 in E-1) |
+
+### E-21c — Was der Reviewer **nicht** tut
+
+- **Keine Live-Aktion:** kein Deploy, kein Dienst-Start/Stop, kein Keyring-Zugriff, kein Key, kein
+  Netz-Call gegen IG/LLM, kein Schreiben in `data/`. Der Bot bleibt im **HOLD**.
+- **Keine Umbenennungen** (T2/§10 — alles Nicht-Phase-17 bleibt draußen), **keine Strategie-Diskussion**
+  (Profit ist kein Kriterium), **kein Neu-Litigieren** gelockter Entscheidungen (T1–T24).
+- **Kein Feature-Wunsch** — der Plan §0: Phase 17 baut **nichts Neues**.
+
+### E-21d — Output-Format (damit AK22 maschinell ablesbar ist)
+
+1. **Review PASS** → ein datierter Eintrag im Phasenkopf (`phase17_testbed/CLAUDE.md`):
+   Session-Kennung · Datum · Harness/Modell (Claude Code / Anthropic / Opus) · geprüfter
+   Commit-Umfang (die SHAs aus E-21a) · **0 offene Befunde** (oder: Liste der Befunde + die
+   Fix-Commits, die sie geschlossen haben) → **damit ist E-3 frei**.
+2. **Befunde** → Liste je Befund: **Schweregrad** (Blocker / Fix vor Deploy / Hinweis) · Datei:Zeile ·
+   **Reproduktion** (Kommando/Test) · Fix-Vorschlag. Blockende Befunde werden **vor** dem Deploy als
+   **Fix-Commits** erledigt und danach an der Stelle nachgeprüft (Re-Review nur der betroffenen Stelle).
+3. **Kein PASS** ⇒ E-3 bleibt **gesperrt**; das Fenster startet erst nach dem Fix.
+
+### E-21e — Danach
+
+**E-3** (Plan §20) freigeben → Deploy (Operator) → **Tag 1 = erster voller Handelstag danach** →
+E-4 (2 Handelstage, Journal-Export je Tag) → E-5 (Report + D-2 + Flip-2 + Modellwahl + **Prereg v5**) →
+E-6 (Closeout). **Frist 2026-11-15** (MiniMax-Abo): läuft der 10-Tage-Lauf nach dem Datum, muss
+Prereg v5 `anthropic` pinnen (oder das Abo verlängert sein).

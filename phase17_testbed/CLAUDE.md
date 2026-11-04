@@ -152,7 +152,7 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 | #5 (B-5) | 2026-10-19 | MiniMax-M3-Fallback (Plan §14.2) — kein z.ai-Modell heute in Verwendung | B-5 Monitor-Re-Adoption (D5, T8, P5 + P8) | n/a | Σ 1978 → **1985** (+7, P5 +5 + P8 +2 ✓ Plan-AK exakt) | — | B-5 ist die letzte Single-Commit-Block: 1 Commit (154f460) in P5+P8. Bit-Identität via `getattr(self._executor, "resume_open_position", None)` — alle Bestands-Fakes unverändert grün |
 | — | — | — | — | — | — | — | Der 5.2-Quirk: bei Flash-ähnlichem Kontingent-Verbrauch einen vergleichbaren Step mit `glm-5.2` fahren |
 
-**Review-Gate vor E-3 (AK22):** ⏳ (Claude-Code-Session, Anthropic; Schwerpunkte B-5, B-6, B-7, B-8, B-9, B-10, C-4, B-3, B-2)
+**Review-Gate vor E-3 (AK22):** ⏳ (**Plan §21** = der ausführbare Auftrag: Claude-Code-Session, Anthropic/Opus; 22 Code-Commits mit SHA-Liste; 5 Pflicht-Schwerpunkte B-5/B-6/C-4/B-3/B-2 + 7 Ergänzungen (B-7…B-10, C-1…C-6, E-1, E-2-Code, Hold, F8-Frage); Output: „Review PASS" im Phasenkopf ⇒ E-3 frei)
 
 > **Integration des Executors = eurofyx-fleet, getrennt vom Plan (Plan §14.8, Nikinger 2026-10-18).** Die Fleet richtet ein: OpenCode-Provider `zai-coding-plan` (Auth), Modell, Neustart von `opencode.service`, MiniMax-Rückweg. Diese Exec-Session fasst `~/.config/opencode/`, `auth.json` und `opencode.service` **nicht** an. A-0 startet erst, wenn die Fleet „OpenCode + z.ai bereit" meldet.
 
@@ -174,6 +174,7 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 | 1 | `fa02a6a` | P8 | **MiniMax-Familien-Ausnahme** (`scheduler/config.py:150-160`): `budget_exempt_models = ("MiniMax-M3", "MiniMax-M3.1-Flash")` — Nikinger-Entscheidung 2026-11-04 („ausname alle minimax Modelle", Variante A = Familie aufzählen, Exakt-Match beibehalten). Zwei Pins verschärft: `test_budget.py::test_budget_ignores_exempt_model_records` prüft jetzt **beide** IDs, `test_config.py::test_llm_profile_default_is_research_m3_with_the_minimax_model_exempt` pinnt das Tupel. **Negativ-Beweis:** mit dem Pre-Code-`config.py` sind **beide** Tests rot. **P8 299 → 299** (keine neue Testzahl — die Pins sind verschärft), Σ **2053** unverändert. |
 | 2 | `32835dd` | P17-Doku + P8-Kopf + root | **E-2 — die Vorregistrierung.** `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md` (**NEU**, `status: locked` nach T23-Freigabe) + **eine** `docs/INDEX.md`-Zeile **im selben Commit** + Phasenkopf (Block-E-Zeile, Σ-Tabelle, Executor-Zeile #16, dieser Block + Rotation #15 → `SESSIONS_ARCHIVE.md`, `down:`-Link auf die neue Datei) + root-`CLAUDE.md` (Banner + Phasen-17-Zeile) + `ROADMAP.md`. **Kein Code** in diesem Commit. |
 | 3 | (dieser Commit) | P17-Doku + Plan | **Plan §20 = Ausführungsblock E-3** (Deploy + Day-0-Verifikation): Reihenfolge (Hold-Freigabe → 4 Dienste stoppen → Backups → T14/T12 → Units installieren → starten) · **live gemessene Sollwerte** (3 770 `ig`-Bars statt ≈ 3 730 · 29 Instincts · 0 OPEN · **Allowance-Expiry 2026-10-26 = vergangen**) · **7 Day-0-Checks** · K2/K11-**Wann** (erster echter Vergleich frühestens **13:00**) · 7 Fehlgriffe · AK. **Doc-only, kein Code.** |
+| 4 | (dieser Commit) | P17-Doku + Plan | **Plan §21 = Ausführungsblock AK22** (Review-Gate vor E-3): **Harness Claude Code (Anthropic, Opus)** (§14.2 — „Claude Code macht nur das Review-Gate"); **22 Code-Commits** mit SHA-Liste (B-1…B-10, C-1…C-6, C-8/M-1, Hold, D-1, E-1, E-2-Code); **5 Pflicht-Schwerpunkte** (B-5 Order-Pfad · B-6 Breaker/Hard Rule 5 · C-4 LLM-Verdrahtung + Startup-Check · B-3 Bridge · B-2 mismatch-Einbahnstraße) **+ 7 Ergänzungen** (B-7…B-10, C-1…C-6, E-1, E-2, Hold, F8-Frage „grün ohne Messung?"); „nicht tun"-Liste; **AK22-Output-Format** (PASS ⇒ Phasenkopf-Eintrag ⇒ E-3 frei). **Doc-only, kein Code.** |
 
 ### Was E-2 festhält (Inhalt der Vorregistrierung)
 
@@ -208,7 +209,7 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 ### Next (der übernächste Block)
 
 - **E-3** (Hold-Freigabe + Deploy, **Operator**) — **jetzt ausführbar geschrieben**: Plan **§20** (Reihenfolge, live gemessene Sollwerte, 7 Day-0-Checks, Fehlgriffe, AK). Macht den Flip 1 wirksam und erzeugt die K2/K11-Belege. Ablauf: `--release-hold` → 4 Dienste stoppen → Backups → `DELETE FROM bars WHERE source='ig'` (T14, **3 770** Zeilen) → `instincts` mit `[legacy-p16] ` markieren (T12, **29** Zeilen) → `install_units.sh` + `daemon-reload` → 4 Units starten. **7 Day-0-Checks** (§20 E-3c) — u. a. Discovery-Beleg > 0 (**der Discovery-Daemon läuft noch mit Pre-B-10-Code** ⇒ Neustart Pflicht) und die **IG-Allowance** (letzte Beobachtung 2026-10-19, expiry **2026-10-26 — vergangen** ⇒ Erneuerung unbestätigt).
-- **Review-Gate AK22** (Claude-Code-Session, Anthropic) ist **vor** E-3 fällig — ⏳ offen.
+- **Review-Gate AK22** (Claude-Code-Session, Anthropic) ist **vor** E-3 fällig — ⏳ offen. **Jetzt ausführbar geschrieben: Plan §21** (Harness, Commit-Umfang, Fragen je Bereich, Output-Format). Der Review läuft in **Claude Code (Anthropic, Opus)** — §14.2: „Claude Code macht nur das Review-Gate"; die Exec-Sessions (OpenCode) sind **nicht** AK22-qualifiziert.
 - **E-4** (Shakedown, 2 Handelstage, Operator — Journal-Export) → **E-5** (Auswertung + **D-2** K6-Einheit + **Flip-2**-Entscheidung + **Modellwahl** M3 vs. Flash + Prereg v5) → **E-6** (Closeout).
 - **D-2** bleibt ein **Nikinger-Entscheidungspunkt ohne Code** (K6-Einheit, nach dem Shakedown).
 - **Frist 2026-11-15** — Abo-Key/Endpoint: jedes `minimax`-Profil vor dem Datum zurückflippen (Default `anthropic`).
@@ -223,7 +224,7 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 ### Session-end-Hinweis
 
 - **Σ 2053** (16 Suiten + root). meta_m1 informativ, nicht in Σ.
-- **Diese Session:** 1 Code-Commit (P8) + 2 Doku-Commits (E-2-Vorregistrierung · Plan §20 = E-3).
+- **Diese Session:** 1 Code-Commit (P8) + 3 Doku-Commits (E-2-Vorregistrierung · Plan §20 = E-3 · Plan §21 = AK22-Review-Auftrag).
 - **Kern-Erkenntnis (neu):** eine Vorregistrierung pinnt **Werte** — und gepinnte Werte müssen **im Code stehen**, sonst ist die Vorregistrierung ein Dokument über einen Zustand, den es nicht gibt. Genau das hat der Nikinger beim Review bemerkt (Ausnahme: eine Modell-ID → die ganze Familie).
 
 
