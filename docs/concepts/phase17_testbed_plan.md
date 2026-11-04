@@ -1778,3 +1778,90 @@ gehört in den Bake-off (`meta_m1_harness/bakeoff/`), nicht in diesen Commit. Pr
 (welche Rolle) und Modell (welches) sind zwei getrennte Datenstellen — der Flip hängt
 deshalb **nicht** an der offenen Modellfrage. Ein Wechsel M3 → M3.1-Flash wäre: Modell +
 Preiszeile + `budget_exempt_models` + ein `effort`-Quirk (eigener Provider-Eintrag, T26).
+
+
+---
+
+## §17 Ausführungsblock D-1 — Token-Budget-Ausnahme (2026-11-03)
+
+> **Der nächste Block** nach C-8 Flip 1. Definition aus §6 D-1, **Anker gegen den
+> aktuellen Code re-verifiziert** (2026-11-03) und die AKs auf den aktuellen Stand
+> (Σ 2043) gehoben. Ausführung = **ein Commit** in P8. D-2 ist ein
+> **Nikinger-Entscheidungspunkt ohne Code** (nach dem Shakedown).
+
+### D-1a — `phase8_scheduler/scheduler/budget.py` (P8)
+
+Anker (aktuell, 2026-11-03): `TokenBudget.consumed_today()` Z. 176–183 — Datumsprüfung
+Z. 181 `            if _record_local_date(rec.get("ts"), self._tz) == today:`,
+Summen-Zeile Z. 182 `                total += _record_tokens(rec)`.
+
+**Änderung (2 Zeilen + 1 Docstring-Satz):**
+
+```python
+            if rec.get("model") in self._config.budget_exempt_models:
+                continue  # Phase 17 D-1 (T7): Abo-Kontingent — measured, not capped
+```
+
+⇒ **Abo-MiniMax-Calls zählen nicht gegen `daily_token_budget`**; die Anthropic-Calls
+bleiben gedeckelt (T7). `consumed_today()` liefert damit die **budget-relevanten** Tokens.
+Docstring von `consumed_today` bekommt den Satz: „Records whose model is in
+`config.budget_exempt_models` are skipped (Phase 17 D-1 / T7) — they are measured in
+`llm_usage.json`, not capped."
+
+**Nicht** ändern: `_TOKEN_FIELDS` (bleibt modellblind), die fail-open-Semantik,
+`is_exhausted()`, `daily_token_budget`.
+
+### D-1b — `phase8_scheduler/webui/api.py` (P8)
+
+Anker (aktuell, 2026-11-03 — **unverändert** gegenüber §6 D-1): `/api/token_usage`
+Z. 277–278 · `tokens = calls = 0` Z. 289 · Datumsprüfung Z. 294 · Summen-Zeile
+Z. 295 `                tokens += _record_tokens(rec)` · Return Z. 301–308.
+
+**Änderung:** `exempt_tokens = 0` neben `tokens = calls = 0` (Z. 289); Z. 295 wird zu
+
+```python
+                if rec.get("model") in cfg.budget_exempt_models:
+                    exempt_tokens += _record_tokens(rec)
+                else:
+                    tokens += _record_tokens(rec)
+```
+
+und das Return bekommt das Feld `"exempt_tokens": exempt_tokens`. **Kosten- und
+Call-Summen zählen weiter alle Records** (die Ausnahme betrifft nur den Token-Cap, nicht
+die Beobachtung). `app.js` bleibt unverändert — das Feld steht für `curl` und den Report
+bereit.
+
+### D-1c — der Report (E-1, Phase 16 — **nicht** in diesem Commit)
+
+Der dritte Zählort ist `phase16_activation/scripts/autonomy_report.py`
+(`llm_usage_per_day()` Z. 369 ff. + eine zweite Summen-Stelle Z. 417–420). Er braucht
+`evaluate_k6_v5(..., exempt_models=…)` (§6 E-1) — das gehört in **Block E** (E-1), nicht
+in D-1. **Folge:** ab D-1 kennen Budget-Gate und WebUI die Ausnahme, der **Report erst ab
+E-1** — das gehört in den Shakedown-Vermerk, damit niemand die Report-Zahl mit der
+Budget-Zahl verwechselt.
+
+### Tests (P8, +3)
+
+- `tests/test_budget.py::test_budget_ignores_exempt_model_records` — ein Record mit
+  `model="MiniMax-M3"` (heute) wird **nicht** gezählt, ein Anthropic-Record daneben **doch**.
+- `tests/test_budget.py::test_budget_counts_non_exempt_records` — nur Nicht-Ausnahme-
+  Records ⇒ `consumed_today()` == Summe.
+- `tests/test_webui.py::test_webui_token_usage_separates_exempt_tokens` —
+  `/api/token_usage` liefert `exempt_tokens` **getrennt** von `tokens`; `calls` und die
+  Kosten zählen alle Records.
+
+**Negativ-Beweis** (Hausregel): mit dem pre-D-1-Code **rot**, mit dem Fix grün.
+
+### AK (aktualisiert auf Σ 2043)
+
+- **P8 296 → 299** (3 neue Tests).
+- **Σ ≥ 2046** (der §6-AK „Σ ≥ 2019 / P8 ≥ 291" ist durch den Bestand überholt und bleibt
+  als historische Untergrenze stehen).
+- **Unverändert:** `_TOKEN_FIELDS` modellblind · `daily_token_budget = 300_000` für
+  Anthropic · `budget_exempt_models = ("MiniMax-M3",)`.
+
+### D-2 — Entscheidungspunkt K6 (Nikinger, nach dem Shakedown, **kein Code**)
+
+Unverändert §6 D-2: E-5 legt die Shakedown-Messung vor (M3-Tokens/Tag, Calls/Tag,
+Anthropic-Tokens/Tag, `LLM_UNAVAILABLE`-Zählung, `truncated`-Zählung, Research-PASS-Quote im
+Vergleich zu 10-12…10-16); der Nikinger wählt die K6-Einheit für Prereg v5.
