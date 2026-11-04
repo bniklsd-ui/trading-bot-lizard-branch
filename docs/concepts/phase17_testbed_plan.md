@@ -10,7 +10,7 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
+updated: 2026-11-04 (**§19 Nachtrag — Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable + Inhalts-Entwurf + live geprüfte Anker + AK; **§18 ausgeführt 2026-11-04: E-1 ✅**, Commit `adc905f`, Σ **2053**) | 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
 ---
 
 # Phase 17 — Prüfstand: Execution-ready Plan (2026-10-17)
@@ -2052,3 +2052,130 @@ ersten zwei Handelstage **nach** dem E-3-Start).
 - **D-2** (K6-Einheit) bleibt ein **Nikinger-Entscheidungspunkt** — E-5 legt die Messung vor.
 - **Flip 2** (`all_m3`) bleibt bis E-5 gegated.
 - **Frist 2026-11-15** (Abo-Key) — danach jedes `minimax`-Profil zurückflippen.
+
+---
+
+## §19 Ausführungsblock E-2 — Shakedown-Vorregistrierung (2026-11-04)
+
+> **Der nächste Block** nach E-1. Definition aus §6 E-2, gegen den Code vom 2026-11-04
+> **re-verifiziert** (alle Anker live gemessen). Ausführung = **ein Doku-Commit**
+> (`phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md` + `docs/INDEX.md`-Zeile).
+> **Kein Code.** E-3 (Deploy) folgt als eigener, **operativer** Schritt.
+>
+> **Reihenfolge:** E-2 (hier) → E-3 (Deploy, Operator) → E-4 (Shakedown, Operator) →
+> E-5 (Auswertung + D-2/Flip-2 + Prereg v5) → E-6 (Closeout).
+> **Wichtig:** E-2 wird **vor** dem E-3-Restart committet (T23), das **Fenster** beginnt aber
+> **erst nach** dem E-3-Start — dieselbe Mechanik wie Prereg v3 (Aktiv-Block wird am
+> Restart-Tag **eingetragen**, nicht editiert).
+
+### E-2a — Das Deliverable
+
+| Ort | Inhalt |
+|---|---|
+| `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md` | **NEU**, Header-Card `status: locked` (T23: „Kriterien werden **vor** dem Lauf committet und danach nicht geändert") · `purpose` · `read-when` · `detail: L3` · `up: ../CLAUDE.md` · `down:` (Plan §6/§19, Report-Skript, Prereg v4 als Format-Vorbild, P16-Handover) · `updated:` |
+| `docs/INDEX.md` | **eine** Zeile für die neue Datei — **im selben Commit** (Root-`CLAUDE.md`: „New .md file created ⇒ add its one-liner to `docs/INDEX.md` in the same commit") |
+| `phase17_testbed/CLAUDE.md` | Session-Block + Σ-Tabelle (unverändert — doc-only) + Block-E-Zeile |
+
+**Format-Vorbild:** `phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v4.md` (78 Zeilen,
+kompakt: Header-Card · BLUF · Vorregistrierte Werte · Kriterien-Tabelle · erlaubte Ereignisse ·
+**Aktiv-Block**). Der **Aktiv-Block** ist die einzige Eintragung und wird vom Operator **am
+E-3-Tag** gefüllt (Start-Zeitstempel aus der `starting scheduler daemon`-Zeile, D1/D2,
+HEAD-Commit, offene Position bei Start).
+
+**T23 — Freigabe:** der Nikinger gibt die Vorregistrierung **beim Commit** frei. Der
+Exec-Session-Code darf den Commit **erst nach** dieser Freigabe machen; bis dahin bleibt die
+Datei ein Entwurf im Arbeitsbaum.
+
+### E-2b — Inhalt der Vorregistrierung (der nächste Session schreibt sie verbatim)
+
+**Kopf (BLUF):** Fenster = Tag 1 = erster voller Handelstag **nach** dem E-3-Start, Tag 2 = der
+nächste Handelstag. Start-Zeitstempel = die `starting scheduler daemon`-Zeile aus E-3.
+Zweck = **kein** weiterer Autonomie-Test, sondern ein **2-Tage-Prüfstand-Fenster**, das
+verifiziert, dass die Phase-17-Fixes (B-1…B-10, C-1…C-8, D-1, E-1) **live tragen** — inklusive
+der drei neuen Kriterien K9/K10/K11, die es vorher gar nicht gab. Profit bleibt **kein**
+Kriterium (Phase-16-v3-Disziplin: „ehrliche Ausschlüsse").
+
+**Gepinnte Werte** (alle am 2026-11-04 gegen den **Code** geprüft — nicht aus dem Plan abgeschrieben):
+
+| Wert | Wert | Beleg (live, 2026-11-04) |
+|---|---|---|
+| `account` | `demo` | `scheduler/run.py:156` — **hart** gesetzt (nicht per Flag) |
+| `max_trades` | `5` | `run.py:73` (CLI-Default; die Unit übergibt **keine** Flags → `systemd/tradingbot-scheduler.service:25` = `python -m scheduler.run`) |
+| `daily_loss_cap` | `1800.0` | `run.py:48` (CLI-Default) |
+| `cycle` | `5min` | `run.py:79` (CLI-Default) |
+| `llm_profile` | `research_m3` | `scheduler/config.py:149` — **Code-Default** (T17), seit C-8 (Flip 1) |
+| `daily_token_budget` | `300 000` | `run.py:60` (CLI-Default) — **nur Nicht-Ausnahme-Modelle** |
+| Token-Ausnahme | `MiniMax-M3` | `scheduler/config.py:154` (`budget_exempt_models`) — D-1: „measured, not capped" |
+
+**Kriterien** (alle PASS nötig; **K3/K4 nur berichtet** — sie sind 10-Tage-Kriterien):
+
+| K | Regel | Quelle im Code |
+|---|---|---|
+| K1 | Start-Zeilen je Dienst ≤ 2 (1 Start + 1 erlaubtes Ereignis) | `evaluate_k1` |
+| K2 | **v5-Regel** — je Handelstag Scheduler-Health ≥1 **und** Recorder-Bars ≥1 **und** Discovery-Zyklen ≥1 | `evaluate_k2_v5` (E-1) |
+| K5 | v3-Regel (alle CRITICALs ≤ 5 je 24 h nach OPEN) | `evaluate_k5` |
+| K6 | **v5-Regel** — Nicht-Ausnahme-Tokens nie ≥ 300 000 vor 17:30 | `evaluate_k6_v5` (E-1) |
+| K7 | **v5-Regel** — Caps unverändert **und** jede Start-Zeile trägt `llm_profile=research_m3` | `evaluate_k7_v5` (E-1) |
+| K8 | v3-Regel (Liveness je Handelstag) | `evaluate_k8` |
+| K9 | **v5-Regel** — Restart-Jobs je Berlin-Tag ≤ 10 (Journal-Export) | `evaluate_k9` (E-1) |
+| K10 | **v5-Regel** — 0 CRITICAL `instinct.bridge`, 0 `extractor returned ok=False`, jede im Fenster angelegte `instincts`-Zeile mit Evidenz (`NA` zulässig) | `evaluate_k10` (E-1) |
+| K11 | **v5-Regel** — je Handelstag ≥1 Divergenz-Event | `evaluate_k11` (E-1) |
+
+**Erlaubte Operator-Ereignisse (gezählt, nie still):**
+- (a) **Re-Adoption-Probe** — **einmal**, wenn eine Position offen ist:
+  `systemctl --user restart tradingbot-scheduler.service`. Erwartet: ≤ 2 Zyklen später
+  `resume: re-adopting open position …` und ein regulärer Close mit geschlossener
+  `trade_outcomes`-Zeile. Das ist das „+1" in K1 (B-5/T8).
+- (b) **Tagesexport Journal** (E-4) — der Export selbst ist kein Ereignis.
+- **Ein VM-Host-Reboot = K1 FAIL** mit Ursache „VM-Host" (T10 — Reboots sind
+  Operator-/VM-Host-Ereignisse, Plan §1 T10).
+
+**FAIL-Regel:** Befund → Fix-Step **in Phase 17** → **neue** Shakedown-Vorregistrierung
+`-S2` → neuer Lauf. **Kein** Kriterium wird gelockert (T3/T23).
+
+**§F2 Flip-2-Tag (bedingt — nur bei Nikinger-Go in E-5):** 1 Handelstag mit `llm_profile=all_m3`,
+dieselben Kriterien, K7 gegen `all_m3`, Abbruch + Revert nach C-8, Start = die erste Start-Zeile
+nach dem Flip-2-Commit. **Dieser Abschnitt wird jetzt mit vorregistriert**, sonst wäre der
+Flip-2-Tag ein Lauf ohne vorab festgelegte Kriterien (T5/T23).
+
+**Report-Befehl (Operator, nach Tag 2):**
+```bash
+phase1_broker_wrapper/.venv/bin/python phase16_activation/scripts/autonomy_report.py \
+  --prereg v5 --from <D1> --to <D2> --summary \
+  --journal-file data/reports/journal_<D1>_to_<D2>.txt \
+  --expect-llm-profile research_m3 \
+  --exempt-model MiniMax-M3 \
+  --reports-dir data/reports
+```
+(`--exempt-model MiniMax-M3` **mit** übergeben — der Wert wird gepinnt, er folgt nicht dem
+Code-Default; genau das ist die Begründung des Flags in §18 E-1d.)
+
+### E-2c — Anker (live gemessen 2026-11-04)
+
+| Anker | Ist | Δ |
+|---|---|---:|
+| `phase16_activation/scripts/autonomy_report.py` — `--prereg {v4,v5}` | vorhanden (E-1, Commit `adc905f`) | 0 |
+| … `--journal-file` / `--expect-llm-profile` / `--exempt-model` | vorhanden (E-1) | 0 |
+| `phase8_scheduler/scheduler/run.py:206-214` — Start-Zeile | `starting scheduler daemon (account=…, max_trades=…, daily_loss_cap=…, cycle=…min, llm_profile=…)` | 0 |
+| `phase8_scheduler/scheduler/run.py:156` — `account="demo"` hart | ja | 0 |
+| `phase8_scheduler/scheduler/run.py:48/60/73/79` — CLI-Defaults 1800.0 / 300 000 / 5 / 5 min | ja | 0 |
+| `phase8_scheduler/scheduler/config.py:149/154` — `llm_profile="research_m3"` · `budget_exempt_models=("MiniMax-M3",)` | ja | 0 |
+| `phase16_activation/systemd/tradingbot-scheduler.service:25` — ExecStart ohne Flags | ja | 0 |
+| `phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v4.md` — Format-Vorbild | 78 Zeilen, Aktiv-Block am Restart-Tag | 0 |
+
+### E-2d — AK + offene Punkte
+
+- **AK:** neue Datei + **eine** `docs/INDEX.md`-Zeile **im selben Commit** · `status: locked`
+  · `check_doc_rotation.py --strict` exit 0 · **Σ unverändert** (doc-only — keine Test-Datei
+  wird angefasst) · **kein** Code in diesem Commit.
+- **Offen für den Nikinger (Blocker für den Commit, T23):**
+  1. **Freigabe der gepinnten Werte + Kriterien** (T23) — der Report-Code ist da, der Inhalt
+     der Vorregistrierung muss vor dem Fenster feststehen.
+  2. **D1/D2** sind erst **nach** E-3 bekannt (der Start-Zeitstempel kommt aus der
+     Start-Zeile) ⇒ Aktiv-Block-Eintragung am E-3-Tag.
+  3. **Review-Gate AK22** (Claude-Code-Session, Anthropic) ist weiterhin ⏳ — es gehört
+     **vor** E-3, nicht vor E-2.
+- **Bekannte Lücke (kein Blocker):** der exakte Journal-Text eines Auto-Restarts
+  (`Scheduled restart job, restart counter is at N`) existiert im Repo noch nicht (Plan §9 #8)
+  ⇒ die **erste** echte Vorkommen in E-4 muss gegen das Muster geprüft werden; K9 zählt
+  Zeilen mit `Scheduled restart job` und ist ohne Journal-Datei `NA`.

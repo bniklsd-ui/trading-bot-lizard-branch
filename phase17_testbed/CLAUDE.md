@@ -170,6 +170,7 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 |---|---|---|---|
 | 1 | `adc905f` | P16 | **E-1 — Report v5.** `llm_usage_per_day` mit `exempt_models` (D-1-Fortsetzung: `exempt_tokens`/`exempt_calls`, **auch** in der `exhausted_at`-Summation übersprungen) · 6 neue Evaluatoren (`evaluate_k2_v5` · `evaluate_k6_v5` · `evaluate_k7_v5` · `evaluate_k9` · `evaluate_k10` · `evaluate_k11`) + `count_discovery_cycles_per_day` · K5-v5 `by_logger`/`deal_related` · CLI `--prereg {v4,v5}` · `--journal-file` · `--expect-llm-profile` · `--exempt-model` (repeatable). **+7 P16-Tests** (15 → 22), Σ 2046 → **2053** (16/16 grün). Negativ-Beweis: mit dem pre-E-1-Code sind **genau die 7 neuen Tests rot**, die 15 Bestandstests bleiben grün. |
 | 2 | (dieser Commit) | P17-Doku + P16-Kopf + root | **Doku-Propagierung:** dieser Block + Rotation #14 → `SESSIONS_ARCHIVE.md` + Σ-Tabelle + Block-D-/Block-E-Zeile + Executor-Evaluations-Zeile #15 + P16-Kopf (E-1-Nachtrag) + `docs/INDEX.md` + `ROADMAP.md` + root-`CLAUDE.md`. |
+| 3 | (dieser Commit) | P17-Doku + Plan | **Plan §19 = Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable (`phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md`, `status: locked`, INDEX-Zeile im selben Commit, T23-Freigabe) + **vollständiger Inhalts-Entwurf** (gepinnte Werte, K1/K2/K5/K6/K7/K8/K9/K10/K11, erlaubte Operator-Ereignisse, FAIL-Regel, §F2, Report-Befehl) + **live geprüfte Anker** + AK. **Doc-only, kein Code, Σ unverändert.** |
 
 ### Was E-1 ändert (Plan §18 — Anker null Drift, live nachgemessen)
 
@@ -210,7 +211,8 @@ K2 (0 Discovery-Zyklen) und K11 (0 Divergenz-Events) sind die in §18 E-1g gemes
 
 ### Next (der übernächste Block)
 
-- **E-2** (Shakedown-Vorregistrierung, 📕 `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md`) — **nach** E-1, **vor** E-3. Der Fenster = die ersten zwei Handelstage **nach** dem E-3-Start; gepinnt: `account=demo` · `max_trades=5` · `daily_loss_cap=1800.0` · `cycle=5min` · `llm_profile=research_m3` · `daily_token_budget=300 000` (Nicht-Ausnahme) · Ausnahme `MiniMax-M3`.
+- **E-2** (Shakedown-Vorregistrierung, 📕 `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md`) — **jetzt ausführbar geschrieben** (Plan **§19**, Doc-Commit dieser Session): Deliverable + **vollständiger Inhalts-Entwurf** + live geprüfte Anker + AK. Der Fenster = die ersten zwei Handelstage **nach** dem E-3-Start; gepinnt (am Code geprüft): `account=demo` · `max_trades=5` · `daily_loss_cap=1800.0` · `cycle=5min` · `llm_profile=research_m3` · `daily_token_budget=300 000` (Nicht-Ausnahme) · Ausnahme `MiniMax-M3`.
+  **T23-Gate:** der Nikinger gibt die Vorregistrierung **beim Commit** frei — der Commit der Datei wartet auf diese Freigabe.
 - **E-3** (Hold-Freigabe + Deploy, **Operator**) — macht den Flip 1 wirksam und erzeugt die K2/K11-Belege. Day-0-Check **zusätzlich**: `grep -c "discovery cycle" data/state/run_discovery.log` > 0.
 - **E-4** (Shakedown, 2 Handelstage, Operator — Journal-Export je Tag) → **E-5** (Auswertung + **D-2** K6-Einheit + **Flip 2**-Entscheidung + Prereg v5) → **E-6** (Closeout).
 - **D-2** bleibt ein **Nikinger-Entscheidungspunkt ohne Code** (K6-Einheit, nach dem Shakedown).
