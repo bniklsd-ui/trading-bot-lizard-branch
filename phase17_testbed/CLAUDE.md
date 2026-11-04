@@ -69,6 +69,19 @@ ps aux | grep "scheduler.run" | grep -v grep             # Gegenprobe: leer
   Drift → exit 1). Nicht von Hand `enable`/`start` ohne Freigabe.
   Freigabe (E-3): `bash scripts/install_units.sh --release-hold` → `bash scripts/install_units.sh`
   → `systemctl --user start tradingbot-scheduler.service`.
+- **E-3-Zeitpunkt (AK22 R2, Nikinger-Entscheidung 2026-11-04, Option a) — Pflicht:** der
+  Scheduler-Start (E-3, Plan §20 Schritt 7) erfolgt **am Morgen von D1 vor 09:00 Berlin** an einem
+  Handelstag (Mo–Fr); alle E-3-Schritte davor (Backups, T14, T12, Units) laufen am selben Morgen.
+  Dann ist D1 der „erste volle Handelstag nach dem E-3-Start" (Prereg BLUF), die
+  `starting scheduler daemon`-Zeile liegt **im** Fenster (K7-v5) und K1 zählt genau den einen
+  regulären Start. Ein Start nach 09:00 oder an einem Vortag/Wochenende ⇒ K7-v5 **FAIL by
+  construction** (keine Start-Zeile in `[D1, D2]`). Die §20-Day-0-Checks laufen damit **auf D1**.
+  **Konsequenz:** es gibt keinen Puffertag mehr — ein gescheiterter Day-0-Check ist ein Befund
+  **im** Fenster ⇒ FAIL-Regel (`-S2` + neuer Lauf). *Nicht gewählte Alternative (Nikinger-Entscheidung,
+  falls gewünscht):* E-3 einen Tag früher (Day-0-Checks als Puffer), dann **ein** bewusster
+  Scheduler-Neustart am Morgen von D1 vor 09:00 als gezählter Start — das liest „die Start-Zeile
+  aus E-3" (Prereg BLUF) anders und ist deshalb nicht übernommen.
+  Prereg und Plan bleiben unverändert (beide 📕/locked) — diese Zeile ist die Ausführungsregel.
 
 ## Test-Sweep (jede Suite getrennt; Σ = 16 Suites, meta_m1 nicht in Σ)
 
