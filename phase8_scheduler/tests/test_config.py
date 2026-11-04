@@ -197,13 +197,15 @@ def test_exported_from_package_root() -> None:
     assert ExportedSchedulerConfig is SchedulerConfig
 
 
-def test_llm_profile_defaults_are_anthropic_with_the_minimax_model_exempt() -> None:
-    """Phase 17 C-2 (T5/T17): the LLM routing profile is a **code default**, not a CLI
-    flag — the systemd unit passes no flags, so only a code default survives a
-    restart. Until the C-7 flip the bot stays on Anthropic (``llm_profile ==
-    "anthropic"``), and the MiniMax model is budget-exempt (its calls do not count
-    against ``daily_token_budget``; Abo/M Plan ⇒ Grenzkosten 0, Nikinger
-    2026-11-03).
+def test_llm_profile_default_is_research_m3_with_the_minimax_model_exempt() -> None:
+    """Phase 17 C-2 (T5/T17) + C-8 Flip 1 (2026-11-03): the LLM routing profile is a
+    **code default**, not a CLI flag — the systemd unit passes no flags, so only a
+    code default survives a restart. After the C-7 family smoke PASSED (both MiniMax
+    models) the default is ``"research_m3"``: **only the research role** moves to
+    MiniMax-M3 (Abo/M Plan) — every other role stays on Anthropic (T5: one profile =
+    one variable; a mixed state would make later model comparisons unreadable). The
+    MiniMax model is budget-exempt (its calls do not count against
+    ``daily_token_budget``; Abo ⇒ Grenzkosten 0, Nikinger 2026-11-03).
 
     The exempt model id is a literal in three places (``llm_profiles._M3.model``,
     the price line in ``research/models.py``, this list) — ``check_llm_profile``
@@ -211,5 +213,28 @@ def test_llm_profile_defaults_are_anthropic_with_the_minimax_model_exempt() -> N
     """
     cfg = SchedulerConfig()
 
-    assert cfg.llm_profile == "anthropic"
+    assert cfg.llm_profile == "research_m3"
     assert cfg.budget_exempt_models == ("MiniMax-M3",)
+
+
+def test_default_profile_moves_only_the_research_role_to_minimax() -> None:
+    """C-8 Flip 1 (2026-11-03): the **shipped default** profile is ``research_m3`` —
+    only the research role is served by MiniMax-M3; every other role (debate,
+    lesson, instinct, reflect, paper-debate) stays on Anthropic.
+
+    The pin exists because a default that moved the whole stack would change the
+    Bull/Bear/Judge path (and the lesson/instinct/reflect calls) without anyone
+    noticing — T5 wants one variable, one role at a time, so later model
+    comparisons stay readable.
+    """
+    from scheduler.llm_profiles import LLM_ROLES, role_spec
+
+    cfg = SchedulerConfig()
+
+    for role in LLM_ROLES:
+        spec = role_spec(cfg.llm_profile, role)
+        if role == "research":
+            assert spec.provider == "minimax", role
+            assert spec.model == "MiniMax-M3", role
+        else:
+            assert spec.provider == "anthropic", role
