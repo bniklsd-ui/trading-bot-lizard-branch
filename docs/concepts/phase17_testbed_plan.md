@@ -1865,3 +1865,23 @@ Budget-Zahl verwechselt.
 Unverändert §6 D-2: E-5 legt die Shakedown-Messung vor (M3-Tokens/Tag, Calls/Tag,
 Anthropic-Tokens/Tag, `LLM_UNAVAILABLE`-Zählung, `truncated`-Zählung, Research-PASS-Quote im
 Vergleich zu 10-12…10-16); der Nikinger wählt die K6-Einheit für Prereg v5.
+
+### Umsetzung (D-1, 2026-11-04 — Exec-Session #13)
+
+**Code-Commit `978619e` (P8, 1 Commit).** Die Anker waren unverändert (Plan §17) — beide
+Stellen liegen heute genau an den notierten Zeilen:
+
+| Ort | Ist-Stand 2026-11-04 | Δ zum Plan-Anker |
+|---|---|---|
+| `scheduler/budget.py::TokenBudget.consumed_today()` | Z. 168–190 (`continue` Z. 186–187, Summe Z. 189) | Plan nannte Z. 176–183 → **+10 Zeilen** (Docstring-Erweiterung in derselben Session) — semantisch identisch |
+| `webui/api.py::/api/token_usage` | Z. 277–320 (`exempt_tokens = 0` Z. 297, Verzweigung Z. 301–304, Feld im Return Z. 313) | Plan nannte Z. 277–308 → **+12 Zeilen** (Docstring-Erweiterung) — semantisch identisch |
+| `phase16_activation/scripts/autonomy_report.py::llm_usage_per_day()` | Z. 369 ff. — **unverändert, bleibt E-1** | keiner |
+
+**AK erfüllt:** P8 296 → **299** (3 Tests) · Σ 2043 → **2046** · 16/16 Suiten grün.
+**Negativ-Beweis:** mit dem pre-D-1-Code sind `test_budget_ignores_exempt_model_records` und
+`test_webui_token_usage_separates_exempt_tokens` rot; `test_budget_counts_non_exempt_records`
+ist ein Regressions-Pin (per Definition auch vorher grün).
+
+**Offen (unverändert):** der dritte Zählort (Report) kennt die Ausnahme erst ab **E-1** — die
+Report-Zahl und die Budget-Zahl weichen bis dahin ab (gehört in den Shakedown-Vermerk).
+**D-2** bleibt ein Nikinger-Entscheidungspunkt ohne Code.

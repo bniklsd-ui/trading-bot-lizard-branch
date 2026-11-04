@@ -7,6 +7,74 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-03 (Exec-Session #12 — **der nächste Block ist geschrieben**: Plan §17 = Block D / D-1 (Budget-Ausnahme an zwei P8-Zählstellen) mit **re-verifizierten Ankern** + D-2 als Entscheidungspunkt; **dokumentarische Session, kein Code** — Σ unverändert **2043**; Session-Ende + **Push**)
+
+> **Auftrag:** Nikinger 2026-11-03 (Web-Chat): „understood. write a next block, end the session, commit and push." → (1) den **nächsten Block** (D-1) ausführbar schreiben, (2) die Session beenden, (3) committen, (4) pushen.
+> **Bot-Ritual (am Session-Ende verifiziert):** Scheduler `disabled` + `inactive` (Hold-Marker `data/state/SCHEDULER_HELD`), `install_units.sh --check` exit 0, Recorder/Discovery/WebUI `enabled` + `active`. **Kein Neustart, kein Netz-Call, kein Live-Key** durch den Agenten.
+> **Cross-Phase-Freigabe:** keine Code-Änderung in dieser Session → keine Cross-Phase-Freigabe nötig.
+
+### Completed — diese Exec-Session (1 Doku-Commit)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | (dieser Commit) | P17-Doku + Plan | **§17 „Ausführungsblock D-1"** im Plan-Snapshot: Anker gegen den Code vom 2026-11-03 **re-verifiziert** (`scheduler/budget.py` `consumed_today()` Z. 176–183 · `webui/api.py` `/api/token_usage` Z. 277–308 — beide **unverändert** gegenüber §6 D-1; der dritte Zählort `autonomy_report.py::llm_usage_per_day()` Z. 369 ff. gehört zu **E-1/Block E**, nicht in D-1) + **3 Testnamen** + Negativ-Beweis-Regel + AKs auf den aktuellen Stand (**P8 296 → 299**, **Σ ≥ 2046**) + D-2 als Nikinger-Entscheidungspunkt ohne Code. **P17-Phasenkopf:** Block-D-Zeile, Executor-Zeile #12, Σ-Tabelle, Session-#12-Block + Rotation #11 → `SESSIONS_ARCHIVE.md`. `docs/INDEX.md`: §17-Eintrag. **Kein Code** — Σ unverändert **2043**. |
+| — | (vorige Sessions) | — | Die Code-Commits dieser Phase-17-Folge: `4d57d99` (M-1 Provider-Wechsel) · `2ee73e6` (C-8 Flip 1) + Doku `15fea80` · `c3891a1` — **gepusht in diesem Schritt**. |
+
+### Der nächste Block — D-1 in Kurzform (Details im Plan §17)
+
+| Ort | Änderung | Test |
+|---|---|---|
+| `scheduler/budget.py` (`consumed_today`, Z. 181/182) | 2 Zeilen: Records von `budget_exempt_models` **skippen** (+ Docstring-Satz) | `test_budget_ignores_exempt_model_records` · `test_budget_counts_non_exempt_records` |
+| `webui/api.py` (`/api/token_usage`, Z. 289/295/301) | `exempt_tokens` separat zählen + als Feld im Return (Kosten/Calls zählen weiter alle Records) | `test_webui_token_usage_separates_exempt_tokens` |
+| Report (`autonomy_report.py`, Z. 369 ff.) | **nicht** in D-1 — E-1 (Block E) | — |
+
+**Warum jetzt:** mit dem Flip 1 (Session #11) ist die Ausnahme **aktiv** — MiniMax-M3-Calls würden sonst weiter gegen das 300-k-Tagesbudget zählen (und Anthropic-Calls dadurch früher blockieren). D-1 macht das unterscheidbar: **budgetwirksam** (Anthropic) vs. **gemessen, nicht gedeckelt** (Abo).
+
+### Gemessen (Host 201, Session-Ende)
+
+| | Wert |
+|---|---|
+| `is-enabled` / `is-active` tradingbot-scheduler | `disabled` / `inactive` (Hold unangetastet) |
+| `bash scripts/install_units.sh --check` | exit 0 |
+| Keyring `trading-bot-minimax-bot/api_key` | ✓ vorhanden (unverändert) |
+| Σ (16 Suiten + root) | **2043** (unverändert — keine Code-Änderung) |
+| `check_doc_rotation.py --strict` | exit 0 |
+| Commits dieser Phase-17-Folge | 4 Code + 4 Doku = **8** → **Push in diesem Schritt** |
+
+### Next (der übernächste Block)
+
+- **D-1 ausführen** (Plan §17, **ein** Commit in P8): die drei Testnamen sind fest, die
+  Anker sind verifiziert → atomar abgearbeitet, kein Re-Planen nötig.
+- **D-2** bleibt ein **Nikinger-Entscheidungspunkt ohne Code** (K6-Einheit, nach dem
+  Shakedown).
+- **E-3** (Hold-Freigabe + Deploy) ist der Schritt, der den Flip 1 **wirksam** macht — und
+  der erste echte MiniMax-Pick (unter voller Prompt-Last) ist der eigentliche Test: dort
+  erst zeigt sich, ob M3 `finish_reason=length` liefert (Hebel:
+  `extra_body={"thinking": {"type": "disabled"}}` am `minimax`-Eintrag).
+- **Frist 2026-11-15** — Abo-Key/Endpoint: jedes `minimax`-Profil vor dem Datum
+  zurückflippen (Default `anthropic`).
+
+### Open questions / blockers
+
+- **D-1 ist der nächste Code-Block**; die Ausführung selbst ist der nächsten Session
+  vorbehalten (Push = Nikinger).
+- **Modellwahl vertagt** (M3 vs. M3.1-Flash, „besseres Trading-LLM" später) — Profil und
+  Modell sind getrennte Datenstellen, der Flip hängt nicht daran.
+- **Frist 2026-11-15** (Abo) — im Phasenkopf + Plan §16 dokumentiert.
+- **Review-Gate vor E-3 (AK22)** weiterhin ⏳ (Claude-Code-Session, Anthropic;
+  Schwerpunkte B-5…B-10, C-4…C-6, B-3, B-2).
+
+### Session-end-Hinweis
+
+- **Σ 2043** (16 Suiten + root). meta_m1 informativ, nicht in Σ.
+- **Diese Session:** 1 Doku-Commit (Plan §17 + Phasenköpfe), **kein Code**.
+- **Push:** die 8 Commits der Phase-17-Folge (M-1 · Flip 1 · Doku) gehen in diesem Schritt
+  auf `origin/main`.
+- **Kern-Erkenntnis:** der Provider-Wechsel war eine Datenfrage, der Flip eine Zeile — und
+  der **Budget-Hebel** (D-1) ist der letzte Ort, an dem das neue Provider-Modell noch
+  nachgezogen werden musste.
+
+
 ## Session stopped — 2026-11-03 (Exec-Session #11 — **C-7-Smoke PASS (Operator)** + **C-8 Flip 1** ausgeführt: `llm_profile = "research_m3"`, nur Research → MiniMax-M3; 1 Code-Commit + 1 Doku-Commit, Σ 2042 + 1 = **2043** grün)
 
 > **Auftrag:** Nikinger 2026-11-03 (Web-Chat): C-7 als Operator-Schritt ausführen (Key seeden + Familien-Smoke), danach weitermachen. **Plan war detailliert genug** (§14.4-Smoke-Protokoll, C-8 als eigener Commit) → **atomar abgearbeitet**: Smoke dokumentiert → Flip 1 als eigener Commit → Doku.

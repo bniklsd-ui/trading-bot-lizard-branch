@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase8_scheduler_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041) | 2026-11-03 (Phase-17 M-1 cross-phase edit — Bot-Provider MiniMax, additiv, Σ 2042) | 2026-11-03 (Phase-17 C-8 Flip 1 cross-phase edit — llm_profile=research_m3, additiv, Σ 2043)
+updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041) | 2026-11-03 (Phase-17 M-1 cross-phase edit — Bot-Provider MiniMax, additiv, Σ 2042) | 2026-11-03 (Phase-17 C-8 Flip 1 cross-phase edit — llm_profile=research_m3, additiv, Σ 2043) | 2026-11-04 (Phase-17 D-1 cross-phase edit — Token-Budget-Ausnahme an `budget_exempt_models`, additiv, Σ 2046)
 ---
 # CLAUDE.md — Phase 8: Scheduler (`phase8_scheduler/`)
 
@@ -104,7 +104,7 @@ immer → Variety + Clamp/Floor + echte Lessons). **Token-Budget by-default scha
 | `scheduler/command.py` | Start/Stop-Command-Datei (`scheduler_command.json`) lesen/schreiben/löschen — von `webui` (Schreiber) + `runner` (Leser) geteilt; fail-soft, atomic; **soft** Pause/Resume (≠ hartem KILL) | ✅ (Modul 12, 10 Tests) |
 | `scheduler/safety.py` | `AutoConfirm` `confirm_fn`: demo + kill + caps + loss-breaker + budget | ✅ (Modul 6, 18 Tests) |
 | `scheduler/backoff.py` | konsekutive-Fehler-Tracking + Backoff-Schedule | ✅ (9 Tests) |
-| `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`) | ✅ (Modul 7, 13 Tests) |
+| `scheduler/budget.py` | Token-Budget-Gate (reuse `token_meter`/`llm_usage.json`); **+ Budget-Ausnahme** (`budget_exempt_models`, Phase 17 D-1) | ✅ (Modul 7, 15 Tests) |
 | `scheduler/research_tick.py` | expliziter echter P4-Trigger + `no_trade_reason` (der Blocker); **+ `REASON_LLM_UNAVAILABLE` + Fehler-Streak** (Phase 17 C-5) | ✅ (Modul 8, 14 Tests) |
 | `scheduler/observability.py` | v1.6 Step 0 — per-Zyklus JSONL-Diagnose-Log (`record_cycle`/`iter_records`), Sicherheitsnetz für Rückfälle | ✅ (v1.6, 9 Tests) |
 | `scheduler/reconcile.py` | `CLOSED_BY_BROKER`-P&L-Nachzieh-Pass (idempotent) — reuse P5/P7 | ✅ (7 Tests) |
@@ -113,8 +113,8 @@ immer → Variety + Clamp/Floor + echte Lessons). **Token-Budget by-default scha
 | `scripts/wiring.py` | Composition Root `build_scheduler()` — voller P1–P7-Stack (Debatte + Reward in EINEN Executor), 3 Closures + `universe_refresher`-Closure (Phase 9/V2); **+ `_build_llm` (eine Bau-Funktion für alle Clients) + `_debate_config` + `_check_llm_profile`** (Phase 17 C-4) | ✅ (Modul 11, operator-run) |
 | `scheduler/llm_profiles.py` | **NEU (Phase 17 C-1)** — Provider-Register: 9 `PROVIDERS` (Daten), `RoleSpec`, `LLM_PROFILES`, `role_spec`/`check_provider`/`client_kwargs`/`check_llm_profile` (rein, stdlib-only, importiert nichts cross-phase) | ✅ (C-1, 11 Tests) |
 | `scripts/run_scheduler.sh` · `smoke_test.py` · `live_test.py` | Operator-Tools (Start-Script · offline Sim-Tag mit Fakes · echter unbeaufsichtigter IG-Demo-Zyklus) | ✅ (Modul 11, operator-run) |
-| `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes. **+ Token-Meter-Card** (`/api/token_usage`) **+ Last-Cycle-Reasoning** (`/api/last_cycle` zeigt jetzt Research-Pick + Bull/Bear/Judge-Transkript) — s. `## UI-Erweiterung — 2026-06-29`. **v1.7 (2026-07-02): `/api/status`s `trades_today`/`realized_pnl_today` DB-gespeist** (nicht mehr der lagging `scheduler_state.json`-Snapshot) — s. `## Session stopped — 2026-07-02 (v1.7: /api/status DB-gespeist)` | ✅ (Modul 12, 20 Tests) |
-| `tests/*` | gemockt, kein Netz/LLM/echter sleep (**294**, Schwerpunkt `test_runner` + `test_safety` + `test_webui` + `test_wiring_*` + `test_llm_profiles`) | ✅ |
+| `webui/api.py` + `webui/static/*` + `scripts/run_webui.sh` | FastAPI read-mostly (DB `mode=ro` + `scheduler_state.json` + Kill/Command-Dateien) + statisches Dark-Neumorphism-Dashboard (GitHub-Dark, Monospace, Polling 7 s, kein Build-Step); Control **nur** Datei-Writes. **+ Token-Meter-Card** (`/api/token_usage`) **+ Last-Cycle-Reasoning** (`/api/last_cycle` zeigt jetzt Research-Pick + Bull/Bear/Judge-Transkript) — s. `## UI-Erweiterung — 2026-06-29`. **v1.7 (2026-07-02): `/api/status`s `trades_today`/`realized_pnl_today` DB-gespeist** (nicht mehr der lagging `scheduler_state.json`-Snapshot) — s. `## Session stopped — 2026-07-02 (v1.7: /api/status DB-gespeist)` | ✅ (Modul 12, 27 Tests) |
+| `tests/*` | gemockt, kein Netz/LLM/echter sleep (**299**, Schwerpunkt `test_runner` + `test_safety` + `test_webui` + `test_wiring_*` + `test_llm_profiles`) | ✅ |
 
 Repo-Konventionen: `from __future__ import annotations`, Type-Hints + Docstrings, eine
 Datei = eine Verantwortung, eigene typisierte Exceptions, nie still schlucken, Logging →
@@ -515,6 +515,32 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 >   zurückgeflippt werden (sicherer Default `anthropic`).
 > - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §16, T13: Code in P8 + P4 ✓).
 >   `phase17_testbed/CLAUDE.md` Session-#10-Block. Push = Nikinger.
+
+> 🔁 **Phase-17 (Prüfstand) D-1 edit (2026-11-04, Exec-Session #13 — additiv, code = source of truth):**
+> Die **Token-Budget-Ausnahme** ist jetzt im Code (T7): Calls der Modelle in
+> `SchedulerConfig.budget_exempt_models` (MiniMax-M3, Abo/M Plan) zählen **nicht** gegen
+> `daily_token_budget`. **Additiv**, Phase 8 bleibt für Bestands-Wire-ups bit-identisch
+> (Anthropic-Records zählen unverändert, das Cap bleibt 300 k):
+> - **`scheduler/budget.py` (`TokenBudget.consumed_today()`)**: ein `continue` vor der
+>   Tages-Summe, wenn `rec.get("model") in self._config.budget_exempt_models` —
+>   „Abo-Kontingent — measured, not capped". Der Docstring nennt die Ausnahme. **Nicht**
+>   geändert: `_TOKEN_FIELDS` (bleibt modellblind), die fail-open-Semantik, `is_exhausted()`,
+>   `daily_token_budget`.
+> - **`webui/api.py` (`/api/token_usage`)**: die Exempt-Records landen in einem **eigenen**
+>   Feld `exempt_tokens` (Return), die übrigen in `consumed_tokens` (⇒ `percent` bleibt die
+>   Cap-Auslastung der bezahlten Modelle). **Kosten- und Call-Summen zählen weiter alle
+>   Records** — die Ausnahme ist ein Cap, kein Blindfleck. `app.js` bleibt unverändert (das
+>   Feld steht für `curl` und den Report bereit).
+> - **Dritter Zählort ist NICHT dabei:** `phase16_activation/scripts/autonomy_report.py`
+>   (`llm_usage_per_day()`) kennt die Ausnahme erst ab **E-1 (Block E)** — bis dahin weicht
+>   die Report-Zahl von der Budget-Zahl ab (dokumentiert im Shakedown-Vermerk, Plan §17 D-1c).
+> - **Tests P8 296 → 299** (+3): `test_budget.py::test_budget_ignores_exempt_model_records` ·
+>   `test_budget.py::test_budget_counts_non_exempt_records` ·
+>   `test_webui.py::test_webui_token_usage_separates_exempt_tokens`. Negativ-Beweis: mit dem
+>   pre-D-1-Code sind der Budget- und der WebUI-Test **rot** (der dritte ist ein
+>   Regressions-Pin und per Definition auch vorher grün). Σ 2043 → **2046** (16/16 grün).
+> - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §17 D-1, T13: Code in P8 ✓).
+>   `phase17_testbed/CLAUDE.md` Session-#13-Block. Push = Nikinger.
 
 > 🔁 **Phase-17 (Prüfstand) C-8 Flip 1 edit (2026-11-03, Exec-Session #11 — additiv, code = source of truth):**
 > Der **Bot-Flip 1** ist ausgeführt: `SchedulerConfig.llm_profile` steht jetzt auf
