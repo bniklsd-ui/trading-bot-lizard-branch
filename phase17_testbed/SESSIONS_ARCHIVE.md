@@ -7,6 +7,72 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-04 (Exec-Session #16 — **E-2 ausgeführt**: Shakedown-Vorregistrierung geschrieben (T23-Freigabe des Nikinger) + MiniMax-**Familie**-Ausnahme im Code; 1 Code-Commit in P8 + 1 Doku-Commit, Σ **2053** unverändert)
+
+> **Auftrag:** Nikinger (Web-Chat, 2026-11-04): Phase 17 fortsetzen. Der Special-Task verweist auf Plan §19 (**E-2 = Shakedown-Vorregistrierung**) mit dem **T23-Gate**: der Commit der Prereg-Datei wartet auf die Freigabe der gepinnten Werte; D1/D2 sind erst nach E-3 bekannt. **Plan war detailliert genug** (§19 mit vollständigem Inhalts-Entwurf + live geprüften Ankern) → **atomar abgearbeitet**, kein Re-Planen nötig.
+> **Bot-Ritual (Session-Start + Session-Ende verifiziert):** Scheduler `disabled` + `inactive` (Hold-Marker `data/state/SCHEDULER_HELD`), kein `scheduler.run`-Prozess, `install_units.sh --check` exit 0, Recorder/Discovery/WebUI `enabled` + `active` (unangetastet). **Kein Neustart, kein Netz-Call, kein Live-Key** durch den Agenten.
+> **Cross-Phase-Freigabe:** E-2 = **P17-Doku** + **P8** (eine Config-Zeile, vom Nikinger ausdrücklich entschieden: „ausname alle minimax Modelle" → Variante A „Familie aufzählen"). Kein Touch in P1/P4/P5/P10/P12/P14/P15/P16.
+
+### Completed — diese Exec-Session (1 Code-Commit + 1 Doku-Commit)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | `fa02a6a` | P8 | **MiniMax-Familien-Ausnahme** (`scheduler/config.py:150-160`): `budget_exempt_models = ("MiniMax-M3", "MiniMax-M3.1-Flash")` — Nikinger-Entscheidung 2026-11-04 („ausname alle minimax Modelle", Variante A = Familie aufzählen, Exakt-Match beibehalten). Zwei Pins verschärft: `test_budget.py::test_budget_ignores_exempt_model_records` prüft jetzt **beide** IDs, `test_config.py::test_llm_profile_default_is_research_m3_with_the_minimax_model_exempt` pinnt das Tupel. **Negativ-Beweis:** mit dem Pre-Code-`config.py` sind **beide** Tests rot. **P8 299 → 299** (keine neue Testzahl — die Pins sind verschärft), Σ **2053** unverändert. |
+| 2 | `32835dd` | P17-Doku + P8-Kopf + root | **E-2 — die Vorregistrierung.** `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md` (**NEU**, `status: locked` nach T23-Freigabe) + **eine** `docs/INDEX.md`-Zeile **im selben Commit** + Phasenkopf (Block-E-Zeile, Σ-Tabelle, Executor-Zeile #16, dieser Block + Rotation #15 → `SESSIONS_ARCHIVE.md`, `down:`-Link auf die neue Datei) + root-`CLAUDE.md` (Banner + Phasen-17-Zeile) + `ROADMAP.md`. **Kein Code** in diesem Commit. |
+| 3 | (dieser Commit) | P17-Doku + Plan | **Plan §20 = Ausführungsblock E-3** (Deploy + Day-0-Verifikation): Reihenfolge (Hold-Freigabe → 4 Dienste stoppen → Backups → T14/T12 → Units installieren → starten) · **live gemessene Sollwerte** (3 770 `ig`-Bars statt ≈ 3 730 · 29 Instincts · 0 OPEN · **Allowance-Expiry 2026-10-26 = vergangen**) · **7 Day-0-Checks** · K2/K11-**Wann** (erster echter Vergleich frühestens **13:00**) · 7 Fehlgriffe · AK. **Doc-only, kein Code.** |
+| 4 | (dieser Commit) | P17-Doku + Plan | **Plan §21 = Ausführungsblock AK22** (Review-Gate vor E-3): **Harness Claude Code (Anthropic, Opus)** (§14.2 — „Claude Code macht nur das Review-Gate"); **22 Code-Commits** mit SHA-Liste (B-1…B-10, C-1…C-6, C-8/M-1, Hold, D-1, E-1, E-2-Code); **5 Pflicht-Schwerpunkte** (B-5 Order-Pfad · B-6 Breaker/Hard Rule 5 · C-4 LLM-Verdrahtung + Startup-Check · B-3 Bridge · B-2 mismatch-Einbahnstraße) **+ 7 Ergänzungen** (B-7…B-10, C-1…C-6, E-1, E-2, Hold, F8-Frage „grün ohne Messung?"); „nicht tun"-Liste; **AK22-Output-Format** (PASS ⇒ Phasenkopf-Eintrag ⇒ E-3 frei). **Doc-only, kein Code.** |
+
+### Was E-2 festhält (Inhalt der Vorregistrierung)
+
+| Abschnitt | Inhalt |
+|---|---|
+| **BLUF** | Fenster = Tag 1 = erster voller Handelstag **nach** dem E-3-Start, Tag 2 = der nächste Handelstag; Start-Zeitstempel = die `starting scheduler daemon`-Zeile aus E-3. Zweck = **kein** Autonomie-Test, sondern **2-Tage-Prüfstand-Fenster** (B-1…B-10, C-1…C-8, D-1, E-1 live belegen, inkl. der neuen Kriterien K9/K10/K11). Profit bleibt **kein** Kriterium. |
+| **Gepinnte Werte** (live am 2026-11-04 gegen den Code geprüft, **null Drift**) | `account=demo` (`run.py:156`, hart) · `max_trades=5` (`run.py:72-74`) · `daily_loss_cap=1800.0` (`run.py:47-49`) · `cycle=5min` (`run.py:78-80`) · `llm_profile=research_m3` (`config.py:149`) · `daily_token_budget=300 000` (`run.py:60-62`, nur Nicht-Ausnahme-Modelle) · **Ausnahme: alle MiniMax-Modelle** (`config.py:154`: `MiniMax-M3` + `MiniMax-M3.1-Flash`) |
+| **Kriterien** (alle PASS nötig; **K3/K4 nur berichtet**) | K1 ≤ 2 Starts je Dienst · K2-v5 je Handelstag ≥1 Scheduler-Event + ≥1 Bar + ≥1 Discovery-Zyklus · K5 ≤ 5 CRITICALs je 24 h nach OPEN · K6-v5 Budget nie vor 17:30 erschöpft · K7-v5 Caps + `llm_profile=research_m3` (ohne Start-Zeile ⇒ FAIL) · K8 Liveness je Handelstag · K9 ≤ 10 Restart-Jobs je Berlin-Tag · K10 0 Bridge-CRITICALs + Evidenz je neuer Instinct (NA ohne CLOSE) · K11 ≥ 1 Divergenz-Event je Handelstag |
+| **Erlaubte Operator-Ereignisse** | (a) Re-Adoption-Probe **einmal** (nur bei offener Position; erwartet `resume: re-adopting open position …` + regulärer Close) = das „+1" in K1 · (b) Tagesexport Journal (der Export selbst ist kein Ereignis) · **ein VM-Host-Reboot = K1 FAIL** (T10). Alles andere ist ein Befund. |
+| **FAIL-Regel** | Befund → Fix-Step in Phase 17 → **neue** Vorregistrierung `-S2` → neuer Lauf. **Kein** Kriterium wird gelockert (T3/T23). |
+| **§F2 Flip-2-Tag** | 1 Handelstag `all_m3`, dieselben Kriterien, K7 gegen `all_m3`, Abbruch + Revert nach C-8 — **jetzt mit vorregistriert** (sonst wäre der Flip-2-Tag ein Lauf ohne vorab festgelegte Kriterien). |
+| **Report-Befehl** | Journal-Export (E-4) → `autonomy_report.py --prereg v5 --from <D1> --to <D2> --summary --journal-file … --expect-llm-profile research_m3 --exempt-model MiniMax-M3 --exempt-model MiniMax-M3.1-Flash --reports-dir data/reports` |
+| **Aktiv-Block** | Vom Operator **am E-3-Tag eingetragen** (Eintragung, kein Edit): Start-Zeitstempel · D1 · D2 · HEAD-Commit · offene Position bei Start · Re-Adoption-Probe |
+
+### Die eine Änderung gegenüber dem Plan-Entwurf §19 (Nikinger-Entscheidung)
+
+- **Der Nikinger hat die Token-Ausnahme von `MiniMax-M3` auf „alle MiniMax-Modelle" erweitert** (2026-11-04, Frage in dieser Session). Umgesetzt als **Familien-Aufzählung** `("MiniMax-M3", "MiniMax-M3.1-Flash")` in `SchedulerConfig.budget_exempt_models` (P8, 1 Zeile) — das Matching ist im Code überall **Exakt-Match** (`budget.py:187`, `webui/api.py:302`, `autonomy_report.py:494/509`, `llm_profiles.py:377`); eine Prefix-Regel wäre ein Cross-Phase-Edit über **P16** hinaus gewesen (vom Nikinger verworfen).
+- **Warum der Code mit muss:** die Vorregistrierung pinnt **Werte** — wenn der Code nur ein Modell ausnimmt, wäre das **Dok-vs-Code-Drift** (genau der Defekt-Typ, den Phase 17 abstellt). Der Startup-Check `check_llm_profile` deckt den Rest ab: ein **künftiges** MiniMax-Modell ohne Eintrag ⇒ der Start wird verweigert und die fehlende ID wird **genannt** (kein stilles Zählen gegen das Cap).
+- **Bekannte Lücke (kein Blocker):** `MiniMax-M3.1-Flash` hat **noch keine Preiszeile** in P4 (`research/models.py`) ⇒ ein Modellwechsel M3 → Flash (Entscheidung E-5) bräuchte zusätzlich eine Preiszeile `(0.0, 0.0)` (Abo), sonst verweigert `check_llm_profile` den Start. **Bis dahin bleibt M3 aktiv.**
+
+### Gemessen (Host 202, Session-Ende)
+
+| | Wert |
+|---|---|
+| `is-enabled` / `is-active` tradingbot-scheduler | `disabled` / `inactive` (Hold unangetastet) |
+| `ps aux | grep scheduler.run` | 0 Treffer |
+| `bash scripts/install_units.sh --check` | exit 0 |
+| Σ (16 Suiten + root) | **2053** (P8 299 unverändert — die Ausnahme-Familie steckt in den verschärften Pins, keine neue Testzahl), 16/16 grün |
+| `check_doc_rotation.py --strict` | exit 0 |
+| **E-3-Vorbereitung (live, 2026-11-04)** | `bars.sqlite` `source='ig'` = **3 770** Zeilen (07-17T11:14Z…10-19T09:05Z, `ts_utc > fetched_at` = 3 770) · `instincts` 29/29 ohne Evidenz, **0** markiert · `trade_outcomes` OPEN = **0**, `execution_state.json` 38/38 CLOSED · `run_discovery.log`: **0** `discovery cycle`-Zeilen (Daemon läuft mit **Pre-B-10-Code**) · `llm_usage.json` 5 559 Records, letzter 10-19 `claude-sonnet-4-6` · `allowance_observations` letzter 10-19T07:08:39Z (10 000 / **9 923** übrig / expiry **2026-10-26** = **vergangen**) |
+
+### Next (der übernächste Block)
+
+- **E-3** (Hold-Freigabe + Deploy, **Operator**) — **jetzt ausführbar geschrieben**: Plan **§20** (Reihenfolge, live gemessene Sollwerte, 7 Day-0-Checks, Fehlgriffe, AK). Macht den Flip 1 wirksam und erzeugt die K2/K11-Belege. Ablauf: `--release-hold` → 4 Dienste stoppen → Backups → `DELETE FROM bars WHERE source='ig'` (T14, **3 770** Zeilen) → `instincts` mit `[legacy-p16] ` markieren (T12, **29** Zeilen) → `install_units.sh` + `daemon-reload` → 4 Units starten. **7 Day-0-Checks** (§20 E-3c) — u. a. Discovery-Beleg > 0 (**der Discovery-Daemon läuft noch mit Pre-B-10-Code** ⇒ Neustart Pflicht) und die **IG-Allowance** (letzte Beobachtung 2026-10-19, expiry **2026-10-26 — vergangen** ⇒ Erneuerung unbestätigt).
+- **Review-Gate AK22** (Claude-Code-Session, Anthropic) ist **vor** E-3 fällig — ⏳ offen. **Jetzt ausführbar geschrieben: Plan §21** (Harness, Commit-Umfang, Fragen je Bereich, Output-Format). Der Review läuft in **Claude Code (Anthropic, Opus)** — §14.2: „Claude Code macht nur das Review-Gate"; die Exec-Sessions (OpenCode) sind **nicht** AK22-qualifiziert.
+- **E-4** (Shakedown, 2 Handelstage, Operator — Journal-Export) → **E-5** (Auswertung + **D-2** K6-Einheit + **Flip-2**-Entscheidung + **Modellwahl** M3 vs. Flash + Prereg v5) → **E-6** (Closeout).
+- **D-2** bleibt ein **Nikinger-Entscheidungspunkt ohne Code** (K6-Einheit, nach dem Shakedown).
+- **Frist 2026-11-15** — Abo-Key/Endpoint: jedes `minimax`-Profil vor dem Datum zurückflippen (Default `anthropic`).
+
+### Open questions / blockers
+
+- **Review-Gate vor E-3 (AK22)** weiterhin ⏳ (Schwerpunkte B-5…B-10, C-4…C-6, B-3, B-2, **E-1**).
+- **Modellwahl vertagt** (M3 vs. M3.1-Flash) — Profil und Modell sind getrennte Datenstellen; die Flash-Preiszeile fehlt noch (siehe oben).
+- **K9-Regex unbewiesen:** der exakte Journal-Text eines Auto-Restarts (`Scheduled restart job, restart counter is at N`) existiert im Repo noch nicht (Plan §9 #8) — die erste echte Vorkommen muss gegen das Muster geprüft werden (E-4).
+- **Frist 2026-11-15** (Abo) — im Phasenkopf + Plan §16 dokumentiert.
+
+### Session-end-Hinweis
+
+- **Σ 2053** (16 Suiten + root). meta_m1 informativ, nicht in Σ.
+- **Diese Session:** 1 Code-Commit (P8) + 3 Doku-Commits (E-2-Vorregistrierung · Plan §20 = E-3 · Plan §21 = AK22-Review-Auftrag).
+- **Kern-Erkenntnis (neu):** eine Vorregistrierung pinnt **Werte** — und gepinnte Werte müssen **im Code stehen**, sonst ist die Vorregistrierung ein Dokument über einen Zustand, den es nicht gibt. Genau das hat der Nikinger beim Review bemerkt (Ausnahme: eine Modell-ID → die ganze Familie).
+
 ## Session stopped — 2026-11-04 (Exec-Session #15 — **E-1 ausgeführt**: Report v5 (`--prereg v5`) in `autonomy_report.py` — D-1-Fortsetzung im Report + v5-Evaluatoren K2/K5/K7/K9/K10/K11; 1 Code-Commit in P16 + 1 Doku-Commit, Σ 2046 + 7 = **2053** grün)
 
 > **Auftrag:** Nikinger (Web-Chat, 2026-11-04): **E-1 ausführen** (Plan §18). **Plan war detailliert genug** (§18 mit Code-Skizzen, 7 festen Testnamen, AKs P16 15 → 22 / Σ ≥ 2053, v4-Regressions-Baseline) → **atomar abgearbeitet**, kein Re-Planen nötig.
