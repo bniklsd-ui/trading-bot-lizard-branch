@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase8_scheduler_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041) | 2026-11-03 (Phase-17 M-1 cross-phase edit — Bot-Provider MiniMax, additiv, Σ 2042)
+updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041) | 2026-11-03 (Phase-17 M-1 cross-phase edit — Bot-Provider MiniMax, additiv, Σ 2042) | 2026-11-03 (Phase-17 C-8 Flip 1 cross-phase edit — llm_profile=research_m3, additiv, Σ 2043)
 ---
 # CLAUDE.md — Phase 8: Scheduler (`phase8_scheduler/`)
 
@@ -515,6 +515,24 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 >   zurückgeflippt werden (sicherer Default `anthropic`).
 > - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §16, T13: Code in P8 + P4 ✓).
 >   `phase17_testbed/CLAUDE.md` Session-#10-Block. Push = Nikinger.
+
+> 🔁 **Phase-17 (Prüfstand) C-8 Flip 1 edit (2026-11-03, Exec-Session #11 — additiv, code = source of truth):**
+> Der **Bot-Flip 1** ist ausgeführt: `SchedulerConfig.llm_profile` steht jetzt auf
+> **`"research_m3"`** (vorher `"anthropic"`). Nach dem C-7-Familien-Smoke (Operator:
+> beide MiniMax-Modelle **PASS**, `MiniMax-M3` 751→164 Tokens, `finish_reason=stop`,
+> 3.62 s) ist der Provider **beweisen**:
+> - **Nur die Research-Rolle** wechselt auf **MiniMax-M3** (Abo/M Plan, `max_tokens=8192`,
+>   `max_completion_tokens`, Denk-Modus an). Debatte, Lesson, Instinct, Reflect und
+>   Paper-Debatte bleiben **Anthropic** (T5: eine Variable, eine Rolle — sonst wären
+>   spätere Modellvergleiche unlesbar).
+> - **Rollback = eine Zeile** (`"research_m3"` → `"anthropic"`).
+> - **Inert bis E-3:** der Scheduler steht im HOLD (`disabled` + `data/state/SCHEDULER_HELD`)
+>   ⇒ der Flip wirkt erst mit dem Deploy in E-3.
+> - **Tests P8 295 → 296** (+1: der Default-Pin — nur `research` → `minimax`/`MiniMax-M3`,
+>   alle anderen Rollen → `anthropic`); der Bestandstest auf den Default umbenannt.
+>   Σ 2042 → **2043** (16/16 grün).
+> - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §16/C-8, T13: Code in P8 ✓).
+>   `phase17_testbed/CLAUDE.md` Session-#11-Block. Commit `2ee73e6`. Push = Nikinger.
 >   `phase17_testbed/CLAUDE.md` Session-#9-Block. Commits `698e9ea` (C-1) · `145e80e`
 >   (C-2) · `4190802` (C-3) · `1a61229` (C-4) · `edeeab8` (C-5) · `6d1f69d` (C-6).
 >   Push = Nikinger.

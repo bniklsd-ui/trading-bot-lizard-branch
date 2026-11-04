@@ -7,6 +7,94 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-03 (Exec-Session #10 ENDE — **Planwechsel z.ai → MiniMax** (Abo/M Plan): M-1 Provider-Register umgestellt — Profil `research_m3`/`all_m3`, Modell `MiniMax-M3`, Preiszeile `(0.0,0.0)`, `budget_exempt_models=("MiniMax-M3",)`, Quirks `max_completion_tokens`; 1 Code-Commit + 1 Doku-Commit, Σ 2041 + 1 = **2042** grün; **C-7 wartet auf den Nikinger**; **Frist 2026-11-15**)
+
+> **Auftrag:** Nikinger 2026-11-03 (Web-Chat): „Passt das?" — der MiniMax.io-Key (`https://api.minimax.io/v1`) soll der Bot-LLM-Provider werden; danach „Continue if you have next steps". **Plan war detailliert genug** (§6-Baseline T4–T7/C-1/C-3/C-8 + §15-Quirk-Maschinerie) → **atomar abgearbeitet, kein Re-Planen**: 1 Code-Commit + 1 Doku-Commit.
+> **Nikinger-Entscheidungen (2 offene Punkte beantwortet):** (a) **Key-Typ = Abo/M Plan** (Grenzkosten 0 ⇒ Preiszeile `(0.0,0.0)`; **Frist 2026-11-15**); (b) **Modellfrage vertagt** („welches Modell *ähnt* dem aktuell verwendeten … klären wir an einem späteren Zeitpunkt") → die Wahl **`MiniMax-M3`** ist **provisorisch** und wird nach dem Familien-Smoke finalisiert (Plan-§14.4-Protokoll, C-7).
+> **Executor-Modus:** MiniMax-M3 (OpenCode) — `~/.config/opencode/`, `auth.json`, `opencode.service` unangefasst (Plan §14.8).
+> **Bot-Ritual (unverändert):** Scheduler `disabled` + `inactive` (Hold-Marker `data/state/SCHEDULER_HELD`), `install_units.sh --check` exit 0. Recorder/Discovery/WebUI `enabled` + `active` — unangetastet. **Kein Neustart, kein Live-Key, kein Netz-Call** in dieser Session (die Smokes sind Operator-Schritte).
+> **Cross-Phase-Freigabe:** M-1 (P8 + P4) — beide in der T13-Liste.
+
+### Completed — diese Exec-Session (1 Code-Commit + 1 Doku-Commit)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | `4d57d99` | P8 + P4 | **M-1 — Bot-Provider zurück auf MiniMax** (Abo/M Plan): `PROVIDERS["minimax"]` bekommt den dokumentierten Quirk `max_tokens_field="max_completion_tokens"` (MiniMax-Doku 2026-11-03: das Feld für neue Integrationen; `max_tokens` = Legacy); `temperature`/`top_p` werden **ignoriert**, nicht abgelehnt ⇒ `send_temperature` bleibt True. `_GLM` → `_M3 = RoleSpec(provider="minimax", model="MiniMax-M3", max_tokens=8192, timeout_s=90.0)` — **8192 statt 4096**, weil MiniMax-M3 default **denkt** und die Reasoning-Tokens gegen das Limit zählen (zu kleines Limit ⇒ `finish_reason=length` + **leerer** `content` — Plan §15.6 Fehlgriffe). Profile `research_m3`/`all_m3` (Plan-§6-Namen); `zai` bleibt **Reserve-Daten-Eintrag** (kein Profil). Preiszeile `"MiniMax-M3": (0.0, 0.0)` (Abo ⇒ Grenzkosten 0; Pay-per-use $0.30/$1.20 pro Mtok im Kommentar). `budget_exempt_models = ("MiniMax-M3",)`. **+1 P8-Test** (Quirks-Pin am MiniMax-Eintrag), Profile/Modell/Base-URL/Token-Limit in P8 + P4 umgestellt. **Σ 2041 → 2042** (16 Suiten + root, 16/16 grün). |
+| 2 | (dieser Commit) | P17-Doku | **Doku-Propagierung:** dieser Block + Rotation von Session #9 → `SESSIONS_ARCHIVE.md` + Σ-Tabelle + Block-Status + Executor-Evaluations-Zeile + **Plan §16 (Planwechsel-Vermerk im 📕-Snapshot)** + die getroffenen Phasenköpfe (P8/P4) + `docs/INDEX.md` + `ROADMAP.md` + root-`CLAUDE.md`. |
+
+### Modellwahl — Datenlage (Antwort auf die Nikinger-Frage)
+
+> **Frage:** „welches Modell *ähnt* denn dem aktuell verwendeten (müsste Sonnet 4.6 sein) von den Performance-Daten eher?"
+> **Antwort: `MiniMax-M3`.** Der Bot nutzt heute `claude-sonnet-4-6` (Research + Debatte-Judge; Bull/Bear/Lesson/Instinct/Reflect = `claude-haiku-4-5-20251001`).
+
+| Beleg (Quelle, Datum) | Wert |
+|---|---|
+| BrowseComp — M3 (MiniMax-Modellseite, 2026-11-03) | **83.5** — MiniMax nennt Opus 4.7 mit 79.3 („surpassing Opus 4.7") |
+| PostTrainBench — M3 (MiniMax-Modellseite, 2026-11-03) | **37.1** → **#3** overall, hinter Opus 4.7 (42.4) und GPT-5.5 (39.3) |
+| M3.1-Flash (MiniMax-Blog, 2026-10-19) | DeepSWE v1.1 **73.7** · BankerToolBench **76.2** · OSWorld V2 **61.7** · CyberGym **82** · „on par with top models" — **Flash-**Klasse (Kosten $0.15/$0.60) |
+| Preise (MiniMax-Pricing, 2026-11-03) | M3 ≤512k Input: **$0.30/$1.20** pro Mtok (Abo-Kontingent ⇒ $0) · M3.1-Flash $0.15/$0.60 |
+| Claude Sonnet 4.6 (Anthropic, 2026-11-03) | $3/$15 · **legacy** (aktuell: Sonnet 5.5 $2/$10) · 1M Context · adaptive Thinking |
+
+**Ehrliche Einordnung:** MiniMax publiziert **keine** direkte Gegenüberstellung mit Sonnet 4.6, und die Benchmarks laufen über verschiedene Harnesses — die Zahlen sind ein **Klassen**-, kein Gleichstands-Beweis. Für die Research-Rolle (ein Shot, JSON-Pick, keine Tools) zählt weniger die Coding-Klasse als **Denk-Tiefe + JSON-Disziplin + Preis**; M3 ist die Frontier-Klasse (M3.1-Flash ist die Flash-/Effizienzklasse, denkt immer, `thinking:disabled` ⇒ HTTP 400). **„Braucht der Bot ein besseres Trading-LLM?"** ist eine **spätere** Frage (Nikinger) — sie gehört in den Bake-off (`meta_m1_harness/bakeoff/`), nicht in diesen Daten-Commit.
+
+### Gemessen (Host 201)
+
+| | vorher | nachher |
+|---|---|---|
+| `is-enabled` / `is-active` tradingbot-scheduler | `disabled` / `inactive` | `disabled` / `inactive` (unverändert — Hold unangetastet) |
+| recorder / discovery / webui | enabled + active | enabled + active (unverändert) |
+| `bash scripts/install_units.sh --check` | exit 0 | exit 0 |
+| Keyring `trading-bot-minimax-bot/api_key` | — | **nicht gesetzt** (gemessen — Voraussetzung für C-7 fehlt) |
+| Keyring `trading-bot-zai-bot/api_key` | — | nicht gesetzt (jetzt irrelevant — `zai` ist Reserve) |
+| Σ-Sweep (16 Suiten + root) | 2041 | **2042** (16/16 grün) |
+| `check_doc_rotation.py --strict` | exit 0 | exit 0 |
+
+### Plan-AK-Stand nach dieser Session
+
+- **M-1 (Daten-Commit): ✅.** Σ **2042** ≥ 2025 ✓ · P8 **295** · P4 **177** ✓.
+- **Plan-AK C-4 (unverändert):** `LLMClient(` → 1 Treffer, `OpenAICompatLLMClient(` → 1 Treffer in `wiring.py` ✓.
+- **Neue Doku-Belege (MiniMax, 2026-11-03):** `max_completion_tokens` = Feld für neue Integrationen · `temperature` wird ignoriert · Denk-Modus default AN (M3 abschaltbar, M3.1-Flash nicht) · Reasoning-Tokens zählen gegen das Limit ⇒ `max_tokens=8192` · Preise M3 $0.30/$1.20, M3.1-Flash $0.15/$0.60 (Abo ⇒ $0).
+
+### Was der Code **jetzt** kann (und was noch nicht)
+
+- **Kann:** der Bot-Provider ist **MiniMax** — ein Daten-Eintrag, ein Profil, ein Preis, eine Ausnahme; der Quirks-Transport (`max_completion_tokens`) ist belegt und getestet.
+- **Kann noch nicht:** der Bot spricht **noch nicht** mit MiniMax — `llm_profile` steht auf `"anthropic"`. Das ist Absicht (T5/T8): **erst der C-7-Smoke, dann der Flip.**
+
+### Next (geplante Folgesessions, in Priorität)
+
+- **C-7 — Operator (Nikinger), zwei Schritte:**
+  1. **Bot-Key seeden** (Abo/M Plan, eigener Namespace — **nie** der Executor-/Coding-Plan-Key):
+     `python scripts/store_minimax_key.py --service trading-bot-minimax-bot --username api_key`
+  2. **Familien-Smoke** (2 Calls, Abo-Kontingent ⇒ $0, Plan-§14.4-Protokoll, mit `--provider minimax`):
+     ```bash
+     PY=phase1_broker_wrapper/.venv/bin/python
+     for m in MiniMax-M3 MiniMax-M3.1-Flash; do
+       $PY phase4_research/scripts/openrouter_smoke.py --provider minimax --model "$m" \
+         --max-tokens 8192 --timeout-s 90 --show-raw; done
+     ```
+     Je Modell PASS/FAIL, `finish_reason`, Tokens und Latenz hierher in den Phasenkopf. **FAIL ⇒ nicht flippen** (Diagnose nach Plan §8/§15.6, dann ggf. `max_tokens`/`timeout_s` in `_M3` anpassen — eigener Commit). **Sonderfall:** `finish_reason=length` mit **leerem** `content` ⇒ Denk-Modus abschalten (`extra_body={"thinking": {"type": "disabled"}}` am `minimax`-Eintrag — für `MiniMax-M3` erlaubt, für `MiniMax-M3.1-Flash` ein 400).
+- **Danach (nach dem Nikinger-Go):** **Modellwahl finalisieren** (`_M3.model` + `budget_exempt_models` + Preiszeile — die drei Stellen, die zusammen geändert werden müssen) → **Flip 1** (`llm_profile = "research_m3"`, eigener Commit) → **C-8 („all_m3") bleibt gegated** bis nach dem Shakedown.
+- **Frist 2026-11-15 (Abo-Key):** läuft das Kontingent ab, muss jedes `minimax`-Profil **vor** dem Datum zurückgeflippt werden (sicherer Default `anthropic`) — sonst startet der Bot nicht mehr (Preflight-Punkt 4 findet keinen Key).
+- **Block D (Token-Budget, T7/D-1):** die drei Zählstellen (P8 `budget.py` · WebUI-Karte · Report) müssen die `budget_exempt_models`-Ausnahme kennen.
+- **Block E:** Report v5 (`--prereg v5`) · Shakedown-Vorregistrierung · **E-3-Deploy** (dort wird der Scheduler-Hold freigegeben) · 2-Tage-Shakedown · Prereg v5.
+- **E-3-Vorbereitung (Pflicht-Schritt):** Hold-Freigabe `--release-hold` → Installer → `start` (sonst fehlt der R5-Autostart-Beweis).
+- **Datenreparatur der 3 730 alten `ig`-Bars** (Plan T14) — folgt in **E-3**.
+
+### Open questions / blockers
+
+- **C-7 ist blockiert, bis der Nikinger den MiniMax-Abo-Key seedet** (gemessen: `trading-bot-minimax-bot/api_key` **nicht** im Keyring). Ohne Key kein Smoke, ohne Smoke kein Flip — **der Bot läuft unverändert auf Anthropic**, das ist der sichere Default.
+- **`_M3.model = "MiniMax-M3"` ist provisorisch** (Nikinger 2026-11-03: die Frage „welches Modell ähnelt Sonnet 4.6" ist **vertagt**; die Wahl stützt sich auf die Benchmark-Klasse). Der Wechsel betrifft **drei** Stellen (`llm_profiles._M3.model`, die Preiszeile in `research/models.py`, `SchedulerConfig.budget_exempt_models`) — `check_llm_profile` benennt die vergessene beim Start.
+- **Frist 2026-11-15** — der Abo-Key/Endpoint gilt nur bis dahin; danach zurückflippen (Default `anthropic`). Der Executor hängt an derselben Frist (Plan §14.2: Rückfall MiniMax → Claude).
+- **`response_format: {"type": "json_object"}`** ist für MiniMax **nicht dokumentiert** — der C-3-400-Fallback (einmal ohne `response_format`) plus der Prosa-Recovery-Pfad decken den Fall ab; der Smoke zeigt, ob der Fallback greift.
+- **Plan-Snapshot-Drift** (B-7-Anker, ≈ +83 Zeilen) — im Phasenkopf dokumentiert, Plan bleibt 📕-Snapshot; Neuauflage ist eine offene Nikinger-Entscheidung.
+- **Review-Gate vor E-3 (AK22)** weiterhin ⏳ (Claude-Code-Session, Anthropic; Schwerpunkte B-5…B-10, C-4…C-6, B-3, B-2).
+
+### Session-end-Hinweis
+
+- **Σ 2042** (16 Suiten + root, Sweep-Kommando aus dem Phase-Kopf). meta_m1 informativ, nicht in Σ.
+- **Commits:** 2 (1 Code-Step M-1 + 1 Doku). Push = Nikinger (Phase-17-Konvention).
+- **Kern-Erkenntnis:** der Provider-Wechsel war **wirklich** eine Datenfrage — 8 Dateien, 1 Commit, keine neue Logik. Der Planwechsel zurück zu MiniMax kostete **weniger als der ursprüngliche Aufbau**, weil §15 die Quirks als Felder und §6 das Profil als Daten entworfen hatte.
+
 ## Session stopped — 2026-11-03 (Exec-Session #9 ENDE — **Block C, Code-Teil C-1…C-6 abgeschlossen**: Provider-Register + LLM-Austausch (`_build_llm`) + `LLM_UNAVAILABLE` + Key-/Smoke-Skript; 6 Commits, Σ 2004 + 37 = **2041** grün; **C-7 wartet auf den Nikinger** — Bot-Key `trading-bot-zai-bot` fehlt im Keyring)
 
 > **Auftrag:** Nikinger 2026-11-03 (Web-Chat, zweite Session desselben Tages): „ja, pushen, und danach weiter mit dem nächsten Step" → (1) **Push** der 5 Commits aus Session #8 (`423a541..d7b6abe main -> main`, auftragsgemäß vom Nikinger freigegeben), (2) **Block C** abarbeiten — Plan §14 → §15 → §6 (die Reihenfolge, die §15 selbst festlegt). **Plan war detailliert genug** → atomar abgearbeitet, ein Commit pro Step, kein Re-Planen.

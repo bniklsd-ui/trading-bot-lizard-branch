@@ -1752,3 +1752,29 @@ Ein Daten-Commit (`4d57d99`): `llm_profiles.py` (Quirk + `_M3` + Profile),
 `config.py` (`budget_exempt_models`), `research/models.py` (Preiszeile) + Tests
 (P8 294 → 295). Σ 2041 → **2042**. Der Flip selbst (`llm_profile="research_m3"`) bleibt C-8
 und ist bis zum Familien-Smoke gesperrt.
+
+### Umsetzung (C-7-Smoke + C-8 Flip 1, 2026-11-03)
+
+**C-7 (Operator, 2026-11-03) — Familien-Smoke `--provider minimax`: beide Modelle PASS.**
+
+| Modell | Ergebnis | Tokens (in/out) | `finish_reason` | Latenz | Rohantwort |
+|---|---|---|---|---|---|
+| `MiniMax-M3` | PASS (valid abstain) | 751 / 164 | `stop` | 3.62 s | `<think>…</think>` inline + JSON → C-3-Strip (belegt) |
+| `MiniMax-M3.1-Flash` | PASS (valid abstain) | 755 / … | `stop` | … | reines JSON (Reasoning getrennt in `reasoning_content`) |
+
+⇒ MiniMax **akzeptiert** `response_format: {"type": "json_object"}` (kein 400) — §15.7
+Nr. 21 damit teilweise geklärt. Der Smoke-Prompt ist synthetisch (keine Marktdaten) ⇒
+der Abstain ist dort die *korrekte* Antwort; Pick-Qualität ist **nicht** gemessen.
+`WARNING … no pricing for model 'MiniMax-M3.1-Flash'` = **erwartetes** Verhalten (§15.6
+Nr. 26: Preiszeilen nur für aktive Modelle).
+
+**C-8 Flip 1 (`2ee73e6`):** `SchedulerConfig.llm_profile` = `"research_m3"` — **nur** die
+Research-Rolle auf MiniMax-M3; Debatte/Lesson/Instinct/Reflect/Paper-Debatte bleiben
+Anthropic (T5). Rollback = eine Zeile. Wirkt erst mit **E-3** (Scheduler-Hold). +1 P8-Test
+(P8 296), Σ 2043. **Flip 2 (`all_m3`) bleibt gegated** bis nach dem Shakedown.
+
+**Modellwahl vertagt** (Nikinger 2026-11-03): „braucht der Bot ein besseres Trading-LLM?"
+gehört in den Bake-off (`meta_m1_harness/bakeoff/`), nicht in diesen Commit. Profil
+(welche Rolle) und Modell (welches) sind zwei getrennte Datenstellen — der Flip hängt
+deshalb **nicht** an der offenen Modellfrage. Ein Wechsel M3 → M3.1-Flash wäre: Modell +
+Preiszeile + `budget_exempt_models` + ein `effort`-Quirk (eigener Provider-Eintrag, T26).
