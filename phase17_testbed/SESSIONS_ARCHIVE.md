@@ -7,6 +7,81 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-04 (Exec-Session #14 — **der nächste Block ist geschrieben**: Plan §18 = Block E / E-1 (Report v5) mit **re-verifizierten Ankern** (null Drift) + **2 live gemessenen Voraussetzungen**; **dokumentarische Session, kein Code** — Σ unverändert **2046**; Session-Ende + **Push**)
+
+> **Auftrag:** Nikinger 2026-11-04 (Web-Chat): „Sehr gut. Session beenden, next schreiben, commit, push." → (1) den **nächsten Block** (E-1) ausführbar schreiben, (2) die Session beenden, (3) committen, (4) pushen.
+> **Bot-Ritual (am Session-Ende verifiziert):** Scheduler `disabled` + `inactive` (Hold-Marker `data/state/SCHEDULER_HELD`), kein `scheduler.run`-Prozess, `install_units.sh --check` exit 0, Recorder/Discovery/WebUI `enabled` + `active` (unangetastet). **Kein Neustart, kein Netz-Call, kein Live-Key** durch den Agenten.
+> **Cross-Phase-Freigabe:** keine Code-Änderung in dieser Session → keine Cross-Phase-Freigabe nötig.
+
+### Completed — diese Exec-Session (1 Doku-Commit)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | (dieser Commit) | P17-Doku + Plan | **§18 „Ausführungsblock E-1"** im Plan-Snapshot: Anker gegen den Code vom 2026-11-04 **re-verifiziert** (alle 11 §6-E-1-Anker in `phase16_activation/scripts/autonomy_report.py` — **null Drift**, P16 seit der Plan-Session unangefasst) + Code-Skizzen (`llm_usage_per_day` mit `exempt_tokens`/`exempt_calls` = D-1-Fortsetzung · `evaluate_k6_v5` · CLI-Flags `--prereg/--journal-file/--expect-llm-profile/--exempt-model` · v5-Evaluatoren-Tabelle mit live geprüften Quellen) + **v4-Regressions-Baseline live gemessen** (FAIL K1/K5/K6 · PASS K2/K3/K4/K7/K8) + **2 live gemessene Voraussetzungen** + 7 Testnamen + AK (P16 15 → 22, Σ ≥ 2053). **P17-Phasenkopf:** Block-E-Zeile, Executor-Zeile #14, Σ-Tabelle, Session-#14-Block + Rotation #13 → `SESSIONS_ARCHIVE.md`. `docs/INDEX.md` + `ROADMAP.md` + root-`CLAUDE.md`. **Kein Code** — Σ unverändert **2046**. |
+
+### Der nächste Block — E-1 in Kurzform (Details im Plan §18)
+
+| Ort | Änderung | Test |
+|---|---|---|
+| `autonomy_report.py::llm_usage_per_day` (Z. 369) | `exempt_models` kw-Arg; Exempt-Records zählen in `exempt_tokens`/`exempt_calls` — **auch** in der `exhausted_at`-Summation | `test_k6_v5_ignores_exempt_model_tokens` |
+| `autonomy_report.py` (neue Evaluatoren, hinter `evaluate_k8` Z. 903) | `evaluate_k2_v5` · `evaluate_k6_v5` · `evaluate_k7_v5` · `evaluate_k9` · `evaluate_k10` · `evaluate_k11` + `count_discovery_cycles_per_day` | `test_k2_v5_requires_discovery_cycle_every_day` · `test_k7_v5_fails_on_profile_change_in_window` · `test_k9_counts_scheduled_restart_jobs_and_na_without_file` · `test_k10_na_without_close_fail_on_bridge_critical` · `test_k11_requires_divergence_event_every_trading_day` |
+| `_parse_args` (Z. 1111) + `main` (Z. 1135) | `--prereg {v4,v5}` · `--journal-file` · `--expect-llm-profile` · `--exempt-model` (repeatable) | `test_v4_default_criteria_unchanged` |
+
+**Warum E-1 jetzt:** D-1 hat die Ausnahme ins **Budget-Gate** und die **WebUI** gebracht — der **Report** (der dritte Zählort) kennt sie erst ab E-1. Ohne E-1 weicht die Report-Zahl von der Budget-Zahl ab (im Shakedown wäre das eine falsche K6-Aussage).
+
+### ⚠ Zwei live gemessene Voraussetzungen (2026-11-04 — neu gegenüber §6 E-1)
+
+| Beleg | Ist | Folge |
+|---|---|---|
+| `grep -c "discovery cycle" data/state/run_discovery.log` | **0** (Daemon läuft seit 2026-11-01 00:24, also **vor** B-10 vom 2026-11-03) | v5-K2 **erst nach E-3** messbar |
+| `grep -c "divergence_ok\|quote_divergence" data/state/research_health.jsonl` | **0** (Datei zuletzt 2026-10-19; die Events kommen aus dem **Scheduler**, der im HOLD steht) | v5-K11 **erst nach E-3** messbar |
+
+⇒ E-1 ist **implementierbar und unit-testbar** (Fixtures), aber ein v5-Verdikt ist **erst nach dem E-3-Deploy** sinnvoll — sonst wäre es ein **false FAIL** (F8-Klasse: „Kriterium erkennt einen toten Bot nicht"). Der E-3-Deploy startet alle vier Dienste neu ⇒ ab dann tragen Discovery- und Scheduler-Prozess den B-2/B-10-Code. **Ergänzung zu den E-3-Day-0-Checks:** `grep -c "discovery cycle" data/state/run_discovery.log` > 0.
+
+**Regression-Baseline (live, 2026-11-04, vor der Implementierung):**
+`--from 2026-09-30 --to 2026-10-13 --summary` ⇒ **FAIL K1 · FAIL K5 · FAIL K6 · PASS K2 · PASS K3 · PASS K4 · PASS K7 · PASS K8**, `overall_verdict: FAIL` — deckt sich mit §6 E-1 und dem Phase-16-Handover §2. Nach E-1 muss derselbe Aufruf **dieselben Verdikte** liefern.
+
+### Gemessen (Host 201, Session-Ende)
+
+| | Wert |
+|---|---|
+| `is-enabled` / `is-active` tradingbot-scheduler | `disabled` / `inactive` (Hold unangetastet) |
+| `ps aux | grep scheduler.run` | 0 Treffer |
+| `bash scripts/install_units.sh --check` | exit 0 |
+| Σ (16 Suiten + root) | **2046** (unverändert — keine Code-Änderung) |
+| `check_doc_rotation.py --strict` | exit 0 |
+
+### Next (der übernächste Block)
+
+- **E-1 ausführen** (Plan §18, **ein Commit in P16**): Anker, Skizzen, Testnamen und AKs sind
+  fest → atomar abgearbeitet, kein Re-Planen nötig. Regressions-AK = die oben gemessene
+  v4-Baseline (Verdikte, nicht Payload).
+- **E-2** (Shakedown-Vorregistrierung, 📕) — nach E-1, **vor** E-3 (der Fenster = die ersten zwei
+  Handelstage **nach** dem E-3-Start).
+- **E-3** (Hold-Freigabe + Deploy, Operator) — der Schritt, der den Flip 1 **wirksam** macht und
+  die K2/K11-Belege erzeugt.
+- **D-2** bleibt ein **Nikinger-Entscheidungspunkt ohne Code** (K6-Einheit, nach dem Shakedown).
+- **Frist 2026-11-15** — Abo-Key/Endpoint: jedes `minimax`-Profil vor dem Datum zurückflippen
+  (Default `anthropic`).
+
+### Open questions / blockers
+
+- **E-1 ist der nächste Code-Block**; die Ausführung selbst ist der nächsten Session vorbehalten.
+- **Modellwahl vertagt** (M3 vs. M3.1-Flash) — Profil und Modell sind getrennte Datenstellen.
+- **Frist 2026-11-15** (Abo) — im Phasenkopf + Plan §16 dokumentiert.
+- **Review-Gate vor E-3 (AK22)** weiterhin ⏳ (Claude-Code-Session, Anthropic; Schwerpunkte
+  B-5…B-10, C-4…C-6, B-3, B-2).
+
+### Session-end-Hinweis
+
+- **Σ 2046** (16 Suiten + root). meta_m1 informativ, nicht in Σ.
+- **Diese Session:** 1 Doku-Commit (Plan §18 + Phasenköpfe), **kein Code**.
+- **Push:** die 4 Commits der Phase-17-Folge (D-1 Code · D-1 Doku · §18 Doku) gehen in diesem
+  Schritt auf `origin/main`.
+- **Kern-Erkenntnis:** ein Kriterium, dessen Beleg erst **nach** dem Deploy entsteht, ist bis
+  dahin kein PASS/FAIL, sondern ein **false FAIL** — die Umkehrung von „grün ohne Messung".
+  Deshalb steht die Voraussetzung jetzt **im Block**, nicht erst im Shakedown.
+
 ## Session stopped — 2026-11-04 (Exec-Session #13 — **D-1 ausgeführt**: Token-Budget-Ausnahme an zwei P8-Zählstellen (`scheduler/budget.py` + `webui/api.py`), 1 Code-Commit + 1 Doku-Commit, Σ 2043 + 3 = **2046** grün)
 
 > **Auftrag:** Nikinger 2026-11-04 (Web-Chat): den in Plan §17 geschriebenen Block **D-1** ausführen. **Plan war detailliert genug** (§17 mit Code-Skizzen, 3 festen Testnamen, AKs P8 296 → 299 / Σ ≥ 2046) → **atomar abgearbeitet**, kein Re-Planen nötig.
