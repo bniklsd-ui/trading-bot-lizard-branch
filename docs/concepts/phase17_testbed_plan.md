@@ -10,7 +10,7 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-11-04 (**§19 Nachtrag — Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable + Inhalts-Entwurf + live geprüfte Anker + AK; **§18 ausgeführt 2026-11-04: E-1 ✅**, Commit `adc905f`, Σ **2053**) | 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
+updated: 2026-11-04 (**§20 Nachtrag — Ausführungsblock E-3** (Deploy + Day-0-Verifikation): Reihenfolge, live gemessene Sollwerte (3 770 `ig`-Bars · 29 Instincts · 0 OPEN · Allowance-Expiry **vergangen**), **7 Day-0-Checks**, K2/K11-Wann-First-Events (13:00), 7 Fehlgriffe, AK) | 2026-11-04 (**§19 Nachtrag — Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable + Inhalts-Entwurf + live geprüfte Anker + AK; **§18 ausgeführt 2026-11-04: E-1 ✅**, Commit `adc905f`, Σ **2053**) | 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
 ---
 
 # Phase 17 — Prüfstand: Execution-ready Plan (2026-10-17)
@@ -2179,3 +2179,126 @@ Code-Default; genau das ist die Begründung des Flags in §18 E-1d.)
   (`Scheduled restart job, restart counter is at N`) existiert im Repo noch nicht (Plan §9 #8)
   ⇒ die **erste** echte Vorkommen in E-4 muss gegen das Muster geprüft werden; K9 zählt
   Zeilen mit `Scheduled restart job` und ist ohne Journal-Datei `NA`.
+
+---
+
+## §20 Ausführungsblock E-3 — Deploy (Hold-Freigabe) + Day-0-Verifikation (2026-11-04)
+
+> **Der nächste Block** nach E-2. **E-3 ist Operator-Arbeit** (Live-Deploy: vier Dienste, DB-Reparatur,
+> Scheduler-Start). Die Exec-Session **führt den Deploy nicht aus** — sie **verifiziert** danach
+> (Day-0-Checks) und dokumentiert die Ergebnisse im Phasenkopf.
+>
+> **Reihenfolge:** E-2 ✅ (`32835dd`, Vorregistrierung committet) → **E-3** (dieser Block) → E-4
+> (2 Handelstage Shakedown) → E-5 (Auswertung + D-2 + Flip-2 + Modellwahl + Prereg v5) → E-6 (Closeout).
+>
+> **Vorbedingung (offen!):** das **Review-Gate AK22** (Claude-Code-Session, Anthropic — Schwerpunkte
+> B-5…B-10, C-4…C-6, B-3, B-2, **E-1**) gehört **vor** E-3, nicht vor E-2.
+>
+> **Alle Anker und Sollwerte sind am 2026-11-04 (20:1x CET) live gemessen** — gegen den Code und
+> gegen die Live-DBs (`mode=ro`). Wo der Plan-§6-Wert veraltet ist, steht hier der gemessene.
+
+### E-3a — Die Reihenfolge (Operator, exakt)
+
+```bash
+cd /home/trading-bot/trading-bot
+
+# 1) Hold freigeben — NUR der Marker verschwindet, es wird NICHTS installiert (install_units.sh:95-104)
+bash scripts/install_units.sh --release-hold
+
+# 2) Vier Dienste stoppen (der Recorder hält sonst die bars.sqlite → "database is locked")
+systemctl --user stop tradingbot-scheduler.service tradingbot-recorder.service \
+                      tradingbot-discovery.service tradingbot-webui.service
+ps aux | grep -E "scheduler.run|data_foundation.run|source_registry.run|uvicorn" | grep -v grep   # muss leer sein
+
+# 3) Backups
+cp data/bars.sqlite        data/bars.sqlite.bak-$(date +%Y%m%d)-pre-p17-igts
+cp data/trading_bot.sqlite data/trading_bot.sqlite.bak-$(date +%Y%m%d)-pre-p17-legacy
+
+# 4) Daten reparieren (T14 + T12) — Sollwerte siehe E-3b
+sqlite3 data/bars.sqlite "DELETE FROM bars WHERE source='ig'; SELECT changes();"
+sqlite3 data/trading_bot.sqlite "UPDATE instincts SET trigger = '[legacy-p16] ' || trigger WHERE evidence_trade_ids_json IS NULL AND trigger NOT LIKE '[legacy-p16]%'; SELECT changes();"
+
+# 5) Units installieren + aktivieren (B-9: TimeoutStopSec=360) — der Start bleibt Operator-Schritt
+bash scripts/install_units.sh && systemctl --user daemon-reload
+
+# 6) Alle vier Dienste starten
+systemctl --user start tradingbot-scheduler.service tradingbot-recorder.service \
+                      tradingbot-discovery.service tradingbot-webui.service
+sleep 30 && systemctl --user is-active tradingbot-scheduler.service tradingbot-recorder.service \
+                      tradingbot-discovery.service tradingbot-webui.service
+
+# 7) Startzeile
+grep "starting scheduler daemon" data/state/run_scheduler.log | tail -1
+```
+
+**Erwartung an Schritt 7:** `starting scheduler daemon (account=demo, max_trades=5, daily_loss_cap=1800.0,
+cycle=5min, llm_profile=research_m3).` (Format: `phase8_scheduler/scheduler/run.py:206-214`).
+
+### E-3b — Die zwei Daten-Schritte (live gemessene Sollwerte, 2026-11-04)
+
+| Schritt | Sollwert (gemessen) | Beleg / Bemerkung |
+|---|---|---|
+| `DELETE FROM bars WHERE source='ig'` | **3 770** Zeilen (nicht ≈ 3 730 — der Plan-§6-Wert ist vom 2026-10-17) | `bars.sqlite` (ro): `source='ig'` = 3 770, `ts_utc` 2026-07-17T11:14Z … **2026-10-19T09:05Z**, 2 Auflösungen (1m/5m). Alle tragen Ortszeit als UTC (T14) ⇒ **kein** Verschieben, nur Löschen (kein PK-Kollisionsrisiko) |
+| `UPDATE instincts SET trigger = '[legacy-p16] ' \|\| trigger …` | **29** Zeilen | `instincts`: 29 Zeilen, **29** ohne `evidence_trade_ids_json`, **0** bereits mit Präfix (die Markierung steht aus). `MIN_EVIDENCE=3` ⇒ ohne genug Trades bleibt `proposed` — die Markierung macht sie **sichtbar**, nicht tot (T12) |
+| `trade_outcomes` OPEN | **0** | ⇒ **keine offene Position beim Start**; die Re-Adoption-Probe (Prereg E-2 (a)) ist beim Start **nicht** anwendbar. `execution_state.json`: 38 Records, **alle CLOSED** |
+
+### E-3c — Day-0-Checks (Exec-Session liest, Nikinger bestätigt — 7 Stück)
+
+| # | Check | Kommando | Erwartung |
+|---|---|---|---|
+| 1 | **Kein Preflight-Fehler** | `grep -c "preflight failed" data/state/run_scheduler.log` (ab der neuen Startzeile) | **0**. Die Fehlerzeile ist `preflight failed — not trading: %s` (`run.py:218`) — ein PreflightError ⇒ der Daemon läuft **nicht** (exit 2) |
+| 2 | **Start-Zeile mit Profil** | `grep "starting scheduler daemon" data/state/run_scheduler.log \| tail -1` | enthält `llm_profile=research_m3` (sonst ist der Flip 1 **nicht** aktiv — K7 würde FAIL) |
+| 3 | **Erster Research-Call auf MiniMax** | `python3 -c "import json;r=json.load(open('data/state/llm_usage.json'));print(r[-1]['ts'], r[-1]['model'])"` | `"model": "MiniMax-M3"`. **Vorher** (live): 5 559 Records, der letzte vom 2026-10-19 mit `claude-sonnet-4-6` — der Flip war bis E-3 inert |
+| 4 | **Neue IG-Bars mit korrektem Zeitstempel** | `sqlite3 "file:data/bars.sqlite?mode=ro" "SELECT COUNT(*) FROM bars WHERE source='ig' AND ts_utc > fetched_at;"` | **0**. **Derselbe Check ist der Beweis, dass der DELETE gewirkt hat:** vor dem Löschen liefert er exakt **3 770** (live gemessen: `ts_utc=2026-10-19T09:05:00.000Z` vs. `fetched_at=2026-10-19T07:05:11.083Z` — genau die +2 h aus T14). Zum Vergleich: die yF-Zeilen halten `ts_utc <= fetched_at` (`2026-11-04T16:14:00.000Z` / `2026-11-04T16:29:45.014Z` — der Recorder liefert aktuell) |
+| 5 | **Discovery-Beleg vorhanden** | `grep -c "discovery cycle" data/state/run_discovery.log` | **≥ 1**. ⚠ **Heute 0** — der Discovery-Daemon läuft seit 2026-11-01 mit dem **Pre-B-10-Code** (B-10 kam am 2026-11-03) ⇒ **der Neustart in Schritt 6 ist Pflicht**, sonst bleibt K2 dauerhaft FAIL |
+| 6 | **Abstain-Naht geschlossen** | `sqlite3 "file:data/trading_bot.sqlite?mode=ro" "SELECT COUNT(*) FROM decision_context WHERE created_utc >= '<E-3-Datum>' AND abstain_record_id IS NULL;"` | **0** (B-7: die Naht gab den `record_id` zurück; 3 669/3 669 waren NULL) |
+| 7 | **IG-Allowance erneuert** (neu, siehe E-3e) | `sqlite3 "file:data/bars.sqlite?mode=ro" "SELECT observed_at, remaining, expiry FROM allowance_observations ORDER BY id DESC LIMIT 3;"` | eine **neue** Zeile nach dem Start mit `remaining > 0`. ⚠ Die letzte Beobachtung ist vom **2026-10-19T07:08:39Z** (10 000 gesamt, **9 923** übrig, expiry **2026-10-26T07:04:27Z** — die Expiry liegt **9 Tage in der Vergangenheit**) |
+
+### E-3d — Was danach messbar wird (und was weiterhin NA ist)
+
+- **K2-v5 wird erstmals belegbar:** Discovery-Zyklen (Check 5) + Scheduler-Health-Events + Recorder-Bars
+  je Handelstag. Der v4-Proxy zählte Scheduler-Events — der B-10-Beleg ist der **eigene** Append-only-Beleg
+  des Discovery-Daemons.
+- **K11 wird erstmals belegbar:** Divergenz-Events. **Wann?** Der Sampler läuft im
+  **Universe-Refresh-Slot** (`runner.py:589-602`, `universe_refresh_interval_min = 240`, `config.py:166`)
+  und zusätzlich nur **im WINDOW und ≥ 40 min nach Öffnung** (`_sampler_due`, `wiring.py:86-105`).
+  `last_universe_refresh_ts` = 2026-10-19T13:29Z ⇒ der erste Refresh nach dem Start ist **fällig**
+  (`_due_after` ⇒ due bei veralteter Zeit), also **09:00**; dort ist der Sampler **noch gesperrt**
+  (40-min-Gate) ⇒ der erste **echte Vergleich** ist frühestens der Refresh um **13:00**.
+  ⚠ **K11 zählt nur `divergence_ok` und `quote_divergence`** (`autonomy_report.py:225`) — die
+  typisierten Warte-Events `no_comparator` (reason `partial_yf_window`/`zero_open`) und
+  `divergence_no_comparator` (reason `no_complete_bar`) sind **kein** K11-Beleg, sondern die
+  ehrliche „noch nicht vergleichbar"-Meldung.
+- **K10** braucht einen CLOSE im Fenster ⇒ ohne Trade bleibt K10 **NA** (kein Fake-FAIL).
+- **K9** bleibt **NA**, bis der Journal-Export vorliegt (E-4).
+- **Der erste v5-Report** (nach Tag 2, Prereg-Befehl) ist die eigentliche Auswertung. Ein v5-Lauf
+  **vor** E-3 war ein false FAIL (Plan §18 E-1g) — **nach** E-3 ist er der Soll-Vergleich.
+
+### E-3e — Fehlgriffe, die wie „alles ok" aussehen (E-3-spezifisch)
+
+| Symptom | Ursache | Hand |
+|---|---|---|
+| `sqlite3: database is locked` beim DELETE | Der Recorder/Scheduler hält `bars.sqlite` | **erst** alle vier Dienste stoppen (Schritt 2), dann löschen; Backups **vor** dem DELETE |
+| K2-v5 FAIL „discovery 0" | Der Discovery-Daemon läuft mit dem **Pre-B-10-Code** (live: 0 `discovery cycle`-Zeilen, Dienst gestartet 2026-11-01) | Neustart des Discovery-Dienstes (Schritt 6) — der Beleg kommt erst mit dem neuen Code |
+| **K11 FAIL „kein Divergenz-Event"** | Der Sampler lief noch nie vergleichbar (vorher 233/233 `divergence_no_comparator`), **oder** der erste Vergleich fällt erst auf 13:00, **oder** die yF-Archiv-Lag (p90 19,6 min) ist noch nicht abgefüllt | **erst die `reason` im Event lesen** (`no_complete_bar` / `partial_yf_window` / `zero_open`), dann die Pass-Zeiten (`universe_refresh_interval_min = 240` + 40-min-Gate) |
+| **IG-Allowance 0** (neu) | Die letzte Beobachtung trägt `expiry = 2026-10-26` — **vergangen**; die Erneuerung ist **unbestätigt** | Check 7. Ohne IG-Bars ⇒ kein Comparator ⇒ K11 nicht erfüllbar ⇒ das ist ein **E-3-Befund**, kein Shakedown-Befund (der Bot darf nicht ohne Allowances laufen) |
+| Der Scheduler startet nicht: `ValueError … not budget-exempt` / `… no price line` | `check_llm_profile` (P8 `llm_profiles.py:372-382`) prüft **Preiszeile** + **Ausnahmenliste** | Modell-ID an **allen** drei Stellen prüfen: `llm_profiles._M3.model` · P4-Preiszeile (`research/models.py:545`, nur `MiniMax-M3`) · `SchedulerConfig.budget_exempt_models` (`config.py:154`, jetzt die **Familie**) |
+| Der Stopp hängt 6 Minuten | `TimeoutStopSec=360` (B-9) — der SIGTERM wird erst nach dem Zyklus-Sleep (≤ 300 s) gewürdigt | **normal**, kein Fehler; nach E-3 ist die Unit installiert, der 90-s-SIGKILL gehört der Vergangenheit an |
+| Der Report sagt K6 FAIL, der Bot blockte nicht | Report ohne `--prereg v5` gelaufen (v4 zählt alle Tokens) oder `--exempt-model` vergessen | Der Prereg-Befehl übergibt **beide** MiniMax-IDs (`--exempt-model` ist repeatable) |
+| `install_units.sh --check` exit 1 nach dem Deploy | Erwartung ist nach dem Hold-Release **`enabled`** für alle vier Units | `--check` prüft gegen den Marker-Zustand: **ohne** Marker erwartet der Installer `enabled` — der Marker muss also **vor** dem Install **weg** (Schritt 1 vor Schritt 5) |
+
+### E-3f — AK (E-3) + Doku-Propagierung
+
+- **AK:** Hold-Marker entfernt · 3 770 `ig`-Bars gelöscht · 29 Instincts mit `[legacy-p16] ` markiert ·
+  alle vier Units `enabled` + `active` · Startzeile mit `llm_profile=research_m3` · **7/7 Day-0-Checks**
+  dokumentiert im Phasenkopf (Wortlaut + Rohwert) · **kein** Preflight-Fehler · **kein** v5-Report
+  **vor** E-3 · `check_doc_rotation.py --strict` exit 0 · Σ **unverändert 2053** (E-3 ist operativ,
+  kein Code) · **Aktiv-Block der Vorregistrierung** am E-3-Tag **eingetragen** (Start · D1 · D2 ·
+  HEAD · offene Position) — das ist die *einzige* erlaubte Eintragung in der gelockten Datei.
+- **Doku-Propagierung (Exec-Session nach dem Deploy):** Phasenkopf (Session-Block mit den 7 Checks +
+  dem Start-Zeitstempel) · `SESSIONS_ARCHIVE.md` (Rotation) · root-`CLAUDE.md` (Banner + Phasen-17-Zeile) ·
+  `ROADMAP.md` (E-3 ✅) · `docs/INDEX.md` (Plan-Zeile §20) · **Aktiv-Block** in
+  `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md`.
+- **Offen für den Nikinger:** die **Modellwahl** (M3 vs. M3.1-Flash) fällt in **E-5**; ein Wechsel
+  bräuchte eine **Preiszeile** für `MiniMax-M3.1-Flash` in P4 (`research/models.py`) — die Ausnahme
+  deckt die Familie bereits ab (Commit `fa02a6a`), die **Preiszeile** nicht.

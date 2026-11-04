@@ -172,7 +172,8 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 | # | Commit | Phase | Inhalt |
 |---|---|---|---|
 | 1 | `fa02a6a` | P8 | **MiniMax-Familien-Ausnahme** (`scheduler/config.py:150-160`): `budget_exempt_models = ("MiniMax-M3", "MiniMax-M3.1-Flash")` — Nikinger-Entscheidung 2026-11-04 („ausname alle minimax Modelle", Variante A = Familie aufzählen, Exakt-Match beibehalten). Zwei Pins verschärft: `test_budget.py::test_budget_ignores_exempt_model_records` prüft jetzt **beide** IDs, `test_config.py::test_llm_profile_default_is_research_m3_with_the_minimax_model_exempt` pinnt das Tupel. **Negativ-Beweis:** mit dem Pre-Code-`config.py` sind **beide** Tests rot. **P8 299 → 299** (keine neue Testzahl — die Pins sind verschärft), Σ **2053** unverändert. |
-| 2 | (dieser Commit) | P17-Doku + root | **E-2 — die Vorregistrierung.** `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md` (**NEU**, `status: locked` nach T23-Freigabe) + **eine** `docs/INDEX.md`-Zeile **im selben Commit** + Phasenkopf (Block-E-Zeile, Σ-Tabelle, Executor-Zeile #16, dieser Block + Rotation #15 → `SESSIONS_ARCHIVE.md`, `down:`-Link auf die neue Datei) + root-`CLAUDE.md` (Banner + Phasen-17-Zeile) + `ROADMAP.md`. **Kein Code** in diesem Commit. |
+| 2 | `32835dd` | P17-Doku + P8-Kopf + root | **E-2 — die Vorregistrierung.** `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md` (**NEU**, `status: locked` nach T23-Freigabe) + **eine** `docs/INDEX.md`-Zeile **im selben Commit** + Phasenkopf (Block-E-Zeile, Σ-Tabelle, Executor-Zeile #16, dieser Block + Rotation #15 → `SESSIONS_ARCHIVE.md`, `down:`-Link auf die neue Datei) + root-`CLAUDE.md` (Banner + Phasen-17-Zeile) + `ROADMAP.md`. **Kein Code** in diesem Commit. |
+| 3 | (dieser Commit) | P17-Doku + Plan | **Plan §20 = Ausführungsblock E-3** (Deploy + Day-0-Verifikation): Reihenfolge (Hold-Freigabe → 4 Dienste stoppen → Backups → T14/T12 → Units installieren → starten) · **live gemessene Sollwerte** (3 770 `ig`-Bars statt ≈ 3 730 · 29 Instincts · 0 OPEN · **Allowance-Expiry 2026-10-26 = vergangen**) · **7 Day-0-Checks** · K2/K11-**Wann** (erster echter Vergleich frühestens **13:00**) · 7 Fehlgriffe · AK. **Doc-only, kein Code.** |
 
 ### Was E-2 festhält (Inhalt der Vorregistrierung)
 
@@ -202,10 +203,11 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 | `bash scripts/install_units.sh --check` | exit 0 |
 | Σ (16 Suiten + root) | **2053** (P8 299 unverändert — die Ausnahme-Familie steckt in den verschärften Pins, keine neue Testzahl), 16/16 grün |
 | `check_doc_rotation.py --strict` | exit 0 |
+| **E-3-Vorbereitung (live, 2026-11-04)** | `bars.sqlite` `source='ig'` = **3 770** Zeilen (07-17T11:14Z…10-19T09:05Z, `ts_utc > fetched_at` = 3 770) · `instincts` 29/29 ohne Evidenz, **0** markiert · `trade_outcomes` OPEN = **0**, `execution_state.json` 38/38 CLOSED · `run_discovery.log`: **0** `discovery cycle`-Zeilen (Daemon läuft mit **Pre-B-10-Code**) · `llm_usage.json` 5 559 Records, letzter 10-19 `claude-sonnet-4-6` · `allowance_observations` letzter 10-19T07:08:39Z (10 000 / **9 923** übrig / expiry **2026-10-26** = **vergangen**) |
 
 ### Next (der übernächste Block)
 
-- **E-3** (Hold-Freigabe + Deploy, **Operator**) — macht den Flip 1 wirksam und erzeugt die K2/K11-Belege. Ablauf: Plan §6 E-3 (4 Dienste stoppen · `bars.sqlite` sichern + `DELETE FROM bars WHERE source='ig'` (T14, ≈ 3 730 Zeilen) · `instincts` mit `[legacy-p16] ` markieren (T12, 29 Zeilen) · `install_units.sh` + `daemon-reload` · 4 Units starten). **Day-0-Checks** (Plan §6 E-3) + zusätzlich `grep -c "discovery cycle" data/state/run_discovery.log` > 0.
+- **E-3** (Hold-Freigabe + Deploy, **Operator**) — **jetzt ausführbar geschrieben**: Plan **§20** (Reihenfolge, live gemessene Sollwerte, 7 Day-0-Checks, Fehlgriffe, AK). Macht den Flip 1 wirksam und erzeugt die K2/K11-Belege. Ablauf: `--release-hold` → 4 Dienste stoppen → Backups → `DELETE FROM bars WHERE source='ig'` (T14, **3 770** Zeilen) → `instincts` mit `[legacy-p16] ` markieren (T12, **29** Zeilen) → `install_units.sh` + `daemon-reload` → 4 Units starten. **7 Day-0-Checks** (§20 E-3c) — u. a. Discovery-Beleg > 0 (**der Discovery-Daemon läuft noch mit Pre-B-10-Code** ⇒ Neustart Pflicht) und die **IG-Allowance** (letzte Beobachtung 2026-10-19, expiry **2026-10-26 — vergangen** ⇒ Erneuerung unbestätigt).
 - **Review-Gate AK22** (Claude-Code-Session, Anthropic) ist **vor** E-3 fällig — ⏳ offen.
 - **E-4** (Shakedown, 2 Handelstage, Operator — Journal-Export) → **E-5** (Auswertung + **D-2** K6-Einheit + **Flip-2**-Entscheidung + **Modellwahl** M3 vs. Flash + Prereg v5) → **E-6** (Closeout).
 - **D-2** bleibt ein **Nikinger-Entscheidungspunkt ohne Code** (K6-Einheit, nach dem Shakedown).
@@ -221,7 +223,7 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 ### Session-end-Hinweis
 
 - **Σ 2053** (16 Suiten + root). meta_m1 informativ, nicht in Σ.
-- **Diese Session:** 1 Code-Commit (P8) + 1 Doku-Commit.
+- **Diese Session:** 1 Code-Commit (P8) + 2 Doku-Commits (E-2-Vorregistrierung · Plan §20 = E-3).
 - **Kern-Erkenntnis (neu):** eine Vorregistrierung pinnt **Werte** — und gepinnte Werte müssen **im Code stehen**, sonst ist die Vorregistrierung ein Dokument über einen Zustand, den es nicht gibt. Genau das hat der Nikinger beim Review bemerkt (Ausnahme: eine Modell-ID → die ganze Familie).
 
 
