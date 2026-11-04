@@ -7,6 +7,78 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-04 (Exec-Session #13 — **D-1 ausgeführt**: Token-Budget-Ausnahme an zwei P8-Zählstellen (`scheduler/budget.py` + `webui/api.py`), 1 Code-Commit + 1 Doku-Commit, Σ 2043 + 3 = **2046** grün)
+
+> **Auftrag:** Nikinger 2026-11-04 (Web-Chat): den in Plan §17 geschriebenen Block **D-1** ausführen. **Plan war detailliert genug** (§17 mit Code-Skizzen, 3 festen Testnamen, AKs P8 296 → 299 / Σ ≥ 2046) → **atomar abgearbeitet**, kein Re-Planen nötig.
+> **Bot-Ritual (Session-Start verifiziert):** Scheduler `disabled` + `inactive` (Hold-Marker `data/state/SCHEDULER_HELD`), kein `scheduler.run`-Prozess, `install_units.sh --check` exit 0. **Kein Neustart, kein Netz-Call, kein Live-Key** durch den Agenten.
+> **Cross-Phase-Freigabe:** D-1 = P8 only (T13 ✓).
+
+### Completed — diese Exec-Session (1 Code-Commit + 1 Doku-Commit)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | `978619e` | P8 | **D-1** — die Token-Budget-Ausnahme: `scheduler/budget.py::TokenBudget.consumed_today()` überspringt Records, deren `model` in `config.budget_exempt_models` steht (MiniMax-M3, Abo/M Plan ⇒ „measured, not capped"); `webui/api.py::/api/token_usage` meldet sie separat als **`exempt_tokens`** (Kosten/Calls zählen weiter alle Records). **+3 P8-Tests** (296 → 299), Σ 2043 → **2046** (16/16 grün). Negativ-Beweis: Budget- + WebUI-Test mit dem pre-D-1-Code **rot**. |
+| 2 | (dieser Commit) | P17-Doku + P8-Kopf + root | **Doku-Propagierung:** dieser Block + Rotation von Session #12 → `SESSIONS_ARCHIVE.md` + Σ-Tabelle + Block-D-Zeile + Executor-Evaluations-Zeile #13 + Plan-§17-Umsetzungs-Vermerk + P8-Kopf (D-1-Block + Modul-Tabelle) + `docs/INDEX.md` + `ROADMAP.md` + root-`CLAUDE.md`. |
+
+### Was D-1 ändert (Plan §17 — Anker unverändert)
+
+| Ort | Änderung | Test |
+|---|---|---|
+| `scheduler/budget.py` (`consumed_today`, Z. 181–190) | 2 Zeilen: Records von `budget_exempt_models` **skippen** (+ Docstring-Satz) | `test_budget_ignores_exempt_model_records` · `test_budget_counts_non_exempt_records` |
+| `webui/api.py` (`/api/token_usage`, Z. 289–320) | `exempt_tokens` separat zählen + Feld im Return (Kosten/Calls zählen weiter alle Records) | `test_webui_token_usage_separates_exempt_tokens` |
+| Report (`autonomy_report.py`, `llm_usage_per_day`) | **nicht** in D-1 — **E-1** (Block E) | — |
+
+**Warum jetzt:** mit dem Flip 1 (Session #11) ist die Ausnahme **aktiv** — MiniMax-M3-Calls würden sonst weiter gegen das 300-k-Tagesbudget zählen (und Anthropic-Calls dadurch früher blockieren). D-1 macht das unterscheidbar: **budgetwirksam** (Anthropic) vs. **gemessen, nicht gedeckelt** (Abo).
+
+**Was D-1 ausdrücklich NICHT ändert:** `_TOKEN_FIELDS` (bleibt modellblind), die fail-open-Semantik des Budgets, `is_exhausted()`, `daily_token_budget = 300_000`, `app.js`, das Preise/Call-Summen-Verhalten der WebUI.
+
+### Negativ-Beweis (Hausregel)
+
+Mit dem pre-D-1-Code (`git stash` der zwei Quell-Dateien) sind **`test_budget_ignores_exempt_model_records`** und **`test_webui_token_usage_separates_exempt_tokens`** **rot** (`assert 5000 == 500` bzw. `assert 2200 == 1200`), mit dem Fix grün. `test_budget_counts_non_exempt_records` ist ein **Regressions-Pin** (nur Nicht-Ausnahme-Records ⇒ Summe) und ist per Definition auch vorher grün — das ist so gewollt und hier offengelegt.
+
+### Gemessen (Host 201, Session-Ende)
+
+| | Wert |
+|---|---|
+| `is-enabled` / `is-active` tradingbot-scheduler | `disabled` / `inactive` (Hold unangetastet) |
+| `ps aux | grep scheduler.run` | 0 Treffer |
+| `bash scripts/install_units.sh --check` | exit 0 |
+| Keyring `trading-bot-minimax-bot/api_key` | ✓ vorhanden (unverändert) |
+| Σ (16 Suiten + root) | **2046** (P8 299) — 16/16 grün |
+| `check_doc_rotation.py --strict` | exit 0 |
+
+### Next (der übernächste Block)
+
+- **E-1** (Report v5): der **dritte** Zählort (`autonomy_report.py::llm_usage_per_day()`) bekommt
+  `evaluate_k6_v5(..., exempt_models=…)` — **nicht** in D-1 (Plan §17 D-1c). Der Report kennt die
+  Ausnahme also erst ab E-1; **bis dahin weicht die Report-Zahl von der Budget-Zahl ab** — das
+  gehört in den Shakedown-Vermerk (Block E), damit niemand die Zahlen verwechselt.
+- **D-2** bleibt ein **Nikinger-Entscheidungspunkt ohne Code** (K6-Einheit, nach dem Shakedown).
+- **E-3** (Hold-Freigabe + Deploy) macht den Flip 1 **wirksam** — der erste echte MiniMax-Pick
+  unter voller Prompt-Last ist der eigentliche Test (`finish_reason=length`? Hebel:
+  `extra_body={"thinking": {"type": "disabled"}}` am `minimax`-Eintrag).
+- **Frist 2026-11-15** — Abo-Key/Endpoint: jedes `minimax`-Profil vor dem Datum zurückflippen
+  (Default `anthropic`).
+
+### Open questions / blockers
+
+- **Kein Blocker** für D-1 — der Block ist vollständig abgearbeitet und grün.
+- **Modellwahl vertagt** (M3 vs. M3.1-Flash) — Profil und Modell sind getrennte Datenstellen,
+  der Flip hängt nicht daran.
+- **Frist 2026-11-15** (Abo) — im Phasenkopf + Plan §16 dokumentiert.
+- **Review-Gate vor E-3 (AK22)** weiterhin ⏳ (Claude-Code-Session, Anthropic;
+  Schwerpunkte B-5…B-10, C-4…C-6, B-3, B-2).
+
+### Session-end-Hinweis
+
+- **Σ 2046** (16 Suiten + root). meta_m1 informativ, nicht in Σ.
+- **Diese Session:** 1 Code-Commit (P8, D-1) + 1 Doku-Commit, **kein** Live-Eingriff.
+- **Push:** die Commits der Phase-17-Folge gehen wie üblich über den Nikinger (`origin/main`).
+- **Kern-Erkenntnis:** die Ausnahme brauchte **zwei** Zählstellen, nicht eine — die eine Stelle
+  (Budget-Gate) entscheidet, die andere (WebUI) **beobachtet**. Der dritte Zählort (Report)
+  ist bewusst **E-1**, weil er eine eigene Semantik (`evaluate_k6_v5`) braucht.
+
+
 ## Session stopped — 2026-11-03 (Exec-Session #12 — **der nächste Block ist geschrieben**: Plan §17 = Block D / D-1 (Budget-Ausnahme an zwei P8-Zählstellen) mit **re-verifizierten Ankern** + D-2 als Entscheidungspunkt; **dokumentarische Session, kein Code** — Σ unverändert **2043**; Session-Ende + **Push**)
 
 > **Auftrag:** Nikinger 2026-11-03 (Web-Chat): „understood. write a next block, end the session, commit and push." → (1) den **nächsten Block** (D-1) ausführbar schreiben, (2) die Session beenden, (3) committen, (4) pushen.

@@ -103,7 +103,7 @@ filtering, validation, or any deterministic logic — STOP. Use code instead.
 >
 > Exec: offener Test GLM in OpenCode (z.ai Coding Plan), Claude Code bleibt Anthropic-only mit Pflicht-Review vor dem Deploy (Plan §14). Σ-Baseline 1964. E1–E8 aus dem Phase-16-Handover sind entschieden
 > (Plan §1); **E6: Gate P7/A6 gilt als erfüllt.**
-> Stand 2026-11-04 (Exec-Session #13): Blöcke **A + B ✅** · **Block C** Code-Teil ✅ (C-7-Smoke PASS, C-8 Flip 1) · **Block D: D-1 ✅** (Token-Budget-Ausnahme: MiniMax-Abo-Calls zählen nicht gegen das 300-k-Budget) — Σ **2046** grün.
+> Stand 2026-11-04 (Exec-Session #14): Blöcke **A + B ✅** · **Block C** Code-Teil ✅ (C-7-Smoke PASS, C-8 Flip 1) · **Block D: D-1 ✅** (Token-Budget-Ausnahme: MiniMax-Abo-Calls zählen nicht gegen das 300-k-Budget) · **Block E: E-1 geschrieben** (Report v5, Plan §18) — Σ **2046** grün.
 
 > **✅ 2026-10-16 — Phase 16 (Freischaltung) ABGESCHLOSSEN MIT TEILBILANZ (Session #38, Opus 5.5).**
 > Einstieg: [`phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md`](./phase16_activation/PHASE16_CLOSEOUT_HANDOVER.md),

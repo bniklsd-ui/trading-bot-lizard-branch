@@ -1885,3 +1885,170 @@ ist ein Regressions-Pin (per Definition auch vorher grün).
 **Offen (unverändert):** der dritte Zählort (Report) kennt die Ausnahme erst ab **E-1** — die
 Report-Zahl und die Budget-Zahl weichen bis dahin ab (gehört in den Shakedown-Vermerk).
 **D-2** bleibt ein Nikinger-Entscheidungspunkt ohne Code.
+
+---
+
+## §18 Ausführungsblock E-1 — Report v5 (2026-11-04)
+
+> **Der nächste Block** nach D-1. Definition aus §6 E-1, **Anker gegen den aktuellen Code
+> re-verifiziert** (2026-11-04) + **zwei live gemessene Voraussetzungen** ergänzt, die in
+> §6 E-1 noch nicht stehen. Ausführung = **ein Commit** in P16
+> (`phase16_activation/scripts/autonomy_report.py` + `phase16_activation/tests/`).
+> E-2 (Shakedown-Vorregistrierung) und E-3 (Deploy) folgen als eigene Schritte.
+
+### E-1a — Anker-Re-Verifikation (2026-11-04)
+
+P16 ist seit der Plan-Session (e19c178) **nicht angefasst** worden ⇒ **null Drift** auf allen
+elf Ankern aus §6 E-1:
+
+| Plan-§6-E-1-Anker | Ist 2026-11-04 | Δ |
+|---|---|---:|
+| `def llm_usage_per_day(` | Z. 369 | 0 |
+| `def critical_count_after_opens(` | Z. 428 | 0 |
+| `def extract_caps_from_scheduler_log(` | Z. 480 | 0 |
+| `def evaluate_k2(` | Z. 633 | 0 |
+| `def evaluate_k5(` | Z. 771 | 0 |
+| `def evaluate_k6(` | Z. 804 | 0 |
+| `def evaluate_k7(` | Z. 858 | 0 |
+| `def evaluate_k8(` (Ende der v4-Evaluatoren) | Z. 903 | 0 |
+| `def _build_day_report(` | Z. 990 | 0 |
+| `def _build_summary_report(` | Z. 1045 | 0 |
+| `def _parse_args(` | Z. 1111 | 0 |
+| `def main(` | Z. 1135 | 0 |
+
+⇒ Die neuen v5-Evaluatoren kommen **hinter `evaluate_k8` (Z. 903)** und **vor
+`_iter_trading_days` (Z. 971)**. `evaluate_k2` (Z. 633–676) hat **eine** `day`-Parameter-Signatur
+(v4 = Tages-Report) — die v5-Fassung braucht ein **Fenster** (`from_day`/`to_day`).
+
+### E-1b — `llm_usage_per_day` (die D-1-Fortsetzung, Z. 369–425)
+
+Signatur: kw-Arg `exempt_models: tuple[str, ...] = ()`.
+
+- **Erster Durchlauf (Z. 392–406):** pro Record — ist `entry.get("model") in exempt_models`,
+  zählt der Record **nicht** in `tokens`/`calls`, sondern in die **neuen** Keys
+  `exempt_tokens`/`exempt_calls` (`continue` nach dem Addieren).
+- **Zweiter Durchlauf (`exhausted_at`, Z. 407–424):** die kumulative Summe **muss** die
+  Exempt-Records überspringen — sonst zählt `exhausted_at` weiter die Abo-Tokens und K6-v5
+  wäre strukturell FAIL (genau der Fehler, den D-1 im Budget-Gate behoben hat).
+- **Default-Dict (Z. 404):** `{"tokens": 0, "calls": 0, "exempt_tokens": 0, "exempt_calls": 0,
+  "exhausted_at": None}` — die zwei neuen Keys **immer** vorhanden (Schema stabil), bei
+  `exempt_models=()` mit Wert 0.
+
+> **Dokumentierte Verfeinerung von §6 E-1:** „Default `()` ⇒ v4 identisch" gilt für das
+> **Verdikt**, nicht byte-identisch für den Payload — die zwei neuen Keys stehen strukturell
+> immer im Tages-Dict. Die Regression-AK prüft deshalb die **Verdikte** (siehe E-1f).
+
+### E-1c — `evaluate_k6_v5` (Z. 804 ff., neue Variante)
+
+```python
+def evaluate_k6_v5(
+    usage_json: Path,
+    from_day: date,
+    to_day: date,
+    *,
+    threshold: int = DEFAULT_DAILY_TOKEN_BUDGET,
+    window_close_hhmm: tuple[int, int] = DEFAULT_WINDOW_CLOSE_HHMM,
+    exempt_models: tuple[str, ...] = (),
+    per_day: dict[date, dict[str, Any]] | None = None,
+) -> CriterionResult:
+```
+
+- Regel wie `evaluate_k6` (Z. 804–855), aber `llm_usage_per_day(..., exempt_models=exempt_models)`.
+- `measured` trägt zusätzlich `exempt_tokens_per_day` je Tag (die **beobachtete**, nicht
+  gedeckelte Größe — die Zahlen, die D-2 für die K6-Einheit braucht).
+- `criterion="6"`, `threshold`-Text unverändert.
+
+### E-1d — CLI + Verdikt-Verdrahtung
+
+**`_parse_args` (Z. 1111–1132)** — neu:
+
+| Flag | Typ | Default | Zweck |
+|---|---|---|---|
+| `--prereg` | choices `v4`/`v5` | `v4` | v4 bleibt Default **und verdikt-identisch** |
+| `--journal-file` | Path | `None` | Operator-Export für K9 (E-4) |
+| `--expect-llm-profile` | str | `None` | K7-v5-Profil-Pin (C-4-Startzeile) |
+| `--exempt-model` | str, **repeatable** | `None` | K6-v5-Ausnahmeliste, **gepinnt** |
+
+- `--summary`-Hilfetext: von „Evaluate 7 PASS criteria" auf **„Evaluate PASS criteria (v4: 8, v5: 11)"**
+  — die „7" war selbst falsch (v4 wertet **8**: `evaluate_k1..k8`; INDEX-Drift-Notiz 2026-10-16).
+- **Ausnahmeliste (neu, gegenüber §6 E-1 verfeinert):** `--exempt-model` (wenn gesetzt) gewinnt;
+  sonst **lazy** `from scheduler.config import SchedulerConfig` → `SchedulerConfig().budget_exempt_models`;
+  bei `ImportError` ⇒ `()` + **eine** WARNING auf stderr (fail-soft, v4-identisch).
+  - **Begründung:** (a) das Skript läuft standalone (`python phase16_activation/scripts/autonomy_report.py …`)
+    und darf an einem fehlenden `scheduler`-Paket **nicht** sterben; (b) eine **vorregistrierte**
+    Messung muss den Wert **gepinnt** bekommen (Prereg v5), nicht einem Code-Default folgen, der
+    sich ohne Vorwarnung ändern kann (Frist 2026-11-15!). Der Config-Import ist nur der Default.
+- **`main` (Z. 1135–1161)** reicht `prereg`, `journal_file`, `expect_llm_profile`, `exempt_models`
+  an `_build_day_report` / `_build_summary_report` durch (kw-Arg `prereg: str = "v4"`).
+
+**`_build_day_report` (Z. 990) / `_build_summary_report` (Z. 1045)** — bei `prereg == "v5"`:
+
+| K | v5-Fassung | Anmerkung |
+|---|---|---|
+| 2 | `evaluate_k2_v5(state_dir, bars_db, from_day, to_day)` | Fenster statt Einzeltag |
+| 5 | `evaluate_k5(..., per_trade_counts=critical_count_after_opens(..., by_logger=True))` | `measured` bekommt `by_logger` je Trade |
+| 6 | `evaluate_k6_v5(..., exempt_models=exempt_models)` | D-1-Fortsetzung |
+| 7 | `evaluate_k7_v5(..., expected_llm_profile=expect_llm_profile)` | `None` ⇒ nur v4-Caps-Regel |
+| 9 | `evaluate_k9(journal_file, from_day, to_day)` | `journal_file is None` ⇒ **NA** |
+| 10 | `evaluate_k10(trading_db, scheduler_log, from_day, to_day)` | 0 CLOSE im Fenster ⇒ **NA** |
+| 11 | `evaluate_k11(state_dir / "research_health.jsonl", from_day, to_day)` | je Handelstag ≥ 1 Divergenz-Event |
+
+### E-1e — die neuen Evaluatoren (Anker + Regeln, live geprüft)
+
+| Funktion | Regel (v5) | Quelle (live verifiziert 2026-11-04) |
+|---|---|---|
+| `count_discovery_cycles_per_day(log: Path) -> dict[date, int]` | Regex `discovery cycle (?P<ts>\d{4}-\d{2}-\d{2}T[\d:.]+Z):` → Berlin-Tag | `phase14_discovery/source_registry/run.py:211/225/272` — `logger.info`, Text `discovery cycle %s: armed=…`; `%s` = `_iso()` (Z. 427–432) ⇒ `2026-11-04T12:34:56.789Z` — der Regex passt. Log: `data/state/run_discovery.log` |
+| `evaluate_k2_v5(state_dir, bars_db, from_day, to_day)` | **jeder** Handelstag (`_iter_trading_days`, Z. 971, Mo–Fr): Scheduler-Health ≥ 1 **und** Recorder-Bars ≥ 1 **und** Discovery-Zyklen ≥ 1; WebUI bleibt „operator-gesichtet" | behebt den K2-Proxy (`autonomy_report.py:660` zählt Scheduler-Events als Discovery) |
+| `evaluate_k6_v5(...)` | Nicht-Ausnahme-Tokens nie ≥ `threshold` vor 17:30; `measured` trägt `exempt_tokens_per_day` | E-1c |
+| `evaluate_k7_v5(..., expected_llm_profile)` | Caps wie v4 **und** **jede** Start-Zeile im Fenster trägt `llm_profile=<expected>` | Start-Zeile (C-4): `phase8_scheduler/scheduler/run.py:206-214` — `starting scheduler daemon (account=…, max_trades=…, daily_loss_cap=…, cycle=…min, llm_profile=…)`; Parsing-Muster wie `extract_caps_from_scheduler_log` (Z. 480–508) |
+| `evaluate_k9(journal_file, from_day, to_day, *, max_per_day=10)` | Zeilen mit `Scheduled restart job` je Berlin-Tag ≤ 10; `journal_file is None` ⇒ **NA** | Operator-Export (E-4) |
+| `evaluate_k10(trading_db, scheduler_log, from_day, to_day)` | 0 CLOSE im Fenster ⇒ **NA**; sonst **0** Zeilen `CRITICAL instinct.bridge` **und** **0** `extractor returned ok=False` **und** jede im Fenster angelegte `instincts`-Zeile hat `evidence_trade_ids_json IS NOT NULL` | `phase15_v4/instinct/bridge.py:125` (CRITICAL `after_trade_closed failed`), **:146** (`extractor returned ok=False` — **INFO**, nicht CRITICAL ⇒ nach **Text** matchen), :230/:244 (CRITICAL `promote()/load_rules() failed`). Live-DB: `instincts` = 29 Zeilen, **alle 29** mit `evidence_trade_ids_json IS NULL` — exakt die 29, die der E-3-Legacy-SQL markiert |
+| `evaluate_k11(health_jsonl, from_day, to_day)` | **jeder** Handelstag ≥ 1 Event `divergence_ok` oder `quote_divergence` | `phase12_data_foundation/data_foundation/heartbeat.py:384` (`divergence_ok`), `phase8_scheduler/scheduler/observability.py:140` (`quote_divergence`) — beide im **Scheduler**-Prozess verdrahtet (`phase8_scheduler/scripts/wiring.py:1177-1178`, 1417-1434) |
+
+### E-1f — Tests (P16, +7) und AKs
+
+- `test_v4_default_criteria_unchanged` · `test_k2_v5_requires_discovery_cycle_every_day` ·
+  `test_k6_v5_ignores_exempt_model_tokens` · `test_k7_v5_fails_on_profile_change_in_window` ·
+  `test_k9_counts_scheduled_restart_jobs_and_na_without_file` ·
+  `test_k10_na_without_close_fail_on_bridge_critical` ·
+  `test_k11_requires_divergence_event_every_trading_day`
+- **Negativ-Beweis** (Hausregel): mit dem pre-E-1-Code rot, mit dem Fix grün.
+- **AK:** P16 15 → **22** · Σ 2046 → **≥ 2053** · **v4 verdikt-identisch** (Default `v4` bleibt).
+
+**Regression-AK — live gemessen 2026-11-04 (vor der Implementierung, als Baseline):**
+
+```bash
+phase1_broker_wrapper/.venv/bin/python phase16_activation/scripts/autonomy_report.py \
+  --from 2026-09-30 --to 2026-10-13 --summary --reports-dir /tmp/p17e1
+```
+
+⇒ **FAIL K1 · FAIL K5 · FAIL K6 · PASS K2 · PASS K3 · PASS K4 · PASS K7 · PASS K8**,
+`overall_verdict: FAIL` — deckt sich mit §6 E-1 („FAIL K1/K5/K6 und PASS K3/K4/K7/K8") und mit
+dem Phase-16-Handover §2 (v3-Lauf). **Nach E-1 muss dieser Aufruf dieselben Verdikte liefern**
+(nur die zusätzlichen Keys im Payload sind neu).
+
+### E-1g — ⚠ zwei live gemessene Voraussetzungen (neu, 2026-11-04)
+
+Beide v5-Kriterien sind **heute strukturell nicht messbar** — nicht, weil der Bot kaputt ist,
+sondern weil die **laufenden Prozesse den Code von vor B-2/B-10 tragen** (Python cached
+`sys.modules` — ein Neustart lädt erst den neuen Code):
+
+| Beleg | Ist-Stand 2026-11-04 | Folge |
+|---|---|---|
+| `grep -c "discovery cycle" data/state/run_discovery.log` | **0** — der Discovery-Daemon läuft seit **2026-11-01 00:24**, also **vor** dem B-10-Commit (2026-11-03) | v5-K2 hat bis **E-3** keinen Beleg ⇒ ein v5-Lauf **vor** E-3 wäre ein **false FAIL** (F8-Klasse) |
+| `grep -c "divergence_ok\|quote_divergence" data/state/research_health.jsonl` | **0** (Datei zuletzt 2026-10-19 17:39) — die Divergenz-Events kommen aus dem **Scheduler**-Prozess (`wiring.py:1177`, 1417), der im **HOLD** steht | v5-K11 hat bis **E-3** keinen Beleg |
+
+⇒ **E-1 darf implementiert und unit-getestet werden (Fixtures), aber ein v5-Verdikt ist erst
+nach dem E-3-Deploy sinnvoll.** Der E-3-Deploy startet alle vier Dienste neu ⇒ ab dann tragen
+Discovery- und Scheduler-Prozess den B-2/B-10-Code. **E-2 (Shakedown-Vorregistrierung) läuft
+ohnehin erst nach E-3** (Plan §6 E-2: „VOR dem Restart" = vor dem E-3-Restart, Fenster = die
+ersten zwei Handelstage **nach** dem E-3-Start).
+
+**Ergänzung zu den E-3-Day-0-Checks (§6 E-3, Punkt 6):** zusätzlich prüfen, dass
+`grep -c "discovery cycle" data/state/run_discovery.log` **> 0** ist (sonst fehlt der K2-Beleg).
+
+### E-1h — Offen (ohne Code)
+
+- **D-2** (K6-Einheit) bleibt ein **Nikinger-Entscheidungspunkt** — E-5 legt die Messung vor.
+- **Flip 2** (`all_m3`) bleibt bis E-5 gegated.
+- **Frist 2026-11-15** (Abo-Key) — danach jedes `minimax`-Profil zurückflippen.
