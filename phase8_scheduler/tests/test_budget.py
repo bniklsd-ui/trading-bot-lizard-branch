@@ -33,11 +33,19 @@ def _write_log(tmp_path, records: list[dict]) -> str:
     return str(path)
 
 
-def _rec(ts: str, *, inp: int = 0, out: int = 0, cw: int = 0, cr: int = 0) -> dict:
+def _rec(
+    ts: str,
+    *,
+    inp: int = 0,
+    out: int = 0,
+    cw: int = 0,
+    cr: int = 0,
+    model: str = "claude-haiku-4-5-20251001",
+) -> dict:
     """A token-meter-shaped record (UTC ``ts`` with a Z suffix)."""
     return {
         "ts": ts,
-        "model": "claude-haiku-4-5-20251001",
+        "model": model,
         "input_tokens": inp,
         "output_tokens": out,
         "cache_creation_input_tokens": cw,
@@ -212,6 +220,44 @@ def test_satisfies_autoconfirm_budget_protocol(tmp_path) -> None:
 
     state = SchedulerState(date="2026-06-28", trades_today=0)
     assert gate.can_open(state) == (False, REASON_BUDGET)
+
+
+# --- budget exemption (Phase 17 D-1, T7) -----------------------------------
+
+
+def test_budget_ignores_exempt_model_records(tmp_path) -> None:
+    """An exempt model's tokens (MiniMax-M3, Abo/M Plan) do NOT count against the cap.
+
+    The Anthropic record next to it **does** count — the cap binds the paid models only.
+    Without the exemption the (free at the margin) MiniMax calls would eat the 300 k budget
+    of the Anthropic calls (Plan §16 / §17 D-1).
+    """
+    config = SchedulerConfig(daily_token_budget=1000)
+    assert config.budget_exempt_models == ("MiniMax-M3",)   # the shipped default (C-2 / M-1)
+    path = _write_log(
+        tmp_path,
+        [
+            _rec("2026-06-28T09:00:00.000Z", inp=4000, out=1000, model="MiniMax-M3"),
+            _rec("2026-06-28T09:05:00.000Z", inp=400, out=100),
+        ],
+    )
+    budget = TokenBudget(config, path, now_fn=lambda: _NOW)
+    assert budget.consumed_today() == 500        # only the Anthropic record
+    assert budget.is_exhausted() is False        # the exempt tokens do not exhaust the cap
+
+
+def test_budget_counts_non_exempt_records(tmp_path) -> None:
+    """With only non-exempt records, ``consumed_today()`` is their exact sum."""
+    config = SchedulerConfig(daily_token_budget=1000, budget_exempt_models=("MiniMax-M3",))
+    path = _write_log(
+        tmp_path,
+        [
+            _rec("2026-06-28T09:00:00.000Z", inp=300, out=100, model="claude-sonnet-4-6"),
+            _rec("2026-06-28T09:05:00.000Z", inp=50, out=25, model="claude-haiku-4-5-20251001"),
+        ],
+    )
+    budget = TokenBudget(config, path, now_fn=lambda: _NOW)
+    assert budget.consumed_today() == 475        # (300+100) + (50+25)
 
 
 # --- exports ---------------------------------------------------------------

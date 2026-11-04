@@ -282,17 +282,27 @@ def create_app(config: SchedulerConfig | None = None) -> FastAPI:
         gates on) and reuses ``scheduler.budget`` helpers so the day boundary is the identical
         Europe/Berlin one. Fail-soft: a missing / corrupt log → zeros (never 500). ``budget`` is
         ``cfg.daily_token_budget`` (``None`` ⇒ disabled; ``percent`` then ``None``).
+
+        Phase 17 D-1 (T7): tokens of models in ``cfg.budget_exempt_models`` (MiniMax-M3, Abo/M
+        Plan) are reported **separately** as ``exempt_tokens`` and do **not** enter
+        ``consumed_tokens`` / ``percent`` — the same split the daemon's budget gate applies
+        (Phase 17 D-1, ``scheduler/budget.py``). Costs and call counts still cover **all**
+        records: the exemption is a cap, not a blind spot.
         """
         usage_path = str(Path(cfg.state_path).parent / "llm_usage.json")
         tz = ZoneInfo(cfg.tz)
         today = Clock(cfg).now().astimezone(tz).date()
         tokens = calls = 0
+        exempt_tokens = 0
         cost_eur = cost_usd = 0.0
         for rec in _load_log(usage_path):
             if not isinstance(rec, dict):
                 continue
             if _record_local_date(rec.get("ts"), tz) == today:
-                tokens += _record_tokens(rec)
+                if rec.get("model") in cfg.budget_exempt_models:
+                    exempt_tokens += _record_tokens(rec)
+                else:
+                    tokens += _record_tokens(rec)
                 cost_eur += float(rec.get("est_cost_eur") or 0.0)
                 cost_usd += float(rec.get("est_cost_usd") or 0.0)
                 calls += 1
@@ -300,6 +310,7 @@ def create_app(config: SchedulerConfig | None = None) -> FastAPI:
         percent = round(100.0 * tokens / budget, 1) if budget else None
         return {
             "consumed_tokens": tokens,
+            "exempt_tokens": exempt_tokens,
             "budget": budget,
             "percent": percent,
             "cost_eur_today": round(cost_eur, 4),

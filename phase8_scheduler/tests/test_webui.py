@@ -361,6 +361,35 @@ def test_token_usage_budget_disabled_percent_none(tmp_path) -> None:
     assert body["percent"] is None                  # no budget ⇒ no percent
 
 
+def test_webui_token_usage_separates_exempt_tokens(client) -> None:
+    """Phase 17 D-1 (T7): exempt-model tokens are reported separately, not capped.
+
+    ``consumed_tokens`` / ``percent`` cover the budget-relevant (Anthropic) tokens only;
+    ``exempt_tokens`` carries the MiniMax-M3 (Abo/M Plan) tokens. Costs and call counts
+    still cover **all** records — the exemption is a cap, not a blind spot.
+    """
+    c, cfg = client
+    today = datetime.now(ZoneInfo(cfg.tz))
+    records = [
+        {"ts": _utc_z(today), "model": "claude-sonnet-4-6", "input_tokens": 1000,
+         "output_tokens": 200, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0,
+         "est_cost_usd": 0.006, "est_cost_eur": 0.0055},
+        {"ts": _utc_z(today), "model": "MiniMax-M3", "input_tokens": 900,
+         "output_tokens": 100, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0,
+         "est_cost_usd": 0.0, "est_cost_eur": 0.0},
+    ]
+    (Path(cfg.state_path).parent / "llm_usage.json").write_text(
+        json.dumps(records), encoding="utf-8"
+    )
+
+    body = c.get("/api/token_usage").json()
+    assert body["consumed_tokens"] == 1200          # only the Anthropic record
+    assert body["exempt_tokens"] == 1000            # the MiniMax-M3 record, separate
+    assert body["calls_today"] == 2                 # all records are counted
+    assert abs(body["cost_eur_today"] - 0.0055) < 1e-9
+    assert body["percent"] == 0.4                   # 100*1200/300000 (exempt excluded)
+
+
 # --- last-cycle reasoning detail -------------------------------------------
 
 

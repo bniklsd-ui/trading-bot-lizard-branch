@@ -172,12 +172,20 @@ class TokenBudget:
         current ``config.tz`` date. Counts all models (research + debate + lesson) — it is a
         system-wide daily budget over the shared meter. Fail-soft: a missing / corrupt log or a
         record with an unusable ``ts`` contributes nothing rather than raising.
+
+        Records whose model is in ``config.budget_exempt_models`` are skipped (Phase 17 D-1 /
+        T7) — they are measured in ``llm_usage.json``, not capped. The cap therefore binds the
+        *paid* models only (Anthropic today); an Abo/M-Plan model (MiniMax-M3) is free at the
+        margin and must not crowd the Anthropic calls out of the budget.
         """
         today = self._now_fn().astimezone(self._tz).date()
         total = 0
+        exempt_models = self._config.budget_exempt_models
         for rec in _load_log(self._usage_log_path):
             if not isinstance(rec, dict):
                 continue
+            if rec.get("model") in exempt_models:
+                continue  # Phase 17 D-1 (T7): Abo-Kontingent — measured, not capped
             if _record_local_date(rec.get("ts"), self._tz) == today:
                 total += _record_tokens(rec)
         return total
