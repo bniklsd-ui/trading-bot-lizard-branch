@@ -7,6 +7,79 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-04 (Exec-Session #15 — **E-1 ausgeführt**: Report v5 (`--prereg v5`) in `autonomy_report.py` — D-1-Fortsetzung im Report + v5-Evaluatoren K2/K5/K7/K9/K10/K11; 1 Code-Commit in P16 + 1 Doku-Commit, Σ 2046 + 7 = **2053** grün)
+
+> **Auftrag:** Nikinger (Web-Chat, 2026-11-04): **E-1 ausführen** (Plan §18). **Plan war detailliert genug** (§18 mit Code-Skizzen, 7 festen Testnamen, AKs P16 15 → 22 / Σ ≥ 2053, v4-Regressions-Baseline) → **atomar abgearbeitet**, kein Re-Planen nötig.
+> **Bot-Ritual (Session-Start + Session-Ende verifiziert):** Scheduler `disabled` + `inactive` (Hold-Marker `data/state/SCHEDULER_HELD`), kein `scheduler.run`-Prozess, `install_units.sh --check` exit 0, Recorder/Discovery/WebUI `enabled` + `active` (unangetastet). **Kein Neustart, kein Netz-Call, kein Live-Key** durch den Agenten.
+> **Cross-Phase-Freigabe:** E-1 = **P16 only** (T13 ✓, Plan §4). Kein Touch in P8/P15/P14 — die *Quellen* der neuen Kriterien werden nur **gelesen**.
+
+### Completed — diese Exec-Session (1 Code-Commit + 1 Doku-Commit)
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | `adc905f` | P16 | **E-1 — Report v5.** `llm_usage_per_day` mit `exempt_models` (D-1-Fortsetzung: `exempt_tokens`/`exempt_calls`, **auch** in der `exhausted_at`-Summation übersprungen) · 6 neue Evaluatoren (`evaluate_k2_v5` · `evaluate_k6_v5` · `evaluate_k7_v5` · `evaluate_k9` · `evaluate_k10` · `evaluate_k11`) + `count_discovery_cycles_per_day` · K5-v5 `by_logger`/`deal_related` · CLI `--prereg {v4,v5}` · `--journal-file` · `--expect-llm-profile` · `--exempt-model` (repeatable). **+7 P16-Tests** (15 → 22), Σ 2046 → **2053** (16/16 grün). Negativ-Beweis: mit dem pre-E-1-Code sind **genau die 7 neuen Tests rot**, die 15 Bestandstests bleiben grün. |
+| 2 | (dieser Commit) | P17-Doku + P16-Kopf + root | **Doku-Propagierung:** dieser Block + Rotation #14 → `SESSIONS_ARCHIVE.md` + Σ-Tabelle + Block-D-/Block-E-Zeile + Executor-Evaluations-Zeile #15 + P16-Kopf (E-1-Nachtrag) + `docs/INDEX.md` + `ROADMAP.md` + root-`CLAUDE.md`. |
+| 3 | (dieser Commit) | P17-Doku + Plan | **Plan §19 = Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable (`phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md`, `status: locked`, INDEX-Zeile im selben Commit, T23-Freigabe) + **vollständiger Inhalts-Entwurf** (gepinnte Werte, K1/K2/K5/K6/K7/K8/K9/K10/K11, erlaubte Operator-Ereignisse, FAIL-Regel, §F2, Report-Befehl) + **live geprüfte Anker** + AK. **Doc-only, kein Code, Σ unverändert.** |
+
+### Was E-1 ändert (Plan §18 — Anker null Drift, live nachgemessen)
+
+| Ort | Änderung | Test |
+|---|---|---|
+| `autonomy_report.py::llm_usage_per_day` | kw-Arg `exempt_models`; Exempt-Records zählen in `exempt_tokens`/`exempt_calls` und werden in der `exhausted_at`-Summation **übersprungen** (sonst weicht die Report-Zahl von der Budget-Zahl ab) | `test_k6_v5_ignores_exempt_model_tokens` |
+| `autonomy_report.py` (neue Evaluatoren) | `evaluate_k2_v5` (Discovery-Zyklen statt Proxy) · `evaluate_k6_v5` · `evaluate_k7_v5` (Profil-Pin) · `evaluate_k9` (Journal) · `evaluate_k10` (Instinct-Bridge) · `evaluate_k11` (Divergenz) + `count_discovery_cycles_per_day` | `test_k2_v5_requires_discovery_cycle_every_day` · `test_k7_v5_fails_on_profile_change_in_window` · `test_k9_counts_scheduled_restart_jobs_and_na_without_file` · `test_k10_na_without_close_fail_on_bridge_critical` · `test_k11_requires_divergence_event_every_trading_day` |
+| `_parse_args` + `main` | `--prereg {v4,v5}` (Default **v4**) · `--journal-file` · `--expect-llm-profile` · `--exempt-model` (repeatable) | `test_v4_default_criteria_unchanged` |
+
+**Quellen live geprüft (nicht aus dem Plan abgeschrieben):** Discovery-Beleg `source_registry/run.py:211/225/272` (`discovery cycle <UTC-iso>: armed=…`) · Start-Zeile `scheduler/run.py:206-214` (`llm_profile=…`) · Bridge-Texte `instinct/bridge.py:125/146/230/244` · Divergenz-Events `data_foundation/heartbeat.py:384` (`divergence_ok`) + `scheduler/observability.py:140` (`quote_divergence`) · Live-DB `instincts` = **29 Zeilen, alle 29 mit `evidence_trade_ids_json IS NULL`** · `SchedulerConfig().budget_exempt_models` = `("MiniMax-M3",)`.
+
+### Fünf Entscheidungen, die der Plan nicht ausschrieb (bewusst fail-closed — F8-Klasse)
+
+1. **K7-v5 ohne Start-Zeile im Fenster ⇒ FAIL.** Der Plan-Text („jede Start-Zeile im Fenster trägt `llm_profile=<expected>`") wäre bei leerem Fenster **vakuum-PASS** gewesen — genau die F8-Falle („grün ohne Messung"). Der Profil-Pin ist nur bestätigt, wenn er belegt ist.
+2. **K9: Restart-Jobs ohne parsbaren Zeitstempel ⇒ FAIL** (nicht NA): sie können keinem Tag zugeordnet werden ⇒ die Tagesgrenze ist **nicht bewiesen**.
+3. **K2-v5 / K11: Fenster ohne Handelstag ⇒ NA** (kein vakuum-PASS, kein Fake-FAIL an einem Wochenende).
+4. **K10: 0 CLOSE im Fenster ⇒ NA**; der Log-Filter bucketet nach **Berlin-Tag** (konsistent zu K2/K8/K11, nicht nach UTC-Grenzen).
+5. **Ausnahmeliste:** `--exempt-model` schlägt den Code-Default; der Default kommt **lazy** aus `SchedulerConfig().budget_exempt_models` (fail-soft + **eine** WARNING auf stderr, falls `scheduler.config` nicht importierbar ist). Gelesen über `dataclasses.fields()` — die Konstruktion des Configs würde einen sachfremden `daily_loss_cap=None`-Warn loggen.
+
+### Regression-AK (live, 2026-11-04) — erfüllt
+
+`--from 2026-09-30 --to 2026-10-13 --summary` (v4) ⇒ **FAIL K1 · FAIL K5 · FAIL K6 · PASS K2 · PASS K3 · PASS K4 · PASS K7 · PASS K8**, `overall_verdict: FAIL` — **identisch zur vor der Implementierung gemessenen Baseline** (Plan §18 E-1f). Die v4-Verdikte sind unangetastet; neu sind nur die zwei strukturell immer vorhandenen Payload-Keys `exempt_tokens`/`exempt_calls` (Wert 0 bei `exempt_models=()`).
+
+### ⚠ v5-Lauf **vor** E-3 — erwartete false FAILs (kein Defekt)
+
+`--prereg v5 --from 2026-09-30 --to 2026-10-13 --summary --expect-llm-profile research_m3` ⇒ **K1 FAIL · K2 FAIL · K5 FAIL · K6 FAIL · K7 FAIL · K10 FAIL · K11 FAIL · PASS K3/K4/K8 · K9 NA**.
+K2 (0 Discovery-Zyklen) und K11 (0 Divergenz-Events) sind die in §18 E-1g gemessenen **Voraussetzungen** — sie werden erst durch den E-3-Deploy belegbar. K7 FAIL, weil die Start-Zeilen im Fenster noch **vor** dem Flip (C-8) liegen (Profil `anthropic` bzw. kein Profil). K10 FAIL, weil im Fenster 10-05…10-07 20 Instincts **ohne** Evidenz angelegt wurden (die 29 Legacy-Zeilen, die E-3 markiert) und 20 CRITICAL `instinct.bridge` + 8 `extractor returned ok=False` im Fenster liegen. **Kein v5-Verdikt ist vor E-3 belastbar.**
+
+### Gemessen (Host 201, Session-Ende)
+
+| | Wert |
+|---|---|
+| `is-enabled` / `is-active` tradingbot-scheduler | `disabled` / `inactive` (Hold unangetastet) |
+| `ps aux | grep scheduler.run` | 0 Treffer |
+| `bash scripts/install_units.sh --check` | exit 0 |
+| Σ (16 Suiten + root) | **2053** (+7 P16: 22), 16/16 grün |
+| `check_doc_rotation.py --strict` | exit 0 |
+
+### Next (der übernächste Block)
+
+- **E-2** (Shakedown-Vorregistrierung, 📕 `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION.md`) — **jetzt ausführbar geschrieben** (Plan **§19**, Doc-Commit dieser Session): Deliverable + **vollständiger Inhalts-Entwurf** + live geprüfte Anker + AK. Der Fenster = die ersten zwei Handelstage **nach** dem E-3-Start; gepinnt (am Code geprüft): `account=demo` · `max_trades=5` · `daily_loss_cap=1800.0` · `cycle=5min` · `llm_profile=research_m3` · `daily_token_budget=300 000` (Nicht-Ausnahme) · Ausnahme `MiniMax-M3`.
+  **T23-Gate:** der Nikinger gibt die Vorregistrierung **beim Commit** frei — der Commit der Datei wartet auf diese Freigabe.
+- **E-3** (Hold-Freigabe + Deploy, **Operator**) — macht den Flip 1 wirksam und erzeugt die K2/K11-Belege. Day-0-Check **zusätzlich**: `grep -c "discovery cycle" data/state/run_discovery.log` > 0.
+- **E-4** (Shakedown, 2 Handelstage, Operator — Journal-Export je Tag) → **E-5** (Auswertung + **D-2** K6-Einheit + **Flip 2**-Entscheidung + Prereg v5) → **E-6** (Closeout).
+- **D-2** bleibt ein **Nikinger-Entscheidungspunkt ohne Code** (K6-Einheit, nach dem Shakedown).
+- **Frist 2026-11-15** — Abo-Key/Endpoint: jedes `minimax`-Profil vor dem Datum zurückflippen (Default `anthropic`).
+
+### Open questions / blockers
+
+- **Review-Gate vor E-3 (AK22)** weiterhin ⏳ (Claude-Code-Session, Anthropic; Schwerpunkte B-5…B-10, C-4…C-6, B-3, B-2 — **plus E-1**, das Skript ist seit heute um 6 Evaluatoren größer).
+- **Modellwahl vertagt** (M3 vs. M3.1-Flash) — Profil und Modell sind getrennte Datenstellen.
+- **Frist 2026-11-15** (Abo) — im Phasenkopf + Plan §16 dokumentiert.
+- **K9-Regex unbewiesen:** der exakte Journal-Text eines Auto-Restarts (`Scheduled restart job, restart counter is at N`) existiert im Repo noch nicht (Plan §9 #8) — die erste echte Vorkommen muss gegen das Muster geprüft werden (E-4).
+
+### Session-end-Hinweis
+
+- **Σ 2053** (16 Suiten + root). meta_m1 informativ, nicht in Σ.
+- **Diese Session:** 1 Code-Commit (P16) + 1 Doku-Commit.
+- **Kern-Erkenntnis (neu):** ein Kriterium muss auch dann **fail-closed** sein, wenn sein Beleg *fehlt* — nicht nur, wenn sein Beleg *falsch* ist. Der Plan-Text von K7/K9 hätte beide Fälle vakuum-PASS gelassen; die Umsetzung schließt sie (F8).
+
 ## Session stopped — 2026-11-04 (Exec-Session #14 — **der nächste Block ist geschrieben**: Plan §18 = Block E / E-1 (Report v5) mit **re-verifizierten Ankern** (null Drift) + **2 live gemessenen Voraussetzungen**; **dokumentarische Session, kein Code** — Σ unverändert **2046**; Session-Ende + **Push**)
 
 > **Auftrag:** Nikinger 2026-11-04 (Web-Chat): „Sehr gut. Session beenden, next schreiben, commit, push." → (1) den **nächsten Block** (E-1) ausführbar schreiben, (2) die Session beenden, (3) committen, (4) pushen.

@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase8_scheduler_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-11 | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041) | 2026-11-03 (Phase-17 M-1 cross-phase edit — Bot-Provider MiniMax, additiv, Σ 2042) | 2026-11-03 (Phase-17 C-8 Flip 1 cross-phase edit — llm_profile=research_m3, additiv, Σ 2043) | 2026-11-04 (Phase-17 D-1 cross-phase edit — Token-Budget-Ausnahme an `budget_exempt_models`, additiv, Σ 2046)
+updated: 2026-07-11 | 2026-11-04 (Phase-17 E-2 cross-phase edit — Token-Budget-Ausnahme deckt die ganze MiniMax-Familie, additiv, Σ 2053) | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041) | 2026-11-03 (Phase-17 M-1 cross-phase edit — Bot-Provider MiniMax, additiv, Σ 2042) | 2026-11-03 (Phase-17 C-8 Flip 1 cross-phase edit — llm_profile=research_m3, additiv, Σ 2043) | 2026-11-04 (Phase-17 D-1 cross-phase edit — Token-Budget-Ausnahme an `budget_exempt_models`, additiv, Σ 2046)
 ---
 # CLAUDE.md — Phase 8: Scheduler (`phase8_scheduler/`)
 
@@ -562,6 +562,34 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 >   `phase17_testbed/CLAUDE.md` Session-#9-Block. Commits `698e9ea` (C-1) · `145e80e`
 >   (C-2) · `4190802` (C-3) · `1a61229` (C-4) · `edeeab8` (C-5) · `6d1f69d` (C-6).
 >   Push = Nikinger.
+
+> 🔁 **Phase-17 (Prüfstand) E-2 edit (2026-11-04, Exec-Session #16 — **additiv**, code = source of truth):**
+> Die **Token-Budget-Ausnahme** deckt jetzt die **ganze MiniMax-Familie** der C-7-Smoke ab.
+> **Rein daten** (3 Dateien, 1 Commit), Phase 8 bleibt für Bestands-Wire-ups bit-identisch
+> (Anthropic-Records zählen unverändert, das Cap bleibt 300 k):
+> - **`scheduler/config.py`** (Z. 150-160): `budget_exempt_models` ist jetzt
+>   `("MiniMax-M3", "MiniMax-M3.1-Flash")` — vorher `("MiniMax-M3",)`. Grund: der **Nikinger**
+>   hat am 2026-11-04 entschieden, **alle MiniMax-Modelle** auszunehmen (Rückfrage in der
+>   Session). Das Matching ist im Code überall **Exakt-Match** (`budget.py:187`,
+>   `webui/api.py:302`, `autonomy_report.py:494/509`, `llm_profiles.py:377`); eine Prefix-Regel
+>   wäre ein Cross-Phase-Edit über P16 hinaus gewesen und wurde vom Nikinger verworfen.
+> - **Warum das eine Datenzeile ist und kein Umbau:** die Ausnahme wirkt an **drei** P8- und
+>   **einer** P16-Stelle, aber alle vier lesen **dieselbe** Quelle (`SchedulerConfig` bzw.
+>   das `--exempt-model`-CLI). Ein Modell, das in der Liste fehlt, wird vom Startup-Check
+>   `check_llm_profile` **laut benannt** (Start verweigert) — kein stilles Zählen gegen das Cap.
+> - **Tests P8 299 → 299** (keine neue Testzahl, **zwei** Pins verschärft):
+>   `test_budget.py::test_budget_ignores_exempt_model_records` prüft jetzt **beide** IDs
+>   (der Flash-Record zählt nicht gegen das Cap) · `test_config.py::
+>   test_llm_profile_default_is_research_m3_with_the_minimax_model_exempt` pinnt das Tupel.
+>   **Negativ-Beweis:** mit dem Pre-Edit-`config.py` sind **beide** Tests rot.
+> - **Bekannte Lücke (kein Blocker):** `MiniMax-M3.1-Flash` hat **noch keine Preiszeile** in P4
+>   (`research/models.py`) ⇒ ein Modellwechsel M3 → Flash (Entscheidung in E-5) bräuchte
+>   zusätzlich eine Preiszeile `(0.0, 0.0)` (Abo), sonst verweigert `check_llm_profile` den
+>   Start („model has no price line"). **Bis dahin bleibt M3 aktiv.**
+> - Cross-Phase-Edit autorisiert: Nikinger-Entscheidung 2026-11-04 (Rückfrage in dieser
+>   Session) + Phase-17-Plan T13 (Code in P8 ✓). `phase17_testbed/CLAUDE.md` Session-#16-Block.
+
+---
 
 ---
 
