@@ -211,6 +211,26 @@ def test_get_price_failure_logs_warning_not_critical(caplog):
     ), "the external-dependency failure must not be logged CRITICAL"
 
 
+def test_local_defect_in_best_effort_block_stays_critical(caplog):
+    """Phase 17 AK22 R3: the B-8 ``try`` also wraps local code (``open_shadow_pair``,
+    ``store.insert``). A programming error there is a local defect, not an external
+    outage — it must stay ``critical`` so K5/AK11 still see it (otherwise AK11
+    turns green by construction)."""
+
+    class _BrokenStore(_RecordingStore):
+        def insert(self, trade):
+            raise NameError("name 'undefined_helper' is not defined")
+
+    engine = PaperEngine(_BrokenStore(), lambda epic: {"bid": 100.0, "ask": 100.5}, _Config())
+    with caplog.at_level(logging.WARNING):
+        engine.on_debate_abstain({}, _record())
+
+    assert any(
+        r.levelno == logging.CRITICAL and "PaperEngine.on_debate_abstain failed" in r.message
+        for r in caplog.records
+    ), f"expected CRITICAL for a local defect, got {[(r.levelname, r.message) for r in caplog.records]}"
+
+
 def test_paper_engine_count_lessons_today_delegates_to_store():
     store = _RecordingStore()
     engine = PaperEngine(store, lambda epic: {}, _Config())

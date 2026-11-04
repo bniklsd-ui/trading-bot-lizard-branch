@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -34,6 +35,19 @@ from abstain_lessons.models import AbstainReason, AbstainRecord
 from abstain_lessons.reflect import build_paper_lesson_prompt, validate_abstain_lesson
 
 logger = logging.getLogger("abstain_lessons.paper")
+
+# Phase 17 AK22 R3: the four B-8 best-effort blocks wrap local code too (prompt building,
+# open_shadow_pair, store writes). A programming error there is a local defect, never an
+# external outage — it stays CRITICAL so K5/AK11 still see it. Everything else (quote/LLM:
+# RuntimeError "get_price not ok", the SDK's API errors) is external → WARNING (B-8).
+_LOCAL_DEFECTS: tuple[type[BaseException], ...] = (
+    NameError, AttributeError, TypeError, ImportError, sqlite3.Error,
+)
+
+
+def _best_effort_level(exc: BaseException) -> int:
+    """Log level for a swallowed best-effort failure: CRITICAL for a local defect, else WARNING."""
+    return logging.CRITICAL if isinstance(exc, _LOCAL_DEFECTS) else logging.WARNING
 
 
 def _utc_iso(dt: datetime) -> str:
@@ -320,7 +334,7 @@ class PaperDebateCaller:
         except Exception as exc:  # noqa: BLE001 — best-effort, never raises (J)
             # Phase 17 B-8 (E4): external-dependency failure (quote/LLM) — WARNING;
             # an LLM outage is reported once by research_tick (LLM_UNAVAILABLE).
-            logger.warning("PaperDebateCaller.request_pick failed: %s", exc)
+            logger.log(_best_effort_level(exc), "PaperDebateCaller.request_pick failed: %s", exc)
             return None
         direction = answer.get("direction")
         if direction not in ("BUY", "SELL"):
@@ -387,7 +401,7 @@ class PaperEngine:
         except Exception as exc:  # noqa: BLE001 — best-effort, must never crash the cycle
             # Phase 17 B-8 (E4): external-dependency failure (quote/LLM) — WARNING;
             # an LLM outage is reported once by research_tick (LLM_UNAVAILABLE).
-            logger.warning("PaperEngine.on_debate_abstain failed: %s", exc)
+            logger.log(_best_effort_level(exc), "PaperEngine.on_debate_abstain failed: %s", exc)
 
     def _maybe_council_pick(self, record: AbstainRecord, quote: Mapping[str, float]) -> None:
         """§10.3: no-op unless a ``debate_caller`` is wired (default off) and the daily
@@ -468,7 +482,10 @@ class PaperEngine:
             except Exception as exc:  # noqa: BLE001 — isolate one epic's failure (J)
                 # Phase 17 B-8 (E4): external-dependency failure (quote/LLM) — WARNING;
                 # an LLM outage is reported once by research_tick (LLM_UNAVAILABLE).
-                logger.warning("PaperEngine.open_scheduled_pairs failed for %s: %s", epic, exc)
+                logger.log(
+                    _best_effort_level(exc),
+                    "PaperEngine.open_scheduled_pairs failed for %s: %s", epic, exc,
+                )
 
 
 class PaperTradeTracker:
@@ -706,6 +723,7 @@ class PaperTradeTracker:
             except Exception as exc:  # noqa: BLE001 — best-effort, must never crash the tick
                 # Phase 17 B-8 (E4): external-dependency failure (quote/LLM) — WARNING;
                 # an LLM outage is reported once by research_tick (LLM_UNAVAILABLE).
-                logger.warning(
-                    "PaperTradeTracker reflect failed for record %s: %s", record_id, exc
+                logger.log(
+                    _best_effort_level(exc),
+                    "PaperTradeTracker reflect failed for record %s: %s", record_id, exc,
                 )
