@@ -788,3 +788,379 @@ def test_k8_liveness_passes_on_live_day(tmp_path: Path) -> None:
     assert flags["bars"] >= 1
     assert flags["heartbeats"] >= 1
     assert flags["live"] is True
+
+
+# -- Phase 17 E-1 (Report v5) ----------------------------------------------------
+# Seven tests, one per E-1 acceptance anchor (Plan §18 E-1f). They pin the new
+# behaviour of the report against fixtures — no network, no live DB, no LLM.
+
+
+def _usage_entry(day: date, hour: int, minute: int, model: str, tokens: int) -> dict[str, object]:
+    """One ``llm_usage.json`` record (the 8-field shape ``token_meter`` writes)."""
+    ts = datetime(day.year, day.month, day.day, hour, minute, tzinfo=timezone.utc)
+    return {
+        "ts": ts.isoformat(),
+        "model": model,
+        "input_tokens": tokens // 2,
+        "output_tokens": tokens - tokens // 2,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0,
+    }
+
+
+def _write_usage_entries(path: Path, entries: list[dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(entries), encoding="utf-8")
+
+
+def _write_discovery_cycles(path: Path, days: list[date]) -> None:
+    """Write the Discovery daemon's append-only cycle lines (Phase-17 B-10)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = []
+    for d in days:
+        lines.append(
+            f"discovery cycle {d.isoformat()}T08:30:00.123Z: armed=True stale=0 "
+            "rows_written=0 errors=0"
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_health_events(path: Path, events: list[dict[str, object]]) -> None:
+    """Write arbitrary events into ``research_health.jsonl``."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        for ev in events:
+            fh.write(json.dumps(ev) + "\n")
+
+
+def _seed_instinct(
+    path: Path,
+    *,
+    created_utc: str,
+    evidence: str | None,
+    trigger: str = "avoid BUY",
+) -> None:
+    """Insert one row into the ``instincts`` table (Phase-15 migration 009)."""
+    conn = sqlite3.connect(str(path))
+    conn.execute(
+        "INSERT INTO instincts (trigger, domain, confidence, evidence_trade_ids_json, "
+        "contradictions_trade_ids_json, status, created_utc) VALUES (?,?,?,?,?,?,?)",
+        (trigger, "entry", 0.8, evidence, None, "proposed", created_utc),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _closed_trade(day: date, deal_id: str = "DIAAAA-TEST-0001") -> dict[str, object]:
+    """One CLOSED+autonomous+demo trade (the report's standard population)."""
+    return {
+        "deal_id": deal_id,
+        "epic": "IX.D.DAX.IFMM.IP",
+        "direction": "BUY",
+        "open_ts": f"{day.isoformat()}T09:30:00+02:00",
+        "close_ts": f"{day.isoformat()}T10:00:00+02:00",
+        "status": "CLOSED",
+        "session_date": day.isoformat(),
+        "created_at": f"{day.isoformat()}T09:30:00+02:00",
+        "updated_at": f"{day.isoformat()}T10:00:00+02:00",
+        "account": "demo",
+        "provenance": "autonomous",
+    }
+
+
+def test_v4_default_criteria_unchanged(tmp_path: Path) -> None:
+    """E-1 regression pin: the default preregistration stays **v4** and stays
+    verdict-identical. The v4 report knows exactly the eight criteria K1–K8 —
+    K9/K10/K11 only exist under ``--prereg v5`` — and the token exemption is
+    *not* applied without being asked for (the two new payload keys are
+    structurally present, with value 0)."""
+    args = autonomy_report._parse_args([])
+    assert args.prereg == "v4"
+    assert args.journal_file is None
+    assert args.expect_llm_profile is None
+    assert args.exempt_model is None
+    assert autonomy_report._parse_args(["--prereg", "v5"]).prereg == "v5"
+
+    trading_db = tmp_path / "trading.sqlite"
+    bars_db = tmp_path / "bars.sqlite"
+    state_dir = tmp_path / "state"
+    day = date(2026, 9, 8)
+    _seed_trading_db(trading_db, [_closed_trade(day)])
+    _seed_bars_db(bars_db, [day])
+    _build_state_dir(state_dir, days=[day], heartbeat_events=[(day, True)])
+    _write_usage_entries(state_dir / "llm_usage.json", [
+        _usage_entry(day, 9, 0, "claude-sonnet-4-6", 400_000),
+    ])
+
+    rep = autonomy_report._build_summary_report(
+        day, day,
+        state_dir=state_dir, bars_db=bars_db, trading_db=trading_db,
+        threshold=300_000, expected_max_trades=5, expected_daily_loss_cap=1800.0,
+    )
+    payload = rep.to_dict()
+    assert set(payload["criteria"].keys()) == {str(i) for i in range(1, 9)}
+    # The exemption is off by default → the 400 k burn still fails K6.
+    assert payload["criteria"]["6"]["verdict"] == "FAIL"
+    budget = payload["criteria"]["6"]["measured"]["budget_per_day"][day.isoformat()]
+    assert budget["tokens"] == 400_000
+    assert budget["exempt_tokens"] == 0
+    assert budget["exempt_calls"] == 0
+    # The per-day helper carries the two new keys structurally, even without exemptions.
+    per_day = autonomy_report.llm_usage_per_day(state_dir / "llm_usage.json")
+    assert per_day[day]["exempt_tokens"] == 0
+    assert per_day[day]["exempt_calls"] == 0
+    assert per_day[day]["tokens"] == 400_000
+
+
+def test_k2_v5_requires_discovery_cycle_every_day(tmp_path: Path) -> None:
+    """E-1 K2-v5: every trading day needs scheduler health, recorder bars **and**
+    a Discovery cycle. v4's Discovery signal was a proxy (the scheduler's own
+    JSONL events), so a day with health events but a dead Discovery daemon read
+    as PASS in v4 — v5 reads the Discovery daemon's own append-only cycle line."""
+    state_dir = tmp_path / "state"
+    bars_db = tmp_path / "bars.sqlite"
+    day = date(2026, 9, 8)
+    _seed_bars_db(bars_db, [day])
+    _build_state_dir(state_dir, days=[day], heartbeat_events=[(day, True)])
+
+    # No discovery log at all → the Discovery arm has no evidence → FAIL.
+    result = autonomy_report.evaluate_k2_v5(state_dir, bars_db, day, day)
+    assert result.verdict == "FAIL"
+    assert result.measured["per_day"][day.isoformat()]["discovery_cycles"] == 0
+    assert result.measured["per_day"][day.isoformat()]["scheduler_health_events"] >= 1
+    assert result.measured["per_day"][day.isoformat()]["recorder_bars_per_day"] >= 1
+
+    # One cycle line (Phase-17 B-10 format) → all three signals → PASS.
+    _write_discovery_cycles(state_dir / "run_discovery.log", [day])
+    result = autonomy_report.evaluate_k2_v5(state_dir, bars_db, day, day)
+    assert result.verdict == "PASS"
+    assert result.measured["per_day"][day.isoformat()]["discovery_cycles"] == 1
+
+    # The cycle counter is per Berlin day — a cycle on another day does not help.
+    other = date(2026, 9, 9)
+    _write_discovery_cycles(state_dir / "run_discovery.log", [other])
+    result = autonomy_report.evaluate_k2_v5(state_dir, bars_db, day, day)
+    assert result.verdict == "FAIL"
+
+
+def test_k6_v5_ignores_exempt_model_tokens(tmp_path: Path) -> None:
+    """E-1 K6-v5 (D-1 continuation): the Abo models are measured, not capped.
+    Their tokens land in ``exempt_tokens`` / ``exempt_calls`` and are skipped in
+    the ``exhausted_at`` cumulative sum — exactly like ``scheduler/budget.py``
+    (Phase-17 D-1). Without that, the report would declare the budget empty
+    while the budget gate still has headroom."""
+    state_dir = tmp_path / "state"
+    day = date(2026, 9, 8)
+    usage = state_dir / "llm_usage.json"
+    # 400 k tokens from the exempt Abo model → v4 FAIL, v5 PASS.
+    _write_usage_entries(usage, [_usage_entry(day, 9, 0, "MiniMax-M3", 400_000)])
+
+    v4 = autonomy_report.evaluate_k6(usage, day, day, threshold=300_000)
+    assert v4.verdict == "FAIL"
+
+    v5 = autonomy_report.evaluate_k6_v5(
+        usage, day, day, threshold=300_000, exempt_models=("MiniMax-M3",)
+    )
+    assert v5.verdict == "PASS"
+    assert v5.measured["exempt_tokens_per_day"][day.isoformat()] == 400_000
+    assert v5.measured["exempt_calls_per_day"][day.isoformat()] == 1
+    assert v5.measured["budget_per_day"][day.isoformat()]["tokens"] == 0
+    assert v5.measured["budget_per_day"][day.isoformat()]["exhausted_at"] is None
+
+    # The same burn from a NON-exempt model still fails.
+    _write_usage_entries(usage, [_usage_entry(day, 9, 0, "claude-sonnet-4-6", 400_000)])
+    v5_paid = autonomy_report.evaluate_k6_v5(
+        usage, day, day, threshold=300_000, exempt_models=("MiniMax-M3",)
+    )
+    assert v5_paid.verdict == "FAIL"
+    assert v5_paid.measured["exempt_tokens_per_day"][day.isoformat()] == 0
+
+
+def test_k7_v5_fails_on_profile_change_in_window(tmp_path: Path) -> None:
+    """E-1 K7-v5: every ``starting scheduler daemon`` line inside the window
+    must carry the expected ``llm_profile`` (Phase-17 C-4 wrote it into the
+    start line). A profile change inside the window is a FAIL — and with no
+    start-line at all the pin cannot be confirmed ⇒ FAIL (fail-closed, F8)."""
+    trading_db = tmp_path / "trading.sqlite"
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    scheduler_log = state_dir / "run_scheduler.log"
+    day = date(2026, 9, 8)
+    _seed_trading_db(trading_db, [])
+
+    def _start(ts: str, profile: str | None) -> str:
+        inner = "account=demo, max_trades=5, daily_loss_cap=1800.0, cycle=5min"
+        if profile is not None:
+            inner += f", llm_profile={profile}"
+        return f"{ts} INFO scheduler.run: starting scheduler daemon ({inner})."
+
+    # (a) one start-line with the expected profile → PASS.
+    scheduler_log.write_text(_start("2026-09-08 09:00:00,000", "research_m3") + "\n", encoding="utf-8")
+    result = autonomy_report.evaluate_k7_v5(
+        trading_db, scheduler_log, day, day, expected_llm_profile="research_m3"
+    )
+    assert result.verdict == "PASS"
+    assert result.measured["llm_profile"]["start_lines_in_window"] == 1
+    assert result.measured["llm_profile"]["observed_profiles"] == ["research_m3"]
+
+    # (b) a second start-line with a different profile inside the window → FAIL.
+    scheduler_log.write_text(
+        _start("2026-09-08 09:00:00,000", "research_m3") + "\n"
+        + _start("2026-09-08 11:00:00,000", "anthropic") + "\n",
+        encoding="utf-8",
+    )
+    result = autonomy_report.evaluate_k7_v5(
+        trading_db, scheduler_log, day, day, expected_llm_profile="research_m3"
+    )
+    assert result.verdict == "FAIL"
+    assert result.measured["llm_profile"]["mismatched_profiles"] == ["anthropic"]
+
+    # (c) no start-line inside the window → the pin cannot be confirmed → FAIL.
+    scheduler_log.write_text(
+        _start("2026-09-07 09:00:00,000", "research_m3") + "\n", encoding="utf-8"
+    )
+    result = autonomy_report.evaluate_k7_v5(
+        trading_db, scheduler_log, day, day, expected_llm_profile="research_m3"
+    )
+    assert result.verdict == "FAIL"
+    assert result.measured["llm_profile"]["start_lines_in_window"] == 0
+
+    # (d) without an expected profile the v4 caps rule applies (and passes).
+    result = autonomy_report.evaluate_k7_v5(trading_db, scheduler_log, day, day)
+    assert result.verdict == "PASS"
+    assert result.measured["llm_profile"]["checked"] is False
+
+
+def test_k9_counts_scheduled_restart_jobs_and_na_without_file(tmp_path: Path) -> None:
+    """E-1 K9: restart jobs per Berlin day ≤ 10. Without a journal file the
+    criterion is NA (not measurable) — it never blocks a run without an export.
+    A restart-job line without a parsable timestamp cannot be assigned to a day
+    ⇒ FAIL (the per-day bound cannot be proven)."""
+    day = date(2026, 9, 8)
+
+    without_file = autonomy_report.evaluate_k9(None, day, day)
+    assert without_file.verdict == "NA"
+    assert without_file.measured["journal_file"] is None
+
+    journal = tmp_path / "journal.txt"
+    journal.write_text(
+        "\n".join(
+            f"2026-09-08T{9 + i // 60:02d}:{i % 60:02d}:00+0200 host unit[1]: "
+            "Scheduled restart job, restart counter is at 1"
+            for i in range(10)
+        ) + "\n",
+        encoding="utf-8",
+    )
+    result = autonomy_report.evaluate_k9(journal, day, day)
+    assert result.verdict == "PASS"
+    assert result.measured["per_day"][day.isoformat()] == 10
+
+    journal.write_text(
+        "\n".join(
+            f"2026-09-08T{9 + i // 60:02d}:{i % 60:02d}:00+0200 host unit[1]: "
+            "Scheduled restart job, restart counter is at 1"
+            for i in range(11)
+        ) + "\n",
+        encoding="utf-8",
+    )
+    result = autonomy_report.evaluate_k9(journal, day, day)
+    assert result.verdict == "FAIL"
+    assert result.measured["offenders"][day.isoformat()] == 11
+
+    # A restart job without a parsable timestamp cannot be attributed → fail-closed.
+    journal.write_text(
+        "Scheduled restart job, restart counter is at 1\n", encoding="utf-8"
+    )
+    result = autonomy_report.evaluate_k9(journal, day, day)
+    assert result.verdict == "FAIL"
+    assert result.measured["unattributed_lines"] == 1
+
+
+def test_k10_na_without_close_fail_on_bridge_critical(tmp_path: Path) -> None:
+    """E-1 K10: the instinct bridge must be healthy for the trades closed in the
+    window. No CLOSE ⇒ NA (nothing to judge). A CRITICAL ``instinct.bridge``
+    line ⇒ FAIL. An instinct created in the window without evidence trade ids
+    ⇒ FAIL (an instinct without evidence is a hallucinated rule)."""
+    trading_db = tmp_path / "trading.sqlite"
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    scheduler_log = state_dir / "run_scheduler.log"
+    day = date(2026, 9, 8)
+    other = date(2026, 9, 9)
+
+    _seed_trading_db(trading_db, [])
+    scheduler_log.write_text("", encoding="utf-8")
+    result = autonomy_report.evaluate_k10(trading_db, scheduler_log, day, day)
+    assert result.verdict == "NA"
+
+    _seed_trading_db(trading_db, [_closed_trade(day)])
+    result = autonomy_report.evaluate_k10(trading_db, scheduler_log, day, day)
+    assert result.verdict == "PASS"
+    assert result.measured["closed_autonomous_trades_in_window"] == 1
+
+    # A CRITICAL from the bridge inside the window → FAIL.
+    scheduler_log.write_text(
+        "2026-09-08 10:05:00,000 CRITICAL instinct.bridge: instinct.bridge: "
+        "after_trade_closed failed for trade_id=1: boom\n",
+        encoding="utf-8",
+    )
+    result = autonomy_report.evaluate_k10(trading_db, scheduler_log, day, day)
+    assert result.verdict == "FAIL"
+    assert result.measured["bridge_critical_lines"] == 1
+
+    # An instinct created in the window without evidence → FAIL.
+    scheduler_log.write_text("", encoding="utf-8")
+    _seed_instinct(trading_db, created_utc=f"{day.isoformat()}T10:30:00.000Z", evidence=None)
+    result = autonomy_report.evaluate_k10(trading_db, scheduler_log, day, day)
+    assert result.verdict == "FAIL"
+    assert result.measured["instincts_created_in_window"] == 1
+    assert result.measured["instincts_without_evidence"] == 1
+
+    # The same instinct *with* evidence → PASS; an instinct from another day is out of scope.
+    _seed_instinct(
+        trading_db, created_utc=f"{day.isoformat()}T10:31:00.000Z", evidence="[1]"
+    )
+    result = autonomy_report.evaluate_k10(trading_db, scheduler_log, day, day)
+    assert result.verdict == "FAIL"  # the first (evidence-less) row is still in the window
+    _seed_instinct(
+        trading_db, created_utc=f"{other.isoformat()}T10:31:00.000Z", evidence="[1]"
+    )
+    assert autonomy_report.evaluate_k10(trading_db, scheduler_log, other, other).verdict == "NA"
+
+
+def test_k11_requires_divergence_event_every_trading_day(tmp_path: Path) -> None:
+    """E-1 K11: every trading day needs ≥ 1 divergence event (``divergence_ok``
+    or ``quote_divergence``). Before Phase-17 B-2 the sampler never compared
+    anything — this criterion is the proof that the comparison arm is alive."""
+    state_dir = tmp_path / "state"
+    health = state_dir / "research_health.jsonl"
+    day1 = date(2026, 9, 8)
+    day2 = date(2026, 9, 9)
+
+    _write_health_events(health, [{
+        "event": "divergence_ok",
+        "epic": "IX.D.DAX.IFMM.IP",
+        "delta": 0.01,
+        "ts": f"{day1.isoformat()}T09:30:00+00:00",
+    }])
+    result = autonomy_report.evaluate_k11(health, day1, day2)
+    assert result.verdict == "FAIL"
+    assert result.measured["days_without_event"] == [day2.isoformat()]
+
+    _write_health_events(health, [
+        {
+            "event": "divergence_ok",
+            "epic": "IX.D.DAX.IFMM.IP",
+            "delta": 0.01,
+            "ts": f"{day1.isoformat()}T09:30:00+00:00",
+        },
+        {
+            "event": "quote_divergence",
+            "epic": "IX.D.DAX.IFMM.IP",
+            "pct": 1.2,
+            "ts": f"{day2.isoformat()}T09:30:00+00:00",
+        },
+    ])
+    result = autonomy_report.evaluate_k11(health, day1, day2)
+    assert result.verdict == "PASS"
+    assert result.measured["per_day"][day2.isoformat()] == 1
