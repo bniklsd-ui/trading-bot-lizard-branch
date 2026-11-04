@@ -912,6 +912,41 @@ def test_v4_default_criteria_unchanged(tmp_path: Path) -> None:
     assert per_day[day]["tokens"] == 400_000
 
 
+def test_v5_summary_reports_k3_k4_without_judging_them(tmp_path: Path) -> None:
+    """Phase 17 AK22 R1: the Shakedown-Prereg reports K3/K4 but does not judge them.
+    K4 is PARTIAL in every 2-day window (it is measured against the 10-day registered
+    window), so judging it made a v5 shakedown unable to ever PASS / exit 0. Under v5
+    K3 FAIL + K4 PARTIAL + every other criterion PASS ⇒ overall PASS; v4 still judges
+    all eight (Phase-16 contract unchanged)."""
+    day = date(2026, 9, 8)
+    C = autonomy_report.CriterionResult
+    crit = {k: C(k, "PASS", {}, "") for k in ("1", "2", "5", "6", "7", "8", "9", "10", "11")}
+    crit["3"] = C("3", "FAIL", {}, "")
+    crit["4"] = C("4", "PARTIAL", {}, "")
+
+    v5 = autonomy_report.SummaryReport(day, day, criteria=crit, reported_only=("3", "4"))
+    payload = v5.to_dict()
+    assert payload["overall_verdict"] == "PASS"
+    assert payload["reported_only"] == ["3", "4"]
+    assert payload["criteria"]["3"]["verdict"] == "FAIL"  # still reported (raw number)
+    v4 = autonomy_report.SummaryReport(day, day, criteria=crit).to_dict()
+    assert v4["overall_verdict"] == "FAIL"
+    assert "reported_only" not in v4  # v4 payload byte-identical
+
+    trading_db = tmp_path / "trading.sqlite"
+    bars_db = tmp_path / "bars.sqlite"
+    state_dir = tmp_path / "state"
+    _seed_trading_db(trading_db, [_closed_trade(day)])
+    _seed_bars_db(bars_db, [day])
+    _build_state_dir(state_dir, days=[day], heartbeat_events=[(day, True)])
+    common = dict(
+        state_dir=state_dir, bars_db=bars_db, trading_db=trading_db,
+        threshold=300_000, expected_max_trades=5, expected_daily_loss_cap=1800.0,
+    )
+    assert autonomy_report._build_summary_report(day, day, prereg="v5", **common).reported_only == ("3", "4")
+    assert autonomy_report._build_summary_report(day, day, **common).reported_only == ()
+
+
 def test_k2_v5_requires_discovery_cycle_every_day(tmp_path: Path) -> None:
     """E-1 K2-v5: every trading day needs scheduler health, recorder bars **and**
     a Discovery cycle. v4's Discovery signal was a proxy (the scheduler's own

@@ -739,9 +739,15 @@ class SummaryReport:
     criteria: dict[str, CriterionResult] = field(default_factory=dict)
     n_trading_days: int = 0
     warnings: list[str] = field(default_factory=list)
+    # Phase 17 AK22 R1: criteria that are reported but not judged (Prereg v5 Shakedown:
+    # K3/K4 are 10-day criteria — K4 is PARTIAL in every 2-day window, so judging them
+    # would make the shakedown unable to ever PASS). Empty ⇒ every criterion is judged (v4).
+    reported_only: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        verdicts = {c.verdict for c in self.criteria.values()}
+        verdicts = {
+            c.verdict for k, c in self.criteria.items() if k not in self.reported_only
+        }
         # Precedence ERROR > FAIL > PARTIAL > PASS: a PARTIAL (e.g. K4 on a sub-window)
         # must not read as clean PASS, but it is not a failure either — it means the
         # query can't judge that criterion, not that the criterion was violated.
@@ -760,6 +766,7 @@ class SummaryReport:
             "criteria": {k: v.to_dict() for k, v in self.criteria.items()},
             "warnings": list(self.warnings),
             "overall_verdict": overall,
+            **({"reported_only": list(self.reported_only)} if self.reported_only else {}),
         }
 
 
@@ -1787,6 +1794,12 @@ def _build_summary_report(
     exempt_models: tuple[str, ...] = (),
 ) -> SummaryReport:
     report = SummaryReport(from_day=from_day, to_day=to_day)
+    if prereg == "v5":
+        # Phase 17 AK22 R1: the Shakedown-Prereg reports K3/K4 without judging them
+        # (PHASE17_SHAKEDOWN_PREREGISTRATION.md "PASS = alle berichtenden Kriterien").
+        # K4 is the only PARTIAL emitter, so v5 overall stays PASS/FAIL/ERROR and the
+        # exit map below matches the prereg; v4 keeps PARTIAL → 1 (Phase 16 R3.2).
+        report.reported_only = ("3", "4")
     report.n_trading_days = sum(1 for _ in _iter_trading_days(from_day, to_day))
     # Summary covers the full Berlin range [from_day 00:00, to_day 24:00).
     # _berlin_day_bounds(to_day)[1] is Berlin-00:00 of the next day (end-exclusive).
