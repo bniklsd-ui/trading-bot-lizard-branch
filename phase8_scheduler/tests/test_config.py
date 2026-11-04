@@ -210,11 +210,15 @@ def test_llm_profile_default_is_research_m3_with_the_minimax_model_exempt() -> N
     The exempt model id is a literal in three places (``llm_profiles._M3.model``,
     the price line in ``research/models.py``, this list) — ``check_llm_profile``
     names the forgotten one at startup, so this test pins only the pair.
+
+    Phase 17 E-2 (2026-11-04, Nikinger): the exemption covers the **whole MiniMax
+    family** of the C-7 smoke — ``MiniMax-M3`` (active) and ``MiniMax-M3.1-Flash``
+    (reserve; the model choice is still open, decided in E-5).
     """
     cfg = SchedulerConfig()
 
     assert cfg.llm_profile == "research_m3"
-    assert cfg.budget_exempt_models == ("MiniMax-M3",)
+    assert cfg.budget_exempt_models == ("MiniMax-M3", "MiniMax-M3.1-Flash")
 
 
 def test_default_profile_moves_only_the_research_role_to_minimax() -> None:

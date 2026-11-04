@@ -151,7 +151,13 @@ class SchedulerConfig:
     # Abo/M Plan ⇒ Grenzkosten 0; Nikinger 2026-11-03). The model id is a literal in three places
     # (llm_profiles._M3.model, the price line in research/models.py, and this list) —
     # check_llm_profile names the forgotten one at startup.
-    budget_exempt_models: tuple[str, ...] = ("MiniMax-M3",)
+    # Phase 17 E-2 (2026-11-04, Nikinger-Entscheidung): the exemption covers the **whole MiniMax
+    # family** of the C-7 smoke — "MiniMax-M3" (active profile research_m3/all_m3) and
+    # "MiniMax-M3.1-Flash" (reserve; the model choice M3 vs. Flash is still open, decided in E-5).
+    # Matching is exact (budget.py / webui/api.py / autonomy_report.py all use ``model in …``),
+    # so a *future* MiniMax model needs an entry here — check_llm_profile refuses the start and
+    # names the missing id instead of silently counting it against the cap.
+    budget_exempt_models: tuple[str, ...] = ("MiniMax-M3", "MiniMax-M3.1-Flash")
 
     # --- reconcile ---
     reconcile_interval_min: int = 15

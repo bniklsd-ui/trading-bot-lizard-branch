@@ -226,18 +226,23 @@ def test_satisfies_autoconfirm_budget_protocol(tmp_path) -> None:
 
 
 def test_budget_ignores_exempt_model_records(tmp_path) -> None:
-    """An exempt model's tokens (MiniMax-M3, Abo/M Plan) do NOT count against the cap.
+    """An exempt model's tokens (MiniMax family, Abo/M Plan) do NOT count against the cap.
 
     The Anthropic record next to it **does** count — the cap binds the paid models only.
     Without the exemption the (free at the margin) MiniMax calls would eat the 300 k budget
     of the Anthropic calls (Plan §16 / §17 D-1).
+
+    Phase 17 E-2 (2026-11-04, Nikinger): the exemption covers the **whole MiniMax family**
+    of the C-7 smoke — both ids are pinned here, because the matching is exact and a
+    forgotten family member would silently count against the cap.
     """
     config = SchedulerConfig(daily_token_budget=1000)
-    assert config.budget_exempt_models == ("MiniMax-M3",)   # the shipped default (C-2 / M-1)
+    assert config.budget_exempt_models == ("MiniMax-M3", "MiniMax-M3.1-Flash")  # shipped default
     path = _write_log(
         tmp_path,
         [
             _rec("2026-06-28T09:00:00.000Z", inp=4000, out=1000, model="MiniMax-M3"),
+            _rec("2026-06-28T09:01:00.000Z", inp=4000, out=1000, model="MiniMax-M3.1-Flash"),
             _rec("2026-06-28T09:05:00.000Z", inp=400, out=100),
         ],
     )
