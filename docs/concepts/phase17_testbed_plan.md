@@ -10,7 +10,7 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-11-04 (**§21 Nachtrag — Ausführungsblock AK22** (Review-Gate vor E-3): **Harness Claude Code (Anthropic, Opus)** — §14.2 „Claude Code macht nur das Review-Gate"; 22 Code-Commits (SHA-Liste), 5 Pflicht-Schwerpunkte + 7 Ergänzungen mit konkreten Fragen, „nicht tun"-Liste, AK22-Output-Format) | 2026-11-04 (**§20 Nachtrag — Ausführungsblock E-3** (Deploy + Day-0-Verifikation): Reihenfolge, live gemessene Sollwerte (3 770 `ig`-Bars · 29 Instincts · 0 OPEN · Allowance-Expiry **vergangen**), **7 Day-0-Checks**, K2/K11-Wann-First-Events (13:00), 7 Fehlgriffe, AK) | 2026-11-04 (**§19 Nachtrag — Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable + Inhalts-Entwurf + live geprüfte Anker + AK; **§18 ausgeführt 2026-11-04: E-1 ✅**, Commit `adc905f`, Σ **2053**) | 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
+updated: 2026-11-05 (**§22 Nachtrag — Ausführungsblock E-3 nach AK22**: AK22 ✅ Review PASS nach Fix (R1 `1766a96` · R2 `9287b3e` · R3 `9f07ab0`); E-3 komplett am Morgen von D1, Scheduler-Start **vor 09:00 Berlin**; Day-0-Checks im Fenster + Check #8 (`is-active`); Kalender D1 ≤ Do 2026-11-12 (Frist 11-15); Sollwerte 2026-11-05 re-gemessen (unverändert); Report-Erwartung `reported_only: [3, 4]`) | 2026-11-04 (**§21 Nachtrag — Ausführungsblock AK22** (Review-Gate vor E-3): **Harness Claude Code (Anthropic, Opus)** — §14.2 „Claude Code macht nur das Review-Gate"; 22 Code-Commits (SHA-Liste), 5 Pflicht-Schwerpunkte + 7 Ergänzungen mit konkreten Fragen, „nicht tun"-Liste, AK22-Output-Format) | 2026-11-04 (**§20 Nachtrag — Ausführungsblock E-3** (Deploy + Day-0-Verifikation): Reihenfolge, live gemessene Sollwerte (3 770 `ig`-Bars · 29 Instincts · 0 OPEN · Allowance-Expiry **vergangen**), **7 Day-0-Checks**, K2/K11-Wann-First-Events (13:00), 7 Fehlgriffe, AK) | 2026-11-04 (**§19 Nachtrag — Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable + Inhalts-Entwurf + live geprüfte Anker + AK; **§18 ausgeführt 2026-11-04: E-1 ✅**, Commit `adc905f`, Σ **2053**) | 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
 ---
 
 # Phase 17 — Prüfstand: Execution-ready Plan (2026-10-17)
@@ -2386,3 +2386,76 @@ cycle=5min, llm_profile=research_m3).` (Format: `phase8_scheduler/scheduler/run.
 E-4 (2 Handelstage, Journal-Export je Tag) → E-5 (Report + D-2 + Flip-2 + Modellwahl + **Prereg v5**) →
 E-6 (Closeout). **Frist 2026-11-15** (MiniMax-Abo): läuft der 10-Tage-Lauf nach dem Datum, muss
 Prereg v5 `anthropic` pinnen (oder das Abo verlängert sein).
+
+---
+
+## §22 Ausführungsblock E-3 (Nachtrag nach AK22) — Start am Morgen von D1, Day-0 im Fenster (2026-11-05)
+
+> **Der nächste Block.** AK22 ist ✅ **Review PASS nach Fix** (Review-Session #17, 2026-11-04 —
+> Phasenkopf, Abschnitt „AK22 — Review-Gate-Ergebnis"). **§20 bleibt die Deploy-Sequenz** (E-3a
+> Schritte 1–7, E-3b Sollwerte, E-3c Checks, E-3e Fehlgriffe). Dieser Nachtrag ändert nur, **wann**
+> E-3 läuft, **wo** die Day-0-Checks liegen und was der Report **erwartet** — kein Code.
+> **E-3 ist Operator-Arbeit**; die Exec-Session verifiziert danach und dokumentiert.
+
+### E-22a — Was sich gegenüber §20 ändert
+
+| Punkt | §20 | jetzt | Grund |
+|---|---|---|---|
+| **Zeitpunkt** | offen | **alle** E-3-Schritte am Morgen von **D1**, Scheduler-Start (§20 Schritt 6) **vor 09:00 Berlin**, D1 = Mo–Fr | AK22 **R2 (a)**, `9287b3e`. Sonst liegt die Start-Zeile vor dem Fenster ⇒ K7-v5 FAIL by construction |
+| **Day-0-Checks** | Tag 0 vor dem Fenster | laufen **auf D1 = im Fenster**; ein gescheiterter Check ist ein Befund ⇒ FAIL-Regel (`-S2` + neuer Lauf) | Konsequenz aus R2 (a) — kein Puffertag mehr |
+| **Day-0-Check #8 (neu)** | — | `systemctl --user is-active` aller vier Units = `active` | AK22 **H4**: die Start-Zeile steht **vor** dem Preflight (`run.py:203-219`) — sie allein beweist nicht, dass der Daemon läuft |
+| **Report-Erwartung** | Exit 0 unerreichbar (K4 strukturell `PARTIAL`) | v5 bewertet K3/K4 nicht; Payload trägt `"reported_only": ["3", "4"]`; **Exit 0 = PASS erreichbar** | AK22 **R1**, `1766a96` |
+| **AK11 / K5** | B-8: Paper-Ausfälle WARNING | Programmierfehler in denselben Blöcken bleiben **CRITICAL** | AK22 **R3**, `9f07ab0` — AK11 misst wieder echt |
+
+### E-22b — Kalender (Frist 2026-11-15)
+
+- D1 = der E-3-Tag, D2 = der nächste Handelstag. **Beide vor dem Abo-Ende** ⇒ D2 ≤ **Fr 2026-11-13**
+  ⇒ **spätestes D1 = Do 2026-11-12**. Frühestes D1 = der nächste Handelstag-Morgen nach dem Push
+  (heute Do 2026-11-05 ⇒ **Fr 2026-11-06**, D2 = Mo 2026-11-09).
+- Kein Feiertagskalender im Report (Prereg „ehrlich"); im Zeitraum 11-06 … 11-13 liegt kein
+  bundesweiter Feiertag.
+- Ein Fenster, das nach 2026-11-15 endet, ist mit `research_m3` **nicht** zulässig (§16).
+
+### E-22c — Ablauf am D1-Morgen (Operator)
+
+| Zeit (Berlin) | Schritt | Beleg |
+|---|---|---|
+| **≤ 08:00** | Vorbedingungen: `git fetch origin main && git status -sb` ⇒ `main...origin/main` ohne `ahead`/`behind` (HEAD liegt auf `origin`) · `bash scripts/install_units.sh --check` exit 0 (Hold aktiv) · `ps aux \| grep scheduler.run \| grep -v grep` leer | Ausgabe in den Session-Block |
+| 08:00–08:40 | §20 E-3a **Schritte 1–5** unverändert (Hold-Freigabe · 4 Dienste stoppen · Backups · T14 `DELETE` · T12 `UPDATE` · Units installieren) | Sollwerte E-22d |
+| **vor 09:00** (Puffer ≥ 15 min) | §20 **Schritt 6** (Start) + **Schritt 7** (Start-Zeile) | Zeitstempel der Start-Zeile < `09:00:00` am D1 |
+| direkt danach | **Aktiv-Block** der Vorregistrierung eintragen: Start-Zeitstempel · D1 · D2 · HEAD (`git rev-parse --short HEAD`) · offene Position `0` · Re-Adoption-Probe „nicht anwendbar" | die einzige erlaubte Eintragung in der gelockten Datei |
+
+### E-22d — Sollwerte, am 2026-11-05 erneut gemessen (read-only, unverändert gegenüber §20)
+
+| Größe | Wert |
+|---|---|
+| `bars.sqlite` `source='ig'` | **3 770** Zeilen, `MAX(ts_utc)` 2026-10-19T09:05Z ⇒ `DELETE` erwartet `changes() = 3770` |
+| `instincts` | **29**, davon 29 ohne Evidenz, **0** mit `[legacy-p16] ` ⇒ `UPDATE` erwartet `changes() = 29` |
+| `trade_outcomes` OPEN | **0** ⇒ keine Re-Adoption beim Start |
+| `allowance_observations` (letzte) | 2026-10-19T07:08:39Z, 9 923 übrig, expiry **2026-10-26** = vergangen ⇒ Check #7 entscheidet |
+| `run_discovery.log` `discovery cycle` | **0** (Daemon noch Pre-B-10) ⇒ der Neustart in Schritt 6 ist Pflicht |
+| Hold-Marker | vorhanden (`data/state/SCHEDULER_HELD`) |
+
+### E-22e — Day-0-Checks auf D1, sortiert nach Verfügbarkeit
+
+| Wann | Check (§20 E-3c-Nummer) | Warum dann |
+|---|---|---|
+| **vor 09:00**, nach dem Start | **#1** kein `preflight failed` · **#2** Start-Zeile mit `llm_profile=research_m3` · **#8 (neu)** alle vier Units `active` · **#5** `discovery cycle` ≥ 1 | Discovery ruft `run_once()` **sofort** beim Start (`source_registry/run.py:290-291`), nicht erst nach `interval_s` |
+| ab dem **ersten WINDOW-Zyklus (09:00)** | **#3** erster Research-Record `MiniMax-M3` · **#6** `abstain_record_id` gesetzt (nach dem ersten NO_TRADE) · **#4** neue `ig`-Bars mit `ts_utc <= fetched_at` · **#7** neue Allowance-Zeile `remaining > 0` | Research, Executor und IG-Abrufe laufen nur im WINDOW |
+| ab **13:00** | K11-Beleg (erster echter Vergleich, §20 E-3d) | kein Day-0-Check — Tag-1-Evidenz |
+
+Ein **rotes** Ergebnis in einem der acht Checks: Wortlaut + Rohwert in den Phasenkopf, dann FAIL-Regel
+der Vorregistrierung — **kein** Hotfix im Fenster.
+
+### E-22f — Danach (unverändert)
+
+E-4 = zwei Handelstage Laufzeit, kein Eingriff außer den erlaubten Ereignissen. Nach D2: Journal-Export
+und Report-Befehl **wörtlich** aus der Vorregistrierung (Abschnitt „Report-Befehl"). Erwartung an den
+Payload: `reported_only: ["3", "4"]`, Exit 0/1/2 = PASS/FAIL/ERROR. Danach E-5 (Auswertung + D-2 +
+Flip-2-Entscheidung + Modellwahl + **Prereg v5** mit AK22-H1 als Input) → E-6 (Closeout).
+
+### E-22g — AK (E-3 nach AK22)
+
+- Start-Zeile auf **D1 vor 09:00** (Zeitstempel im Aktiv-Block) · HEAD == `origin/main` beim Start ·
+  **8/8** Day-0-Checks im Phasenkopf (Wortlaut + Rohwert) · Aktiv-Block eingetragen · Σ **unverändert
+  2055** (E-3 ist operativ, kein Code) · `check_doc_rotation.py --strict` exit 0 · plus alle §20-E-3f-AK.
