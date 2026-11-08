@@ -1,0 +1,14 @@
+[Unit]
+Description=Phase-17 E-3 deploy (one-shot, Plan §20 E-3a + §22 E-22c)
+Documentation=file:///home/trading-bot/trading-bot/phase17_testbed/PHASE17_E3_RUNBOOK.md
+# The keyring (Secret Service) lives in the graphical session — same dependency
+# the four bot units carry. The script reads it in the pre-flight and aborts
+# loudly if it is unreachable (it never writes to it).
+After=graphical-session.target gnome-keyring-daemon.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/trading-bot/trading-bot
+ExecStart=/usr/bin/bash /home/trading-bot/trading-bot/scripts/e3_deploy.sh
+StandardOutput=journal
+StandardError=journal

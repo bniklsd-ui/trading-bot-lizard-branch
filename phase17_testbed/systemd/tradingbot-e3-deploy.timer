@@ -1,0 +1,17 @@
+[Unit]
+Description=Phase-17 E-3 deploy timer (D1-Morgen 07:30 Berlin)
+Documentation=file:///home/trading-bot/trading-bot/phase17_testbed/PHASE17_E3_RUNBOOK.md
+
+[Timer]
+# D1 = Mo 2026-11-09, 07:30 Berlin — der Deploy-Tag ist D1 selbst (AK22 R2 (a)):
+# der Scheduler-Start muss VOR 09:00 Berlin liegen, damit D1 ein voller
+# Handelstag nach dem Start ist und die Start-Zeile im Fenster [D1, D2] liegt
+# (K7-v5 ist fail-closed). 07:30 + ~15 min Deploy = Start ~07:45.
+OnCalendar=2026-11-09 07:30:00 Europe/Berlin
+# The deploy must not be lost because the VM was off at that moment.
+Persistent=true
+AccuracySec=1min
+Unit=tradingbot-e3-deploy.service
+
+[Install]
+WantedBy=timers.target
