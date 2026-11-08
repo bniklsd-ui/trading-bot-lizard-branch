@@ -7,6 +7,38 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-04 (Review-Session #17 — **AK22-Review-Gate ausgeführt** (Plan §21, Claude Code / Anthropic / Opus): 27 code-tragende Commits geprüft → zunächst **kein PASS** (R1 + R2 Fix vor Deploy, R3 Nikinger-Entscheidung) → Fixes R1/R2/R3 nach Nikinger-Entscheidung → **✅ Review PASS, E-3 frei**; 2 Code-Commits (P16, P10) + 2 Doku-Commits, Σ 2053 → **2055**)
+
+> **Auftrag:** Nikinger (2026-11-04): „führe Plan §21 (AK22) aus". **Plan war detailliert genug** (§21: Umfang, Fragen je Bereich, Nicht-tun-Liste, Output-Format) → kein Re-Planen, atomar abgearbeitet.
+> **Harness:** Claude Code · Anthropic · Opus — die einzige AK22-qualifizierte Kombination (§14.2).
+> **Live-frei:** kein Deploy, kein Dienst-Start/Stop, kein Keyring, kein Netz, kein Schreiben in `data/` (Report-Läufe nach `--reports-dir <scratchpad>`, DBs `mode=ro`). Bot im HOLD: `install_units.sh --check` exit 0, kein `scheduler.run`-Prozess.
+> **Analyse, dann Fix:** erst die vollständige Analyse (read-only) + Befund-Commit; die Fixes erst **nach** den Nikinger-Entscheidungen (Rückfrage). **Autor = Reviewer für R1/R3** (Nikinger-Entscheidung „diese Session").
+
+### Completed
+
+| # | Commit | Phase | Inhalt |
+|---|---|---|---|
+| 1 | `ea0aa3b` | P17-Doku + root | **AK22-Befund:** Abschnitt „AK22 — Review-Gate-Ergebnis" (Befunde R1–R3/H1–H4 mit Datei:Zeile + Reproduktion, Antworten P1–P5/E1–E7), Rotation #16 → `SESSIONS_ARCHIVE.md`, Root-Banner + Phase-17-Zeile |
+| 2 | `1766a96` | P16 | **R1:** `SummaryReport.reported_only`; `--prereg v5` setzt `("3", "4")` ⇒ K3/K4 berichtet, nicht bewertet. Exit-Map unverändert (K4 ist der einzige `PARTIAL`-Emitter). P16 22 → **23**, Negativ-Beweis rot; v4-Regression-Payload **identisch** |
+| 3 | `9f07ab0` | P10 | **R3:** `_LOCAL_DEFECTS` (`NameError, AttributeError, TypeError, ImportError, sqlite3.Error`) → `critical`, Rest `warning` an den vier B-8-Stellen. P10 168 → **169**, Negativ-Beweis rot; reale Phase-16-Fälle (`RuntimeError` 35×, `BadRequestError` 72×) bleiben WARNING |
+| 4 | `9287b3e` | P17-Doku | **R2 (a):** Ausführungsregel im Bot-Ritual — Scheduler-Start in E-3 **am Morgen von D1 vor 09:00 Berlin** (+ Konsequenz + nicht gewählte Alternative) |
+| 5 | `145c074` | P17-Doku + root | **Review PASS** im AK22-Abschnitt (Fix-Stand-Tabelle), Σ-Zeile, dieser Block, Root-Banner + Phase-17-Zeile |
+| 6 | (dieser Commit, 2026-11-05) | Plan + P17-Doku + root + INDEX | **Plan §22 = der nächste Block** (E-3 nach AK22): Zeitpunkt D1 vor 09:00, Day-0-Checks im Fenster + #8 `is-active`, Kalender D1 ≤ Do 2026-11-12, Sollwerte **re-gemessen 2026-11-05** (3 770 `ig`-Bars · 29 Instincts · 0 OPEN · Allowance-Expiry vergangen · 0 Discovery-Zyklen — unverändert), Report-Erwartung. Doc-only. **Push** aller Session-Commits (Nikinger-Auftrag) |
+
+Dazu gemessen: Σ **2055** grün 16/16 · v4-Regression `--from 2026-09-30 --to 2026-10-13` = FAIL K1/K5/K6 · PASS K2/K3/K4/K7/K8 · Offline-Proben C-4 grün · Key-Scan sauber · zwei Advisor-Gegenprüfungen (vor dem Verdikt, vor dem PASS).
+
+### Next
+
+- **E-3** (Operator) ist **frei** — ausführbar nach **Plan §22** (Nachtrag zu §20): alle E-3-Schritte am Morgen von D1, Scheduler-Start **vor 09:00 Berlin**; Vorbedingung `main` == `origin/main` (gepusht in dieser Session). Day-0-Checks laufen **auf D1** in der §22-E-22e-Reihenfolge (8 Checks; ein roter = Befund im Fenster ⇒ `-S2`). Danach sofort den **Aktiv-Block** der Vorregistrierung eintragen.
+- **Kalender:** D1 frühestens **Fr 2026-11-06**, spätestens **Do 2026-11-12** (D2 ≤ Fr 11-13, Abo-Frist 2026-11-15). D1 wählt der Nikinger.
+- Danach E-4 (2 Handelstage, Journal-Export) → E-5 (Report v5 + D-2 + Flip-2 + Modellwahl + **Prereg v5**, Input H1) → E-6.
+
+### Open questions / blockers
+
+- **Unabhängigkeit:** R1/R3 hat dieselbe Session geschrieben und nachgeprüft (Nikinger-Wahl). Wer eine unabhängige Zweitprüfung will: eine frische Claude-Code-Session liest nur `1766a96` + `9f07ab0` (zusammen ~90 Zeilen).
+- **H1** (K10 PASS ohne Bridge-Aktivität, `NA`-Faltung) → Prereg v5 · **H2** (Bridge zählt OPEN-Trades als Evidenz) offen, heute wirkungslos.
+- **K9-Regex unbewiesen** (Plan §9 #8) — der erste echte `Scheduled restart job`-Text muss in E-4 gegen das Muster geprüft werden.
+
 ## Session stopped — 2026-11-04 (Exec-Session #16 — **E-2 ausgeführt**: Shakedown-Vorregistrierung geschrieben (T23-Freigabe des Nikinger) + MiniMax-**Familie**-Ausnahme im Code; 1 Code-Commit in P8 + 1 Doku-Commit, Σ **2053** unverändert)
 
 > **Auftrag:** Nikinger (Web-Chat, 2026-11-04): Phase 17 fortsetzen. Der Special-Task verweist auf Plan §19 (**E-2 = Shakedown-Vorregistrierung**) mit dem **T23-Gate**: der Commit der Prereg-Datei wartet auf die Freigabe der gepinnten Werte; D1/D2 sind erst nach E-3 bekannt. **Plan war detailliert genug** (§19 mit vollständigem Inhalts-Entwurf + live geprüften Ankern) → **atomar abgearbeitet**, kein Re-Planen nötig.

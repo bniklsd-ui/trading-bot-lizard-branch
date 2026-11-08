@@ -10,7 +10,11 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-11-05 (**§22 Nachtrag — Ausführungsblock E-3 nach AK22**: AK22 ✅ Review PASS nach Fix (R1 `1766a96` · R2 `9287b3e` · R3 `9f07ab0`); E-3 komplett am Morgen von D1, Scheduler-Start **vor 09:00 Berlin**; Day-0-Checks im Fenster + Check #8 (`is-active`); Kalender D1 ≤ Do 2026-11-12 (Frist 11-15); Sollwerte 2026-11-05 re-gemessen (unverändert); Report-Erwartung `reported_only: [3, 4]`) | 2026-11-04 (**§21 Nachtrag — Ausführungsblock AK22** (Review-Gate vor E-3): **Harness Claude Code (Anthropic, Opus)** — §14.2 „Claude Code macht nur das Review-Gate"; 22 Code-Commits (SHA-Liste), 5 Pflicht-Schwerpunkte + 7 Ergänzungen mit konkreten Fragen, „nicht tun"-Liste, AK22-Output-Format) | 2026-11-04 (**§20 Nachtrag — Ausführungsblock E-3** (Deploy + Day-0-Verifikation): Reihenfolge, live gemessene Sollwerte (3 770 `ig`-Bars · 29 Instincts · 0 OPEN · Allowance-Expiry **vergangen**), **7 Day-0-Checks**, K2/K11-Wann-First-Events (13:00), 7 Fehlgriffe, AK) | 2026-11-04 (**§19 Nachtrag — Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable + Inhalts-Entwurf + live geprüfte Anker + AK; **§18 ausgeführt 2026-11-04: E-1 ✅**, Commit `adc905f`, Σ **2053**) | 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
+updated: 2026-11-06 (**§23 Nachtrag — Ergänzung: D1 = Mo 2026-11-09** (der Fr 06.11. war nach
+  10:07 nicht mehr möglich ⇒ K7 by construction) **+ der Deploy läuft automatisch** via
+  `scripts/e3_deploy.sh` + systemd-Timer `OnCalendar=2026-11-09 07:30:00 Europe/Berlin`,
+  `Persistent=true`; zwei Guardrails: 09:00-Guard und `changes()`-Guard; 6 neue root-Tests) | 
+  2026-11-05 (**§23 Nachtrag — E-3-Runbook** (`phase17_testbed/PHASE17_E3_RUNBOOK.md`, locked) + **zwei live gemessene Korrekturen** gegen §20: Check #4 liefert vor dem DELETE 2 637 (nicht 3 770 — das ist die DELETE-Zahl, der Sollwert 0 bleibt) · der K1-Log-Truncate aus dem Phase-16-Runbook v2 §2.4 ist **obsolet** (Wrapper-Logs sind timestamped ⇒ fenstergenau gefiltert) ⇒ **nicht** truncaten; doc-only, kein Code) | 2026-11-05 (**§22 Nachtrag — Ausführungsblock E-3 nach AK22**: AK22 ✅ Review PASS nach Fix (R1 `1766a96` · R2 `9287b3e` · R3 `9f07ab0`); E-3 komplett am Morgen von D1, Scheduler-Start **vor 09:00 Berlin**; Day-0-Checks im Fenster + Check #8 (`is-active`); Kalender D1 ≤ Do 2026-11-12 (Frist 11-15); Sollwerte 2026-11-05 re-gemessen (unverändert); Report-Erwartung `reported_only: [3, 4]`) | 2026-11-04 (**§21 Nachtrag — Ausführungsblock AK22** (Review-Gate vor E-3): **Harness Claude Code (Anthropic, Opus)** — §14.2 „Claude Code macht nur das Review-Gate"; 22 Code-Commits (SHA-Liste), 5 Pflicht-Schwerpunkte + 7 Ergänzungen mit konkreten Fragen, „nicht tun"-Liste, AK22-Output-Format) | 2026-11-04 (**§20 Nachtrag — Ausführungsblock E-3** (Deploy + Day-0-Verifikation): Reihenfolge, live gemessene Sollwerte (3 770 `ig`-Bars · 29 Instincts · 0 OPEN · Allowance-Expiry **vergangen**), **7 Day-0-Checks**, K2/K11-Wann-First-Events (13:00), 7 Fehlgriffe, AK) | 2026-11-04 (**§19 Nachtrag — Ausführungsblock E-2** (Shakedown-Vorregistrierung): Deliverable + Inhalts-Entwurf + live geprüfte Anker + AK; **§18 ausgeführt 2026-11-04: E-1 ✅**, Commit `adc905f`, Σ **2053**) | 2026-11-03 (§16 Nachtrag — **Planwechsel: Bot-Anbieter zurück auf MiniMax** (Abo/M Plan, Frist 2026-11-15); überschreibt T4–T7, C-1, C-3, C-7, C-8 für den Bot) | 2026-10-19 (§15 Nachtrag — Provider-Plastizität: 9 Provider-Einträge als Daten, 3 Quirks, T25–T30, zwei Live-Stufen; ändert C-1/C-3/C-4/C-6/C-7 in place) | 2026-10-18 (§14 Nachtrag — Executor GLM in OpenCode, Bot-Provider z.ai Pay-per-use) | 2026-10-17
 ---
 
 # Phase 17 — Prüfstand: Execution-ready Plan (2026-10-17)
@@ -2459,3 +2463,64 @@ Flip-2-Entscheidung + Modellwahl + **Prereg v5** mit AK22-H1 als Input) → E-6 
 - Start-Zeile auf **D1 vor 09:00** (Zeitstempel im Aktiv-Block) · HEAD == `origin/main` beim Start ·
   **8/8** Day-0-Checks im Phasenkopf (Wortlaut + Rohwert) · Aktiv-Block eingetragen · Σ **unverändert
   2055** (E-3 ist operativ, kein Code) · `check_doc_rotation.py --strict` exit 0 · plus alle §20-E-3f-AK.
+
+## §23 Nachtrag 2026-11-05 — E-3-Runbook + zwei live gemessene Korrekturen gegen §20
+
+> **Kein Code, kein Eingriff in die Kriterien.** §20 und §22 bleiben die Deploy-Sequenz; dieses
+> Nachtrag-Protokoll ist (a) der Verweis auf den **Operator-Runbook** und (b) **zwei Korrekturen**,
+> die am 2026-11-05 live gegen den Code und die Live-DBs gemessen wurden. Beide betreffen
+> **Erwartungswerte**, nicht die Regeln.
+
+### E-23a — Der Operator-Pfad ist als Runbook festgeschrieben
+
+`phase17_testbed/PHASE17_E3_RUNBOOK.md` (locked-nach-Commit, Phase-16-Runbook-Konvention) trägt
+den ausführbaren Pfad für den Deploy-Morgen: §0 BLUF · §1 6 Vorbedingungs-Checks (mit Kommando +
+Erwartung) · §2 Ablauf 08:00–09:00 (§20 E-3a Schritt 1–7 **verbatim**) · §3 die **8** Day-0-Checks
+(mit exakten Kommandos) · §4 Aktiv-Block-Eintrag · §5 Journal-Export + Report-Befehl (§20 E-22f) ·
+§6 Fehlgriffe · §7 die zwei Korrekturen unten · §8 Was es nicht macht.
+
+**D1 = Mo 2026-11-09, D2 = Di 2026-11-10** (Fenster-Ende vor der Abo-Frist 2026-11-15, §16/§22 E-22b).
+
+> **🟡 Korrektur 2026-11-06 (Nikinger-Entscheidung, Session #18):** der ursprünglich geplante
+> **Fr 2026-11-06** ist **nicht** mehr möglich — um 10:07 ist der Start-Zeitpunkt nach 09:00,
+> damit wäre D1 *kein* voller Handelstag nach dem Start ⇒ K7-v5 **FAIL by construction**
+> (Prereg BLUF, §22 E-22a). Der Deploy läuft deshalb als **systemd-Timer**:
+> `OnCalendar=2026-11-09 07:30:00 Europe/Berlin`, `Persistent=true` (Reboot ⇒ der Deploy wird
+> nachgeholt, nicht verschoben). Ausführbar: `scripts/e3_deploy.sh` (die Sequenz §20 E-3a
+> Schritt 1–7 **verbatim** + zwei Guardrails: der **09:00-Guard** startet den Scheduler nach
+> 08:55 **nicht** mehr, der **`changes()`-Guard** bricht bei ≠ 3 770 / ≠ 29 **vor** Schritt 5 ab).
+> Unit-Dateien: `phase17_testbed/systemd/tradingbot-e3-deploy.{service,timer}`; Tests:
+> `tests/test_e3_deploy.py` (root, 6 Tests). **AK:** der Deploy bleibt operativ — Σ ändert sich
+> nur um die neuen Tests, **kein** Bot-Code.
+
+### E-23b — Korrektur 1: §20 E-3c, Check #4 — die Beweis-Zahl war falsch (Sollwert bleibt 0)
+
+| | Wert |
+|---|---|
+| **Plan (§20 E-3c, Check #4)** | „vor dem Löschen liefert er exakt **3 770** (live gemessen)" |
+| **Gemessen 2026-11-05** | die Abfrage `SELECT COUNT(*) FROM bars WHERE source='ig' AND ts_utc > fetched_at` liefert **2 637** |
+| **Erklärung** | **3 770** ist die Zahl der `source='ig'`-Zeilen (die Zahl des `DELETE`) — die Abfrage zählt davon nur die Teilmenge mit `ts_utc > fetched_at` (ein Bar mit Alter > 2 h hat `ts_utc < fetched_at`, weil der B-1-Versatz +2 h ist). Versatz-Spanne gemessen: `ts_utc − fetched_at` von **+2,0 h** (frischeste Bars) bis **−768 h** (alte, spät nachgeholte Bars). |
+| **Konsequenz** | **Der Sollwert des Checks bleibt 0** (nach dem DELETE). Der DELETE ist vollständig: **alle** 3 770 Zeilen tragen den +2-h-Versatz (T14/D1), es gibt keine „richtigen" IG-Zeilen, die erhalten bleiben müssten. Nur die Beweis-Zahl im Planstext war falsch. |
+
+### E-23c — Korrektur 2: der K1-Log-Truncate aus dem Phase-16-Runbook v2 §2.4 ist obsolet
+
+Das Phase-16-Runbook v2 §2.4 verlangt, `data/state/run_recorder.log`, `run_discovery.log` und
+`run_webui.log` vor dem Start zu truncaten, weil die Wrapper-Start-Zeilen **keinen** Timestamp
+tragen und der Report sie als *full-file-count* wertet (≤ 2 Starts je Dienst).
+
+**Live gemessen 2026-11-05:** die Wrapper-Start-Zeilen tragen **heute** einen Timestamp-Prefix
+(`2026-11-01 00:21:58 [run_recorder] starting recorder …`), und `autonomy_report.py::
+count_starts_in_window` filtert sie **fenstergenau** (live: 2 Starts am 2026-11-01, **0** im Fenster
+2026-11-06…2026-11-09, Scheduler 0 ⇒ nach dem Deploy je Dienst 1 ⇒ K1 PASS, Schwelle ≤ 2).
+
+⇒ **Kein Truncate.** Ein Truncate würde Beweismaterial löschen, ohne den K1-Zähler zu verbessern.
+(Der Docstring `count_starts_in_window` in P16 ist insoweit **veraltet** — er sagt „the others
+(recorder/discovery/webui) emit untimestamped lines". Das ist ein **Hygiene-Befund ohne Wirkung**
+(der Code filtert korrekt); ein Eingriff in P16 ist in E-3 nicht vorgesehen → **Hinweis H5**.)
+
+### E-23d — Was E-23 an den AK ändert
+
+**Nichts.** E-3 bleibt operativ (kein Code, Σ unverändert **2055**). Die AK aus §20 E-3f und §22
+E-22g gelten unverändert: 8/8 Day-0-Checks im Phasenkopf (Wortlaut + Rohwert) · Startzeile auf
+D1 vor 09:00 · HEAD == `origin/main` · Aktiv-Block eingetragen · `check_doc_rotation.py --strict`
+exit 0.
