@@ -10,7 +10,7 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-11-06 (**§23 Nachtrag — Ergänzung: D1 = Mo 2026-11-09** (der Fr 06.11. war nach
+updated: 2026-11-09 (**§24 Nachtrag — E-4-Abschluss + E-5** für Mi 2026-11-11: Export + Report wörtlich, Auswertung, D-2/Flip-2/Modell, Prereg v5; Frist 11-15 entfällt (MiniMax Go verlängert, Kontingent geteilt ⇒ keine Exec-Session im Fenster); e3_deploy.sh-Fix nach D2) | 2026-11-06 (**§23 Nachtrag — Ergänzung: D1 = Mo 2026-11-09** (der Fr 06.11. war nach
   10:07 nicht mehr möglich ⇒ K7 by construction) **+ der Deploy läuft automatisch** via
   `scripts/e3_deploy.sh` + systemd-Timer `OnCalendar=2026-11-09 07:30:00 Europe/Berlin`,
   `Persistent=true`; zwei Guardrails: 09:00-Guard und `changes()`-Guard; 6 neue root-Tests) | 
@@ -2524,3 +2524,55 @@ count_starts_in_window` filtert sie **fenstergenau** (live: 2 Starts am 2026-11-
 E-22g gelten unverändert: 8/8 Day-0-Checks im Phasenkopf (Wortlaut + Rohwert) · Startzeile auf
 D1 vor 09:00 · HEAD == `origin/main` · Aktiv-Block eingetragen · `check_doc_rotation.py --strict`
 exit 0.
+
+---
+
+## §24 Ausführungsblock E-4-Abschluss + E-5 — Auswertung, Entscheidungen, Prereg v5 (2026-11-09)
+
+> **Der nächste Block.** E-3 ist gelaufen (automatisch, Mo 2026-11-09 07:30:23; Skript brach in Schritt 7
+> ab, der Bot lief weiter — `docs/concepts/eurofleet_stand_2026-11-08.md` §8). Aktiv-Block eingetragen
+> (`8dd270b`): **D1 = Mo 2026-11-09, D2 = Di 2026-11-10**, HEAD beim Start `28ecf2b`, Day-0-Checks **8/8 grün**.
+> Plan §6 E-4/E-5 gelten; dieser Block macht sie für **Mi 2026-11-11** ausführbar und trägt die
+> eurofleet-Änderungen vom 2026-11-08 nach.
+
+### E-24a — Was sich seit §22/§23 geändert hat (eurofleet-Notiz 2026-11-08)
+
+| Punkt | Folge |
+|---|---|
+| MiniMax als **„M Plan Go"** verlängert (monatlich, nächste Verlängerung 2026-12-07) | **Die Frist 2026-11-15 entfällt** (§16-Rückflipp-Regel nicht ausgelöst). Prereg v5 darf `research_m3` pinnen |
+| Go = kleinstes Kontingent, **geteilt** zwischen Bot-Research und Ausführer (nicht gemessen) | **Keine Exec-Session bis D2 18:00**. In E-5 das Kontingent laut MiniMax-Konsole notieren — Eingangsgröße für Flip 2 und Prereg v5 |
+| z.ai/GLM entfernt | §14-Executor-Test beendet; Ausführer = MiniMax-M3 (Code) / M3.1-Flash (planbar), Reviews Claude Code |
+| `SCHEDULER_HELD` gehört dieser Session | Vor jedem **bewussten** Scheduler-Stopp `bash scripts/install_units.sh --hold`; sonst startet eurofleet ihn nach einem Reboot (nächster Lauf Sa 2026-11-14) |
+| Modell-Trailer je Ausführer-Commit gewünscht | ab E-5 in jedem Exec-Commit `Model: <id>` als Trailer |
+
+### E-24b — Mi 2026-11-11 morgens (Operator): Export + Report, wörtlich
+
+Journal-Export und Report-Befehl **wörtlich** aus `phase17_testbed/PHASE17_E3_RUNBOOK.md` §5
+(= Vorregistrierung „Report-Befehl", Fenster `2026-11-09 … 2026-11-10`). Erwartung: Payload mit
+`"reported_only": ["3", "4"]`; Exit 0/1/2 = PASS/FAIL/ERROR. **Kein** Kriterium nachträglich ändern.
+
+### E-24c — Auswertung (Exec- oder Review-Session, read-only)
+
+1. Verdikte K1/K2/K5–K11 + Rohzahlen K3/K4 in den Phasenkopf (Muster: Tabelle wie AK22-Abschnitt).
+2. **K9-Regex belegen** (Plan §9 #8): gab es eine `Scheduled restart job`-Zeile im Journal, deren Wortlaut gegen `_RESTART_JOB_RE` (`autonomy_report.py`) prüfen; gab es keine, das notieren.
+3. **D-2-Messwerte** aus K6-v5: `exempt_tokens_per_day` / `exempt_calls_per_day` (MiniMax) + Anthropic-Tokens je Tag.
+4. **AK8:** keine offene Position beim Start ⇒ Re-Adoption live nicht belegt — als „nicht anwendbar" führen, nicht als PASS.
+5. **FAIL** in einem bewertenden Kriterium ⇒ FAIL-Regel der Vorregistrierung: Befund → Fix-Step in Phase 17 → `PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` → neuer Lauf. Prereg v5 wartet dann.
+
+### E-24d — Nikinger-Entscheidungen (nur bei Shakedown-PASS)
+
+| # | Frage | Grundlage |
+|---|---|---|
+| D-2 | K6-Einheit für den 10-Tage-Lauf (Anthropic-Tokens gecappt bei 300 k + MiniMax gemessen, oder anders) | E-24c Nr. 3 |
+| Flip 2 | `all_m3` ja/nein → bei ja: 1 Commit + §F2-Flip-2-Tag der Vorregistrierung (`--expect-llm-profile all_m3`) | Go-Kontingent: `all_m3` ≈ alle Rollen auf dem geteilten Kontingent |
+| Modell | M3 bleibt oder M3.1-Flash. Flash braucht eine **Preiszeile** `"MiniMax-M3.1-Flash": (0.0, 0.0)` in `phase4_research/research/models.py` + `_M3.model` in `llm_profiles.py`; die Budget-Ausnahme deckt die Familie schon | eurofleet: Herstellerdoku nennt für Go nur Flash, beide antworten (gemessen 2026-11-08) |
+
+### E-24e — Prereg v5 (Plan §6 E-5 Nr. 3, unverändert) + Aufräumen nach dem Fenster
+
+- `phase17_testbed/PHASE17_AUTONOMY_PREREGISTRATION_v5.md` (📕, `status: locked`, INDEX-Zeile im selben Commit): 10 Handelstage, K1–K11 nach v5, K3 ≥ 5 · K4 ≥ 8/10 · K5 ≤ 5, K6 nach D-2, Profil gepinnt, erlaubte Ereignisse wie E-2 ohne Re-Adoption-Probe, Startbedingung „Start-Zeile nach Commit-Zeit". **Committet vor dem Start**; der 10-Tage-Lauf selbst gehört nicht mehr zu Phase 17 (T3).
+- **Nach D2 erlaubt (außerhalb des Fensters):** `scripts/e3_deploy.sh` Z. 183 `… | tail -1 || true`, Z. 205 `|| true` statt `|| echo 0` + 1 root-Test, der die Start-Zeile erst nach dem ersten Poll schreibt (eurofleet §8). Danach E-6 (Closeout, Plan §6).
+
+### E-24f — AK
+
+Report-Datei in `data/reports/` · Verdikt-Tabelle + D-2-Messwerte im Phasenkopf · Entscheidungen
+D-2/Flip 2/Modell protokolliert · bei PASS: Prereg v5 committet (AK20) · `check_doc_rotation.py --strict` exit 0.
