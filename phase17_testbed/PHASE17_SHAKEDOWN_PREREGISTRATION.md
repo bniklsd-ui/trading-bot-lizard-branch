@@ -167,13 +167,21 @@ research_m3` ist der K7-Profil-Pin. **Exit-Code:** 0 = PASS · 1 = FAIL · 2 = P
 
 | Feld | Wert | Quelle |
 |---|---|---|
-| **Start (E-3-Start-Zeitstempel)** | — (wird am E-3-Tag eingetragen) | `data/state/run_scheduler.log`, erste Zeile `starting scheduler daemon (account=…, max_trades=…, daily_loss_cap=…, cycle=…min, llm_profile=research_m3)` |
-| **D1 (Tag 1)** | — (erster voller Handelstag **nach** dem Start) | Berlin-Kalender, Mo–Fr |
-| **D2 (Tag 2)** | — (der nächste Handelstag) | Berlin-Kalender, Mo–Fr |
-| **HEAD-Commit beim Start** | — | `git log -1` |
-| **Offene Position bei Start** | — | `data/state/execution_state.json` (OPEN/PENDING) + `trade_outcomes` (OPEN) |
-| **Erlaubte Re-Adoption-Probe** | — (nur falls eine Position offen ist) | (a) in *Erlaubte Operator-Ereignisse* |
-| **Vorregistriert** | Exec-Session #16 (2026-11-04) — **Freigabe: Nikinger (T23), 2026-11-04**; Commit-SHA wird beim Commit eingetragen | `git log` |
+| **Start (E-3-Start-Zeitstempel)** | **2026-11-09 07:30:23,789 Europe/Berlin** — `starting scheduler daemon (account=demo, max_trades=5, daily_loss_cap=1800.0, cycle=5min, llm_profile=research_m3).` (automatischer Deploy, systemd-Timer 07:30) | `data/state/run_scheduler.log`, erste Zeile `starting scheduler daemon (account=…, max_trades=…, daily_loss_cap=…, cycle=…min, llm_profile=research_m3)` |
+| **D1 (Tag 1)** | **Mo 2026-11-09** (Start vor 09:00 ⇒ erster voller Handelstag nach dem Start; Plan §22 / AK22 R2 a) | Berlin-Kalender, Mo–Fr |
+| **D2 (Tag 2)** | **Di 2026-11-10** | Berlin-Kalender, Mo–Fr |
+| **HEAD-Commit beim Start** | **`28ecf2b`** (= `origin/main`; Runbook erwartete `b372649` — Bot-Code seit `b372649` unverändert, Differenz nur Deploy-Skript/Units/Tests/Doku, siehe `docs/concepts/eurofleet_stand_2026-11-08.md` §6) | `git log -1` |
+| **Offene Position bei Start** | **0** (`execution_state.json`: 0 OPEN/PENDING · `trade_outcomes`: 0 OPEN) | `data/state/execution_state.json` (OPEN/PENDING) + `trade_outcomes` (OPEN) |
+| **Erlaubte Re-Adoption-Probe** | **nicht anwendbar** (keine offene Position beim Start) | (a) in *Erlaubte Operator-Ereignisse* |
+| **Vorregistriert** | Exec-Session #16 (2026-11-04) — **Freigabe: Nikinger (T23), 2026-11-04**; Commit `32835dd` (Vorregistrierung), `fa02a6a` (Familien-Ausnahme) | `git log` |
+
+> **Eintragung nachträglich** am 2026-11-09 ~17:55 (Review-Session #17, Claude Code, Nikinger-Auftrag) — nicht vor dem ersten Zyklus,
+> weil `scripts/e3_deploy.sh` nach Schritt 6 in Schritt 7 abbrach (`set -e` + leerer `grep` in Z. 183, Bot lief weiter;
+> `docs/concepts/eurofleet_stand_2026-11-08.md` §8). Alle Werte stammen aus append-only Quellen und sind vom Zeitpunkt der
+> Eintragung unabhängig. **Day-0-Checks 8/8 grün:** #1 0 `preflight failed` · #2 Start-Zeile mit `llm_profile=research_m3` ·
+> #3 erster `MiniMax-M3`-Record 2026-11-09T08:14:56Z · #4 40 `ig`-Bars, 0 mit `ts_utc > fetched_at` · #5 `discovery cycle`-Zeilen
+> vorhanden · #6 14 NO_TRADE-`decision_context`-Zeilen seit Start, 0 ohne `abstain_record_id` · #7 neue Allowance
+> 2026-11-09T12:08Z, 9 632 übrig, expiry 2026-11-16 · #8 alle vier Units `active`.
 
 ## Was diese Vorregistrierung **nicht** prüft
 
