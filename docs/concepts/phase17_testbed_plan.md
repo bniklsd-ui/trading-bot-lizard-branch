@@ -10,7 +10,7 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-11-09 (**§24 Nachtrag — E-4-Abschluss + E-5** für Mi 2026-11-11: Export + Report wörtlich, Auswertung, D-2/Flip-2/Modell, Prereg v5; Frist 11-15 entfällt (MiniMax Go verlängert, Kontingent geteilt ⇒ keine Exec-Session im Fenster); e3_deploy.sh-Fix nach D2) | 2026-11-06 (**§23 Nachtrag — Ergänzung: D1 = Mo 2026-11-09** (der Fr 06.11. war nach
+updated: 2026-11-11 (**§25 Nachtrag — Shakedown S1 FAIL an K6**: Ergebnis von §24, Korrektur gegen §11 Nr. 7 (Anthropic-Schätzung widerlegt), nächster Block = Fix-Entscheidung → Fix-Step → `-S2`; doc-only) | 2026-11-09 (**§24 Nachtrag — E-4-Abschluss + E-5** für Mi 2026-11-11: Export + Report wörtlich, Auswertung, D-2/Flip-2/Modell, Prereg v5; Frist 11-15 entfällt (MiniMax Go verlängert, Kontingent geteilt ⇒ keine Exec-Session im Fenster); e3_deploy.sh-Fix nach D2) | 2026-11-06 (**§23 Nachtrag — Ergänzung: D1 = Mo 2026-11-09** (der Fr 06.11. war nach
   10:07 nicht mehr möglich ⇒ K7 by construction) **+ der Deploy läuft automatisch** via
   `scripts/e3_deploy.sh` + systemd-Timer `OnCalendar=2026-11-09 07:30:00 Europe/Berlin`,
   `Persistent=true`; zwei Guardrails: 09:00-Guard und `changes()`-Guard; 6 neue root-Tests) | 
@@ -2576,3 +2576,21 @@ Journal-Export und Report-Befehl **wörtlich** aus `phase17_testbed/PHASE17_E3_R
 
 Report-Datei in `data/reports/` · Verdikt-Tabelle + D-2-Messwerte im Phasenkopf · Entscheidungen
 D-2/Flip 2/Modell protokolliert · bei PASS: Prereg v5 committet (AK20) · `check_doc_rotation.py --strict` exit 0.
+
+---
+
+## §25 Nachtrag 2026-11-11 — Shakedown S1: FAIL an K6; nächster Block = Fix-Entscheidung → Fix-Step → `-S2`
+
+> **Ergebnis von §24 (E-24c), Auswertungs-Session #20.** Vorab-Lauf des Report-Befehls read-only im
+> Scratchpad: Exit 1. Verdikt je Kriterium, Ursache, Fix-Optionen, Nebenbefunde und die Liste „Nicht
+> geprüft" stehen im Phasenkopf, Abschnitt „E-4/E-5 — Shakedown-S1-Auswertung". §24 E-24d/E-24e (Entscheidungen,
+> Prereg v5) sind damit **nicht** ausgelöst (E-24c Nr. 5).
+
+| Punkt | Stand (gemessen 2026-11-11) |
+|---|---|
+| Verdikt | **K6 FAIL** — D2 (Di 2026-11-10) Nicht-Ausnahme-Tokens 302 186 > 300 000, erschöpft 17:19:13 Berlin. K1/K2/K5/K7/K8/K9/K10/K11 PASS; K3 = 7, K4 = 2/2 (nur berichtet) |
+| Ursache | Research (MiniMax-M3) liefert an 84 % / 97 % der Ticks einen Kandidaten; jeder löst eine Debatte aus (3 Anthropic-Calls ≈ 4 490 Tokens). 300 k ≈ 66 Debatten, ein volles Fenster hat bis zu 102 Zyklen |
+| 🟡 Korrektur gegen §11 Nr. 7 | Die Schätzung „Anthropic ≈ 60–90 k Tokens/Tag" ist **widerlegt**: gemessen 302 k an einem vollen Tag, Worst Case ≈ 493 k (102 × 4 490 + 5 Trades × ~7 k). §11 bleibt als Snapshot stehen |
+| Fix-Vorschlag | **A** Cap 300 k → 600 k (`phase8_scheduler/scheduler/run.py:62` + `config.py:140` + 3 P8-Test-Pins; Report `--budget-tokens 600000`) · B Debatten-Cooldown (neue Logik, nach Phase 17) · C Flip 2 (K6 grün ohne Messung, nicht als Fix). **Entscheidung beim Nikinger**, inklusive der Frage, ob A unter T3/T23 („kein Kriterium wird gelockert") zulässig ist |
+| Nächster Block | Fix-Entscheidung → Stopp nach Bot-Ritual (vorher `install_units.sh --hold`) → Fix-Commit + Sweep + Review → `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` (T23-Freigabe) → Start am Morgen von D1 vor 09:00 → zwei aufeinanderfolgende Handelstage einer Woche (frühestens Mo 2026-11-16 / Di 2026-11-17) → Auswertung wie §24 |
+| Wartet | D-2 / Flip 2 / Modell · eurofleet-Fragen zu Prereg v5 (Wochenlauf, Ruhefenster-Marker, Kontingent-Regel) · Prereg v5 · `scripts/e3_deploy.sh`-Fix · E-6 |

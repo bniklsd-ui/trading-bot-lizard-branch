@@ -7,6 +7,33 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-09 (Review-Session #19 — Fortsetzung von #17, Claude Code: **Shakedown D1 geprüft** (Day-0-Checks 8/8 grün), **Aktiv-Block eingetragen** (`8dd270b`), eurofleet-Notiz gelesen (**Frist 11-15 entfällt**), **Plan §24 = nächster Block E-4-Abschluss + E-5**; doc-only, Σ 2055 unverändert)
+
+> **Auftrag:** Nikinger 2026-11-09: Shakedown-Stand prüfen, Aktiv-Block eintragen + committen, eurofleet-Notiz lesen, nächsten Block schreiben, committen + pushen, Session beenden.
+> **Live-frei:** nur read-only Reads (`mode=ro`, Logs); kein Dienst-Start/Stop, kein Bot-Code. Der Bot läuft seit Mo 07:30:23 ununterbrochen (D1).
+
+### Completed
+
+| # | Commit | Inhalt |
+|---|---|---|
+| 1 | `8dd270b` | **Aktiv-Block** der Shakedown-Vorregistrierung: Start 2026-11-09 07:30:23 Berlin (`llm_profile=research_m3`) · D1 Mo 11-09 · D2 Di 11-10 · HEAD beim Start `28ecf2b` (Bot-Code = `b372649`) · 0 offene Positionen · Prereg-Commit `32835dd`; als **nachträglich** markiert (Deploy-Skript brach in Schritt 7 ab) |
+| 2 | (dieser Commit) | **Plan §24** (E-4-Abschluss + E-5 für Mi 2026-11-11) · Plan-Header + INDEX · dieser Block + Rotation #18 → `SESSIONS_ARCHIVE.md` · Root-Banner/-Zeile · eurofleet-Notiz §6–§8 mitcommittet (Nikinger-Auftrag; doc-only, berührt den laufenden Bot nicht) |
+
+**D1-Stand (17:42, read-only):** 0 `preflight failed` · 0 CRITICAL seit Start · alle 4 Units `active` · 19 Research-Calls `MiniMax-M3` (erster 09:14) · 40 `ig`-Bars, 0 in der Zukunft · 8 Divergenz-Events (vorher 0/233) · 14 NO_TRADE-Zeilen, 0 ohne `abstain_record_id` · Allowance neu (9 632 übrig, expiry 11-16) · **5 Trades CLOSED** (Tages-Cap erreicht).
+
+### Next
+
+- **Di 2026-11-10 (D2):** Bot läuft, **kein Eingriff**, **keine Exec-Session** (geteiltes MiniMax-Go-Kontingent).
+- **Mi 2026-11-11:** Plan **§24** — Journal-Export + Report wörtlich (Runbook §5) → Auswertung (E-24c) → bei PASS Nikinger-Entscheidungen D-2 / Flip 2 / Modell (E-24d) → Prereg v5 (E-24e) → danach `e3_deploy.sh`-Fix und E-6 Closeout.
+
+### Open questions / blockers
+
+- **AK8 (Re-Adoption live)** bleibt unbelegt — keine offene Position beim Start.
+- **K9-Regex** weiterhin unbewiesen (E-24c Nr. 2).
+- **Kontingent-Verbrauch** Bot vs. Ausführer auf dem Go-Plan nicht gemessen.
+- Unabhängige Zweitprüfung von R1/R3 (`1766a96`, `9f07ab0`) weiterhin optional.
+
+
 ## Session stopped — 2026-11-06 (Exec-Session #18 — **E-3-Runbook geschrieben** + **der Deploy läuft jetzt automatisch** (Mo 2026-11-09, 07:30, systemd-Timer): der komplette Operator-Pfad als `phase17_testbed/PHASE17_E3_RUNBOOK.md`, das Deploy als `scripts/e3_deploy.sh` (Schritt 1–7 verbatim + 2 Guardrails) mit Timer-Unit; alle Anker und Sollwerte live gegen den Code und die Live-DBs nachgemessen (null Drift) + **2 Korrekturen** gegen den Plan; **kein Bot-Code**, +6 root-Tests, Σ 2055 → **2061**)
 
 > **Auftrag:** Nikinger (2026-11-05, Web-Chat): „Please walk me through the deploy, so the bot can start tomorrow." **Plan war detailliert genug** (§20 E-3a Schritt 1–7 + §22 E-22c) → kein Re-Planen; die Session hat (a) **alle** Anker gegen den Code verifiziert, (b) den Operator-Pfad als Runbook festgeschrieben, (c) den Chat-Durchgang an den Nikinger übergeben.
