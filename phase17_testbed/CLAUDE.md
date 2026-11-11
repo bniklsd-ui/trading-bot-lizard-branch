@@ -241,10 +241,11 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 > Auftrag Plan §24 (E-24c). Harness **Claude Code / Anthropic**. Read-only: kein Dienst-Start/Stop, kein
 > Signal, kein Bot-Code, kein Schreiben in `data/` (DBs `mode=ro`). Grundlage ist ein **Vorab-Lauf** des
 > Report-Befehls am 2026-11-11 18:06 — wörtlich Runbook §5, nur `--journal-file`/`--reports-dir` in den
-> Scratchpad gelegt (Muster AK22). Der **offizielle** Lauf nach `data/reports/` ist Operator-Schritt und
-> stand bei Session-Ende aus. Alle Quellen sind append-only ⇒ der offizielle Lauf muss dieselben Zahlen
-> liefern; weicht er ab, **gilt er**. Dieser Abschnitt ist **kein** Session-Block — er bleibt stehen, bis
-> der `-S2`-Lauf ausgewertet ist.
+> Scratchpad gelegt (Muster AK22). **Der offizielle Lauf ist erfolgt** (Nikinger, 2026-11-11 18:42):
+> `data/reports/autonomy_2026-11-09_to_2026-11-10.json` + `journal_2026-11-09_to_2026-11-10.txt`, Exit 1.
+> Der Payload ist **identisch** zum Vorab-Lauf (verglichen per JSON-Diff, einziger Unterschied der
+> `journal_file`-Pfad). Dieser Abschnitt ist **kein** Session-Block — er bleibt stehen, bis der
+> `-S2`-Lauf ausgewertet ist.
 
 | Feld | Wert |
 |---|---|
@@ -293,6 +294,13 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 | B | Debatten-Cooldown: nach Judge-Ablehnung dasselbe (Epic, Richtung) N Minuten nicht neu debattieren | neue Logik in P8/P5 + Tests + Review | D2: 68 abgelehnte Debatten ≈ 290 k Tokens gespart | Trifft die Wurzel, ist aber **neue Logik im Entscheidungspfad** (T24 Strategie, „keine neuen Features"). Kandidat für nach Phase 17 |
 | C | Flip 2 (`all_m3`) | 1 Zeile | K6 trivial grün | **Grün ohne Messung** (F8). Verlagert ~290 k Tokens + ~190 Calls/Tag auf das geteilte Go-Kontingent (ungemessen), tauscht den Judge ohne Live-Beleg. Laut Vorregistrierung §F2 erst **nach** einem PASS. Nicht als Fix |
 
+**Stand der Entscheidung (2026-11-11 abends, offen):** Der Nikinger tendiert zu **C** (`all_m3`) plus einem Qualitäts-Check der M3-Arbeit durch ein Anthropic-Modell (z. B. Opus) im Nachgang. Dazu gemessen/geprüft in dieser Session:
+- **Phase 6 nutzt einen geteilten Client** und setzt `client.model` je Rolle (`phase6_debate/debate/llm_caching.py:90`); `_debate_config` (`phase8_scheduler/scripts/wiring.py:402`) benennt bei einem Debatten-Umzug **alle drei** Rollen um. „Bull/Bear auf M3, Judge auf Anthropic" ist deshalb **kein** Config-Wert, sondern neuer Code (Router-Client in P8 oder zweiter Client in P6).
+- Mit `all_m3` zählt **kein** Modell mehr gegen das Budget ⇒ **K6 kann nicht mehr reißen** (grün ohne Messung). Das frühere K6-Risiko wandert zu „MiniMax-Kontingent leer ⇒ `LLM_UNAVAILABLE`", wofür der Report **keinen** Evaluator hat.
+- Last auf dem geteilten Go-Kontingent bei D2-Verhalten: heute 71 Calls / 262 k Tokens (nur Research); mit `all_m3` kämen ~192 Debatten-Calls dazu (≈ 265–280 Calls/Tag, Worst Case ≈ 410). Token-Menge unbekannt: M3 denkt, das Profil setzt für die Debatte `max_tokens=8192` statt 512.
+- Ein Opus-Check **je Kandidat** (70–102/Tag) läge bei ~250–460 k Anthropic-Tokens/Tag und risse das 300-k-Cap erneut. **Je freigegebenem Trade** (≤ 5/Tag) oder **offline nach dem Lauf** ist er unkritisch.
+- Empfehlung dieser Session: **A für `-S2`**, danach `all_m3` als der in der Vorregistrierung bereits vorgesehene **§F2-Flip-2-Tag** mit Offline-Review als vorab festgelegtem Messinstrument. **Vorher** das Go-Kontingent an der MiniMax-Konsole ablesen (Verbrauch Mo/Di/Mi ist bekannt: 72 k / 262 k / 127 k Tokens). Entscheidung beim Nikinger.
+
 **Ablauf nach der Entscheidung (FAIL-Regel):** Stopp nach Bot-Ritual (vorher `bash scripts/install_units.sh --hold`) → Fix-Commit + P8-Suite + Sweep → Review des Fix-Commits (Claude Code) → `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` (neu, supersedes S1 mit Begründung, T23-Freigabe, INDEX-Zeile im selben Commit) → Start am Morgen von D1 **vor 09:00 Berlin** → zwei aufeinanderfolgende Handelstage **einer** Woche. Frühester sauberer Termin: **Mo 2026-11-16 / Di 2026-11-17**.
 
 ### Nebenbefunde (von der Vorregistrierung nicht gedeckt — Befunde, kein Ermessen)
@@ -309,7 +317,7 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 
 ### Nicht geprüft (eigene Liste — hier wird nicht geraten)
 
-- **Offizieller Report-Lauf** nach `data/reports/` (Operator-Schritt, Befehle Runbook §5).
+- ~~Offizieller Report-Lauf~~ — erledigt 2026-11-11 18:42, identisch zum Vorab-Lauf (siehe oben).
 - **MiniMax-Kontingent laut Konsole** (E-24a) — kein Zugriff.
 - Ob an D1/D2 **Ausführer-Sitzungen** auf demselben MiniMax-Key liefen. In diesem Repo gibt es im Fenster keinen Exec-Commit; Sharefyx ist von hier nicht prüfbar.
 - **WebUI-Sichtung** (K2 „operator-gesichtet").
@@ -340,8 +348,8 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 
 ### Next
 
-1. **Nikinger (Operator):** Journal-Export + Report wörtlich nach Runbook §5 (lokal, 0 €, kein Netz, kein IG-/LLM-Call, DBs `mode=ro`; schreibt zwei Dateien nach `data/reports/`). Erwartet: Exit 1.
-2. **Nikinger entscheidet den Fix** (A / B / C) und, bei A, ob eine Cap-Anhebung unter T3/T23 zulässig ist (= D-2 vorgezogen).
+1. ~~Nikinger (Operator): Journal-Export + Report~~ — **erledigt 2026-11-11 18:42**, Exit 1, Payload identisch zum Vorab-Lauf.
+2. **Nikinger entscheidet den Fix** (A / B / C) und, bei A, ob eine Cap-Anhebung unter T3/T23 zulässig ist (= D-2 vorgezogen). **Tendenz 2026-11-11 abends: C + Opus-Check im Nachgang** — Einordnung und Empfehlung im Abschnitt „Fix-Optionen → Stand der Entscheidung". Vor einer Entscheidung für C: Go-Kontingent an der MiniMax-Konsole ablesen.
 3. **Fix-Step** (bei A): `bash scripts/install_units.sh --hold` → `systemctl --user stop tradingbot-scheduler.service` → Gegenprobe `ps aux | grep scheduler.run` leer → `phase8_scheduler/scheduler/run.py:62` + `config.py:140` (+ Docstring `:81`, Help-Text `run.py:63`) + Pins in `phase8_scheduler/tests/test_run.py`, `test_config.py`, `test_webui.py` → P8-Suite + Sweep → Review des Fix-Commits (Claude Code).
 4. **`phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md`** (neu; supersedes S1 mit Begründung; T23-Freigabe; INDEX-Zeile im selben Commit): gleiche Kriterien, neuer Cap gepinnt, Report-Befehl mit `--budget-tokens <Cap>`; der Aktiv-Block wird **vor 09:00** eingetragen (S1-Befund N1).
 5. **Start** am Morgen von D1 vor 09:00 Berlin (`--release-hold` → `install_units.sh` → `start`). Fenster = zwei aufeinanderfolgende Handelstage **einer** Woche (eurofleet patcht samstags). Frühester sauberer Termin: **Mo 2026-11-16 / Di 2026-11-17**.
