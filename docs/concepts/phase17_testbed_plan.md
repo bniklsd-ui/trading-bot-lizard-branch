@@ -10,7 +10,7 @@ down:
   - ../../phase16_activation/PHASE16_LLM_SWITCH_PLAN.md      # 📕 ungebauter LLM-Plan (hier abgelöst, §1 T4/T16)
   - ../../phase16_activation/PHASE16_AUTONOMY_PREREGISTRATION_v3.md  # 📕 Kriterien K1–K9 (Basis für v5)
   - ../../phase16_activation/scripts/autonomy_report.py      # Report-Skript (Block E erweitert es in place)
-updated: 2026-11-11 (**§25 Nachtrag — Shakedown S1 FAIL an K6**: Ergebnis von §24, Korrektur gegen §11 Nr. 7 (Anthropic-Schätzung widerlegt), nächster Block = Fix-Entscheidung → Fix-Step → `-S2`; doc-only) | 2026-11-09 (**§24 Nachtrag — E-4-Abschluss + E-5** für Mi 2026-11-11: Export + Report wörtlich, Auswertung, D-2/Flip-2/Modell, Prereg v5; Frist 11-15 entfällt (MiniMax Go verlängert, Kontingent geteilt ⇒ keine Exec-Session im Fenster); e3_deploy.sh-Fix nach D2) | 2026-11-06 (**§23 Nachtrag — Ergänzung: D1 = Mo 2026-11-09** (der Fr 06.11. war nach
+updated: 2026-11-11 (**§26 — nächster Block F**: Fix-Step nach dem S1-FAIL = Flip 2 `all_m3` + Eingabe-Rekorder + K12 „LLM-Verfügbarkeit", Fund Debatten-Caps, Generalprobe-Vorschlag, Inhalt der `-S2`; Plan zur Freigabe, kein Code) | 2026-11-11 (**§25 Nachtrag — Shakedown S1 FAIL an K6**: Ergebnis von §24, Korrektur gegen §11 Nr. 7 (Anthropic-Schätzung widerlegt), nächster Block = Fix-Entscheidung → Fix-Step → `-S2`; doc-only) | 2026-11-09 (**§24 Nachtrag — E-4-Abschluss + E-5** für Mi 2026-11-11: Export + Report wörtlich, Auswertung, D-2/Flip-2/Modell, Prereg v5; Frist 11-15 entfällt (MiniMax Go verlängert, Kontingent geteilt ⇒ keine Exec-Session im Fenster); e3_deploy.sh-Fix nach D2) | 2026-11-06 (**§23 Nachtrag — Ergänzung: D1 = Mo 2026-11-09** (der Fr 06.11. war nach
   10:07 nicht mehr möglich ⇒ K7 by construction) **+ der Deploy läuft automatisch** via
   `scripts/e3_deploy.sh` + systemd-Timer `OnCalendar=2026-11-09 07:30:00 Europe/Berlin`,
   `Persistent=true`; zwei Guardrails: 09:00-Guard und `changes()`-Guard; 6 neue root-Tests) | 
@@ -2594,3 +2594,180 @@ D-2/Flip 2/Modell protokolliert · bei PASS: Prereg v5 committet (AK20) · `chec
 | Fix-Vorschlag | **A** Cap 300 k → 600 k (`phase8_scheduler/scheduler/run.py:62` + `config.py:140` + 3 P8-Test-Pins; Report `--budget-tokens 600000`) · B Debatten-Cooldown (neue Logik, nach Phase 17) · C Flip 2 (K6 grün ohne Messung, nicht als Fix). **Entscheidung beim Nikinger**, inklusive der Frage, ob A unter T3/T23 („kein Kriterium wird gelockert") zulässig ist |
 | Nächster Block | Fix-Entscheidung → Stopp nach Bot-Ritual (vorher `install_units.sh --hold`) → Fix-Commit + Sweep + Review → `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` (T23-Freigabe) → Start am Morgen von D1 vor 09:00 → zwei aufeinanderfolgende Handelstage einer Woche (frühestens Mo 2026-11-16 / Di 2026-11-17) → Auswertung wie §24 |
 | Wartet | D-2 / Flip 2 / Modell · eurofleet-Fragen zu Prereg v5 (Wochenlauf, Ruhefenster-Marker, Kontingent-Regel) · Prereg v5 · `scripts/e3_deploy.sh`-Fix · E-6 |
+
+---
+
+## §26 Ausführungsblock F — Fix-Step nach dem S1-FAIL: Flip 2 (`all_m3`) + Eingabe-Rekorder + K12, dann `-S2` (2026-11-11)
+
+> **Der nächste Block.** Nikinger-Entscheidungen vom 2026-11-11 (Auswertungs-Session #20): Fix = **C**
+> (`llm_profile = "all_m3"` direkt für `-S2`) · Verfügbarkeitsmaß als **Evaluator im Report** ·
+> **Eingabe-Rekorder** für die Debatten-Calls · Qualitäts-Check = **geplantes Review in Claude Code (Opus,
+> Pro-Plan)**, nicht automatisch · Bot läuft bis zum Stopp weiter, Anthropic-Guthaben auf 12,53 $ aufgeladen.
+> Grundlage: Phasenkopf „E-4/E-5 — Shakedown-S1-Auswertung" + §25. **Dieser § ist ein Plan zur Freigabe —
+> es ist noch kein Code geschrieben.** Alle Anker am 2026-11-11 gegen den Code gelesen.
+
+### F-26a — Was sich gegenüber §24/§25 ändert
+
+| Punkt | Folge |
+|---|---|
+| Fix = Flip 2 statt Cap-Anhebung | Der §F2-Flip-2-Tag der S1-Vorregistrierung geht in `-S2` auf. D-2 (K6-Einheit) und „Flip 2 ja/nein" sind damit entschieden; „Modell M3 vs. M3.1-Flash" bleibt für nach `-S2` |
+| Mit `all_m3` zählt kein aktives Modell gegen das Budget | **K6 kann nicht mehr reißen.** `-S2` sagt das offen und trägt die Aussage „der Bot wird vor 17:30 nicht LLM-blind" mit dem neuen **K12** |
+| MiniMax-Kontingent (Konsole, Nikinger 2026-11-11) | Coding-Tage 13–24 Mio. Tokens ohne Limit; Bot-Tage 0,1–0,3 Mio.; `all_m3` geschätzt 0,8–1,2 Mio./Tag ⇒ Kontingent ist kein Blocker. Ausführer-Sperre nur im 2-Tage-Fenster |
+| `debate_log.json` speichert die Judge-Eingabe nicht | Der Rekorder (F-2) macht spätere Modellvergleiche auf identischer Eingabe nachholbar |
+
+### F-26b — 🔴 Fund beim Anker-Lesen: die Debatten-Caps sind für Haiku/Sonnet kalibriert
+
+`phase6_debate/debate/models.py:140-145` — **harte Caps je Debatte**, erster Bruch ⇒ `DebateBudgetExceeded`
+⇒ fail-closed ABSTAIN auf **WARNING**-Stufe (`debate.py:143`, für K5 unsichtbar):
+
+| Cap | Wert | Anthropic gemessen (S1) | Risiko mit M3 |
+|---|---:|---|---|
+| `max_cumulative_output_tokens` | 12 000 | ≈ 770 je Debatte (3 Calls) | M3 denkt; Research-Calls liegen bei ≈ 1 050 Output-Tokens, das Profil erlaubt 8 192 je Call. 3 Calls typisch 3–5 k, im Schwanz über 12 k |
+| `wall_clock_timeout_s` | 120 s | ≈ 15–25 s je Debatte | M3-Research-Calls brauchten 9–17 s; 3 Calls typisch 30–50 s, bei langsamen Calls (Timeout 90 s) über 120 s |
+| `max_total_calls` / `max_cumulative_input_tokens` | 18 / 120 000 | 3 / ≈ 3 600 | unkritisch |
+
+**„Flip 2 ist eine Zeile" stimmt für den Code, nicht für das Verhalten.** Reißen die Caps regelmäßig, handelt
+der Bot still nicht mehr. Phase 6 ist nach T13 ohne Code-Freigabe; `_debate_config`
+(`phase8_scheduler/scripts/wiring.py:402-433`) kann die Caps aber **in P8** per `dataclasses.replace`
+mit umbenennen, wenn die Generalprobe (F-26e) das verlangt. **Nicht vorab ändern — erst messen.**
+
+### F-26c — Die drei Code-Teile (je ein Commit; Reihenfolge wie unten)
+
+**F-1 — K12 „LLM-Verfügbarkeit" im Report (P16, läuft nicht im Bot ⇒ vor dem Stopp baubar)**
+
+- Datei `phase16_activation/scripts/autonomy_report.py`: neuer Evaluator `evaluate_k12(...)` nach
+  `evaluate_k11` (heute `:1606`); Einhängen im v5-Zweig bei `:1770-1775` als `report.criteria["12"]`;
+  neues CLI-Flag `--expect-no-capped-calls` (`store_true`) bei den v5-Flags (`:1953-1968`); Hilfetext
+  „v5: 11" → „v5: 12" (`:1944`).
+- **Quellen (append-only):** `data/state/run_scheduler.log` + `data/state/llm_usage.json`.
+- **Ereignisse je Berlin-Handelstag:**
+  - Research ok: `research tick: N candidate(s) written (PASS).` oder `research tick: abstain (no candidate, reason=X).` mit X ≠ `LLM_UNAVAILABLE` (`research_tick.py:224`, `:250`).
+  - Research-Ausfall: `reason=LLM_UNAVAILABLE` (`research_tick.py:89`).
+  - Debatte gestartet: `debate_runner: Bull/Bear/Judge for …` (`wiring.py:571`).
+  - Debatten-Ausfall: `debate fail-closed (DebateLLMError)`, `debate fail-closed (DebateBudgetExceeded)` oder `debate fail-closed (unexpected)` (`debate.py:143`, `:146`). **Nicht** gezählt, nur berichtet: `debate fail-closed (DebateError): get_ohlcv not ok …` (Datenpfad, kein LLM).
+- **Regel (Vorschlag, Freigabe mit `-S2`/T23):** PASS, wenn an **jedem** Handelstag
+  (a) ≥ 1 Research-ok-Ereignis (positives Signal — kein Vakuum-PASS),
+  (b) **keine Serie ≥ 3** aufeinanderfolgender LLM-Ausfall-Ereignisse (Research + Debatte in Log-Reihenfolge),
+  (c) LLM-Ausfälle ≤ **10 %** der LLM-Ereignisse des Tages,
+  (d) nur mit `--expect-no-capped-calls`: **0** Nicht-Ausnahme-Calls im Fenster (jeder `claude-*`-Record wäre ein Rollen-Leck des Flips).
+  Fenster ohne Handelstag ⇒ `NA`.
+- **Tests (P16, +5):** alles ok ⇒ PASS · Serie 3 ⇒ FAIL · 11 % Ausfälle ⇒ FAIL · Tag ohne Research-ok ⇒ FAIL · ein `claude-*`-Record bei gesetztem Flag ⇒ FAIL (ohne Flag PASS). Negativ-Beweis je Test.
+- **Regression:** `--prereg v4` unverändert; ein S1-Nachlauf mit `--prereg v5` trägt künftig zusätzlich „12" (das archivierte S1-JSON in `data/reports/` bleibt der Beleg). Erwartung für S1: K12 PASS (0 `LLM_UNAVAILABLE`, 0 `DebateLLMError` im Fenster — gemessen 2026-11-11).
+
+**F-2 — Eingabe-Rekorder (P8, bot-berührend ⇒ nur bei gestopptem Scheduler)**
+
+- Datei `phase8_scheduler/scripts/wiring.py`: neuer Helper `_record_llm_io(client, path, role)` direkt nach
+  `_build_llm` (endet heute `:400`). Er ersetzt **an der Instanz** `client.ask_candidate` durch eine Hülle
+  und gibt denselben Client zurück — keine Proxy-Klasse, weil Phase 6 `client.model`/`client.temperature`
+  je Rolle auf genau diesem Objekt setzt (`phase6_debate/debate/llm_caching.py:90-91`); beide Client-Klassen
+  haben kein `__slots__` (geprüft).
+- Je Call eine JSONL-Zeile nach `data/state/llm_io.jsonl`: `ts` (UTC) · `role` · `model` und `temperature`
+  **zum Aufrufzeitpunkt** · `system` · `user` · `json_schema` · `answer` **oder** `error` (`repr`) ·
+  `usage` (`client.last_usage`) · `finish_reason` (`getattr(client, "last_finish_reason", None)`).
+- **Fail-soft:** der Original-Call läuft unverändert, seine Exception wird unverändert weitergereicht; ein
+  Schreibfehler des Rekorders darf den Call nie brechen und loggt **genau einmal** je Prozess `critical`
+  (sichtbar, aber kein K5-Rauschen).
+- Angewendet auf den **Debatten-Client** (`wiring.py:553-562`) und den **Research-Client** (`:519`).
+  Lesson/Instinct/Reflect/Paper-Debatte: nicht (kein Bedarf benannt).
+- Kein zusätzlicher LLM-Call, kein Eingriff in Gates/VETOs/Order-Pfad. Wachstum ≈ 1–2 MB je Handelstag,
+  keine Rotation (Obergrenze ≈ 0,5 GB/Jahr; `data/` ist gitignored; Prompts tragen keine Credentials).
+- **Tests (P8, +3):** eine Zeile je Call mit dem Modell zum Aufrufzeitpunkt · Fehlerfall schreibt `error`
+  und reicht die Exception durch · Schreibfehler bricht den Call nicht und loggt einmal `critical`.
+
+**F-3 — Flip 2 (P8, eigener Commit, Rollback = eine Zeile)**
+
+- `phase8_scheduler/scheduler/config.py:149`: `llm_profile: str = "research_m3"` → `"all_m3"` (Kommentar
+  nachziehen). Das Profil existiert seit M-1 (`llm_profiles.py:205`), die Preiszeile für `MiniMax-M3` und
+  die Budget-Ausnahme ebenfalls; `test_llm_profiles.py:322` prüft `all_m3` bereits gegen `check_llm_profile`.
+- Geprüft 2026-11-11: außerhalb von Phase 6 überschreibt **niemand** `client.model` je Call ⇒ Lesson,
+  Instinct, Reflect und Paper-Debatte folgen dem Profil über `_build_llm`. Für die Debatte benennt
+  `_debate_config` alle drei Rollen um.
+- **Pins anpassen (keine neue Testzahl):** `tests/test_config.py:200` (Default-Pin: jetzt **alle** Rollen →
+  `minimax`/`MiniMax-M3`), dazu jede Stelle in `tests/test_wiring_llm_routing.py`, die den Default voraussetzt.
+- Der OpenAI-kompatible Client schreibt das Schema als Anweisung in den System-Prompt und sendet
+  `response_format: json_object` (`phase4_research/research/llm_openai_compat.py:319-362`) — **erzwungen**
+  wird das Schema dort nicht. Ob M3 die Schemata von Debatte, Lesson und Instinct trifft, ist **nie
+  gelaufen** (der C-7-Smoke deckte nur das Research-Schema).
+
+### F-26d — Σ-Ziele und AK
+
+- Baseline **vor** dem Step neu messen (zuletzt gemessen: Σ 2061, Session #18; in Session #20 nicht gelaufen).
+- P16 23 → **28** · P8 299 → **302** · Σ ≥ Baseline + 8, 16/16 Suites grün.
+- `rg "\bLLMClient\(" phase8_scheduler/scripts/wiring.py` und `rg "OpenAICompatLLMClient\("` bleiben bei je 1 Treffer.
+- Review des Fix-Umfangs durch Claude Code **vor** dem `-S2`-Start (Muster AK22, Schwerpunkte: Rekorder
+  fail-soft · K12 fail-closed/kein Vakuum-PASS · Flip-Pins).
+- Exec-Commits tragen einen `Model:`-Trailer (eurofleet-Wunsch, §24).
+
+### F-26e — Rollen-Probe: Generalprobe am Fr 2026-11-13 (Empfehlung) oder Fixture-Smoke
+
+Ein fertiges Rollen-Smoke-Skript gibt es nicht (`scripts/store_minimax_key.py` verwaltet nur den Key).
+Zwei Wege, **Entscheidung beim Nikinger**:
+
+| | **G — Generalprobe** (Empfehlung) | S — Fixture-Smoke-Skript |
+|---|---|---|
+| Was | F-2 + F-3 am **Do 2026-11-12 nach 17:35** einspielen, Fr 11-13 läuft der Bot unregistriert auf `all_m3` | Neues Operator-Skript ruft je Rolle einen Call mit Fixture-Eingabe auf M3 |
+| Deckt ab | echte Eingaben, echte Schemata, die Caps aus F-26b, den Rekorder, Rollen-Lecks (`claude-*`-Records), Latenz | nur Schema-Treffer je Rolle, synthetisch |
+| Zusatz-Code | keiner | ≈ 100–150 Zeilen + Fixtures für 5 Nähte |
+| Preis | ein Tag weniger Sonnet-Judge-Daten; Stopp schon Do statt Fr; Review erst nach dem Einspielen (Demo, Caps und VETOs unverändert) | Wochenend-Arbeit; die Caps aus F-26b bleiben ungeprüft |
+| Restlücke | schließt am Fr kein Trade, bleiben Lesson/Instinct ungeprüft | Verhalten unter echter Last ungeprüft |
+
+**Disziplin bei G:** die K12-Schwellen (F-1) werden **vor** dem Freitag freigegeben. Befunde der
+Generalprobe dürfen nur Code-Fixes auslösen, keine Kriterienänderung.
+
+### F-26f — Ablauf
+
+| Wann | Was | Wer |
+|---|---|---|
+| Do 11-12 tagsüber | Bot läuft (`research_m3`). F-1 bauen + P16-Suite | Ausführer |
+| Do 11-12 nach 17:35 *(nur bei G)* | `bash scripts/install_units.sh --hold` → `systemctl --user stop tradingbot-scheduler.service` → `ps aux \| grep scheduler.run` leer → F-2 + F-3 + P8-Suite + Sweep → `--release-hold` → `bash scripts/install_units.sh` → `systemctl --user start tradingbot-scheduler.service` | Stopp/Start: Nikinger-Go; Code: Ausführer |
+| Fr 11-13 *(nur bei G)* | Generalprobe, kein Eingriff | — |
+| Fr 11-13 nach 17:35 | `--hold` + Stopp + Gegenprobe. Bei G: Probe lesend auswerten (je Rolle ≥ 1 Call? `DebateBudgetExceeded`? `claude-*`-Records? K12 trocken) | Nikinger-Go; Auswertung: Claude Code |
+| Wochenende | ohne G: F-2 + F-3 + Fixture-Smoke. Immer: Sweep, Review, `-S2`-Datei mit Ankern, T23-Freigabe, Push. eurofleet-Wochenlauf Sa: Scheduler bleibt wegen `SCHEDULER_HELD` aus | Ausführer / Claude Code / Nikinger |
+| Mo 11-16, 07:30–08:55 | `--release-hold` → `install_units.sh` → `start`. **Aktiv-Block vor 09:00 eintragen** (S1-Befund N1). Day-0: Start-Zeile `llm_profile=all_m3` · 0 `preflight failed` · erster Debatten-Record in `llm_io.jsonl` · 0 `claude-*`-Records seit Start · vier Units `active` | Nikinger (Operator) + Session lesend |
+| Mo 11-16 / Di 11-17 | `-S2`-Fenster. Keine Ausführer-Sitzung auf dem MiniMax-Key von D1 07:30 bis D2 18:00 | — |
+| Mi 11-18 | Export + Report (Befehl unten) → Auswertung → Offline-Review | Nikinger / Claude Code |
+
+Nur der Scheduler wird gestoppt und gestartet; Recorder, Discovery und WebUI laufen durch (K1: 0 Starts im
+Fenster, erlaubt sind ≤ 2).
+
+### F-26g — Inhalt der Vorregistrierung `-S2` (Datei wird nach den Fix-Commits geschrieben, dann gelockt)
+
+`phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` (📕, INDEX-Zeile im selben Commit) — **supersedes
+S1**, Begründung: S1 FAIL an K6 (§25), Fix = Flip 2. Aufbau wie S1, mit diesen Änderungen:
+
+- **Fenster:** D1 Mo 2026-11-16, D2 Di 2026-11-17 (Start vor 09:00 an D1).
+- **Gepinnt:** wie S1, außer `llm_profile = all_m3`. `daily_token_budget` bleibt 300 000 und bindet kein aktives Modell.
+- **Kriterien:** K1, K2, K5, K7 (gegen `all_m3`), K8, K9, K10, K11 unverändert. **K6 unverändert im Code, aber offen als „unter `all_m3` nicht verletzbar" geführt.** **Neu K12** (F-1, mit `--expect-no-capped-calls`). K3/K4 nur berichtet.
+- **Nur berichtet (kein PASS/FAIL):** Judge-Freigabequote je Tag (Vergleich S1 unter Sonnet: 5/16 · 2/70 · 5/17) · MiniMax-Calls und -Tokens je Tag · Anzahl `DebateError`-Abbrüche (Datenpfad) · **Offline-Review** in Claude Code (Opus, Pro-Plan, manuell): Stichprobe = alle Debatten mit `TRADE` + jede fünfte übrige in Dateireihenfolge aus `debate_log.json`, Eingaben aus `llm_io.jsonl`; berichtet werden Übereinstimmung Reviewer/Judge und Fälle „Daten falsch gelesen".
+- **Erlaubte Ereignisse:** wie S1. Neu als Befund benannt: eine Ausführer-Sitzung auf dem MiniMax-Key im Fenster; Doku-Commits im Fenster (S1-Befund N2) sind **erlaubt**, Code- und Konfig-Commits nicht.
+- **FAIL-Regel:** unverändert. Bei FAIL an K12 oder K10: Revert von F-3 (eine Zeile) ist der kleinste Fix.
+- **§F2 entfällt** (in `-S2` aufgegangen).
+- **Report-Befehl:**
+
+```bash
+phase1_broker_wrapper/.venv/bin/python phase16_activation/scripts/autonomy_report.py \
+  --prereg v5 --from 2026-11-16 --to 2026-11-17 --summary \
+  --journal-file data/reports/journal_2026-11-16_to_2026-11-17.txt \
+  --expect-llm-profile all_m3 --expect-no-capped-calls \
+  --exempt-model MiniMax-M3 \
+  --exempt-model MiniMax-M3.1-Flash \
+  --reports-dir data/reports
+```
+
+### F-26h — Bei Ausführung verifizieren / Fehlgriffe
+
+| Symptom | Erster Verdächtiger |
+|---|---|
+| Bot läuft, 0 Trades, viele `debate fail-closed (DebateBudgetExceeded)` | Caps aus F-26b (Output 12 000 / Wanduhr 120 s) |
+| `debate fail-closed (DebateLLMError)` mit „unterminated <think> block" | `finish_reason=length`: M3 hat das Token-Limit im Denken verbraucht (Plan §15.6) |
+| K10 FAIL, `extractor returned ok=False` | M3 trifft das Lesson-/Instinct-Schema nicht |
+| `claude-*`-Records nach dem Start | Rollen-Leck: ein LLM-Aufrufer außerhalb von `_build_llm`, oder der Flip ist nicht aktiv (Start-Zeile prüfen) |
+| Zyklen deutlich länger als 5 min | 4 M3-Calls in Folge (Research + 3 Debatte), je bis 90 s Timeout |
+| `llm_io.jsonl` wächst nicht | Rekorder nicht verdrahtet oder Schreibfehler (genau eine `critical`-Zeile suchen) |
+
+### F-26i — Was §26 nicht tut
+
+Kein Cap-Wechsel (Fix A verworfen) · kein Debatten-Cooldown (Fix B, nach Phase 17) · kein Opus-Call im
+Handelspfad · kein Judge-Split über zwei Anbieter · kein M3.1-Flash (fehlende Preiszeile; nach `-S2`) ·
+kein `e3_deploy.sh`-Fix und kein E-6 (beides nach `-S2`-PASS, §24 E-24e) · keine Prereg v5.
+
