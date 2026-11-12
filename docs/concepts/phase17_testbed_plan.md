@@ -2605,6 +2605,8 @@ D-2/Flip 2/Modell protokolliert · bei PASS: Prereg v5 committet (AK20) · `chec
 > Pro-Plan)**, nicht automatisch · Bot läuft bis zum Stopp weiter, Anthropic-Guthaben auf 12,53 $ aufgeladen.
 > Grundlage: Phasenkopf „E-4/E-5 — Shakedown-S1-Auswertung" + §25. **Dieser § ist ein Plan zur Freigabe —
 > es ist noch kein Code geschrieben.** Alle Anker am 2026-11-11 gegen den Code gelesen.
+>
+> ✅ **Freigegeben (Nikinger, 2026-11-12)** — inklusive der K12-Schwellen (Serie ≥ 3 · ≤ 10 % · 0 Nicht-Ausnahme-Calls) und der Generalprobe (F-26e, Weg G) als Empfehlung des Plans. **Bau: Ausführer (OpenCode / MiniMax-M3), Review: Claude Code** (T22; Empfehlung der Session, vom Nikinger übernommen). Geprüft 2026-11-12: der laufende Bot lädt `autonomy_report.py` nicht ⇒ F-1 ist ohne Stopp baubar.
 
 ### F-26a — Was sich gegenüber §24/§25 ändert
 
