@@ -7,6 +7,58 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-12 (Auswertungs-Session #20, Claude Code, 11-11 → 11-12: **Shakedown S1 ausgewertet — ❌ FAIL an K6** (D2: Anthropic-Budget um 17:19:13 erschöpft); K1/K2/K5/K7–K11 PASS; offizieller Report bestätigt; **Fix entschieden: Flip 2 `all_m3` + Eingabe-Rekorder + K12**; **Plan §26 (Block F) freigegeben**, **Generalprobe Fr 11-13 bestätigt**, Bau = Ausführer, Review = Claude Code (Fr abends, spätestens So 11-15); Mitteilung an eurofleet geschrieben; **gepusht**; doc-only, kein Bot-Code, Σ nicht neu gemessen)
+
+> **Auftrag:** Nikinger 2026-11-11: Plan §24 — Auswertung des Shakedowns; bei FAIL anhalten (Ursache + kleinster Fix, FAIL-Regel `-S2`).
+> **Live-frei:** nur read-only (`mode=ro`, Logs, `journalctl`, `systemctl show`); kein Dienst-Start/Stop, kein Signal, kein Bot-Code, kein Schreiben in `data/`. Der Bot läuft seit Mo 2026-11-09 07:30:23 ununterbrochen (PID 963510, vier Units `active`, `NRestarts=0`; gemessen 2026-11-11 18:05).
+
+### Completed
+
+| # | Was | Ergebnis |
+|---|---|---|
+| 1 | **Report** — Vorab-Lauf im Scratchpad + offizieller Lauf des Nikingers (18:42) | Exit **1**, Payload identisch; `data/reports/autonomy_2026-11-09_to_2026-11-10.json` |
+| 2 | **Verdikt je Kriterium** mit Gegenprobe | Abschnitt „E-4/E-5 — Shakedown-S1-Auswertung": **K6 FAIL**, K1/K2/K5/K7/K8/K9/K10/K11 PASS, K3 = 7, K4 = 2/2 (nur berichtet) |
+| 3 | **Ursache K6** | 64 Debatten × 4 490 Tokens = 95 % der 302 186 Anthropic-Tokens an D2; Research (MiniMax-M3) liefert an 97 % der Ticks einen Kandidaten |
+| 4 | **Fix-Entscheidung (Nikinger):** C = `llm_profile = "all_m3"` direkt für `-S2` · Verfügbarkeitsmaß als Report-Evaluator · Eingabe-Rekorder ja · Review über Claude Code (Opus, Pro-Plan), nicht automatisch · Bot läuft weiter, Anthropic-Guthaben 12,53 $ | protokolliert im Abschnitt „Fix-Optionen → Stand der Entscheidung" |
+| 5 | **Plan §26** (Block F) geschrieben, Anker gegen den Code gelesen | F-1 K12 (P16) · F-2 Rekorder (P8) · F-3 Flip 2 (P8) · Inhalt der `-S2` · Ablauf bis Mi 11-18. **Fund:** Debatten-Caps (`phase6_debate/debate/models.py:140-145`: Output 12 000, Wanduhr 120 s) sind für Haiku/Sonnet kalibriert |
+| 6 | **Freigaben (Nikinger, 2026-11-12):** Plan §26 inklusive K12-Schwellen · Bau durch den Ausführer (OpenCode / MiniMax-M3), Review durch Claude Code · Push | Vermerk am Kopf von Plan §26 |
+| 7 | **Mitteilung an eurofleet** | `docs/concepts/tradingbot_an_eurofleet_2026-11-12.md` (Zeitplan der Stopps, Fenster `-S2`, MiniMax-Last, Stand der drei Fragen) |
+| 8 | Doku | dieser Block + Rotation #19 → `SESSIONS_ARCHIVE.md` · Plan §25 + §26 · Root-Banner/-Zeile · INDEX · Memory · **Push** aller Session-Commits |
+
+### Next
+
+> **Entschieden (Nikinger, 2026-11-12 17:05):** **Generalprobe ja** (Plan §26 F-26e, Weg G) · Ausführer in OpenCode baut · danach Review durch Claude Code.
+> **Stand bei Session-Ende (gemessen 17:05):** Scheduler läuft noch (PID 963510, kein `SCHEDULER_HELD`), **0 offene Positionen** (`execution_state.json`: 55 × CLOSED; `trade_outcomes`: 0 OPEN), 5 Trades heute (Tages-Cap erreicht). Es ist **noch nichts gestoppt und kein Code gebaut.**
+
+| # | Wann | Was | Wer |
+|---|---|---|---|
+| 1 | **Do 11-12 nach 17:35** (nicht früher — um ~17:31 läuft der Tages-Heartbeat) | `bash scripts/install_units.sh --hold` → `systemctl --user stop tradingbot-scheduler.service` → `ps aux \| grep "scheduler.run" \| grep -v grep` leer | Nikinger |
+| 2 | Do 11-12 abends | Plan §26 **F-2** (Eingabe-Rekorder) + **F-3** (Flip 2), je ein Commit mit `Model:`-Trailer; vorher Σ-Baseline messen, danach P8-Suite + voller Sweep. **F-1** (K12 im Report) am selben Abend oder bis spätestens Fr 17:30 | Ausführer (OpenCode / MiniMax-M3) |
+| 3 | Do abends oder Fr 11-13 **vor 08:50** | `bash scripts/install_units.sh --release-hold` → `bash scripts/install_units.sh` → `systemctl --user start tradingbot-scheduler.service`. Prüfen: Start-Zeile mit `llm_profile=all_m3`, kein `preflight failed` | Nikinger |
+| 4 | Fr 11-13 | **Generalprobe**, unregistriert, kein Eingriff | — |
+| 5 | Fr 11-13 nach 17:35 | `--hold` + Stopp + Gegenprobe (vorher 0 offene Positionen prüfen) | Nikinger |
+| 6 | **Fr 11-13 abends (empfohlen), spätestens Sa 11-14** | **Review + Auswertung der Generalprobe** in einer Claude-Code-Session: (a) Review der Commits F-1…F-3 nach Plan §26 F-26d; (b) Probe lesend auswerten — je Rolle ≥ 1 Call auf M3? `DebateBudgetExceeded` oder `DebateLLMError`? `claude-*`-Records seit dem Start? `llm_io.jsonl` gefüllt? Zykluslänge? K12 trocken über den Freitag | Claude Code |
+| 7 | Sa 11-14 / So 11-15 | Fixes aus Review oder Probe (Ausführer) → Re-Review der Stellen → `PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` mit Ankern (Inhalt Plan §26 F-26g) → **T23-Freigabe** → Push. **Alles muss bis So 11-15 abends stehen.** eurofleet-Wochenlauf Sa: Scheduler bleibt wegen `SCHEDULER_HELD` aus | Ausführer / Claude Code / Nikinger |
+| 8 | **Mo 11-16, 07:30–08:55** | Start wie Zeile 3. **Aktiv-Block vor 09:00 eintragen.** Day-0-Checks nach Plan §26 F-26f | Nikinger + Session lesend |
+| 9 | Mo 11-16 / Di 11-17 | Fenster `-S2`. Keine Ausführer-Sitzung auf dem MiniMax-Key von Mo 07:30 bis Di 18:00 | — |
+| 10 | Mi 11-18 | Journal-Export + Report (Befehl Plan §26 F-26g) → Auswertung → Offline-Review in Claude Code (Opus) | Nikinger / Claude Code |
+| 11 | nach `-S2`-PASS | Modell (M3 / M3.1-Flash) + die drei eurofleet-Fragen → Prereg v5 → `scripts/e3_deploy.sh`-Fix → E-6 | — |
+
+**Wann das Review stattfinden muss:** harte Grenze ist der Start am Mo 11-16 um 07:30 — im Fenster ist jeder Code-Commit ein Befund, und die Vorregistrierung `-S2` zitiert Code-Anker, kann also erst nach dem Review gelockt werden. Praktisch: **Freitagabend nach dem Stopp**, damit Samstag und Sonntag als Puffer für Fixes und Re-Review bleiben. Die Generalprobe selbst läuft bewusst **ohne** vorheriges Review (Demo-Konto, Caps und VETOs unverändert, Plan §26 F-26e).
+
+**Fällt Zeile 1–3 heute Abend aus,** gilt automatisch Weg S aus Plan §26 F-26e: Stopp Fr 11-13 nach 17:35, F-2 + F-3 + Fixture-Smoke am Wochenende, Review bis So abends.
+
+### Open questions / blockers
+
+- **Ob heute Abend gestoppt und eingespielt wurde,** steht bei Session-Ende nicht fest — die nächste Session prüft zuerst `git log`, `systemctl --user is-active tradingbot-scheduler.service` und die letzte Start-Zeile in `data/state/run_scheduler.log`.
+- **Debatten-Caps unter M3 ungemessen** (Plan §26 F-26b: Output 12 000 Tokens, Wanduhr 120 s je Debatte) — die Generalprobe misst sie. Reißen sie regelmäßig, ist der kleinste Fix eine Überschreibung in `_debate_config` (`phase8_scheduler/scripts/wiring.py:402`), **Nikinger-Entscheidung**.
+- **Restlücke der Generalprobe:** schließt am Freitag kein Trade, bleiben Lesson und Instinct auf M3 ungeprüft (K10-Risiko in `-S2`).
+- **Advisor** war in dieser Session nicht verfügbar (kein Werkzeug) — beide vorgesehenen Konsultationen nicht erfolgt.
+- **AK8** (Re-Adoption live) und der **K9-Regex-Wortlaut** bleiben unbelegt.
+- Aufräumen (Operator, optional): `systemctl --user reset-failed tradingbot-e3-deploy.service` + `systemctl --user disable --now tradingbot-e3-deploy.timer` — der Timer feuert nicht erneut (N3), `failed` bleibt bei eurofleet aber rot.
+
+---
+
 ## Session stopped — 2026-11-09 (Review-Session #19 — Fortsetzung von #17, Claude Code: **Shakedown D1 geprüft** (Day-0-Checks 8/8 grün), **Aktiv-Block eingetragen** (`8dd270b`), eurofleet-Notiz gelesen (**Frist 11-15 entfällt**), **Plan §24 = nächster Block E-4-Abschluss + E-5**; doc-only, Σ 2055 unverändert)
 
 > **Auftrag:** Nikinger 2026-11-09: Shakedown-Stand prüfen, Aktiv-Block eintragen + committen, eurofleet-Notiz lesen, nächsten Block schreiben, committen + pushen, Session beenden.

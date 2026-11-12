@@ -2773,3 +2773,37 @@ Kein Cap-Wechsel (Fix A verworfen) · kein Debatten-Cooldown (Fix B, nach Phase 
 Handelspfad · kein Judge-Split über zwei Anbieter · kein M3.1-Flash (fehlende Preiszeile; nach `-S2`) ·
 kein `e3_deploy.sh`-Fix und kein E-6 (beides nach `-S2`-PASS, §24 E-24e) · keine Prereg v5.
 
+
+---
+
+## §26.1 Ausführungs-Nachtrag 2026-11-12 — Block F ist gebaut (Exec-Session #21)
+
+> **Datierter Nachtrag zu §26** (die gelockten Entscheidungen in §26 F-26a…F-26i bleiben
+> **unverändert** — dieser Abschnitt protokolliert nur, was gebaut wurde und was gemessen wurde).
+> Bau = Ausführer (OpenCode / MiniMax-M3), Review = Claude Code steht aus.
+
+| Teil | Commit | Ergebnis |
+|---|---|---|
+| **F-1** K12 | `6e8ec57` | `evaluate_k12` + `--expect-no-capped-calls` in `phase16_activation/scripts/autonomy_report.py`. **P16 23 → 28 (+5)**. Negativ-Beweis: mit dem pre-F-1-Code genau die 5 neuen Tests rot. v4 unverändert (Kriterienmenge {1..8}, Verdikte identisch) |
+| **F-2** Rekorder | `7f8bd83` | `_record_llm_io` in `phase8_scheduler/scripts/wiring.py` + `data/state/llm_io.jsonl` in der `.gitignore` (`ec9335a`). **P8 299 → 302 (+3)**. Negativ-Beweis: mit dem pre-F-2-`wiring.py` ist die Testdatei rot |
+| **F-3** Flip 2 | `54a45d9` | `config.py:149` `llm_profile` = `"all_m3"` + 2 verschärfte Pins. `check_llm_profile("all_m3")` offline grün (alle 6 Rollen → minimax/`MiniMax-M3`). Negativ-Beweis: mit dem pre-F-3-`config.py` genau die 2 Pins rot |
+
+- **Σ 2061 → 2069** (16/16 Suites grün, selbst gemessen): P1 98 · P2 82 · P3 108 · P4 177 · P5 195 ·
+  P6 76 · P7 170 · P8 302 · P9 95 · P10 169 · P12 153 · P13 85 · P14 62 · P15 128 · P16 28 · root 141.
+  AK F-26d („Σ ≥ Baseline + 8") **erfüllt** (exakt +8).
+- **Live-Gegenprobe K12 am S1-Fenster** (2026-11-09..10, read-only, `--reports-dir` in den
+  Scratchpad): **K12 PASS** — genau die im Plan vorhergesagte Erwartung. D1 19 research_ok /
+  16 debate_started / 0 Ausfälle · D2 72 / 70 / 0 · 11 Datenpfad-Fehler (= Nebenbefund N6).
+- **Betrieb (Weg G, Generalprobe):** Hold gelöst, Bot am **2026-11-12 18:47:48** mit
+  `llm_profile=all_m3` neu gestartet — Start-Sequenz 4:31 min, Symbol-Resolver 8/8 ok,
+  Lightstreamer CONOK (8/8 Subscriptions), `NRestarts=0`, 0 offene Positionen.
+- **🟡 Offen für die Generalprobe (Fr 2026-11-13) — genau die Risiken aus F-26b/F-26e:**
+  (a) die **Debatten-Caps** (`max_cumulative_output_tokens = 12 000`, `wall_clock_timeout_s = 120 s`)
+  sind für Haiku/Sonnet kalibriert, während `all_m3` `max_tokens_agent/judge = 8192` setzt (M3 denkt);
+  ein Cap-Bruch ⇒ `DebateBudgetExceeded` ⇒ fail-closed ABSTAIN auf **WARNING** (für K5 unsichtbar,
+  für K12 ein Ausfall); (b) **Lesson/Instinct/Reflect auf M3 sind nie gelaufen** — der
+  OpenAI-kompatible Client **erzwängt** das Schema nicht (K10-Risiko in `-S2`);
+  (c) der erste `llm_io.jsonl`-Datensatz erscheint erst mit dem ersten LLM-Call im WINDOW
+  (Fr 09:00) — die Rekorder-Verdrahtung ist bis dahin **nicht** live belegt.
+- **Nicht getan (bewusst):** keine Cap-Änderung, kein Debatten-Cooldown, kein Opus-Call im
+  Handelspfad, keine Prereg v5, kein `e3_deploy.sh`-Fix, kein E-6 — alles nach §26 F-26i.

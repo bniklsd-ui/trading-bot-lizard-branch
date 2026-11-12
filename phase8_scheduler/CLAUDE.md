@@ -8,7 +8,7 @@ down:
   - ./SESSIONS_ARCHIVE.md      # full session history (L3)
   - ./README.md
   - ../docs/concepts/phase8_scheduler_concept.md   # full concept/plan snapshot (L3)
-updated: 2026-07-11 | 2026-11-04 (Phase-17 E-2 cross-phase edit — Token-Budget-Ausnahme deckt die ganze MiniMax-Familie, additiv, Σ 2053) | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041) | 2026-11-03 (Phase-17 M-1 cross-phase edit — Bot-Provider MiniMax, additiv, Σ 2042) | 2026-11-03 (Phase-17 C-8 Flip 1 cross-phase edit — llm_profile=research_m3, additiv, Σ 2043) | 2026-11-04 (Phase-17 D-1 cross-phase edit — Token-Budget-Ausnahme an `budget_exempt_models`, additiv, Σ 2046)
+updated: 2026-07-11 | 2026-11-12 (Phase-17 F-2 + F-3 cross-phase edit — **Eingabe-Rekorder** (`data/state/llm_io.jsonl`, fail-soft) + **Flip 2** `llm_profile="all_m3"`, additiv, Σ 2061 → 2069) | 2026-11-04 (Phase-17 E-2 cross-phase edit — Token-Budget-Ausnahme deckt die ganze MiniMax-Familie, additiv, Σ 2053) | 2026-10-19 (Phase-17 B-5 cross-phase edit, additiv, Σ 1985) | 2026-10-19 (Phase-17 B-6 cross-phase edit, additiv, Σ 1988) | 2026-11-03 (Phase-17 B-7 cross-phase edit, additiv, Σ 2004) | 2026-11-03 (Phase-17 C-1…C-6 cross-phase edit, additiv, Σ 2041) | 2026-11-03 (Phase-17 M-1 cross-phase edit — Bot-Provider MiniMax, additiv, Σ 2042) | 2026-11-03 (Phase-17 C-8 Flip 1 cross-phase edit — llm_profile=research_m3, additiv, Σ 2043) | 2026-11-04 (Phase-17 D-1 cross-phase edit — Token-Budget-Ausnahme an `budget_exempt_models`, additiv, Σ 2046)
 ---
 # CLAUDE.md — Phase 8: Scheduler (`phase8_scheduler/`)
 
@@ -588,6 +588,56 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 >   Start („model has no price line"). **Bis dahin bleibt M3 aktiv.**
 > - Cross-Phase-Edit autorisiert: Nikinger-Entscheidung 2026-11-04 (Rückfrage in dieser
 >   Session) + Phase-17-Plan T13 (Code in P8 ✓). `phase17_testbed/CLAUDE.md` Session-#16-Block.
+
+
+> 🔁 **Phase-17 (Prüfstand) F-2 + F-3 edit (2026-11-12, Exec-Session #21 — **additiv**, code = source of truth):**
+> Der Bot-LLM-Anbieter ist jetzt für **alle** Rollen MiniMax-M3, und jeder LLM-Call wird
+> mit seinem Eingabeprompt mitgeschrieben. **Rein daten + ein Wrapper**, Phase 8 bleibt für
+> Bestands-Wire-ups bit-identisch (der Default-Flip ist eine Zeile, der Wrapper ist fail-soft):
+> - **F-2 — Eingabe-Rekorder** (`scripts/wiring.py`, direkt nach `_build_llm`): die neue
+>   Funktion `_record_llm_io(client, path, role)` wickelt `client.ask_candidate` **auf der
+>   Instanz** und gibt **denselben** Client zurück — bewusst **keine Proxy-Klasse**: Phase 6
+>   setzt `client.model` / `client.temperature` **je Rolle** auf genau diesem Objekt
+>   (`phase6_debate/debate/llm_caching.py:90`), ein Proxy würde das Rollen-Renaming brechen;
+>   beide Client-Klassen haben kein `__slots__` (geprüft). Je Call eine JSONL-Zeile nach
+>   `data/state/llm_io.jsonl`: `ts` · `role` · `model`/`temperature` **zum Aufrufzeitpunkt** ·
+>   `system` · `user` · `json_schema` · `answer` **oder** `error` (repr) · `usage`
+>   (`client.last_usage`) · `finish_reason`. **Fail-soft:** der Original-Call läuft unverändert,
+>   seine Exception wird unverändert weitergereicht, ein Schreibfehler des Rekorders bricht den
+>   Call nie und loggt **genau einmal je Prozess** `critical` (sichtbar, aber kein K5-Rauschen).
+>   Angewendet auf den **Debatten-Client** (`:553-562`) und den **Research-Client** (`:519`);
+>   Lesson/Instinct/Reflect/Paper-Debatte: nicht (kein Bedarf benannt). Kein zusätzlicher
+>   LLM-Call, kein Eingriff in Gates/VETOs/Order-Pfad. Wachstum ≈ 1–2 MB je Handelstag, keine
+>   Rotation — `data/state/llm_io.jsonl` steht deshalb in der `.gitignore` (die listet
+>   `data/state/*` Datei für Datei). **+3 P8-Tests** (299 → **302**, neue Datei
+>   `tests/test_wiring_llm_recorder.py`): eine Zeile je Call mit dem Modell zum
+>   Aufrufzeitpunkt · Fehlerfall schreibt `error` und reicht die Exception **unverändert**
+>   durch · Schreibfehler bricht den Call nicht und loggt einmal `critical`.
+> - **F-3 — Flip 2** (`scheduler/config.py:149`): `llm_profile` = `"research_m3"` → **`"all_m3"`**
+>   (eine Zeile, Kommentar nachgezogen; Rollback = eine Zeile). Grund: der Shakedown S1
+>   (Mo 2026-11-09 / Di 2026-11-10) **FAIL an K6** — unter Flip 1 lief die Debatte weiter auf
+>   Anthropic (3 Calls ≈ 4 490 Tokens), an einem vollen Tag 302 186 Tokens gegen ein Cap von
+>   300 000, erschöpft um 17:19:13. Unter `all_m3` zählt **kein** aktives Modell mehr gegen das
+>   Cap (T7, Abo/M Plan) ⇒ K6 kann nicht mehr reißen; das LLM-Gesundheitssignal wandert in
+>   **K12** (Phase-17 Plan §26 F-1, P16). Die Debatten-Rollen benennt `_debate_config`
+>   (`wiring.py:402`) um, die übrigen Rollen folgen dem Profil über `_build_llm`.
+>   **Pins verschärft** (keine neue Testzahl): `tests/test_config.py` — Default-Pin jetzt
+>   `"all_m3"` und **alle** 6 Rollen → `minimax`/`MiniMax-M3`. In
+>   `tests/test_wiring_llm_routing.py` gibt es **keine** Default-Annahme (dort wird das Profil
+>   überall explizit übergeben) — nichts zu ändern. `check_llm_profile("all_m3")` offline grün.
+> - **Bekanntes Risiko (Plan §26 F-26b, bewusst NICHT vorab geändert — „erst messen"):** die
+>   Debatten-Caps sind für Haiku/Sonnet kalibriert. Unter `all_m3` gilt
+>   `max_tokens_agent/judge = 8192` (M3 denkt), während `max_cumulative_output_tokens = 12 000`
+>   und `wall_clock_timeout_s = 120 s` je Debatte **unverändert** bleiben. Reißt einer,
+>   loggt die Debatte fail-closed (`DebateBudgetExceeded`) auf **WARNING** — für K5 unsichtbar,
+>   für K12 ein Ausfall. Messung: Generalprobe Fr 2026-11-13; ein Fix wäre ein
+>   `dataclasses.replace` in `_debate_config` (P8) — Nikinger-Entscheidung.
+> - **Betrieb:** Der Bot wurde am 2026-11-12 18:47:48 mit `llm_profile=all_m3` neu gestartet
+>   (Hold vorher gelöst; Start-Sequenz 4:31 min, 8/8 Symbole, Lightstreamer CONOK, `NRestarts=0`,
+>   0 offene Positionen). Am 2026-11-12 16:01 lief noch der alte Anthropic-Pfad (1 Trade).
+> - Cross-Phase-Edits im Phase-17-Plan autorisiert (Plan §26 F-2/F-3, T13: Code in P8 ✓).
+>   Commits `7f8bd83` (F-2) · `54a45d9` (F-3) · `ec9335a` (`.gitignore`).
+>   `phase17_testbed/CLAUDE.md` Session-#21-Block. Σ 2061 → **2069** (16/16 grün).
 
 ---
 
