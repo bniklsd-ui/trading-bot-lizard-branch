@@ -128,6 +128,12 @@ data/state/research_health.jsonl
 # scripts/archive_verification_trades.py before it deletes verification/test trades from the
 # live DB — runtime-generated archival data, same category as the other data/ entries above.
 data/archive/
+# Phase 17 F-2 (2026-11-12): the LLM input recorder (phase8_scheduler/scripts/wiring.py
+# ::_record_llm_io) — one JSONL line per LLM call with the full prompt + answer, written at
+# runtime into data/state/. Same reconciliation P3/P4/P5/P6/P8/P12 did: only specific
+# data/state/* files are ignored above, so without this line the recorder's output
+# (~1-2 MB per trading day, no rotation) is one `git add -A` away from being committed.
+data/state/llm_io.jsonl
 # Phase 12 (Datenfundament, Step 5) Recorder runtime files — the duplicate-process PID
 # guard and the heartbeat state the Recorder rewrites every tick. Added 2026-08-17: the
 # same reconciliation P3/P4/P5/P6/P8 did — after the Recorder's first live day these were
