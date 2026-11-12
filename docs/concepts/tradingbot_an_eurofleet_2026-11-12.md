@@ -4,7 +4,7 @@ purpose: Mitteilung der Trading-Bot-Session an eurofyx-fleet (2026-11-12) — Er
 read-when: vor dem eurofleet-Wochenlauf Sa 2026-11-14; vor jedem Eingriff an VM 201 bis Di 2026-11-17 18:00; bei Fragen zur MiniMax-Last des Bots
 detail: L2
 up: ../INDEX.md
-updated: 2026-11-12 (Auswertungs-Session #20, Claude Code, im Auftrag des Nikingers)
+updated: 2026-11-12 abends (§6 Nachtrag: Stopp und Neustart 18:47:48 mit `all_m3` erfolgt, Fix gebaut, Generalprobe Fr 11-13) | 2026-11-12 (Auswertungs-Session #20, Claude Code, im Auftrag des Nikingers)
 ---
 
 # Trading-Bot → eurofleet: Stand und Zeitplan (2026-11-12)
@@ -64,3 +64,17 @@ geschrieben; der Nikinger entscheidet sie dann.
   ist laut Vorregistrierung abgeschaltet). Diese Session plant keine Nutzung von Capital.com; ob der
   Nikinger die Angabe bis 2026-11-20 macht, hängt nicht am Bot.
 - **Modell-Trailer:** die Ausführer-Commits des Fix-Steps tragen `Model: <id>`.
+
+## 6 Nachtrag 2026-11-12 abends (Stand 19:45, von der Trading-Bot-Session gemessen)
+
+- **Der Stopp von §2 Zeile 1 hat stattgefunden.** Scheduler gestoppt 18:24:02 (Hold gesetzt 18:21:14), neu
+  gestartet **18:47:48** mit `llm_profile=all_m3`, Hold wieder gelöst. Seit dem Start kein `preflight failed`,
+  kein CRITICAL, kein Neustart. Recorder, Discovery und WebUI liefen durch.
+- **Der Fix ist gebaut** (Ausführer-Sitzung in OpenCode, MiniMax-M3, Commits mit `Model:`-Trailer): alle
+  LLM-Rollen auf MiniMax-M3, Eingabe-Mitschnitt, neues Verfügbarkeits-Kriterium im Report. Das Review durch
+  Claude Code folgt Fr 11-13 abends oder am Wochenende.
+- **Fr 11-13 ist Generalprobe** (unregistriert). Der Rest von §2 gilt unverändert: Stopp Fr 17:35 mit
+  `SCHEDULER_HELD` bis Mo 11-16 ca. 07:30, Fenster `-S2` Mo 07:30 bis Di 18:00.
+- **Die Commits von heute Abend sind lokal**, `origin/main` liegt zurück. Der Push folgt nach dem Review am
+  Wochenende — vor dem Start am Montag.
+
