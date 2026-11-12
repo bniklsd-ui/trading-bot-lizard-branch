@@ -371,6 +371,16 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 - **🟠 Lesson/Instinct/Reflect auf M3 sind nie gelaufen** (C-7-Smoke deckte nur das Research-Schema; der OpenAI-kompatible Client **erzwängt** das Schema nicht, er schreibt es als Anweisung in den System-Prompt). Schließt die Generalprobe keinen Trade, bleiben Lesson/Instinct ungeprüft ⇒ **K10-Risiko in `-S2`**.
 - **Review steht aus** (Claude Code, Muster AK22): Schwerpunkte = Rekorder fail-soft · K12 fail-closed/kein Vakuum-PASS · Flip-Pins · die 3 Commits sind noch **nicht gepusht** (Push = Nikinger bzw. Wochenende).
 - **AK8** (Re-Adoption live) und der **K9-Regex-Wortlaut** bleiben unbelegt. `tradingbot-e3-deploy.service` steht weiter auf `failed` (Timer feuert nicht erneut, N3).
+- **🟡 `tests/test_scheduler_hold.py::test_restart_start_would_start_scheduler_without_hold` ist
+  zustandsabhängig** (Befund dieser Session, **kein Code-Regressionsbefund**): `restart-services.sh
+  start --dry-run` prüft per pgrep, ob der Dienst schon läuft — solange der Scheduler läuft
+  (Generalprobe), meldet das Skript „already alive — skipping (refuse double-start)" statt
+  „would nohup", und der Test schlägt fehl. Der Test ist **nicht hermetisch** gegen die laufenden
+  Prozesse (sein Docstring verspricht nur den Schutz von `data/state`). **Gemessen:** grün bei
+  gestopptem Bot (der Σ-Sweep 2069 lief **vor** dem Neustart um 18:47:48), rot bei laufendem Bot.
+  Ein Fix wäre eine Fake-`pgrep` im `env`-Fixture des Root-Tests — **Root-Test-Code, außerhalb
+  Block F** ⇒ Nikinger-Entscheidung. Für den Start am Mo 11-16 ist es **folgenlos**: das
+  Deploy-Skript `scripts/e3_deploy.sh` führt **keine** Tests aus.
 - **Advisor** war in dieser Session nicht verfügbar (kein Werkzeug im Harness) — die im Working-Style vorgesehenen Konsultationen (VERIFY-Mismatch, 2–3 Fehlversuche, Block-Abschluss) sind nicht erfolgt; ersatzweise: alle Plan-Anker live am Code nachgemessen, Negativ-Beweis je Teil, 16/16-Sweep.
 - **Σ 2069** selbst gemessen (16 Suites einzeln + root).
 
