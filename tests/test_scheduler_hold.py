@@ -73,6 +73,16 @@ def env(tmp_path: Path) -> dict[str, str]:
     systemctl = fake_bin / "systemctl"
     systemctl.write_text(_FAKE_SYSTEMCTL)
     systemctl.chmod(0o755)
+    # A fake `pgrep` — the restart helper refuses a double start when the
+    # service is already alive ("already alive — skipping (refuse double-start)").
+    # Without this fake the test sees the **live** bot: while the scheduler runs,
+    # `start --dry-run` never reaches its "would nohup" branch and
+    # `test_restart_start_would_start_scheduler_without_hold` fails on live state
+    # instead of on the hold logic. Mid-plan fix (Nikinger, 2026-11-12): the test
+    # was never hermetic against the running processes, only against data/state.
+    pgrep = fake_bin / "pgrep"
+    pgrep.write_text("#!/usr/bin/env bash\n# no service is running inside the test\nexit 1\n")
+    pgrep.chmod(0o755)
     home = tmp_path / "home"
     home.mkdir()
     child_env = dict(os.environ)
