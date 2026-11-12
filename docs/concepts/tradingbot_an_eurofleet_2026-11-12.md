@@ -24,7 +24,7 @@ updated: 2026-11-12 (Auswertungs-Session #20, Claude Code, im Auftrag des Niking
 
 | Wann | Zustand | Was eurofleet tun bzw. lassen soll |
 |---|---|---|
-| Do 11-12 ab 17:35 | kurzer **bewusster** Stopp mit `SCHEDULER_HELD`, Code wird eingespielt, Start am selben Abend oder Fr vor 08:50 (Hold dann wieder weg). **Nur falls der Nikinger das heute Abend durchführt** — sonst läuft der Scheduler bis Fr 17:35 unverändert | nichts |
+| Do 11-12 ab 17:35 | kurzer **bewusster** Stopp mit `SCHEDULER_HELD`, Code wird eingespielt, Start am selben Abend oder Fr vor 08:50 (Hold dann wieder weg). vom Nikinger so entschieden (2026-11-12 17:05); fällt es aus, läuft der Scheduler bis Fr 17:35 unverändert | nichts |
 | Fr 11-13 | Generalprobe (unregistriert) bzw. Normalbetrieb | nichts |
 | **Fr 11-13 ab 17:35 bis Mo 11-16 ca. 07:30** | **gestoppt, `data/state/SCHEDULER_HELD` liegt** | Wochenlauf Sa 11-14: Scheduler **nicht** starten (die Datei sagt es). Reboot und Neustart von recorder/discovery/webui sind in Ordnung |
 | Mo 11-16, 07:30–08:55 | Start durch den Operator, Hold wird gelöst | nichts |
