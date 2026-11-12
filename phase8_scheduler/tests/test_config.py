@@ -197,14 +197,19 @@ def test_exported_from_package_root() -> None:
     assert ExportedSchedulerConfig is SchedulerConfig
 
 
-def test_llm_profile_default_is_research_m3_with_the_minimax_model_exempt() -> None:
-    """Phase 17 C-2 (T5/T17) + C-8 Flip 1 (2026-11-03): the LLM routing profile is a
-    **code default**, not a CLI flag — the systemd unit passes no flags, so only a
-    code default survives a restart. After the C-7 family smoke PASSED (both MiniMax
-    models) the default is ``"research_m3"``: **only the research role** moves to
-    MiniMax-M3 (Abo/M Plan) — every other role stays on Anthropic (T5: one profile =
-    one variable; a mixed state would make later model comparisons unreadable). The
-    MiniMax model is budget-exempt (its calls do not count against
+def test_llm_profile_default_is_all_m3_with_the_minimax_model_exempt() -> None:
+    """Phase 17 C-2 (T5/T17) + C-8 Flip 1 (2026-11-03) + **F-3 Flip 2 (2026-11-12)**:
+    the LLM routing profile is a **code default**, not a CLI flag — the systemd unit
+    passes no flags, so only a code default survives a restart.
+
+    C-8 Flip 1 moved only the *research* role to MiniMax-M3 (Abo/M Plan). **F-3 Flip 2**
+    moves **all** roles: the Shakedown S1 (Mo 2026-11-09 / Di 2026-11-10) failed on
+    K6 — under Flip 1 the Anthropic debate (3 calls ≈ 4 490 tokens) burned the
+    300-k cap on a full day (302 186 tokens, exhausted 17:19:13). Under ``all_m3`` no
+    active model counts against the cap (T7) and the LLM-health signal moves to K12
+    (Plan §26 F-1).
+
+    The MiniMax model is budget-exempt (its calls do not count against
     ``daily_token_budget``; Abo ⇒ Grenzkosten 0, Nikinger 2026-11-03).
 
     The exempt model id is a literal in three places (``llm_profiles._M3.model``,
@@ -217,19 +222,20 @@ def test_llm_profile_default_is_research_m3_with_the_minimax_model_exempt() -> N
     """
     cfg = SchedulerConfig()
 
-    assert cfg.llm_profile == "research_m3"
+    assert cfg.llm_profile == "all_m3"
     assert cfg.budget_exempt_models == ("MiniMax-M3", "MiniMax-M3.1-Flash")
 
 
-def test_default_profile_moves_only_the_research_role_to_minimax() -> None:
-    """C-8 Flip 1 (2026-11-03): the **shipped default** profile is ``research_m3`` —
-    only the research role is served by MiniMax-M3; every other role (debate,
-    lesson, instinct, reflect, paper-debate) stays on Anthropic.
+def test_default_profile_moves_every_role_to_minimax() -> None:
+    """**F-3 Flip 2** (2026-11-12): the **shipped default** profile is ``all_m3`` —
+    every role (research, debate, lesson, instinct, reflect, paper-debate) is served
+    by MiniMax-M3.
 
-    The pin exists because a default that moved the whole stack would change the
-    Bull/Bear/Judge path (and the lesson/instinct/reflect calls) without anyone
-    noticing — T5 wants one variable, one role at a time, so later model
-    comparisons stay readable.
+    The pin exists because the S1-FAIL fix moved the **whole** stack: under Flip 1
+    the Anthropic debate burned the 300-k token cap on a full day (302 186 tokens,
+    exhausted 17:19:13) ⇒ K6 FAIL. The debate roles are renamed by
+    ``_debate_config`` (Phase 6 rewrites ``client.model`` per role), the other roles
+    follow the profile through ``_build_llm``.
     """
     from scheduler.llm_profiles import LLM_ROLES, role_spec
 
@@ -237,8 +243,5 @@ def test_default_profile_moves_only_the_research_role_to_minimax() -> None:
 
     for role in LLM_ROLES:
         spec = role_spec(cfg.llm_profile, role)
-        if role == "research":
-            assert spec.provider == "minimax", role
-            assert spec.model == "MiniMax-M3", role
-        else:
-            assert spec.provider == "anthropic", role
+        assert spec.provider == "minimax", role
+        assert spec.model == "MiniMax-M3", role

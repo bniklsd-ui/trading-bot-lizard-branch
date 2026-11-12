@@ -139,14 +139,20 @@ class SchedulerConfig:
     # --- budget ---
     daily_token_budget: int | None = 300_000  # Phase 16 C3 (2026-09-05): raised from 200k — exhausted daily at ~15:48; None ⇒ explicitly disabled (WARNING in budget.py)
 
-    # Phase 17 C-2 (T5/T17) + C-8 Flip 1 (2026-11-03): LLM routing profile
-    # (scheduler/llm_profiles.py). A code default is the only restart-proof switch
-    # (systemd ExecStart passes no flags). **Flipped 2026-11-03** after the C-7
-    # family smoke PASSED for both MiniMax models: only the *research* role moves to
-    # MiniMax-M3 (Abo/M Plan) — debate/lesson/instinct/reflect stay on Anthropic.
-    # Rollback = this one line back to "anthropic". Flip 2 ("all_m3") stays gated
-    # behind the shakedown (Nikinger go).
-    llm_profile: str = "research_m3"
+    # Phase 17 C-2 (T5/T17) + C-8 Flip 1 (2026-11-03) + **F-3 Flip 2 (2026-11-12)**:
+    # LLM routing profile (scheduler/llm_profiles.py). A code default is the only
+    # restart-proof switch (systemd ExecStart passes no flags).
+    #   C-8 Flip 1 (2026-11-03): only the *research* role moved to MiniMax-M3
+    #     (Abo/M Plan) after the C-7 family smoke PASSED — debate/lesson/instinct/
+    #     reflect stayed on Anthropic.
+    #   F-3 Flip 2 (2026-11-12, Nikinger-Entscheidung nach dem S1-FAIL an K6):
+    #     **all** roles move to MiniMax-M3. Reason: under Flip 1 the Anthropic
+    #     debate (3 calls ≈ 4 490 tokens) burned the 300-k cap on a full day
+    #     (302 186 tokens, exhausted 17:19:13) — the Shakedown S1 FAIL criterion.
+    #     Under "all_m3" no active model counts against the cap (T7), so K6 can
+    #     no longer break; the LLM-health signal moves to K12 (Plan §26 F-1).
+    # Rollback = this one line back to "research_m3" (or "anthropic").
+    llm_profile: str = "all_m3"
     # Phase 17 D-1/C-2 (T7): calls of these models do NOT count against daily_token_budget (MiniMax
     # Abo/M Plan ⇒ Grenzkosten 0; Nikinger 2026-11-03). The model id is a literal in three places
     # (llm_profiles._M3.model, the price line in research/models.py, and this list) —
