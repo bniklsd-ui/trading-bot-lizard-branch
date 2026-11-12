@@ -54,6 +54,7 @@ uses fakes — does not call this) / ``live_test`` are its callers. Every cross-
 from __future__ import annotations
 
 import dataclasses
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -208,6 +209,10 @@ _SCHED_STATE_PATH = _STATE_DIR / "scheduler_state.json"
 _KILL_PATH = _STATE_DIR / "KILL"
 _COMMAND_PATH = _STATE_DIR / "scheduler_command.json"
 _OBSERVABILITY_PATH = _STATE_DIR / "research_health.jsonl"  # v1.6 Step 0 per-cycle health log
+# Phase 17 F-2 (Plan §26): the LLM input recorder. One JSONL line per LLM call
+# (input + output), so a later model comparison on identical input is
+# reconstructible — ``debate_log.json`` keeps only the answers.
+_LLM_IO_LOG = _STATE_DIR / "llm_io.jsonl"
 
 
 def _no_research() -> list[dict[str, Any]]:
@@ -399,6 +404,110 @@ def _build_llm(
     )
 
 
+# Phase 17 F-2: the recorder may fail, but only once per process — a broken
+# recorder must be visible without flooding the K5 CRITICAL bucket.
+_RECORDER_ERROR_LOGGED: bool = False
+
+
+def _write_llm_io(
+    client: Any,
+    path: Path,
+    role: str,
+    system: str,
+    user: str,
+    json_schema: dict,
+    answer: Any,
+    error: BaseException | None,
+) -> None:
+    """Append one JSONL record for an LLM call — **fail-soft by contract**.
+
+    A write error never breaks the call: it is logged **exactly once per
+    process** as ``critical`` (visible, but no K5 noise).
+
+    Args:
+        client: the LLM client the call ran on (for model/temperature/usage).
+        path: the JSONL file to append to.
+        role: the arm the client serves (``"research"`` / ``"debate"``).
+        system / user / json_schema: the call's input, verbatim.
+        answer: the parsed answer (``None`` when the call failed).
+        error: the exception the call raised (``None`` on success).
+    """
+    global _RECORDER_ERROR_LOGGED
+    try:
+        record = {
+            "ts": _utc_iso(datetime.now(timezone.utc)),
+            "role": role,
+            # Model + temperature are read **at call time**: Phase 6 rewrites
+            # ``client.model`` per role on exactly this object.
+            "model": getattr(client, "model", None),
+            "temperature": getattr(client, "temperature", None),
+            "system": system,
+            "user": user,
+            "json_schema": json_schema,
+            "answer": answer,
+            "error": repr(error) if error is not None else None,
+            "usage": getattr(client, "last_usage", None),
+            "finish_reason": getattr(client, "last_finish_reason", None),
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, default=str, ensure_ascii=False) + "\n")
+    except Exception as exc:  # noqa: BLE001 — the recorder must never break a call
+        if not _RECORDER_ERROR_LOGGED:
+            _RECORDER_ERROR_LOGGED = True
+            logger.critical(
+                "llm_io recorder failed (%s) — the LLM input is no longer recorded "
+                "(once per process); the calls themselves keep running",
+                exc,
+            )
+
+
+def _record_llm_io(client: Any, path: Path, role: str) -> Any:
+    """Record every ``ask_candidate`` call of ``client`` as one JSONL line.
+
+    Phase 17 F-2 (Plan §26): ``debate_log.json`` stores the *answers* of
+    Bull/Bear/Judge but not the prompt the Judge actually saw — a later model
+    comparison on identical input is therefore **not** reconstructible from
+    today's log (measured 2026-11-11: 339 debates, none with the Judge's
+    input). This wrapper makes it reconstructible: one line per call with the
+    input **and** the output.
+
+    The wrapper is installed **on the instance** (``client.ask_candidate = …``)
+    and the same client is returned — deliberately no proxy class: Phase 6 sets
+    ``client.model`` / ``client.temperature`` **per role** on exactly this
+    object (``phase6_debate/debate/llm_caching.py:90``), so a proxy would break
+    the role renaming. Both client classes have no ``__slots__`` (verified).
+
+    Fail-soft by contract: the original call runs unchanged, its exception is
+    re-raised unchanged, and a write error of the recorder never breaks the
+    call (see :func:`_write_llm_io`).
+
+    Args:
+        client: the LLM client (Anthropic or OpenAI-compatible).
+        path: the JSONL file to append to.
+        role: the arm the client serves (``"research"`` / ``"debate"``).
+
+    Returns:
+        The same client object (with the wrapped ``ask_candidate``).
+    """
+    original = client.ask_candidate
+
+    def ask_candidate(system: str, user: str, json_schema: dict) -> Any:
+        answer: Any = None
+        error: BaseException | None = None
+        try:
+            answer = original(system, user, json_schema)
+            return answer
+        except BaseException as exc:  # noqa: BLE001 — re-raised unchanged below
+            error = exc
+            raise
+        finally:
+            _write_llm_io(client, path, role, system, user, json_schema, answer, error)
+
+    client.ask_candidate = ask_candidate
+    return client
+
+
 def _debate_config(llm_profile: str) -> Any:
     """The Phase-6 :class:`DebateConfig` for the active profile (Plan §6 C-4).
 
@@ -516,14 +625,18 @@ def _build_research(
     market_data = _build_market_data(
         mapper, FileCache(str(_CACHE_DIR)), bar_service, enable_bar_service=enable_bar_service
     )
-    llm = _build_llm(
+    llm = _record_llm_io(
+        _build_llm(
+            "research",
+            llm_profile,
+            default_model=config.model,
+            max_tokens=config.max_tokens,
+            temperature=config.temperature,
+            timeout_s=config.timeout_s,
+            research_config=config,
+        ),
+        _LLM_IO_LOG,
         "research",
-        llm_profile,
-        default_model=config.model,
-        max_tokens=config.max_tokens,
-        temperature=config.temperature,
-        timeout_s=config.timeout_s,
-        research_config=config,
     )
     return Research(broker, db, state, market_data, llm, config)
 
@@ -550,15 +663,21 @@ def _make_debate_runner(
     def _build() -> Any:
         cfg = _debate_config(llm_profile)
         research_config = ResearchConfig()
-        llm = _build_llm(
+        # Phase 17 F-2: the recorder wraps the **instance** (not a proxy) —
+        # Phase 6 rewrites ``client.model`` per role on this very object.
+        llm = _record_llm_io(
+            _build_llm(
+                "debate",
+                llm_profile,
+                default_model=cfg.model_judge,
+                max_tokens=cfg.max_tokens_judge,
+                temperature=cfg.temperature_judge,
+                timeout_s=research_config.timeout_s,
+                research_config=research_config,
+                cache_system=True,
+            ),
+            _LLM_IO_LOG,
             "debate",
-            llm_profile,
-            default_model=cfg.model_judge,
-            max_tokens=cfg.max_tokens_judge,
-            temperature=cfg.temperature_judge,
-            timeout_s=research_config.timeout_s,
-            research_config=research_config,
-            cache_system=True,
         )
 
         def audit(outcome: Any, ctx: Any) -> None:
