@@ -79,8 +79,19 @@ below is reachable only via ``--prereg v5``:
   K10    instinct-bridge health: 0 CRITICAL ``instinct.bridge`` lines, 0
         ``extractor returned ok=False`` lines, and every instinct created in the
         window carries evidence trade ids (NA without a CLOSE in the window).
-  K11    every trading day has ≥ 1 divergence event (``divergence_ok`` or
-        ``quote_divergence``) in ``research_health.jsonl``.
+K11    every trading day has ≥ 1 divergence event (``divergence_ok`` or
+         ``quote_divergence``) in ``research_health.jsonl``.
+
+Phase 17 F-1 (Plan §26) adds one more criterion — reachable only via
+``--prereg v5``:
+
+  K12    LLM availability: every trading day has ≥ 1 research-ok event, no run
+         of ≥ 3 consecutive LLM failures in log order, and ≤ 10 % LLM failures
+         of the day's LLM events. With ``--expect-no-capped-calls`` it also
+         requires 0 non-exempt calls in the window (role-leak check after the
+         ``all_m3`` flip). It replaces the K6 budget signal, which cannot break
+         any more once no active model counts against the cap (T7).
+
 
 Constraints:
 
@@ -223,6 +234,37 @@ _EXTRACTOR_NOT_OK_RE = re.compile(r"extractor returned ok=False")
 # Phase-12 heartbeat sampler, ``quote_divergence`` from the Phase-8 observability
 # module; both are written into ``research_health.jsonl`` with a ``ts``.
 _DIVERGENCE_EVENTS = ("divergence_ok", "quote_divergence")
+
+# Phase 17 F-1 (K12): the LLM-availability events in the scheduler log. Under the
+# ``all_m3`` profile no active model counts against the token cap any more, so K6
+# cannot break — the LLM health signal moves here (Plan §26 F-1).
+#
+# Event taxonomy (exactly the four types the plan lists):
+#   * research ok    — ``research tick: N candidate(s) written (PASS).`` or
+#                       ``research tick: abstain (no candidate, reason=X).`` with
+#                       X != ``LLM_UNAVAILABLE`` (an abstain is a *working* LLM)
+#   * research fail  — the same line with ``reason=LLM_UNAVAILABLE``
+#   * debate started — ``debate_runner: Bull/Bear/Judge for …``
+#   * debate failed  — ``debate fail-closed (DebateLLMError|DebateBudgetExceeded|
+#                       unexpected)`` (``debate.debate`` logs ``type(exc).__name__``)
+#
+# ``debate fail-closed (DebateError): get_ohlcv not ok …`` is a **data-path**
+# failure, not an LLM failure (Plan §26 F-1): it is counted and reported, but it
+# neither counts as an LLM event nor as a failure.
+_RESEARCH_PASS_RE = re.compile(r"research tick: \d+ candidate\(s\) written \(PASS\)\.")
+_RESEARCH_ABSTAIN_RE = re.compile(
+    r"research tick: abstain \(no candidate, reason=(?P<reason>[^)]+)\)\."
+)
+_DEBATE_START_RE = re.compile(r"debate_runner: Bull/Bear/Judge for ")
+_DEBATE_FAIL_RE = re.compile(r"debate fail-closed \((?P<kind>[A-Za-z]+)\)")
+
+# The LLM-failure kinds of ``debate fail-closed`` — everything else (today:
+# ``DebateError`` = data path) is reported only.
+_LLM_FAIL_KINDS = ("DebateLLMError", "DebateBudgetExceeded", "unexpected")
+
+# Phase 17 F-1 (K12) thresholds — freed by the Nikinger on 2026-11-12 (Plan §26).
+K12_MAX_CONSECUTIVE_FAILURES: int = 3
+K12_MAX_FAILURE_PCT: int = 10
 
 
 def _parse_iso(ts: str) -> datetime | None:
@@ -1662,6 +1704,254 @@ def evaluate_k11(
     )
 
 
+def _k12_event_kind(line: str) -> str | None:
+    """Classify one scheduler-log line into a K12 event kind.
+
+    Returns ``"research_ok"``, ``"research_fail"``, ``"debate_started"``,
+    ``"debate_failed"``, ``"debate_data_failed"`` or ``None`` (not an LLM event).
+
+    The classification is pure text matching against the four event shapes of
+    Plan §26 F-1 — the log is the only append-only source that carries them.
+    """
+    if _RESEARCH_PASS_RE.search(line):
+        return "research_ok"
+    m = _RESEARCH_ABSTAIN_RE.search(line)
+    if m:
+        reason = m.group("reason").strip()
+        return "research_fail" if reason == "LLM_UNAVAILABLE" else "research_ok"
+    if _DEBATE_START_RE.search(line):
+        return "debate_started"
+    m = _DEBATE_FAIL_RE.search(line)
+    if m:
+        return "debate_failed" if m.group("kind") in _LLM_FAIL_KINDS else "debate_data_failed"
+    return None
+
+
+def evaluate_k12(
+    scheduler_log: Path,
+    usage_json: Path | None,
+    from_day: date,
+    to_day: date,
+    *,
+    exempt_models: tuple[str, ...] = (),
+    expect_no_capped_calls: bool = False,
+    max_consecutive_failures: int = K12_MAX_CONSECUTIVE_FAILURES,
+    max_failure_pct: int = K12_MAX_FAILURE_PCT,
+) -> CriterionResult:
+    """K12 — the LLM stayed available on every trading day of the window.
+
+    Under the ``all_m3`` profile no active model counts against the token cap
+    any more (T7), so **K6 can no longer break** — the budget signal has to be
+    replaced by a quality/availability signal (Plan §26 F-1, Nikinger go
+    2026-11-12). K12 measures that signal from two append-only sources:
+    ``run_scheduler.log`` (the event stream) and ``llm_usage.json`` (the call
+    bookkeeping, only used for the role-leak check).
+
+    Four requirements, all of them per Berlin trading day:
+
+    (a) ≥ 1 **research-ok** event — a positive signal. A day without any
+        research answer is a FAIL, not a vacuous PASS (F8: „grün ohne Messung?").
+    (b) No run of ≥ ``max_consecutive_failures`` (default 3) consecutive LLM
+        failures in log order (research + debate) — a sustained outage.
+    (c) LLM failures ≤ ``max_failure_pct`` (default 10 %) of the day's LLM
+        events. The LLM events of a day are the four event types of the
+        taxonomy above (research ok · research fail · debate started ·
+        debate failed). A ``debate fail-closed (DebateError)`` is a **data-path**
+        failure: it is counted and reported, but it is neither an LLM event nor
+        an LLM failure (it does not touch the model).
+    (d) Only with ``expect_no_capped_calls`` (``--expect-no-capped-calls``):
+        **0** non-exempt calls in the window. After the flip to ``all_m3`` every
+        call must come from the MiniMax models — a ``claude-*`` record would be
+        a role leak (Plan §26 F-26h).
+
+    A window without any trading day is ``NA``.
+
+    Log lines without a parsable timestamp cannot be attributed to a day and
+    are skipped — the same convention as K10 — but their number is reported in
+    ``measured["unattributed_events"]`` so the hole stays visible.
+    """
+    trading_days = list(_iter_trading_days(from_day, to_day))
+    threshold = (
+        f"every trading day: ≥1 research-ok event, no run of ≥{max_consecutive_failures} "
+        f"consecutive LLM failures, ≤{max_failure_pct}% LLM failures"
+        + (
+            "; with --expect-no-capped-calls: 0 non-exempt calls in the window"
+            if expect_no_capped_calls
+            else ""
+        )
+    )
+    if not trading_days:
+        return CriterionResult(
+            criterion="12",
+            verdict="NA",
+            measured={"trading_days_considered": 0},
+            threshold=threshold,
+            note="window contains no trading day (Mo–Fr) — nothing to judge",
+        )
+    per_day: dict[date, dict[str, int]] = {
+        d: {
+            "research_ok": 0,
+            "research_fail": 0,
+            "debate_started": 0,
+            "debate_failed": 0,
+            "debate_data_failed": 0,
+            "max_consecutive_failures": 0,
+        }
+        for d in trading_days
+    }
+    unattributed = 0
+    streak = 0
+    current_day: date | None = None
+    if scheduler_log.exists():
+        with scheduler_log.open("r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                kind = _k12_event_kind(line)
+                if kind is None:
+                    continue
+                ts = _parse_scheduler_ts(line)
+                if ts is None:
+                    unattributed += 1
+                    continue
+                # The scheduler log carries local wall-clock timestamps; the
+                # report buckets them into Berlin days (same convention as K10).
+                day = _berlin_day(ts)
+                rec = per_day.get(day)
+                if rec is None:
+                    continue  # outside the window
+                if day != current_day:
+                    current_day = day
+                    streak = 0
+                if kind == "research_ok":
+                    rec["research_ok"] += 1
+                    streak = 0
+                elif kind == "research_fail":
+                    rec["research_fail"] += 1
+                    streak += 1
+                elif kind == "debate_started":
+                    rec["debate_started"] += 1
+                    streak = 0
+                elif kind == "debate_failed":
+                    rec["debate_failed"] += 1
+                    streak += 1
+                else:  # debate_data_failed — data path, does not touch the model
+                    rec["debate_data_failed"] += 1
+                    continue
+                rec["max_consecutive_failures"] = max(rec["max_consecutive_failures"], streak)
+    days_without_research_ok: list[str] = []
+    days_with_long_streak: list[str] = []
+    days_over_failure_pct: list[str] = []
+    per_day_measured: dict[str, dict[str, Any]] = {}
+    for d in trading_days:
+        rec = per_day[d]
+        failures = rec["research_fail"] + rec["debate_failed"]
+        events = failures + rec["research_ok"] + rec["debate_started"]
+        failure_pct = round(failures * 100 / events, 1) if events else None
+        per_day_measured[d.isoformat()] = {
+            **rec,
+            "llm_events": events,
+            "llm_failures": failures,
+            "failure_pct": failure_pct,
+        }
+        if rec["research_ok"] < 1:
+            days_without_research_ok.append(d.isoformat())
+        if rec["max_consecutive_failures"] >= max_consecutive_failures:
+            days_with_long_streak.append(d.isoformat())
+        # "≤ max_failure_pct %" — integer arithmetic, no float rounding at the edge.
+        if events and failures * 100 > events * max_failure_pct:
+            days_over_failure_pct.append(d.isoformat())
+    non_exempt_calls = 0
+    non_exempt_models: list[str] = []
+    if expect_no_capped_calls:
+        if usage_json is None or not usage_json.exists():
+            return CriterionResult(
+                criterion="12",
+                verdict="ERROR",
+                measured={"error": f"llm_usage.json missing: {usage_json}"},
+                threshold=threshold,
+                note="--expect-no-capped-calls set, but the call bookkeeping is unreadable "
+                "— the role-leak check cannot be proven (fail-closed)",
+            )
+        try:
+            with usage_json.open("r", encoding="utf-8") as fh:
+                usage_data = json.load(fh)
+        except (OSError, json.JSONDecodeError) as exc:
+            return CriterionResult(
+                criterion="12",
+                verdict="ERROR",
+                measured={"error": f"llm_usage.json unparseable: {exc}"},
+                threshold=threshold,
+                note="--expect-no-capped-calls set, but the call bookkeeping is unreadable "
+                "— the role-leak check cannot be proven (fail-closed)",
+            )
+        if not isinstance(usage_data, list):
+            return CriterionResult(
+                criterion="12",
+                verdict="ERROR",
+                measured={"error": f"llm_usage.json must be a list, got {type(usage_data).__name__}"},
+                threshold=threshold,
+                note="--expect-no-capped-calls set, but the call bookkeeping is unreadable "
+                "— the role-leak check cannot be proven (fail-closed)",
+            )
+        for entry in usage_data:
+            if not isinstance(entry, dict):
+                continue
+            ts_str = entry.get("ts")
+            dt = _parse_iso(ts_str) if ts_str else None
+            if dt is None:
+                continue
+            if not (from_day <= _berlin_day(dt) <= to_day):
+                continue
+            model = entry.get("model")
+            if model in exempt_models:
+                continue
+            non_exempt_calls += 1
+            if model not in non_exempt_models:
+                non_exempt_models.append(model)
+    verdict = "PASS"
+    reasons: list[str] = []
+    if days_without_research_ok:
+        verdict = "FAIL"
+        reasons.append(
+            f"{len(days_without_research_ok)} trading day(s) without a research-ok event"
+        )
+    if days_with_long_streak:
+        verdict = "FAIL"
+        reasons.append(
+            f"{len(days_with_long_streak)} trading day(s) with a run of ≥"
+            f"{max_consecutive_failures} consecutive LLM failures"
+        )
+    if days_over_failure_pct:
+        verdict = "FAIL"
+        reasons.append(
+            f"{len(days_over_failure_pct)} trading day(s) with more than {max_failure_pct}% "
+            "LLM failures"
+        )
+    if expect_no_capped_calls and non_exempt_calls:
+        verdict = "FAIL"
+        reasons.append(
+            f"{non_exempt_calls} non-exempt call(s) in the window "
+            f"(models: {', '.join(sorted(non_exempt_models)) or 'unknown'})"
+        )
+    return CriterionResult(
+        criterion="12",
+        verdict=verdict,
+        measured={
+            "trading_days_considered": len(trading_days),
+            "per_day": per_day_measured,
+            "days_without_research_ok": days_without_research_ok,
+            "days_with_consecutive_failure_streak": days_with_long_streak,
+            "days_over_failure_pct": days_over_failure_pct,
+            "unattributed_events": unattributed,
+            "non_exempt_calls": non_exempt_calls,
+            "non_exempt_models": sorted(non_exempt_models),
+            "expect_no_capped_calls": expect_no_capped_calls,
+            "exempt_models": list(exempt_models),
+        },
+        threshold=threshold,
+        note="; ".join(reasons),
+    )
+
+
 # ----------------------------------------------------------------------------
 # Convenience: trading-day iterator
 # ----------------------------------------------------------------------------
@@ -1698,6 +1988,7 @@ def _build_day_report(
     journal_file: Path | None = None,
     expect_llm_profile: str | None = None,
     exempt_models: tuple[str, ...] = (),
+    expect_no_capped_calls: bool = False,
 ) -> DayReport:
     report = DayReport(day=day)
     k2_evidence = {
@@ -1775,6 +2066,14 @@ def _build_day_report(
         report.criteria["11"] = evaluate_k11(
             state_dir / "research_health.jsonl", day, day
         )
+        report.criteria["12"] = evaluate_k12(
+            state_dir / "run_scheduler.log",
+            state_dir / "llm_usage.json",
+            day,
+            day,
+            exempt_models=exempt_models,
+            expect_no_capped_calls=expect_no_capped_calls,
+        )
     return report
 
 
@@ -1792,6 +2091,7 @@ def _build_summary_report(
     journal_file: Path | None = None,
     expect_llm_profile: str | None = None,
     exempt_models: tuple[str, ...] = (),
+    expect_no_capped_calls: bool = False,
 ) -> SummaryReport:
     report = SummaryReport(from_day=from_day, to_day=to_day)
     if prereg == "v5":
@@ -1871,6 +2171,14 @@ def _build_summary_report(
         report.criteria["11"] = evaluate_k11(
             state_dir / "research_health.jsonl", from_day, to_day
         )
+        report.criteria["12"] = evaluate_k12(
+            state_dir / "run_scheduler.log",
+            state_dir / "llm_usage.json",
+            from_day,
+            to_day,
+            exempt_models=exempt_models,
+            expect_no_capped_calls=expect_no_capped_calls,
+        )
     return report
 
 
@@ -1941,7 +2249,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--summary",
         action="store_true",
-        help="Evaluate PASS criteria (v4: 8, v5: 11) (--from/--to required)",
+        help="Evaluate PASS criteria (v4: 8, v5: 12) (--from/--to required)",
     )
     p.add_argument(
         "--prereg",
@@ -1965,6 +2273,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="append",
         default=None,
         help="Model whose tokens are exempt from the K6 cap (repeatable); wins over the code default",
+    )
+    p.add_argument(
+        "--expect-no-capped-calls",
+        action="store_true",
+        help="K12: require 0 non-exempt LLM calls in the window (role-leak check after the all_m3 flip)",
     )
     p.add_argument("--trading-db", type=Path, default=_DEFAULT_TRADING_DB)
     p.add_argument("--bars-db", type=Path, default=_DEFAULT_BARS_DB)
@@ -1998,6 +2311,7 @@ def main(argv: list[str] | None = None) -> int:
         journal_file=args.journal_file,
         expect_llm_profile=args.expect_llm_profile,
         exempt_models=exempt_models,
+        expect_no_capped_calls=args.expect_no_capped_calls,
     )
     if args.day:
         rep = _build_day_report(args.day, **common)

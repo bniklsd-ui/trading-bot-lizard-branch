@@ -1199,3 +1199,210 @@ def test_k11_requires_divergence_event_every_trading_day(tmp_path: Path) -> None
     result = autonomy_report.evaluate_k11(health, day1, day2)
     assert result.verdict == "PASS"
     assert result.measured["per_day"][day2.isoformat()] == 1
+
+
+# ----------------------------------------------------------------------------
+# Phase 17 F-1 — K12 (LLM availability)
+# ----------------------------------------------------------------------------
+
+def _k12_line(ts: str, message: str, level: str = "INFO", logger: str = "scheduler.research_tick") -> str:
+    """One scheduler-log line in the live format: ``<ts> <level> <logger>: <message>``."""
+    return f"{ts} {level} {logger}: {message}"
+
+
+def _k12_ok_line(ts: str) -> str:
+    return _k12_line(ts, "research tick: 2 candidate(s) written (PASS).")
+
+
+def _k12_research_fail_line(ts: str) -> str:
+    return _k12_line(ts, "research tick: abstain (no candidate, reason=LLM_UNAVAILABLE).")
+
+
+def _k12_abstain_line(ts: str) -> str:
+    """An abstain for another reason — the LLM *worked*, it just found nothing."""
+    return _k12_line(ts, "research tick: abstain (no candidate, reason=LLM_ABSTAIN).")
+
+
+def _k12_debate_start_line(ts: str) -> str:
+    return _k12_line(ts, "debate_runner: Bull/Bear/Judge for IX.D.DAX.IFMM.IP", logger="phase8.wiring")
+
+
+def _k12_debate_fail_line(ts: str, kind: str = "DebateLLMError") -> str:
+    return _k12_line(
+        ts, f"debate fail-closed ({kind}): boom", level="WARNING", logger="debate.debate",
+    )
+
+
+def test_k12_passes_when_llm_is_available(tmp_path: Path) -> None:
+    """F-1 K12: a healthy day PASSes. The taxonomy is the one of Plan §26 F-1 —
+    a research *abstain* (another reason than ``LLM_UNAVAILABLE``) is a working
+    LLM, and ``debate fail-closed (DebateError)`` is a **data-path** failure: it
+    is reported, but it neither counts as an LLM event nor as an LLM failure."""
+    state_dir = tmp_path / "state"
+    log = state_dir / "run_scheduler.log"
+    usage = state_dir / "llm_usage.json"
+    day = date(2026, 9, 8)
+    _write_log(log, [
+        _k12_ok_line("2026-09-08 09:05:00,000"),
+        _k12_abstain_line("2026-09-08 09:10:00,000"),
+        _k12_debate_start_line("2026-09-08 09:15:00,000"),
+        _k12_debate_fail_line("2026-09-08 09:16:00,000", kind="DebateError"),
+    ])
+    _write_usage_entries(usage, [_usage_entry(day, 9, 0, "MiniMax-M3", 1_000)])
+
+    result = autonomy_report.evaluate_k12(
+        log, usage, day, day,
+        exempt_models=("MiniMax-M3",),
+        expect_no_capped_calls=True,
+    )
+    assert result.verdict == "PASS", result.measured
+    per_day = result.measured["per_day"][day.isoformat()]
+    assert per_day["research_ok"] == 2          # PASS tick + abstain with another reason
+    assert per_day["research_fail"] == 0
+    assert per_day["debate_started"] == 1
+    assert per_day["debate_failed"] == 0        # DebateError = data path, not an LLM failure
+    assert per_day["debate_data_failed"] == 1
+    assert per_day["llm_failures"] == 0
+    assert result.measured["non_exempt_calls"] == 0
+
+
+def test_k12_fails_on_three_consecutive_failures(tmp_path: Path) -> None:
+    """F-1 K12 (b): no run of ≥ 3 consecutive LLM failures in log order. The run
+    is measured over the LLM event stream (research + debate) — a *successful*
+    event breaks it, a data-path failure does not."""
+    state_dir = tmp_path / "state"
+    log = state_dir / "run_scheduler.log"
+    usage = state_dir / "llm_usage.json"
+    day = date(2026, 9, 8)
+    _write_usage_entries(usage, [_usage_entry(day, 9, 0, "MiniMax-M3", 1_000)])
+
+    # Two failures in a row are still within the threshold. The ok-events keep
+    # the failure *rate* (rule c) below 10 % — only the streak (rule b) is tested.
+    ok_block = [
+        _k12_ok_line(f"2026-09-08 {9 + i // 60:02d}:{i % 60:02d}:00,000")
+        for i in range(30)
+    ]
+    _write_log(log, ok_block + [
+        _k12_research_fail_line("2026-09-08 10:00:00,000"),
+        _k12_debate_fail_line("2026-09-08 10:01:00,000"),
+        _k12_ok_line("2026-09-08 10:02:00,000"),
+    ])
+    result = autonomy_report.evaluate_k12(log, usage, day, day, exempt_models=("MiniMax-M3",))
+    assert result.verdict == "PASS", result.measured
+    assert result.measured["days_with_consecutive_failure_streak"] == []
+    assert result.measured["days_over_failure_pct"] == []
+
+    # A third failure in a row breaks it.
+    _write_log(log, ok_block + [
+        _k12_research_fail_line("2026-09-08 10:00:00,000"),
+        _k12_debate_fail_line("2026-09-08 10:01:00,000"),
+        _k12_research_fail_line("2026-09-08 10:02:00,000"),
+        _k12_ok_line("2026-09-08 10:03:00,000"),
+    ])
+    result = autonomy_report.evaluate_k12(log, usage, day, day, exempt_models=("MiniMax-M3",))
+    assert result.verdict == "FAIL"
+    assert result.measured["days_with_consecutive_failure_streak"] == [day.isoformat()]
+    assert result.measured["days_over_failure_pct"] == []  # only the streak fires
+    assert result.measured["per_day"][day.isoformat()]["max_consecutive_failures"] == 3
+
+
+def test_k12_fails_above_ten_percent_failures(tmp_path: Path) -> None:
+    """F-1 K12 (c): the LLM failures must stay ≤ 10 % of the day's LLM events.
+    The boundary is inclusive (exactly 10 % passes), the comparison is integer
+    arithmetic so no float rounding can flip the edge."""
+    state_dir = tmp_path / "state"
+    log = state_dir / "run_scheduler.log"
+    usage = state_dir / "llm_usage.json"
+    day = date(2026, 9, 8)
+    _write_usage_entries(usage, [_usage_entry(day, 9, 0, "MiniMax-M3", 1_000)])
+
+    def _day_lines(n_failures: int, n_ok: int) -> list[str]:
+        """``n_ok`` research-ok events with ``n_failures`` failures spread between
+        them — never two failures in a row, so rule (b) never fires and only
+        rule (c) is measured."""
+        fail_positions = {(i * n_ok) // n_failures for i in range(n_failures)}
+        kinds: list[str] = []
+        for i in range(n_ok):
+            if i in fail_positions:
+                kinds.append("fail")
+            kinds.append("ok")
+        lines: list[str] = []
+        minute = 9 * 60
+        for kind in kinds:
+            minute += 1
+            ts = f"2026-09-08 {minute // 60:02d}:{minute % 60:02d}:00,000"
+            lines.append(_k12_research_fail_line(ts) if kind == "fail" else _k12_ok_line(ts))
+        return lines
+
+    # 10 failures / 100 events = exactly 10 % → still PASS.
+    _write_log(log, _day_lines(10, 90))
+    result = autonomy_report.evaluate_k12(log, usage, day, day, exempt_models=("MiniMax-M3",))
+    assert result.measured["per_day"][day.isoformat()]["llm_events"] == 100
+    assert result.measured["per_day"][day.isoformat()]["llm_failures"] == 10
+    assert result.measured["days_over_failure_pct"] == []
+    assert result.verdict == "PASS", result.measured
+
+    # 11 failures / 100 events = 11 % → FAIL.
+    _write_log(log, _day_lines(11, 89))
+    result = autonomy_report.evaluate_k12(log, usage, day, day, exempt_models=("MiniMax-M3",))
+    assert result.measured["per_day"][day.isoformat()]["llm_failures"] == 11
+    assert result.measured["days_over_failure_pct"] == [day.isoformat()]
+    assert result.verdict == "FAIL"
+
+
+def test_k12_fails_without_research_ok_event(tmp_path: Path) -> None:
+    """F-1 K12 (a): every trading day needs ≥ 1 research-ok event — a positive
+    signal. A day where the LLM never answered is a FAIL, not a vacuous PASS
+    (F8: „grün ohne Messung?")."""
+    state_dir = tmp_path / "state"
+    log = state_dir / "run_scheduler.log"
+    usage = state_dir / "llm_usage.json"
+    day = date(2026, 9, 8)
+    _write_usage_entries(usage, [_usage_entry(day, 9, 0, "MiniMax-M3", 1_000)])
+
+    # Only debates, no research tick → no research-ok event → FAIL.
+    _write_log(log, [
+        _k12_debate_start_line("2026-09-08 09:15:00,000"),
+        _k12_debate_start_line("2026-09-08 09:20:00,000"),
+    ])
+    result = autonomy_report.evaluate_k12(log, usage, day, day, exempt_models=("MiniMax-M3",))
+    assert result.verdict == "FAIL"
+    assert result.measured["days_without_research_ok"] == [day.isoformat()]
+
+    # A research tick on the day flips it to PASS.
+    _write_log(log, [
+        _k12_ok_line("2026-09-08 09:05:00,000"),
+        _k12_debate_start_line("2026-09-08 09:15:00,000"),
+    ])
+    result = autonomy_report.evaluate_k12(log, usage, day, day, exempt_models=("MiniMax-M3",))
+    assert result.verdict == "PASS", result.measured
+
+
+def test_k12_role_leak_check_flags_non_exempt_call(tmp_path: Path) -> None:
+    """F-1 K12 (d): with ``--expect-no-capped-calls`` the window must contain 0
+    non-exempt calls — after the ``all_m3`` flip a ``claude-*`` record is a role
+    leak. Without the flag the check is off (the criterion then measures
+    availability only)."""
+    state_dir = tmp_path / "state"
+    log = state_dir / "run_scheduler.log"
+    usage = state_dir / "llm_usage.json"
+    day = date(2026, 9, 8)
+    _write_log(log, [_k12_ok_line("2026-09-08 09:05:00,000")])
+    _write_usage_entries(usage, [
+        _usage_entry(day, 9, 0, "MiniMax-M3", 1_000),
+        _usage_entry(day, 9, 10, "claude-sonnet-4-6", 4_000),
+    ])
+
+    # Without the flag: the non-exempt call is not judged.
+    result = autonomy_report.evaluate_k12(log, usage, day, day, exempt_models=("MiniMax-M3",))
+    assert result.verdict == "PASS", result.measured
+
+    # With the flag: one non-exempt call ⇒ FAIL (the leak is named).
+    result = autonomy_report.evaluate_k12(
+        log, usage, day, day,
+        exempt_models=("MiniMax-M3",),
+        expect_no_capped_calls=True,
+    )
+    assert result.verdict == "FAIL"
+    assert result.measured["non_exempt_calls"] == 1
+    assert result.measured["non_exempt_models"] == ["claude-sonnet-4-6"]
