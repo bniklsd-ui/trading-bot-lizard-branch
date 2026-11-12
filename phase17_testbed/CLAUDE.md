@@ -351,7 +351,8 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 | 2 | `7f8bd83` | **F-2 — Eingabe-Rekorder** (P8, `phase8_scheduler/scripts/wiring.py`): `_record_llm_io(client, path, role)` wickelt `ask_candidate` **auf der Instanz** (bewusst kein Proxy — Phase 6 setzt `client.model` je Rolle auf genau diesem Objekt) und schreibt je Call eine JSONL-Zeile nach `data/state/llm_io.jsonl`: `ts` · `role` · `model`/`temperature` **zum Aufrufzeitpunkt** · `system` · `user` · `json_schema` · `answer`/`error` · `usage` · `finish_reason`. Fail-soft: Original-Call unverändert, Exception unverändert durchgereicht, Schreibfehler bricht den Call nie und loggt **genau einmal je Prozess** `critical`. Angewendet auf Debatten- und Research-Client. **P8 299 → 302 (+3)** |
 | 3 | `54a45d9` | **F-3 — Flip 2**: `config.py:149` `llm_profile` = `"research_m3"` → **`"all_m3"`** (Kommentar nachgezogen), 2 Pins in `test_config.py` verschärft (keine neue Testzahl). Rollback = eine Zeile. `check_llm_profile("all_m3")` offline grün (alle 6 Rollen → minimax/`MiniMax-M3`) |
 | 4 | `ec9335a` | `.gitignore`: `data/state/llm_io.jsonl` (die `.gitignore` listet `data/state/*` Datei für Datei — ohne die Zeile wäre die Rekorder-Ausgabe ein `git add -A` davon entfernt, committet zu werden) |
-| 5 | (dieser Commit) | Doku: Phasenkopf (dieser Block + Rotation #20 → `SESSIONS_ARCHIVE.md`) · P8- und P16-Kopf (🔁-Notizen) · Plan §26 Ausführungs-Nachtrag · INDEX · Root-`CLAUDE.md` |
+| 5 | `b89af96` + `4d29d4e` | Doku-Commit + **Mid-Plan-Fix** (vom Nikinger bewusst so entschieden): der zustandsabhängige Root-Test `test_scheduler_hold.py::test_restart_start_would_start_scheduler_without_hold` sieht jetzt eine Fake-`pgrep` ⇒ hermetisch gegen laufende Prozesse (Negativ-Beweis: ohne sie genau dieser Test rot). Root 141/141 grün bei laufendem Bot |
+| 6 | (dieser Commit) | Doku: Phasenkopf (dieser Block + Rotation #20 → `SESSIONS_ARCHIVE.md`) · P8- und P16-Kopf (🔁-Notizen) · Plan §26 Ausführungs-Nachtrag · INDEX · Root-`CLAUDE.md` |
 
 ### Next
 
@@ -360,7 +361,7 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
 | 1 | **Fr 2026-11-13, 09:00–17:30** | **Generalprobe** (unregistriert, kein Eingriff). Zu messen: je Rolle ≥ 1 Call auf M3? `DebateBudgetExceeded`/`DebateLLMError`? `claude-*`-Records? `llm_io.jsonl` gefüllt? Zykluslänge? K12 trocken über den Freitag? | — |
 | 2 | **Fr 2026-11-13, 17:35** | `--hold` + Stopp + Gegenprobe (vorher 0 offene Positionen prüfen) — der **Nikinger-Operator-Schritt** (eurofleet-Notiz §2) | Nikinger |
 | 3 | **Fr 2026-11-13 abends** | **Review** (Muster AK22) der Commits F-1/F-2/F-3 + Auswertung der Generalprobe in Claude Code | Claude Code |
-| 4 | **Sa 11-14 / So 11-15** | Fixes aus Review oder Probe (Ausführer) → Re-Review der Stellen → `PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` (Inhalt Plan §26 F-26g) → **T23-Freigabe** → Push. **Alles bis So 11-15 abends.** eurofleet-Wochenlauf Sa: Scheduler bleibt wegen `SCHEDULER_HELD` aus | Ausführer / Claude Code / Nikinger |
+| 4 | **Sa 11-14 / So 11-15** | Fixes aus Review oder Probe (Ausführer) → Re-Review der Stellen → `PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` (Inhalt Plan §26 F-26g) → **T23-Freigabe** → **Push** (Nikinger-Entscheidung 2026-11-12: die 7 Commits dieser Session bleiben bis hier lokal — `origin/main` ist 7 Commits hinterher). **Alles bis So 11-15 abends.** eurofleet-Wochenlauf Sa: Scheduler bleibt wegen `SCHEDULER_HELD` aus | Ausführer / Claude Code / Nikinger |
 | 5 | **Mo 11-16, 07:30–08:55** | Start wie oben; **Aktiv-Block vor 09:00 eintragen**; Day-0-Checks nach Plan §26 F-26f (Start-Zeile `all_m3` · 0 `preflight failed` · erster Rekorder-Datensatz · 0 `claude-*`-Records · vier Units `active`) | Nikinger + Session lesend |
 | 6 | Mo 11-16 / Di 11-17 | Fenster `-S2`. Keine Ausführer-Sitzung auf dem MiniMax-Key von D1 07:30 bis D2 18:00 | — |
 | 7 | Mi 11-18 | Journal-Export + Report (Befehl Plan §26 F-26g) → Auswertung → Offline-Review | Nikinger / Claude Code |
@@ -378,9 +379,11 @@ Diese Forward-Agenda ist **kein Block** der Phase 17 — sie ist „Material fü
   „would nohup", und der Test schlägt fehl. Der Test ist **nicht hermetisch** gegen die laufenden
   Prozesse (sein Docstring verspricht nur den Schutz von `data/state`). **Gemessen:** grün bei
   gestopptem Bot (der Σ-Sweep 2069 lief **vor** dem Neustart um 18:47:48), rot bei laufendem Bot.
-  Ein Fix wäre eine Fake-`pgrep` im `env`-Fixture des Root-Tests — **Root-Test-Code, außerhalb
-  Block F** ⇒ Nikinger-Entscheidung. Für den Start am Mo 11-16 ist es **folgenlos**: das
-  Deploy-Skript `scripts/e3_deploy.sh` führt **keine** Tests aus.
+  **Nikinger-Entscheidung 2026-11-12: „jetzt fixen, aber bewusst als mid plan fix notieren"**
+  ⇒ geschlossen in `4d29d4e` (Fake-`pgrep` im `env`-Fixture des Root-Tests, 2 Zeilen; Negativ-Beweis:
+  ohne sie genau dieser Test rot). Root 141/141 grün **bei laufendem Bot**. Für den Start am
+  Mo 11-16 war der Befund **folgenlos**: das Deploy-Skript `scripts/e3_deploy.sh` führt **keine**
+  Tests aus.
 - **Advisor** war in dieser Session nicht verfügbar (kein Werkzeug im Harness) — die im Working-Style vorgesehenen Konsultationen (VERIFY-Mismatch, 2–3 Fehlversuche, Block-Abschluss) sind nicht erfolgt; ersatzweise: alle Plan-Anker live am Code nachgemessen, Negativ-Beweis je Teil, 16/16-Sweep.
 - **Σ 2069** selbst gemessen (16 Suites einzeln + root).
 
