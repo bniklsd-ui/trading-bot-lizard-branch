@@ -89,6 +89,10 @@ geschrieben; der Nikinger entscheidet sie dann.
   **Mo 11-16 07:30–08:55** durch den Operator, Fenster `-S2` **Mo 07:30 bis Di 18:00** ohne Reboot, ohne
   Unit-Neustart und ohne Ausführer-Sitzung auf dem MiniMax-Key.
 - **Generalprobe ausgewertet:** zwei Grenzwerte für MiniMax-M3 angehoben (Instinct-Extraktion bis 32 768
-  Tokens / 480 s je Call, Debatte bis 240 s und 24 000 Ausgabe-Tokens). Erwartete Mehrlast auf dem Key: wenige Instinct-Calls je
+  Tokens / 480 s je Call, Debatte bis 240 s und 24 000 Ausgabe-Tokens).
+- **Der Start am Mo 11-16 läuft automatisch:** `tradingbot-s2-start.timer` (User-Unit, `OnCalendar=2026-11-16 07:30`,
+  `Persistent=true`) ruft `scripts/s2_start.sh`. Das Skript startet **nur** den Scheduler und **verweigert** jeden
+  Start nach 08:55 oder an einem anderen Tag. Bitte den Timer bis dahin **nicht** entfernen oder deaktivieren. Ein Reboot **vor** Mo 07:30 ist unkritisch
+  (Timer persistent, der Hold verhindert einen Autostart); ab Mo 07:30 gilt §2 (kein Reboot bis Di 18:00). Erwartete Mehrlast auf dem Key: wenige Instinct-Calls je
   Handelstag (≤ 5) mit je bis zu 32 768 Ausgabe-Tokens — weiterhin unter einer Mio. Tokens je Tag
   zusätzlich, also unkritisch nach §3.
