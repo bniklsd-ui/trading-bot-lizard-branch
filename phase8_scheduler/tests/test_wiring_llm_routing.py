@@ -146,19 +146,21 @@ def test_debate_config_all_m3_renames_all_three_roles() -> None:
     assert cfg.max_tokens_judge == 8192
 
 
-def test_debate_config_all_m3_raises_only_the_wall_clock_cap() -> None:
-    """Phase 17 §26.2 G2 (Generalprobe 2026-11-13, Nikinger 2026-11-14): the Phase-6
-    wall-clock cap (120 s) is calibrated for Haiku/Sonnet (15–25 s per debate). M3
-    thinks — median ≈ 45 s, p90 ≈ 110 s, 2 of 24 debates aborted at 120 s
-    (``DebateBudgetExceeded``). A profile that moves the debate gets 240 s; every
-    other hard cap stays the Phase-6 default (one change, not a cap sweep)."""
+def test_debate_config_all_m3_raises_the_wall_clock_and_output_caps() -> None:
+    """Phase 17 §26.2 G2 + G2b (Generalprobe 2026-11-13, Nikinger 2026-11-14): the
+    Phase-6 caps are calibrated for Haiku/Sonnet (15–25 s, ≈ 770 output tokens per
+    debate). M3 thinks — median ≈ 45 s, p90 ≈ 110 s, 2 of 24 debates aborted at the
+    120-s wall clock; the longest debate produced 10 096 output tokens in 111 s. A
+    profile that moves the debate gets 240 s **and** 24 000 output tokens (the cap
+    that would bind next once the wall clock doubles); the input and call caps stay
+    the Phase-6 defaults."""
     from debate.models import DebateConfig
 
     cfg = _debate_config("all_m3")
     default = DebateConfig()
 
     assert cfg.wall_clock_timeout_s == 240.0
-    assert cfg.max_cumulative_output_tokens == default.max_cumulative_output_tokens
+    assert cfg.max_cumulative_output_tokens == 24_000
     assert cfg.max_cumulative_input_tokens == default.max_cumulative_input_tokens
     assert cfg.max_total_calls == default.max_total_calls
 
@@ -205,6 +207,7 @@ def test_debate_config_anthropic_is_default() -> None:
     assert cfg.max_tokens_agent == default.max_tokens_agent
     assert cfg.max_tokens_judge == default.max_tokens_judge
     assert cfg.wall_clock_timeout_s == default.wall_clock_timeout_s
+    assert cfg.max_cumulative_output_tokens == default.max_cumulative_output_tokens
 
 
 def test_build_llm_unknown_profile_raises_before_any_client(no_keyring: None) -> None:
