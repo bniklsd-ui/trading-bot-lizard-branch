@@ -8,7 +8,7 @@ down:
   - ./PHASE17_SHAKEDOWN_PREREGISTRATION.md                       # 📕 S1 (superseded durch diese Datei, Begründung unten)
   - ../docs/concepts/phase17_testbed_plan.md                     # 📕 Plan §25 (S1 FAIL) · §26 F-26g (Inhalt dieser Datei) · §26.2 (Generalprobe + G1/G2)
   - ../phase16_activation/scripts/autonomy_report.py            # 🔧 Report: v5-Evaluatoren inkl. K12 + CLI-Flags
-updated: 2026-11-14 (Review-Session #22 — Entwurf aus Plan §26 F-26g + den Generalprobe-Fixes G1/G2 (§26.2); alle Anker am 2026-11-14 gegen den Code gemessen)
+updated: 2026-11-14 (Review-Session #22 — Entwurf aus Plan §26 F-26g + den Generalprobe-Fixes G1/G2/G2b (§26.2); alle Anker am 2026-11-14 gegen den Code gemessen)
 ---
 # PHASE17 SHAKEDOWN-PREREGISTRATION (-S2) — 2-Tage-Prüfstand-Fenster
 
@@ -33,7 +33,8 @@ updated: 2026-11-14 (Review-Session #22 — Entwurf aus Plan §26 F-26g + den Ge
   **G1** — die Instinct-Extraktion lief auf M3 in 4 von 5 Calls in `finish_reason=length` (K10 wäre
   an jedem CLOSE-Tag FAIL) — und **G2** — 2 von 24 Debatten rissen das 120-s-Wanduhr-Cap.
   **Fixes (Nikinger 2026-11-14):** G1 = Instinct-Rolle unter `all_m3` 32 768 Tokens / 480 s ·
-  G2 = Debatten-Wanduhr 240 s für Profile, die die Debatte verlagern. Kein Kriterium geändert
+  G2 = Debatten-Wanduhr 240 s + G2b = Debatten-Output-Cap 24 000 für Profile, die die Debatte
+  verlagern. Kein Kriterium geändert
   (F-26e: „Befunde der Generalprobe dürfen nur Code-Fixes auslösen").
 
 ## BLUF
@@ -62,7 +63,7 @@ Alle Werte **am 2026-11-14 gegen den Code geprüft** (nicht aus dem Plan abgesch
 | `cycle` | `5min` | `run.py:78-80` (`default=5`) |
 | `llm_profile` | **`all_m3`** | `phase8_scheduler/scheduler/config.py:155` — Code-Default seit F-3 (`54a45d9`): **alle sechs Rollen** (research · debate · lesson · instinct · reflect · paper_debate) → MiniMax-M3 |
 | Rollen-Limits unter `all_m3` | research/debate/lesson/reflect/paper_debate: `max_tokens=8192`, Timeout 90 s · **instinct: `max_tokens=32768`, Timeout 480 s** (G1) | `phase8_scheduler/scheduler/llm_profiles.py:200` (`_M3`) · `:208` (`_M3_INSTINCT`) · `:213` (`all_m3`) |
-| Debatten-Caps | **Wanduhr 240 s** (G2) · Output kumuliert 12 000 · Input kumuliert 120 000 · Calls 18 · Runden 5 | `phase8_scheduler/scripts/wiring.py:542` (`_debate_config`) · Phase-6-Defaults `phase6_debate/debate/models.py:139-144` |
+| Debatten-Caps | **Wanduhr 240 s** (G2) · **Output kumuliert 24 000** (G2b) · Input kumuliert 120 000 · Calls 18 · Runden 5 | `phase8_scheduler/scripts/wiring.py:543-544` (`_debate_config`) · Phase-6-Defaults `phase6_debate/debate/models.py:139-144` |
 | `daily_token_budget` | `300 000` | `run.py:60-62` (`default=300_000`) — bindet unter `all_m3` **kein** aktives Modell |
 | Token-Ausnahme | `MiniMax-M3` + `MiniMax-M3.1-Flash` | `config.py:166` (`budget_exempt_models`) |
 | Eingabe-Rekorder | an (Research- + Debatten-Client) → `data/state/llm_io.jsonl` | `wiring.py` `_record_llm_io` (F-2, `7f8bd83`) |

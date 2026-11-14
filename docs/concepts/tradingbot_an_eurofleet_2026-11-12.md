@@ -89,6 +89,6 @@ geschrieben; der Nikinger entscheidet sie dann.
   **Mo 11-16 07:30–08:55** durch den Operator, Fenster `-S2` **Mo 07:30 bis Di 18:00** ohne Reboot, ohne
   Unit-Neustart und ohne Ausführer-Sitzung auf dem MiniMax-Key.
 - **Generalprobe ausgewertet:** zwei Grenzwerte für MiniMax-M3 angehoben (Instinct-Extraktion bis 32 768
-  Tokens / 480 s je Call, Debatte bis 240 s). Erwartete Mehrlast auf dem Key: wenige Instinct-Calls je
+  Tokens / 480 s je Call, Debatte bis 240 s und 24 000 Ausgabe-Tokens). Erwartete Mehrlast auf dem Key: wenige Instinct-Calls je
   Handelstag (≤ 5) mit je bis zu 32 768 Ausgabe-Tokens — weiterhin unter einer Mio. Tokens je Tag
   zusätzlich, also unkritisch nach §3.
