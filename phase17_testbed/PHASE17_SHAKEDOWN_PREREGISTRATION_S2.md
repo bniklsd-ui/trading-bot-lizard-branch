@@ -1,5 +1,5 @@
 ---
-status: draft (Review-Session #22, 2026-11-14) — wird nach dem G1-Smoke-PASS und der Nikinger-Freigabe (T23) auf `locked` gesetzt und vor dem Fenster committet; danach nur noch der Aktiv-Block (Eintragung am D1-Morgen)
+status: locked (Nikinger-Freigabe T23 am 2026-11-14, nach dem G1-Smoke-PASS; committet vor dem Fenster, danach nicht geändert — nur der Aktiv-Block wird am D1-Morgen eingetragen)
 purpose: Vorregistrierung des 2-Tage-Prüfstand-Fensters -S2 (Mo 2026-11-16 / Di 2026-11-17) — supersedes S1 nach dem S1-FAIL an K6; prüft die Konfiguration des 10-Tage-Laufs (`all_m3`) mit K1/K2/K5/K6/K7/K8/K9/K10/K11 + neu K12; K3/K4 + Judge-Quote + MiniMax-Last + Offline-Review nur berichtet
 read-when: D1-Morgen (Start + Aktiv-Block), Mi 2026-11-18 (Export + Report + Auswertung) — die Kriterien werden danach NICHT editiert
 detail: L3
@@ -8,7 +8,7 @@ down:
   - ./PHASE17_SHAKEDOWN_PREREGISTRATION.md                       # 📕 S1 (superseded durch diese Datei, Begründung unten)
   - ../docs/concepts/phase17_testbed_plan.md                     # 📕 Plan §25 (S1 FAIL) · §26 F-26g (Inhalt dieser Datei) · §26.2 (Generalprobe + G1/G2)
   - ../phase16_activation/scripts/autonomy_report.py            # 🔧 Report: v5-Evaluatoren inkl. K12 + CLI-Flags
-updated: 2026-11-14 (Review-Session #22 — Entwurf aus Plan §26 F-26g + den Generalprobe-Fixes G1/G2/G2b (§26.2); alle Anker am 2026-11-14 gegen den Code gemessen)
+updated: 2026-11-14 (Review-Session #22 — **T23-Freigabe durch den Nikinger ⇒ `locked`**; Entwurf aus Plan §26 F-26g + den Generalprobe-Fixes G1/G2/G2b (§26.2); alle Anker am 2026-11-14 gegen den Code gemessen)
 ---
 # PHASE17 SHAKEDOWN-PREREGISTRATION (-S2) — 2-Tage-Prüfstand-Fenster
 
@@ -173,7 +173,7 @@ dem Start in `data/state/llm_usage.json` · vier Units `active`.
 | **HEAD-Commit beim Start** | *(einzutragen)* | `git log -1` |
 | **Offene Position bei Start** | *(einzutragen)* | `execution_state.json` + `trade_outcomes` (OPEN) |
 | **Re-Adoption-Probe** | *(einzutragen: anwendbar ja/nein)* | (a) oben |
-| **Vorregistriert** | Review-Session #22 (2026-11-14) — **Freigabe: Nikinger (T23), *(Datum)***; Commits: *(einzutragen)* | `git log` |
+| **Vorregistriert** | Review-Session #22 (2026-11-14) — **Freigabe: Nikinger (T23), 2026-11-14**; Fix-Commits G1 `933b063` · G2 `e963fb9` · G2b `26443fb` (dazu F-1 `6e8ec57` · F-2 `7f8bd83` · F-3 `54a45d9`); Lock = der Commit, der `status: locked` setzt (`git log -1 -- phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` vor dem Start) | `git log` |
 
 ## Was diese Vorregistrierung **nicht** prüft
 
