@@ -146,6 +146,34 @@ def test_debate_config_all_m3_renames_all_three_roles() -> None:
     assert cfg.max_tokens_judge == 8192
 
 
+def test_build_llm_all_m3_instinct_gets_room_to_think(no_keyring: None) -> None:
+    """Phase 17 §26.2 G1 (Generalprobe 2026-11-13, Nikinger 2026-11-14): on M3 the
+    instinct extraction ran into ``finish_reason=length`` in 4 of 5 calls at 8 192
+    tokens (the one success used 8 026; Haiku answers the same input in 360–524).
+    Under ``all_m3`` the instinct role gets 32 768 tokens and 480 s — built through
+    ``_build_llm`` with the real call-site values, so the pin covers the wiring,
+    not only the profile table. Every other role keeps 8 192 / 90 s."""
+    from scripts.wiring import _INSTINCT_EXTRACTOR_MAX_TOKENS, _INSTINCT_EXTRACTOR_TIMEOUT_S
+
+    instinct = _build_llm(
+        "instinct",
+        "all_m3",
+        default_model="claude-haiku-4-5-20251001",
+        max_tokens=_INSTINCT_EXTRACTOR_MAX_TOKENS,
+        temperature=0.2,
+        timeout_s=_INSTINCT_EXTRACTOR_TIMEOUT_S,
+    )
+    assert instinct.model == "MiniMax-M3"
+    assert instinct.max_tokens == 32_768
+    assert instinct.timeout_s == 480.0
+
+    for role in LLM_ROLES:
+        if role == "instinct":
+            continue
+        spec = LLM_PROFILES["all_m3"][role]
+        assert (spec.max_tokens, spec.timeout_s) == (8192, 90.0), role
+
+
 def test_debate_config_anthropic_is_default() -> None:
     """With the ``anthropic`` profile nothing is renamed — the config is the
     plain Phase-6 default."""

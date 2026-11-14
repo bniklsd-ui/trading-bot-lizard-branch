@@ -198,11 +198,19 @@ _ANTHROPIC = RoleSpec(provider="anthropic")
 # ``finish_reason=length`` with an **empty** content (MiniMax doc 2026-11-03; Plan
 # §15.6 failure table). timeout_s=90 leaves room for the reasoning block.
 _M3 = RoleSpec(provider="minimax", model="MiniMax-M3", max_tokens=8192, timeout_s=90.0)
+# Phase 17 §26.2 G1 (Generalprobe 2026-11-13, Nikinger 2026-11-14): the instinct
+# extraction thinks far longer than every other role — 4 of 5 calls ended with
+# finish_reason=length at 8 192 (the one success used 8 026; Haiku answers the same
+# ~2 600-token input in 360–524). The role is not time-critical ⇒ 4× the limit; the
+# timeout covers 32 768 tokens at ≥ 68 tok/s (measured 120–160). The call is
+# synchronous in the trade-close path (reward/recorder.py instinct_hook): a slow
+# call only delays the next cycle. M3's output ceiling is undocumented (1 M context).
+_M3_INSTINCT = RoleSpec(provider="minimax", model="MiniMax-M3", max_tokens=32_768, timeout_s=480.0)
 
 LLM_PROFILES: dict[str, dict[str, RoleSpec]] = {
     "anthropic": {role: _ANTHROPIC for role in LLM_ROLES},
     "research_m3": {**{role: _ANTHROPIC for role in LLM_ROLES}, "research": _M3},
-    "all_m3": {role: _M3 for role in LLM_ROLES},
+    "all_m3": {**{role: _M3 for role in LLM_ROLES}, "instinct": _M3_INSTINCT},
 }
 
 
