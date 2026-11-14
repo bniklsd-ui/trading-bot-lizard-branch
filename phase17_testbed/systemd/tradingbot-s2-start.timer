@@ -1,0 +1,16 @@
+[Unit]
+Description=Phase-17 -S2 start timer (D1 morning 07:30 Berlin)
+Documentation=file:///home/trading-bot/trading-bot/phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md
+
+[Timer]
+# D1 = Mo 2026-11-16: the scheduler start must lie BEFORE 09:00 Berlin so D1 is a
+# full trading day after the start and the start line sits inside [D1, D2]
+# (K7-v5, fail-closed). The script refuses after 08:55 or on any other day —
+# so the Persistent= catch-up below can never start a void window.
+OnCalendar=2026-11-16 07:30:00 Europe/Berlin
+Persistent=true
+AccuracySec=1min
+Unit=tradingbot-s2-start.service
+
+[Install]
+WantedBy=timers.target

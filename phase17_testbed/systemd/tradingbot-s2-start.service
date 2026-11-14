@@ -1,0 +1,13 @@
+[Unit]
+Description=Phase-17 -S2 start (one-shot: release hold + start the scheduler, Mon 2026-11-16 before 08:55 Berlin)
+Documentation=file:///home/trading-bot/trading-bot/phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md
+# Same keyring dependency as the bot units and the E-3 deploy: the pre-flight
+# reads the Secret Service (presence only, never writes).
+After=graphical-session.target gnome-keyring-daemon.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/trading-bot/trading-bot
+ExecStart=/usr/bin/bash /home/trading-bot/trading-bot/scripts/s2_start.sh
+StandardOutput=journal
+StandardError=journal
