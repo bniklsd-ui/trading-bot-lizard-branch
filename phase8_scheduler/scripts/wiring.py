@@ -535,6 +535,11 @@ def _debate_config(llm_profile: str) -> Any:
         "model_bull": spec.model,
         "model_bear": spec.model,
         "model_judge": spec.model,
+        # Phase 17 §26.2 G2 (Generalprobe 2026-11-13, Nikinger 2026-11-14): the
+        # Phase-6 120-s wall-clock cap is calibrated for Haiku/Sonnet (15–25 s per
+        # debate); M3 thinks — median ≈ 45 s, p90 ≈ 110 s, 2 of 24 debates aborted.
+        # Only the wall clock moves; the token/call caps stay Phase-6 defaults.
+        "wall_clock_timeout_s": 240.0,
     }
     if spec.max_tokens is not None:
         updates["max_tokens_agent"] = spec.max_tokens
