@@ -7,6 +7,57 @@ carries at most one `## Session stopped` block; archives have no size cap. See
 
 ---
 
+## Session stopped — 2026-11-12 (Exec-Session #21, Ausführer in OpenCode / MiniMax-M3: **Block F gebaut** — F-1 K12 im Report (P16) · F-2 Eingabe-Rekorder (P8) · F-3 Flip 2 `all_m3` (P8); Σ 2061 → **2069**, 16/16 grün; Bot 18:47:48 mit `llm_profile=all_m3` neu gestartet ⇒ Generalprobe Fr 11-13; **Review durch Claude Code steht aus**)
+
+> **Auftrag:** Nikinger 2026-11-12 (Phase-17-Exec-Auftrag): Plan §26 (Block F) bauen — Bau = Ausführer, Review = Claude Code; Generalprobe-Weg G bestätigt (2026-11-12 17:05).
+> **Betrieb:** Der Nikinger hatte den Bot **vor** dieser Session gestoppt (`data/state/SCHEDULER_HELD` 18:21:14, Stopp 18:24:02 „scheduler daemon stopped cleanly"). Code wurde im gestoppten Zustand gebaut; danach Hold gelöst, Bot 18:47:48 neu gestartet (Start-Zeile `llm_profile=all_m3`). **Kein Eingriff in Gates/VETOs/Order-Pfad**, kein Keyring-Write, kein Schreiben in `data/` außer durch den Bot selbst (Rekorder-Datei).
+
+### Completed
+
+| # | Commit | Inhalt |
+|---|---|---|
+| 1 | `6e8ec57` | **F-1 — K12 „LLM-Verfügbarkeit" im Report** (P16, `phase16_activation/scripts/autonomy_report.py`): neuer Evaluator `evaluate_k12` + `--expect-no-capped-calls`. Regeln je Berlin-Handelstag: (a) ≥ 1 Research-ok-Ereignis (kein Vakuum-PASS), (b) keine Serie ≥ 3 aufeinanderfolgender LLM-Ausfälle in Log-Reihenfolge, (c) LLM-Ausfälle ≤ 10 % der LLM-Ereignisse, (d) nur mit Flag: 0 Nicht-Ausnahme-Calls im Fenster (Rollen-Leck). Ereignis-Taxonomie nach Plan §26 F-1 — `debate fail-closed (DebateError)` ist ein **Datenpfad**-Fehler: gezählt und berichtet, aber weder LLM-Ereignis noch Ausfall. **P16 23 → 28 (+5)**, Negativ-Beweis: mit dem pre-F-1-Code sind genau die 5 neuen Tests rot, die 23 Bestandstests grün. `--prereg v4` unverändert (Kriterienmenge {1..8}, Verdikte identisch) |
+| 2 | `7f8bd83` | **F-2 — Eingabe-Rekorder** (P8, `phase8_scheduler/scripts/wiring.py`): `_record_llm_io(client, path, role)` wickelt `ask_candidate` **auf der Instanz** (bewusst kein Proxy — Phase 6 setzt `client.model` je Rolle auf genau diesem Objekt) und schreibt je Call eine JSONL-Zeile nach `data/state/llm_io.jsonl`: `ts` · `role` · `model`/`temperature` **zum Aufrufzeitpunkt** · `system` · `user` · `json_schema` · `answer`/`error` · `usage` · `finish_reason`. Fail-soft: Original-Call unverändert, Exception unverändert durchgereicht, Schreibfehler bricht den Call nie und loggt **genau einmal je Prozess** `critical`. Angewendet auf Debatten- und Research-Client. **P8 299 → 302 (+3)** |
+| 3 | `54a45d9` | **F-3 — Flip 2**: `config.py:149` `llm_profile` = `"research_m3"` → **`"all_m3"`** (Kommentar nachgezogen), 2 Pins in `test_config.py` verschärft (keine neue Testzahl). Rollback = eine Zeile. `check_llm_profile("all_m3")` offline grün (alle 6 Rollen → minimax/`MiniMax-M3`) |
+| 4 | `ec9335a` | `.gitignore`: `data/state/llm_io.jsonl` (die `.gitignore` listet `data/state/*` Datei für Datei — ohne die Zeile wäre die Rekorder-Ausgabe ein `git add -A` davon entfernt, committet zu werden) |
+| 5 | `b89af96` + `4d29d4e` | Doku-Commit + **Mid-Plan-Fix** (vom Nikinger bewusst so entschieden): der zustandsabhängige Root-Test `test_scheduler_hold.py::test_restart_start_would_start_scheduler_without_hold` sieht jetzt eine Fake-`pgrep` ⇒ hermetisch gegen laufende Prozesse (Negativ-Beweis: ohne sie genau dieser Test rot). Root 141/141 grün bei laufendem Bot |
+| 6 | (dieser Commit) | Doku: Phasenkopf (dieser Block + Rotation #20 → `SESSIONS_ARCHIVE.md`) · P8- und P16-Kopf (🔁-Notizen) · Plan §26 Ausführungs-Nachtrag · INDEX · Root-`CLAUDE.md` |
+
+### Next
+
+| # | Wann | Was | Wer |
+|---|---|---|---|
+| 1 | **Fr 2026-11-13, 09:00–17:30** | **Generalprobe** (unregistriert, kein Eingriff). Zu messen: je Rolle ≥ 1 Call auf M3? `DebateBudgetExceeded`/`DebateLLMError`? `claude-*`-Records? `llm_io.jsonl` gefüllt? Zykluslänge? K12 trocken über den Freitag? | — |
+| 2 | **Fr 2026-11-13, 17:35** | `--hold` + Stopp + Gegenprobe (vorher 0 offene Positionen prüfen) — der **Nikinger-Operator-Schritt** (eurofleet-Notiz §2) | Nikinger |
+| 3 | **Fr 2026-11-13 abends** | **Review** (Muster AK22) der Commits F-1/F-2/F-3 + Auswertung der Generalprobe in Claude Code | Claude Code |
+| 4 | **Sa 11-14 / So 11-15** | Fixes aus Review oder Probe (Ausführer) → Re-Review der Stellen → `PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` (Inhalt Plan §26 F-26g) → **T23-Freigabe** → **Push** (Nikinger-Entscheidung 2026-11-12: die 7 Commits dieser Session bleiben bis hier lokal — `origin/main` ist 7 Commits hinterher). **Alles bis So 11-15 abends.** eurofleet-Wochenlauf Sa: Scheduler bleibt wegen `SCHEDULER_HELD` aus | Ausführer / Claude Code / Nikinger |
+| 5 | **Mo 11-16, 07:30–08:55** | Start wie oben; **Aktiv-Block vor 09:00 eintragen**; Day-0-Checks nach Plan §26 F-26f (Start-Zeile `all_m3` · 0 `preflight failed` · erster Rekorder-Datensatz · 0 `claude-*`-Records · vier Units `active`) | Nikinger + Session lesend |
+| 6 | Mo 11-16 / Di 11-17 | Fenster `-S2`. Keine Ausführer-Sitzung auf dem MiniMax-Key von D1 07:30 bis D2 18:00 | — |
+| 7 | Mi 11-18 | Journal-Export + Report (Befehl Plan §26 F-26g) → Auswertung → Offline-Review | Nikinger / Claude Code |
+
+### Open questions / blockers
+
+- **🔴 Die Debatten-Caps sind für Haiku/Sonnet kalibriert** (Plan §26 F-26b): unter `all_m3` gilt `max_tokens_agent/judge = 8192` (M3 denkt), die Caps bleiben aber `max_cumulative_output_tokens = 12 000` und `wall_clock_timeout_s = 120 s` je Debatte. Reißt einer, loggt die Debatte **fail-closed** (`DebateBudgetExceeded`) auf **WARNING** — für K5 unsichtbar, für K12 ein Ausfall. **Nicht vorab geändert** (Plan: „erst messen"); die Generalprobe misst es. Ein Fix wäre ein `dataclasses.replace` in `_debate_config` (P8) — **Nikinger-Entscheidung**.
+- **🟠 Lesson/Instinct/Reflect auf M3 sind nie gelaufen** (C-7-Smoke deckte nur das Research-Schema; der OpenAI-kompatible Client **erzwängt** das Schema nicht, er schreibt es als Anweisung in den System-Prompt). Schließt die Generalprobe keinen Trade, bleiben Lesson/Instinct ungeprüft ⇒ **K10-Risiko in `-S2`**.
+- **Review steht aus** (Claude Code, Muster AK22): Schwerpunkte = Rekorder fail-soft · K12 fail-closed/kein Vakuum-PASS · Flip-Pins · die 3 Commits sind noch **nicht gepusht** (Push = Nikinger bzw. Wochenende).
+- **AK8** (Re-Adoption live) und der **K9-Regex-Wortlaut** bleiben unbelegt. `tradingbot-e3-deploy.service` steht weiter auf `failed` (Timer feuert nicht erneut, N3).
+- **🟡 `tests/test_scheduler_hold.py::test_restart_start_would_start_scheduler_without_hold` ist
+  zustandsabhängig** (Befund dieser Session, **kein Code-Regressionsbefund**): `restart-services.sh
+  start --dry-run` prüft per pgrep, ob der Dienst schon läuft — solange der Scheduler läuft
+  (Generalprobe), meldet das Skript „already alive — skipping (refuse double-start)" statt
+  „would nohup", und der Test schlägt fehl. Der Test ist **nicht hermetisch** gegen die laufenden
+  Prozesse (sein Docstring verspricht nur den Schutz von `data/state`). **Gemessen:** grün bei
+  gestopptem Bot (der Σ-Sweep 2069 lief **vor** dem Neustart um 18:47:48), rot bei laufendem Bot.
+  **Nikinger-Entscheidung 2026-11-12: „jetzt fixen, aber bewusst als mid plan fix notieren"**
+  ⇒ geschlossen in `4d29d4e` (Fake-`pgrep` im `env`-Fixture des Root-Tests, 2 Zeilen; Negativ-Beweis:
+  ohne sie genau dieser Test rot). Root 141/141 grün **bei laufendem Bot**. Für den Start am
+  Mo 11-16 war der Befund **folgenlos**: das Deploy-Skript `scripts/e3_deploy.sh` führt **keine**
+  Tests aus.
+- **Advisor** war in dieser Session nicht verfügbar (kein Werkzeug im Harness) — die im Working-Style vorgesehenen Konsultationen (VERIFY-Mismatch, 2–3 Fehlversuche, Block-Abschluss) sind nicht erfolgt; ersatzweise: alle Plan-Anker live am Code nachgemessen, Negativ-Beweis je Teil, 16/16-Sweep.
+- **Σ 2069** selbst gemessen (16 Suites einzeln + root).
+
+---
+
 ## Session stopped — 2026-11-12 (Auswertungs-Session #20, Claude Code, 11-11 → 11-12: **Shakedown S1 ausgewertet — ❌ FAIL an K6** (D2: Anthropic-Budget um 17:19:13 erschöpft); K1/K2/K5/K7–K11 PASS; offizieller Report bestätigt; **Fix entschieden: Flip 2 `all_m3` + Eingabe-Rekorder + K12**; **Plan §26 (Block F) freigegeben**, **Generalprobe Fr 11-13 bestätigt**, Bau = Ausführer, Review = Claude Code (Fr abends, spätestens So 11-15); Mitteilung an eurofleet geschrieben; **gepusht**; doc-only, kein Bot-Code, Σ nicht neu gemessen)
 
 > **Auftrag:** Nikinger 2026-11-11: Plan §24 — Auswertung des Shakedowns; bei FAIL anhalten (Ursache + kleinster Fix, FAIL-Regel `-S2`).

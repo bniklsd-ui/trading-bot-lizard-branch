@@ -2807,3 +2807,21 @@ kein `e3_deploy.sh`-Fix und kein E-6 (beides nach `-S2`-PASS, §24 E-24e) · kei
   (Fr 09:00) — die Rekorder-Verdrahtung ist bis dahin **nicht** live belegt.
 - **Nicht getan (bewusst):** keine Cap-Änderung, kein Debatten-Cooldown, kein Opus-Call im
   Handelspfad, keine Prereg v5, kein `e3_deploy.sh`-Fix, kein E-6 — alles nach §26 F-26i.
+
+---
+
+## §26.2 Nachtrag 2026-11-14 — Generalprobe ausgewertet, Review F-1/F-2/F-3, Fixes G1 + G2 (Review-Session #22)
+
+> **Datierter Nachtrag zu §26** (F-26a…F-26i bleiben unverändert). Harness Claude Code / Anthropic /
+> Opus 5.5 (Max). Details, Messwerte und Belege: Phasenkopf, Abschnitt „Block F — Review (Muster
+> AK22) + Generalprobe-Auswertung".
+
+| Punkt | Ergebnis |
+|---|---|
+| Review F-1/F-2/F-3 (F-26d) | ✅ **0 blockierende Befunde**; Hinweise H5–H9 im Phasenkopf. Σ **2069** selbst gemessen (16/16, bei laufendem Bot) |
+| Generalprobe Fr 2026-11-13 (F-26e/F-26f) | alle 6 Rollen auf M3 gelaufen · 0 `claude-*`-Records (149 Calls / 414 279 Tokens) · Rekorder 123/123 Research- + Debatten-Calls · 5 Trades, 5 Lessons · **K12 trocken PASS** (3,1 % Ausfälle, Serie max 1) · Report-Trockenlauf: **K10 FAIL** (4 × `extractor returned ok=False`), K7 FAIL strukturell (Start-Zeile vor dem 1-Tages-Fenster), Rest PASS |
+| **G1** — Instinct-Rolle abgeschnitten | 4 von 5 Instinct-Calls `finish_reason=length` bei 8 192 (der Erfolg brauchte 8 026; Haiku: 360–524). **Nikinger 2026-11-14:** Token- und Timeout-Limit anheben („die Rolle ist nicht zeitkritisch, MiniMax-Tokens sind billig") ⇒ `all_m3["instinct"] = RoleSpec(minimax, MiniMax-M3, max_tokens=32 768, timeout_s=480)` (`llm_profiles.py` `_M3_INSTINCT`). Der Call läuft synchron im Close-Pfad (`reward/recorder.py:461`) — ein langsamer Call verzögert nur den nächsten Zyklus. M3-Output-Obergrenze in der Doku nicht beziffert (1 M Kontext) ⇒ **Smoke durch den Nikinger** vor `-S2` |
+| **G2** — Debatten-Wanduhr | 2 von 24 LLM-Debatten `DebateBudgetExceeded` bei 120 s (Median ≈ 45 s, p90 ≈ 110 s). **Nikinger 2026-11-14:** Wanduhr **240 s** ⇒ `_debate_config` setzt `wall_clock_timeout_s=240.0` für jedes Profil, das die Debatte verlagert; alle anderen Caps bleiben Phase-6-Default. ⚠ Folge-Befund: die längste Freitags-Debatte (9 Calls) erzeugte 10 096 Output-Tokens in 111 s — mit 240 s wird das Output-Cap **12 000** zum nächsten bindenden Cap für Mehr-Runden-Debatten (Entscheidung offen, Phasenkopf) |
+| G3 — Betrieb | Fr-Abend-Stopp fand nicht statt; eurofleet-Reboot Sa 00:23 startete den Scheduler ohne Hold neu. **Stopp mit `--hold` am Sa 2026-11-14 09:06–09:09 (Nikinger-Freigabe)**, `install_units.sh --check` exit 0 |
+| `-S2`-Vorregistrierung (F-26g) | Entwurf `phase17_testbed/PHASE17_SHAKEDOWN_PREREGISTRATION_S2.md` (`status: draft`) — Inhalt F-26g + gepinnte G1/G2-Werte; `locked` erst nach G1-Smoke-PASS + T23 |
+| Nicht geändert | kein Kriterium (F-26e-Disziplin), kein Cap außer der Wanduhr, keine Prereg v5, kein `e3_deploy.sh`-Fix, kein E-6 |

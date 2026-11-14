@@ -4,7 +4,7 @@ purpose: Mitteilung der Trading-Bot-Session an eurofyx-fleet (2026-11-12) — Er
 read-when: vor dem eurofleet-Wochenlauf Sa 2026-11-14; vor jedem Eingriff an VM 201 bis Di 2026-11-17 18:00; bei Fragen zur MiniMax-Last des Bots
 detail: L2
 up: ../INDEX.md
-updated: 2026-11-12 abends (§6 Nachtrag: Stopp und Neustart 18:47:48 mit `all_m3` erfolgt, Fix gebaut, Generalprobe Fr 11-13) | 2026-11-12 (Auswertungs-Session #20, Claude Code, im Auftrag des Nikingers)
+updated: 2026-11-14 (§7 Nachtrag: Fr-Stopp ausgefallen, Hold seit Sa 09:06, Generalprobe-Fixes) | 2026-11-12 abends (§6 Nachtrag: Stopp und Neustart 18:47:48 mit `all_m3` erfolgt, Fix gebaut, Generalprobe Fr 11-13) | 2026-11-12 (Auswertungs-Session #20, Claude Code, im Auftrag des Nikingers)
 ---
 
 # Trading-Bot → eurofleet: Stand und Zeitplan (2026-11-12)
@@ -78,3 +78,17 @@ geschrieben; der Nikinger entscheidet sie dann.
 - **Die Commits von heute Abend sind lokal**, `origin/main` liegt zurück. Der Push folgt nach dem Review am
   Wochenende — vor dem Start am Montag.
 
+
+## 7 Nachtrag 2026-11-14 (Sa, von der Trading-Bot-Session gemessen)
+
+- **Der Fr-Abend-Stopp aus §2 hat nicht stattgefunden** — kein Fehler von eurofleet. Weil `SCHEDULER_HELD`
+  fehlte, startete der Scheduler nach dem Reboot des Wochenlaufs (Sa 00:23) wieder (00:25:20). Markt zu,
+  keine offene Position, kein Schaden.
+- **Seit Sa 2026-11-14 09:06 liegt `data/state/SCHEDULER_HELD`**, der Scheduler ist gestoppt (`disabled`,
+  sauber beendet 09:09:54). Recorder, Discovery und WebUI laufen. Ab hier gilt §2 unverändert: Start
+  **Mo 11-16 07:30–08:55** durch den Operator, Fenster `-S2` **Mo 07:30 bis Di 18:00** ohne Reboot, ohne
+  Unit-Neustart und ohne Ausführer-Sitzung auf dem MiniMax-Key.
+- **Generalprobe ausgewertet:** zwei Grenzwerte für MiniMax-M3 angehoben (Instinct-Extraktion bis 32 768
+  Tokens / 480 s je Call, Debatte bis 240 s). Erwartete Mehrlast auf dem Key: wenige Instinct-Calls je
+  Handelstag (≤ 5) mit je bis zu 32 768 Ausgabe-Tokens — weiterhin unter einer Mio. Tokens je Tag
+  zusätzlich, also unkritisch nach §3.

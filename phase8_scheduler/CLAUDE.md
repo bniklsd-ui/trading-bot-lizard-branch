@@ -639,6 +639,28 @@ wiring.py:149` als Vorlage; `phase4_research/scripts/wiring.py:50`):
 >   Commits `7f8bd83` (F-2) · `54a45d9` (F-3) · `ec9335a` (`.gitignore`).
 >   `phase17_testbed/CLAUDE.md` Session-#21-Block. Σ 2061 → **2069** (16/16 grün).
 
+> 🔁 **Phase-17 (Prüfstand) G1 + G2 edit (2026-11-14, Review-Session #22 — Generalprobe-Fixes, code = source of truth):**
+> Die Generalprobe Fr 2026-11-13 (`all_m3`, unregistriert) fand zwei Kalibrierungen, die für
+> Haiku/Sonnet gesetzt waren; beide Fixes sind Nikinger-Entscheidungen vom 2026-11-14 (Plan §26.2):
+> - **G1 — Instinct-Rolle** (`scheduler/llm_profiles.py`): neues `_M3_INSTINCT = RoleSpec(minimax,
+>   MiniMax-M3, max_tokens=32_768, timeout_s=480.0)`, `all_m3["instinct"]` zeigt darauf; alle anderen
+>   Rollen bleiben `_M3` (8 192 / 90 s). Grund: 4 von 5 Instinct-Calls endeten mit
+>   `finish_reason=length` bei 8 192 (der eine Erfolg brauchte 8 026; Haiku beantwortet dieselbe
+>   Eingabe mit 360–524 Tokens — der Rest ist M3-Denken) ⇒ `extractor returned ok=False` ⇒ K10 FAIL an
+>   jedem CLOSE-Tag. Der Call läuft synchron im Close-Pfad (`phase7_reward/reward/recorder.py:461`):
+>   ein langsamer Call verzögert nur den nächsten Zyklus. `anthropic`/`research_m3` unverändert.
+> - **G2 — Debatten-Wanduhr** (`scripts/wiring.py` `_debate_config`): `wall_clock_timeout_s=240.0`
+>   für jedes Profil, das die Debatte verlagert (heute nur `all_m3`); Output-/Input-/Call-Caps bleiben
+>   Phase-6-Defaults (`phase6_debate/debate/models.py:139-144`). Grund: 2 von 24 M3-Debatten rissen
+>   die 120 s (Median ≈ 45 s, p90 ≈ 110 s; Anthropic 15–25 s).
+> - **+2 P8-Tests** (302 → **304**, `tests/test_wiring_llm_routing.py`):
+>   `test_debate_config_all_m3_raises_only_the_wall_clock_cap` ·
+>   `test_build_llm_all_m3_instinct_gets_room_to_think` (über `_build_llm` mit den echten
+>   Call-Site-Werten); der Anthropic-Pin prüft zusätzlich die unveränderte Wanduhr. Negativ-Beweis:
+>   mit dem Pre-Fix-Code genau die 2 neuen Tests rot. Startup-Check (`_check_llm_profile`) offline grün.
+> - Cross-Phase-Edit im Phase-17-Plan autorisiert (Plan §26.2, T13: Code in P8 ✓).
+>   `phase17_testbed/CLAUDE.md` Abschnitt „Block F — Review + Generalprobe" + Session-#22-Block.
+
 ---
 
 ---
