@@ -34,7 +34,8 @@ updated: 2026-11-14 (Review-Session #22 — Entwurf aus Plan §26 F-26g + den Ge
   an jedem CLOSE-Tag FAIL) — und **G2** — 2 von 24 Debatten rissen das 120-s-Wanduhr-Cap.
   **Fixes (Nikinger 2026-11-14):** G1 = Instinct-Rolle unter `all_m3` 32 768 Tokens / 480 s ·
   G2 = Debatten-Wanduhr 240 s + G2b = Debatten-Output-Cap 24 000 für Profile, die die Debatte
-  verlagern. Kein Kriterium geändert
+  verlagern. **G1-Smoke PASS** (2026-11-14 12:29, Bot-Verdrahtung): 5 Instincts, `finish_reason=stop`,
+  7 798 Output-Tokens, 49,2 s — dieselbe Eingabe, die am Fr bei 8 192 abgeschnitten wurde. Kein Kriterium geändert
   (F-26e: „Befunde der Generalprobe dürfen nur Code-Fixes auslösen").
 
 ## BLUF
@@ -94,7 +95,7 @@ Alle Regeln sind die **Code-Regeln** des Reports (`phase16_activation/scripts/au
 - **Judge-Freigabequote je Tag** (Vergleich: S1 unter Sonnet 5/16 · 2/70 · 5/17; Generalprobe unter M3 5/22).
 - **MiniMax-Calls und -Tokens je Tag** (aus K6 `exempt_calls_per_day` / `exempt_tokens_per_day`).
 - **Abbrüche je Tag:** `DebateError` (Datenpfad) · `DebateBudgetExceeded` (Wanduhr/Token, in K12 `debate_failed`).
-- **Instinct-Calls je Tag:** Anzahl, max. Output-Tokens (Abstand zum 32 768-Limit aus G1), Dauer.
+- **Instinct-Calls je Tag:** Anzahl, max. Output-Tokens (Abstand zum 32 768-Limit aus G1; Smoke-Referenz 7 798, Fr 8 026 / 4 × ≥ 8 192), Dauer. Ein `finish_reason=length` unter 32 768 wäre eine stille Kappung durch MiniMax.
 - **Offline-Review** in Claude Code (Opus, Pro-Plan, manuell — **kein** API-Call des Bots): Stichprobe =
   alle Debatten mit `TRADE` + jede fünfte übrige in Dateireihenfolge aus `data/state/debate_log.json`,
   Eingaben aus `data/state/llm_io.jsonl`; berichtet werden Übereinstimmung Reviewer/Judge und Fälle
